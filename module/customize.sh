@@ -50,6 +50,10 @@ lc_install_module() {
   rm -f "$LC_INSTALL_BOOTSTRAP" "$UPGRADE_BOOTSTRAP" "$COMPAT_BOOTSTRAP"
   ui_print ""
   ui_print "安装完成。请重启设备，再从管理器打开 WebUI。"
+  if [ -f /data/local/tmp/luma_curve.paused ]; then
+    ui_print "检测到此前保留的暂停状态：重启后引擎不会自动启动。"
+    ui_print "需要运行时，请在 WebUI 设置页点「恢复」，无需再次安装。"
+  fi
   if [ -r "$MODPATH/framework-broker.jar" ]; then
     ui_print "当前是 HyperOS 4 本地体验构建，框架引擎会在重启后接管。"
     ui_print "此内核尚未推送 GitHub；管理器更新源不会提供它。"

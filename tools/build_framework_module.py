@@ -52,7 +52,7 @@ info={'local_only':True,'published':False,'build':'20260930-framework-local05',
       'daemon_sha256':sha(binary),'jar_sha256':sha(stage/'framework-broker.jar'),
       'source_sha256':{p.relative_to(ROOT).as_posix():sha(p) for p in sources+sorted((ROOT/'csrc').glob('*.h'))}}
 (stage/'local-build-info.json').write_text(json.dumps(info,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
-target=ROOT/'dist/luma_curve-1.0.0-local-framework-fix04.zip';target.parent.mkdir(exist_ok=True)
+target=ROOT/'dist/luma_curve-1.0.0-local-framework-fix05.zip';target.parent.mkdir(exist_ok=True)
 with zipfile.ZipFile(target,'w',zipfile.ZIP_DEFLATED) as archive:
  for source in sorted(stage.rglob('*')):
   if not source.is_file():continue

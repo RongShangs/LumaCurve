@@ -235,6 +235,7 @@ async function main() {
           else stdout='Starting: Intent';
         }
         else if(command.endsWith('core-status')) stdout=f.coreStatus || (f.paused?'paused':'running');
+        else if(command.includes('then printf paused; else printf active; fi')) stdout=f.paused?'paused':'active';
         else if(command.startsWith('sh ')) {
           if(f.failControl) {errno=1;stderr='控制脚本失败';}
           else {
@@ -496,6 +497,10 @@ async function main() {
     assert.equal(await connected.locator('#raw-dot').getAttribute('visibility'),'hidden');
     assert.equal(await connected.locator('#response-target').getAttribute('visibility'),'hidden');
     assert.equal(await connected.locator('#output-wire').getAttribute('data-active'),'false');
+    await connected.evaluate(()=>fixture.paused=true);
+    await connected.waitForFunction(()=>document.getElementById('connection').textContent==='已暂停');
+    assert.match(await connected.locator('#explanation').innerText(),/设置页恢复引擎/);
+    await connected.evaluate(()=>fixture.paused=false);
     await connected.evaluate(()=>fixture.failState=false);
     await connected.click('#nav-tools');
     await connected.waitForFunction(()=>document.getElementById('log').textContent.includes('正常日志'));

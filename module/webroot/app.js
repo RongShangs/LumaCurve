@@ -352,7 +352,7 @@
     renderScene(s, stale);
     $('diagnostics').textContent = stateText || '暂无原始状态';
   }
-  function unavailable(error) {
+  function unavailable(error, paused) {
     stateText = ''; lastState = null; history = []; historyStamp = '';
     $('engine-scene').setAttribute('data-idle', 'true'); $('engine-scene').style.removeProperty('--display-fill'); $('engine-scene').style.removeProperty('--display-ink');
     document.querySelectorAll('.signal-wire').forEach(function (wire) { wire.setAttribute('data-active', 'false'); wire.setAttribute('data-blocked', 'false'); });
@@ -364,9 +364,9 @@
     $('response-target').setAttribute('visibility', 'hidden'); $('response-current').setAttribute('visibility', 'hidden'); $('target-marker').hidden = true;
     $('raw-dot').setAttribute('visibility', 'hidden'); $('smooth-dot').setAttribute('visibility', 'hidden');
     $('raw-trend').setAttribute('points', ''); $('smooth-trend').setAttribute('points', ''); set('trend-scale', '等待新照度数据');
-    set('connection', device ? '状态不可用' : '未连接设备'); $('connection').className = 'badge warn';
-    set('scene-heading', device ? '等待连接引擎' : '未连接设备');
-    set('explanation', device ? '无法读取状态。请确认模块已启动，页面会自动重试。' : '请从模块管理器打开 WebUI。浏览器中可查看界面示例。');
+    set('connection', paused ? '已暂停' : device ? '状态不可用' : '未连接设备'); $('connection').className = 'badge warn';
+    set('scene-heading', paused ? '自动调节已暂停' : device ? '等待连接引擎' : '未连接设备');
+    set('explanation', paused ? '模块保留了此前的暂停状态。请在设置页恢复引擎。' : device ? '无法读取状态。请确认模块已启动，页面会自动重试。' : '请从模块管理器打开 WebUI。浏览器中可查看界面示例。');
     set('state-age', '未读取到有效状态');
     ['brightness', 'target', 'lux', 'smooth', 'mode', 'owner', 'sunlight', 'thermal', 'transition', 'sampling', 'flow-target', 'flow-current', 'sensor-health', 'sensor-source', 'sensor-age', 'front-lux', 'back-lux', 'front-age', 'back-age', 'sensor-interval', 'loop-interval', 'device-temperature', 'device-battery', 'write-permission', 'target-confirmation'].forEach(function (id) { set(id, '—'); });
     set('flow-relation', '等待环境光和背光数据…');
@@ -381,7 +381,11 @@
     return exec(watch + 'cat ' + quote(BASE + '_state') + ' && printf "\\n_ui_paused=" && if [ -f ' + quote(BASE + '.paused') + ' ]; then printf 1; else printf 0; fi').then(function (text) {
       var s = parse(text); if (!s.mode || s.current_br === undefined) throw new Error('状态内容不完整');
       stateText = text; renderState(s);
-    }).catch(function (e) { unavailable(e.message); }).finally(function () { stateBusy = false; });
+    }).catch(function (e) {
+      return exec('if [ -f ' + quote(BASE + '.paused') + ' ]; then printf paused; else printf active; fi').then(function (status) {
+        unavailable(e.message, status.trim() === 'paused');
+      }).catch(function () { unavailable(e.message); });
+    }).finally(function () { stateBusy = false; });
   }
   function parseCurve(text) {
     var values = typeof text === 'string' ? text.split(',').map(Number) : [];
