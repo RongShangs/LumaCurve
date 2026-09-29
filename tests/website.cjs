@@ -18,7 +18,7 @@ async function main(){
   await page.locator('#demo-lux').fill('1000');assert.match(await page.locator('#demo-output').innerText(),/100,000 lux · 85.00%/);checks.push('Curve demo uses 201 complete samples and truthful default endpoints');
   for(const width of [360,390,768,1440]){await page.setViewportSize({width,height:900});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));}checks.push('No horizontal overflow on four phone/tablet/desktop sizes');
   const localLinks=await page.locator('[href],[src]').evaluateAll(nodes=>nodes.map(n=>n.getAttribute('href')||n.getAttribute('src')).filter(s=>s&&!s.startsWith('#')&&!s.startsWith('https://')));
-  for(const target of localLinks)assert.ok(fs.existsSync(path.resolve(site,target)),target);checks.push('Every local asset, license and module/source download resolves');
+  for(const target of localLinks){assert.ok(fs.existsSync(path.resolve(site,target)),target);assert.ok(fs.existsSync(path.resolve(root,'website',target)),'repository website missing '+target);}checks.push('Both website and web directories contain every local asset, license and module/source download');
   assert.equal(await page.locator('.hero .actions a').first().getAttribute('href'),'#download');
   await page.locator('.hero .actions a').first().click();
   await page.waitForFunction(()=>{const box=document.getElementById('download').getBoundingClientRect();return location.hash==='#download'&&box.top<innerHeight&&box.bottom>0;});checks.push('Hero download button navigates to the visible download section');
@@ -31,12 +31,12 @@ async function main(){
     }
   }checks.push('Real browser downloads from both module/source buttons complete with matching bytes');
   const sums=fs.readFileSync(path.join(site,'downloads/SHA256SUMS.txt'),'utf8');
-  for(const line of sums.trim().split(/\r?\n/)){const [digest,name]=line.split('  ');assert.equal(crypto.createHash('sha256').update(fs.readFileSync(path.join(site,'downloads',name))).digest('hex'),digest);assert.equal(digest,crypto.createHash('sha256').update(fs.readFileSync(path.join(root,'dist',name))).digest('hex'));}checks.push('Website module/source downloads match dist and SHA-256');
+  for(const line of sums.trim().split(/\r?\n/)){const [digest,name]=line.split('  ');for(const folder of [path.join(site,'downloads'),path.join(root,'website/downloads'),path.join(root,'dist')])assert.equal(crypto.createHash('sha256').update(fs.readFileSync(path.join(folder,name))).digest('hex'),digest);}checks.push('Both deploy directories contain module/source downloads matching dist and SHA-256');
   assert.equal(await page.locator('script[src^="http"]').count(),0);assert.equal(await page.locator('link[href^="http"][rel="stylesheet"]').count(),0);checks.push('No network JS, CSS, fonts, frameworks or device bridge');
   await page.setViewportSize({width:1440,height:1000});await page.screenshot({path:path.join(root,'build/website-desktop.png'),fullPage:true});
   await page.setViewportSize({width:390,height:844});await page.locator('#demo-lux').fill('401');await page.screenshot({path:path.join(root,'build/website-mobile.png'),fullPage:true});
   assert.deepEqual(errors,[]);checks.push('Desktop/mobile screenshots rendered without JavaScript errors');
-  const source_sha256={};for(const name of ['website/index.html','website/assets/site.css','website/assets/site.js','website/assets/icon.svg','website/assets/curve_math.js','tools/sync_website.py','tests/website.cjs'])source_sha256[name]=crypto.createHash('sha256').update(fs.readFileSync(path.join(root,name))).digest('hex');
+  const source_sha256={};for(const name of ['website/index.html','website/assets/site.css','website/assets/site.js','website/assets/icon.svg','website/assets/curve_math.js','tools/sync_website.py','tools/package_source.py','tests/website.cjs'])source_sha256[name]=crypto.createHash('sha256').update(fs.readFileSync(path.join(root,name))).digest('hex');
   fs.writeFileSync(path.join(root,'build/website-verification.json'),JSON.stringify({ok:true,checks,source_sha256,website:site,hosted:false},null,2));console.log(JSON.stringify({ok:true,checks:checks.length}));
  }finally{await browser.close();}
 }

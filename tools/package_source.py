@@ -9,6 +9,8 @@ excluded={'build','dist','__pycache__','.git'}
 with zipfile.ZipFile(archive,'w',zipfile.ZIP_DEFLATED) as z:
     for path in sorted(ROOT.rglob('*')):
         relative=path.relative_to(ROOT)
+        # The published source ZIP must not embed its own website download copy.
+        if relative.parts[:2]==('website','downloads'):continue
         if not path.is_file() or any(p in excluded for p in relative.parts) or path.suffix=='.pyc':continue
         z.write(path,relative.as_posix())
 print(archive)

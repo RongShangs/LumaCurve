@@ -1,0 +1,2 @@
+39a103ec383dbaf0a73f61bfd1c4988d68fee8fb03c9bce7c2ec0db790374657  luma_curve-1.0.0.zip
+55f3e64e73f43f4cca7ca22b89c8c1fd08e3b4a7cbc4d0700eff9a4009e2287d  LumaCurve-1.0.0-source.zip
