@@ -21,10 +21,19 @@ public final class LumaFrameworkProbe {
             Arrays.sort(methods, Comparator.comparing(Method::toString));
             for (Method method : methods) {
                 String name = method.getName().toLowerCase(Locale.ROOT);
-                if (name.contains("bright") || name.contains("ramp") || name.contains("lux"))
+                if (name.contains("bright") || name.contains("ramp") || name.contains("lux") ||
+                    name.contains("animat") || name.contains("sensor") || name.contains("mode"))
                     System.out.println("METHOD " + method.toString());
             }
         } catch (Throwable error) { System.out.println("METHODS_UNAVAILABLE " + error); }
+    }
+    static void values(Object object) {
+        if (object == null) { System.out.println("FIELDS null"); return; }
+        for (Field field : object.getClass().getFields()) {
+            if (Modifier.isStatic(field.getModifiers())) continue;
+            try { System.out.println("VALUE " + field.getName() + "=" + field.get(object)); }
+            catch (Throwable error) { System.out.println("FIELD_UNAVAILABLE " + field.getName() + " " + error); }
+        }
     }
     static String file(String path) {
         try (BufferedReader in = new BufferedReader(new FileReader(path))) {
@@ -153,7 +162,7 @@ public final class LumaFrameworkProbe {
         System.out.println("result=control_calls_completed (not proof of stable physical brightness)");
     }
     static void inspect() throws Exception {
-        System.out.println("probe_build=20260929-framework01");
+        System.out.println("probe_build=20260929-framework02");
         System.out.println("uid="+invoke(Class.forName("android.os.Process"),"myUid",new Class<?>[0]));
         for (String name:new String[]{"android.hardware.display.DisplayManagerGlobal","android.hardware.display.IDisplayManager",
                                     "android.view.SurfaceControl"}) {
@@ -163,6 +172,7 @@ public final class LumaFrameworkProbe {
             AndroidBridge bridge=new AndroidBridge();
             System.out.println("DISPLAY0 "+invoke(bridge.global,"getDisplayInfo",new Class<?>[]{int.class},0));
             System.out.println("BRIGHTNESS_INFO "+bridge.info());
+            values(bridge.info());
             System.out.println("BRIGHTNESS_SETTING "+bridge.brightness());
             try { System.out.println("SYSTEM_MODE "+bridge.mode()); }
             catch (Throwable error) { System.out.println("SETTINGS_UNAVAILABLE "+error); }
@@ -175,6 +185,14 @@ public final class LumaFrameworkProbe {
             for (String name:new String[]{"com.android.server.display.DisplayPowerController",
                                          "com.android.server.display.AutomaticBrightnessController",
                                          "com.android.server.display.RampAnimator",
+                                         "com.android.server.display.MiuiRampAnimator",
+                                         "com.android.server.display.DisplayPowerControllerImpl",
+                                         "com.android.server.display.AutomaticBrightnessControllerImpl",
+                                         "com.android.server.display.DualSensorPolicy",
+                                         "com.android.server.display.MiuiBrightnessUtilsImpl",
+                                         "com.android.server.display.MiuiPhysicalBrightnessMappingStrategy",
+                                         "com.android.server.display.ThermalBrightnessController",
+                                         "com.android.server.display.ManualMaxBrightnessController",
                                          "com.android.server.display.brightness.strategy.AutomaticBrightnessStrategy",
                                          "com.android.server.display.brightness.strategy.AutomaticBrightnessStrategy2"}) {
                 try { methods(Class.forName(name,false,services)); }
