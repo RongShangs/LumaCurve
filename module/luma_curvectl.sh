@@ -8,10 +8,18 @@ LOG_FILE=/data/local/tmp/luma_curve.log
 CMD_FILE=/data/local/tmp/luma_curve_cmd
 PAUSE_FILE=/data/local/tmp/luma_curve.paused
 UPGRADE_HELPER="$MODDIR/upgrade_data.sh"
-LOG_RETENTION_DEFAULT_DAYS=7
+LOG_RETENTION_DEFAULT_DAYS=3
 LOG_RETENTION_MAX_DAYS=30
 LOG_MAX_BACKUPS_DEFAULT=2
 LOG_MAX_BACKUPS_LIMIT=10
+
+if [ "$1" = current-log ]; then
+  [ "$#" -eq 1 ] || exit 1
+  current_boot_id=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null) || exit 1
+  [ -n "$current_boot_id" ] || exit 1
+  sh "$MODDIR/current_boot_log.sh" "$LOG_FILE" "$current_boot_id"
+  exit $?
+fi
 
 [ ! -r "$MODDIR/core_status.sh" ] || . "$MODDIR/core_status.sh"
 trap 'lc_core_description_refresh >/dev/null 2>&1 || :' 0

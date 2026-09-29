@@ -10,7 +10,7 @@ PAUSE_FILE=/data/local/tmp/luma_curve.paused
 STATE_FILE=/data/local/tmp/luma_curve_state
 UPGRADE_HELPER="$MODDIR/upgrade_data.sh"
 IOS_CONF_VERSION=11
-LOG_RETENTION_DEFAULT_DAYS=7
+LOG_RETENTION_DEFAULT_DAYS=3
 LOG_RETENTION_MAX_DAYS=30
 LOG_MAX_BYTES_DEFAULT=1048576
 LOG_MAX_BACKUPS_DEFAULT=2
@@ -26,6 +26,16 @@ lc_core_description_refresh || :
 
 log_msg() {
   printf '[%s] [LumaCurve服务] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$1" >> "$LOG_FILE"
+}
+
+mark_boot_log() {
+  boot_id=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null) || return 1
+  [ -n "$boot_id" ] || return 1
+  marker_file="${LOG_FILE}.boot_id"
+  [ "$(cat "$marker_file" 2>/dev/null)" = "$boot_id" ] && return 0
+  printf '[%s] [LumaCurve服务] 本次开机日志开始 LUMA_BOOT_ID=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$boot_id" >> "$LOG_FILE" || return 1
+  printf '%s\n' "$boot_id" > "$marker_file" || return 1
+  chmod 0600 "$marker_file" 2>/dev/null || :
 }
 
 wait_boot_complete() {
@@ -347,6 +357,7 @@ sync_runtime_config() {
 
 mkdir -p "$(dirname "$LOG_FILE")"
 touch "$LOG_FILE"
+mark_boot_log || log_msg "未能标记本次开机日志"
 sync_runtime_config || exit 0
 ensure_runtime_log_config
 ios_live_refresh_if_changed service_start || log_msg "持久快照更新延后，稍后重试"

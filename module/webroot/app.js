@@ -26,7 +26,6 @@
   var learnedDraft = null;
   var curveDraft = window.LumaCurveMath.defaults.slice(), curveCustom = false, curvePointEditing = false;
   var presets = [], presetText = '', presetsReady = false, presetBusy = false;
-  var curveEditorNode = $('curve-title').closest('.curve-editor');
   var groups = [
     {title: '日常调节', hint: '优先调整速度，数值越大，变化越快。', open: true, fields: [
       ['indoor_stability', '场景自适应', '正面优先；双侧同向变化更快响应，单侧突变先确认。', 'bool'],
@@ -535,15 +534,9 @@
     updateField(f); markDirty(); renderCurveEditor(); $('setting-dialog').close();
   });
   function renderForm(data) {
-    if (curveEditorNode.parentNode) curveEditorNode.parentNode.removeChild(curveEditorNode);
     var container = $('config-fields'); container.textContent = '';
-    var learning = document.createElement('section'); learning.className = 'fields';
-    learning.innerHTML = '<div class="field"><div><label class="field-title" for="cfg-preference_learning">随手动调节学习曲线</label><span class="hint">默认开启，只缓慢微调当前照度附近的锚点；关闭后保留曲线。</span></div><input id="cfg-preference_learning" name="preference_learning" type="checkbox" aria-label="随手动调节学习曲线"></div>';
-    var oldLearning = curveEditorNode.querySelector('.learning-control'); if (oldLearning) oldLearning.remove();
-    learning.classList.add('learning-control'); curveEditorNode.insertBefore(learning, curveEditorNode.querySelector('.curve-legend'));
-    container.appendChild(curveEditorNode);
     inputFor('preference_learning').checked = String(data.preference_learning === undefined ? 1 : data.preference_learning) === '1';
-    inputFor('preference_learning').addEventListener('change', function () { markDirty(); refreshPreference(); });
+    inputFor('preference_learning').onchange = function () { markDirty(); refreshPreference(); };
     groups.forEach(function (group) {
       var section = document.createElement(group.open ? 'section' : 'details'); section.className = 'config-group';
       if (group.open) { var title = document.createElement('h2'); title.textContent = group.title; section.appendChild(title); var p = document.createElement('p'); p.className = 'caption'; p.textContent = group.hint; section.appendChild(p); }
@@ -680,10 +673,15 @@
     if (!device) { set('log', '浏览器预览不读取设备日志。'); return; }
     var box = $('log'), follow = forceBottom === true || box.scrollHeight - box.scrollTop - box.clientHeight < 48;
     var previous = box.scrollTop;
-    exec('tail -n 150 ' + quote(BASE + '.log')).then(function (text) { logText = text; set('log', text || '暂无日志'); box.scrollTop = follow ? box.scrollHeight : previous; $('copy-log').disabled = !text; }).catch(function (e) { logText = ''; $('copy-log').disabled = true; set('log', '读取失败：' + e.message); });
+    exec('sh ' + quote(CTL) + ' current-log').then(function (text) {
+      logText = text;
+      var lines = text.trimEnd().split('\n');
+      set('log', text ? lines.slice(-150).join('\n') : '暂无本次开机日志');
+      box.scrollTop = follow ? box.scrollHeight : previous; $('copy-log').disabled = !text;
+    }).catch(function (e) { logText = ''; $('copy-log').disabled = true; set('log', '读取失败：' + e.message); });
   }
   function syncLogDays(value) {
-    var number = Number(value === undefined ? 7 : value); if (!Number.isInteger(number) || number < 0 || number > 30) number = 7;
+    var number = Number(value === undefined ? 3 : value); if (!Number.isInteger(number) || number < 0 || number > 30) number = 3;
     var option = Array.from($('log-days').options).find(function (o) { return o.value === String(number); });
     if (!option) { option = document.createElement('option'); option.value = number; option.textContent = number + ' 天'; $('log-days').appendChild(option); }
     $('log-days').value = String(number);
@@ -714,6 +712,9 @@
   window.addEventListener('resize', syncStatusLayout);
   $('show-readings').addEventListener('click', function () { $('readings-dialog').showModal(); });
   $('close-readings').addEventListener('click', function () { $('readings-dialog').close(); });
+  $('open-curve-editor').addEventListener('click', function () { $('curve-dialog').showModal(); renderCurveEditor(); });
+  $('close-curve-editor').addEventListener('click', function () { $('curve-dialog').close(); });
+  $('copy-qq-group').addEventListener('click', function () { copyText('314981836', 'QQ群号'); });
   $('refresh-diagnostics').addEventListener('click', pollState); $('refresh-log').addEventListener('click', loadLog);
   $('settings-form').addEventListener('submit', saveConfig);
   $('reload-config').addEventListener('click', function () { if ($('dirty-status').textContent === '有未保存的修改' && !confirm('重新读取会丢弃未保存的修改，继续吗？')) return; readConfig(); });
@@ -727,7 +728,7 @@
     var filename = 'LumaCurve-' + new Date().toISOString().replace(/[:.]/g, '-') + '-' + Math.random().toString(36).slice(2, 7) + '.log';
     var command = 'umask 022; user_id=$(am get-current-user) || exit 1; case "$user_id" in ""|*[!0-9]*) exit 1;; esac; ' +
       'directory="/storage/emulated/$user_id/Download"; mkdir -p "$directory" && destination="$directory/"' + quote(filename) + ' && ' +
-      '(set -C; cat ' + quote(BASE + '.log') + ' > "$destination") && chmod 0644 "$destination" && printf %s "$destination"';
+      '(set -C; sh ' + quote(CTL) + ' current-log > "$destination") && chmod 0644 "$destination" && printf %s "$destination"';
     exec(command).then(function (path) { set('export-status', '已导出：' + path.trim()); toast('日志已保存到下载目录'); })
       .catch(function (error) { set('export-status', '导出失败：' + error.message); }).finally(function () { exportBusy = false; syncButtons(); });
   });

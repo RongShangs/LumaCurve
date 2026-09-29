@@ -43,7 +43,7 @@ for source in corresponding:
  destination=stage/'source'/source.relative_to(ROOT)
  destination.parent.mkdir(parents=True,exist_ok=True)
  shutil.copy2(source,destination)
-info={'local_only':True,'published':False,'build':'20260930-framework-hold01',
+info={'local_only':True,'published':False,'build':'20260930-framework-hold01-ui01',
       'firmware_framework_sha256':'1d2bf53f6c2684103dadbeef0d2665a7f033b7746a75f3e7404145dd999600fd',
       'firmware_services_sha256':'ac53add4b7f559780affd6c7a614f405cefad18f2cb07cb769c7a1afbbae5c20',
       'panel_unique_id':'local:4630946949513469331','panel_codes_per_framework_float':17848,
@@ -52,7 +52,7 @@ info={'local_only':True,'published':False,'build':'20260930-framework-hold01',
       'daemon_sha256':sha(binary),'jar_sha256':sha(stage/'framework-broker.jar'),
       'source_sha256':{p.relative_to(ROOT).as_posix():sha(p) for p in sources+sorted((ROOT/'csrc').glob('*.h'))}}
 (stage/'local-build-info.json').write_text(json.dumps(info,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
-target=ROOT/'dist/luma_curve-1.0.0-local-framework-hold01.zip';target.parent.mkdir(exist_ok=True)
+target=ROOT/'dist/luma_curve-1.0.0-local-framework-hold01-ui01.zip';target.parent.mkdir(exist_ok=True)
 with zipfile.ZipFile(target,'w',zipfile.ZIP_DEFLATED) as archive:
  for source in sorted(stage.rglob('*')):
   if not source.is_file():continue
@@ -67,7 +67,7 @@ with zipfile.ZipFile(target) as archive:
  assert archive.read('system/bin/luma_curve_daemon')==binary.read_bytes()
  assert archive.read('module.prop').decode('utf-8').find('version=1.0.0')>=0
  assert b'updateJson=' not in archive.read('module.prop')
- assert all(name in archive.namelist() for name in ('LICENSE','customize.sh','service.sh','webroot/index.html',
+ assert all(name in archive.namelist() for name in ('LICENSE','customize.sh','service.sh','current_boot_log.sh','webroot/index.html',
     'META-INF/com/google/android/update-binary','source/csrc/main_business.c',
     'source/experimental/framework_output/LumaLegacyBacklightCoordinate.java'))
  image=archive.read('system/bin/luma_curve_daemon')

@@ -19,7 +19,7 @@ LIVE_BACKUP=$PERSIST_DIR/live
 BR_PATH=$(luma_backlight_path)
 MAX_BR_PATH=
 [ -z "$BR_PATH" ] || MAX_BR_PATH=${BR_PATH%/brightness}/max_brightness
-LOG_RETENTION_DEFAULT_DAYS=7
+LOG_RETENTION_DEFAULT_DAYS=3
 LOG_RETENTION_MAX_DAYS=30
 
 read_pid() {
