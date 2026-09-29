@@ -360,6 +360,8 @@ touch "$LOG_FILE"
 mark_boot_log || log_msg "未能标记本次开机日志"
 sync_runtime_config || exit 0
 ensure_runtime_log_config
+migration_result=$(sh "$MODDIR/migrate_log_retention.sh" "$CONF_FILE" /data/adb/luma_curve/log_retention_default_3) || log_msg "旧日志保留策略迁移延后"
+[ "$migration_result" != migrated ] || log_msg "旧默认日志保留时间已调整为 3 天"
 ios_live_refresh_if_changed service_start || log_msg "持久快照更新延后，稍后重试"
 maintain_logs
 trap 'lc_core_description_refresh || :; log_msg "服务正在停止"; exit 0' INT TERM

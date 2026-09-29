@@ -67,7 +67,7 @@ with zipfile.ZipFile(target) as archive:
  assert archive.read('system/bin/luma_curve_daemon')==binary.read_bytes()
  assert archive.read('module.prop').decode('utf-8').find('version=1.0.0')>=0
  assert b'updateJson=' not in archive.read('module.prop')
- assert all(name in archive.namelist() for name in ('LICENSE','customize.sh','service.sh','current_boot_log.sh','webroot/index.html',
+ assert all(name in archive.namelist() for name in ('LICENSE','customize.sh','service.sh','current_boot_log.sh','migrate_log_retention.sh','webroot/index.html',
     'META-INF/com/google/android/update-binary','source/csrc/main_business.c',
     'source/experimental/framework_output/LumaLegacyBacklightCoordinate.java'))
  image=archive.read('system/bin/luma_curve_daemon')
