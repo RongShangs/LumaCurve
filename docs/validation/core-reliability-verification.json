@@ -1,0 +1,86 @@
+{
+  "ok": true,
+  "host": "Windows GCC with controlled libc/NDK boundaries",
+  "checks": [
+    "fallback: finite/range/parse/clock failure preserves state; valid timestamp PASS",
+    "screen: cached on/off, cold unknown, invalid state, failed pipe and retry throttle PASS",
+    "backlight: original preference, unique alternate, coherent paths, ambiguous/missing rejection PASS",
+    "NDK: four front/back enable combinations, back-only and failed/successful resume PASS",
+    "temporal: 120 jitter samples held, sustained move accepted, no repeated-event confirmation, reversal and bypass PASS",
+    "config: indoor switch parsed strictly and invalid reload rolls back PASS",
+    "config: preference default/disable, curve parse and transactional invalid reload rollback PASS",
+    "scene: front priority, tiny jitter and rear flashlight cannot override front PASS",
+    "scene: unilateral rise waits 2s, sustained front change eventually accepted PASS",
+    "scene: transient front occlusion is cancelled before original fast-dark PASS",
+    "scene: paired rise/fall immediate, independent sensor scales and all-lux operation PASS",
+    "scene: opposite directions, asynchronous onset and queued timestamp skew are unconfirmed PASS",
+    "scene: confirmed on-change validity, no fabricated timestamp/count, continuous/unknown timeout and reset PASS",
+    "scene: temporal confirmation extends beyond indoor lux; protection bypass preserved PASS",
+    "on-change smoothing: cadence equivalence, monotone convergence, clock reversal/stale hold, no invented events PASS",
+    "on-change smoothing: accepted input continues converging through a deadband event PASS",
+    "on-change guards: real-time zero/spike confirmation, actual sample counts and limited-rise window PASS",
+    "ALL PASS"
+  ],
+  "negative": [
+    {
+      "name": "clock-check",
+      "compiled": true,
+      "semantic_failure_detected": true
+    },
+    {
+      "name": "screen-unknown",
+      "compiled": true,
+      "semantic_failure_detected": true
+    },
+    {
+      "name": "front-enable",
+      "compiled": true,
+      "semantic_failure_detected": true
+    },
+    {
+      "name": "temporal-off",
+      "compiled": true,
+      "semantic_failure_detected": true
+    },
+    {
+      "name": "scene-front-priority",
+      "compiled": true,
+      "semantic_failure_detected": true
+    },
+    {
+      "name": "scene-common-evidence",
+      "compiled": true,
+      "semantic_failure_detected": true
+    },
+    {
+      "name": "scene-timestamp-pairing",
+      "compiled": true,
+      "semantic_failure_detected": true
+    },
+    {
+      "name": "scene-onchange-only",
+      "compiled": true,
+      "semantic_failure_detected": true
+    },
+    {
+      "name": "scene-timed-smoothing",
+      "compiled": true,
+      "semantic_failure_detected": true
+    }
+  ],
+  "android_device_verified": false,
+  "source_sha256": {
+    "csrc/curve_pct_for_lux.c": "47d14f430b23cdc0cff314a2946ed463a770079126d27ca6a3eba8cdd6df6f5b",
+    "csrc/brightness_preference.c": "1ce43c1929701f6c0d98c774898aee2a780e5e0f3f3e78ea398ecb755badbd0d",
+    "csrc/state.c": "b466dc2f70b9019e4360851929b61e074a47d5f92f48bad4e2cdef6010df72c6",
+    "csrc/read_screen.c": "22380627ded900f82a07500cda7464c72eeabcb38fe07de415bdd973875ac447",
+    "csrc/read_lux_fallback.c": "2542dbbd655ad336633023f8ea9a231009a9a87e7289057c01ce54708f0c1a8c",
+    "csrc/business_sensor_init.c": "32fc012e076f03f342e45c549526b3b50eea94745705c937969887bb758d0038",
+    "csrc/set_light_sensors_enabled.c": "71b05a277ce3915684db2265cedd064e93945c976c939bfb279d0e297c797977",
+    "csrc/business_debounce.c": "13f268f8e0ec83477c78b8af8aaf62ce50745a7a9b2f635fddaea60f99906e8d",
+    "csrc/load_config.c": "06e9d96faf51bd58cdabe773678075d97ce1422cfe4d021015cd29dd887039e5",
+    "csrc/backlight_paths.h": "72ebda39f1256610b16ab50133d6c70b5866ed6476c09e810b747dacaa7cc84b",
+    "csrc/temporal_stability.h": "52b32350142efe3c2adcc88abc54da9eaff7866519fdab1109f3ccd23df00f05",
+    "csrc/scene_adaptation.h": "da2bb193ca8cc7cd7513982fbaf6addccc86ea0982fd790ccc5dd6dd7492c169"
+  }
+}

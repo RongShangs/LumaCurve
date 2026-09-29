@@ -1,0 +1,1117 @@
+{
+  "ok": true,
+  "cases": [
+    {
+      "name": "sysfs_fractional",
+      "ok": true,
+      "differences": [],
+      "expected_behavior_change": false,
+      "coverage": {
+        "ndk_events": 0,
+        "thermal_reads": 0,
+        "hbm_writes": 0,
+        "lux_reads": 57,
+        "signal_callbacks": 0,
+        "backlight_writes": 7,
+        "injected_io_failures": 0,
+        "learn_commits": 0,
+        "sunlight_entries": 0
+      }
+    },
+    {
+      "name": "sysfs_rise_fall",
+      "ok": true,
+      "differences": [],
+      "expected_behavior_change": false,
+      "coverage": {
+        "ndk_events": 0,
+        "thermal_reads": 0,
+        "hbm_writes": 0,
+        "lux_reads": 89,
+        "signal_callbacks": 0,
+        "backlight_writes": 29,
+        "injected_io_failures": 0,
+        "learn_commits": 0,
+        "sunlight_entries": 0
+      }
+    },
+    {
+      "name": "thermal_hot",
+      "ok": true,
+      "differences": [],
+      "expected_behavior_change": false,
+      "coverage": {
+        "ndk_events": 0,
+        "thermal_reads": 44,
+        "hbm_writes": 0,
+        "lux_reads": 59,
+        "signal_callbacks": 0,
+        "backlight_writes": 2,
+        "injected_io_failures": 0,
+        "learn_commits": 0,
+        "sunlight_entries": 0
+      }
+    },
+    {
+      "name": "sunlight_hbm",
+      "ok": true,
+      "differences": [],
+      "expected_behavior_change": false,
+      "coverage": {
+        "ndk_events": 0,
+        "thermal_reads": 0,
+        "hbm_writes": 13,
+        "lux_reads": 121,
+        "signal_callbacks": 0,
+        "backlight_writes": 60,
+        "injected_io_failures": 0,
+        "learn_commits": 0,
+        "sunlight_entries": 1
+      }
+    },
+    {
+      "name": "ndk_front_back_prox",
+      "ok": true,
+      "differences": [],
+      "expected_behavior_change": false,
+      "coverage": {
+        "ndk_events": 288,
+        "thermal_reads": 0,
+        "hbm_writes": 0,
+        "lux_reads": 0,
+        "signal_callbacks": 0,
+        "backlight_writes": 7,
+        "injected_io_failures": 0,
+        "learn_commits": 0,
+        "sunlight_entries": 0
+      }
+    },
+    {
+      "name": "ndk_rise_fall",
+      "ok": true,
+      "differences": [],
+      "expected_behavior_change": false,
+      "coverage": {
+        "ndk_events": 285,
+        "thermal_reads": 0,
+        "hbm_writes": 0,
+        "lux_reads": 0,
+        "signal_callbacks": 0,
+        "backlight_writes": 29,
+        "injected_io_failures": 0,
+        "learn_commits": 0,
+        "sunlight_entries": 0
+      }
+    },
+    {
+      "name": "ndk_missing_required",
+      "ok": true,
+      "differences": [],
+      "expected_behavior_change": false,
+      "coverage": {
+        "ndk_events": 0,
+        "thermal_reads": 0,
+        "hbm_writes": 0,
+        "lux_reads": 57,
+        "signal_callbacks": 0,
+        "backlight_writes": 7,
+        "injected_io_failures": 0,
+        "learn_commits": 0,
+        "sunlight_entries": 0
+      }
+    },
+    {
+      "name": "ndk_hot_hbm",
+      "ok": true,
+      "differences": [],
+      "expected_behavior_change": false,
+      "coverage": {
+        "ndk_events": 279,
+        "thermal_reads": 52,
+        "hbm_writes": 2,
+        "lux_reads": 0,
+        "signal_callbacks": 0,
+        "backlight_writes": 11,
+        "injected_io_failures": 0,
+        "learn_commits": 0,
+        "sunlight_entries": 0
+      }
+    },
+    {
+      "name": "learn_dormant",
+      "ok": true,
+      "differences": [],
+      "expected_behavior_change": false,
+      "coverage": {
+        "ndk_events": 0,
+        "thermal_reads": 0,
+        "hbm_writes": 0,
+        "lux_reads": 57,
+        "signal_callbacks": 0,
+        "backlight_writes": 7,
+        "injected_io_failures": 0,
+        "learn_commits": 0,
+        "sunlight_entries": 0
+      }
+    },
+    {
+      "name": "learn_populated",
+      "ok": true,
+      "differences": [],
+      "expected_behavior_change": false,
+      "coverage": {
+        "ndk_events": 0,
+        "thermal_reads": 0,
+        "hbm_writes": 0,
+        "lux_reads": 57,
+        "signal_callbacks": 0,
+        "backlight_writes": 7,
+        "injected_io_failures": 0,
+        "learn_commits": 0,
+        "sunlight_entries": 0
+      }
+    },
+    {
+      "name": "learn_commit",
+      "ok": true,
+      "differences": [],
+      "expected_behavior_change": false,
+      "coverage": {
+        "ndk_events": 0,
+        "thermal_reads": 0,
+        "hbm_writes": 0,
+        "lux_reads": 128,
+        "signal_callbacks": 0,
+        "backlight_writes": 8,
+        "injected_io_failures": 0,
+        "learn_commits": 1,
+        "sunlight_entries": 0
+      }
+    },
+    {
+      "name": "learn_existing_cell_commit",
+      "ok": true,
+      "differences": [],
+      "expected_behavior_change": false,
+      "coverage": {
+        "ndk_events": 0,
+        "thermal_reads": 0,
+        "hbm_writes": 0,
+        "lux_reads": 187,
+        "signal_callbacks": 0,
+        "backlight_writes": 7,
+        "injected_io_failures": 0,
+        "learn_commits": 2,
+        "sunlight_entries": 0
+      }
+    },
+    {
+      "name": "reload_reset_flags",
+      "ok": true,
+      "differences": [],
+      "expected_behavior_change": false,
+      "coverage": {
+        "ndk_events": 0,
+        "thermal_reads": 0,
+        "hbm_writes": 0,
+        "lux_reads": 60,
+        "signal_callbacks": 0,
+        "backlight_writes": 7,
+        "injected_io_failures": 0,
+        "learn_commits": 0,
+        "sunlight_entries": 0
+      }
+    },
+    {
+      "name": "registered_signal_reload",
+      "ok": true,
+      "differences": [],
+      "expected_behavior_change": false,
+      "coverage": {
+        "ndk_events": 0,
+        "thermal_reads": 0,
+        "hbm_writes": 0,
+        "lux_reads": 60,
+        "signal_callbacks": 3,
+        "backlight_writes": 7,
+        "injected_io_failures": 0,
+        "learn_commits": 0,
+        "sunlight_entries": 0
+      }
+    },
+    {
+      "name": "manual_auto_edges",
+      "ok": true,
+      "differences": [],
+      "expected_behavior_change": false,
+      "coverage": {
+        "ndk_events": 0,
+        "thermal_reads": 0,
+        "hbm_writes": 0,
+        "lux_reads": 51,
+        "signal_callbacks": 0,
+        "backlight_writes": 7,
+        "injected_io_failures": 0,
+        "learn_commits": 0,
+        "sunlight_entries": 0
+      }
+    },
+    {
+      "name": "screen_wake_edges",
+      "ok": true,
+      "differences": [],
+      "expected_behavior_change": false,
+      "coverage": {
+        "ndk_events": 42,
+        "thermal_reads": 0,
+        "hbm_writes": 0,
+        "lux_reads": 0,
+        "signal_callbacks": 0,
+        "backlight_writes": 0,
+        "injected_io_failures": 0,
+        "learn_commits": 0,
+        "sunlight_entries": 0
+      }
+    },
+    {
+      "name": "external_brightness",
+      "ok": true,
+      "differences": [],
+      "expected_behavior_change": false,
+      "coverage": {
+        "ndk_events": 0,
+        "thermal_reads": 0,
+        "hbm_writes": 0,
+        "lux_reads": 26,
+        "signal_callbacks": 0,
+        "backlight_writes": 5,
+        "injected_io_failures": 0,
+        "learn_commits": 0,
+        "sunlight_entries": 0
+      }
+    },
+    {
+      "name": "thermal_cool_exit",
+      "ok": true,
+      "differences": [],
+      "expected_behavior_change": false,
+      "coverage": {
+        "ndk_events": 0,
+        "thermal_reads": 40,
+        "hbm_writes": 0,
+        "lux_reads": 89,
+        "signal_callbacks": 0,
+        "backlight_writes": 2,
+        "injected_io_failures": 0,
+        "learn_commits": 0,
+        "sunlight_entries": 0
+      }
+    },
+    {
+      "name": "ndk_proximity_block",
+      "ok": true,
+      "differences": [],
+      "expected_behavior_change": false,
+      "coverage": {
+        "ndk_events": 300,
+        "thermal_reads": 0,
+        "hbm_writes": 0,
+        "lux_reads": 0,
+        "signal_callbacks": 0,
+        "backlight_writes": 0,
+        "injected_io_failures": 0,
+        "learn_commits": 0,
+        "sunlight_entries": 0
+      }
+    },
+    {
+      "name": "adjustment_edges",
+      "ok": true,
+      "differences": [],
+      "expected_behavior_change": false,
+      "coverage": {
+        "ndk_events": 0,
+        "thermal_reads": 0,
+        "hbm_writes": 0,
+        "lux_reads": 57,
+        "signal_callbacks": 0,
+        "backlight_writes": 7,
+        "injected_io_failures": 0,
+        "learn_commits": 0,
+        "sunlight_entries": 0
+      }
+    },
+    {
+      "name": "sunlight_exit",
+      "ok": true,
+      "differences": [],
+      "expected_behavior_change": false,
+      "coverage": {
+        "ndk_events": 0,
+        "thermal_reads": 0,
+        "hbm_writes": 3,
+        "lux_reads": 75,
+        "signal_callbacks": 0,
+        "backlight_writes": 94,
+        "injected_io_failures": 0,
+        "learn_commits": 0,
+        "sunlight_entries": 1
+      }
+    },
+    {
+      "name": "ndk_front_invalid_back_valid",
+      "ok": true,
+      "differences": [],
+      "expected_behavior_change": false,
+      "coverage": {
+        "ndk_events": 288,
+        "thermal_reads": 0,
+        "hbm_writes": 0,
+        "lux_reads": 0,
+        "signal_callbacks": 0,
+        "backlight_writes": 7,
+        "injected_io_failures": 0,
+        "learn_commits": 0,
+        "sunlight_entries": 0
+      }
+    },
+    {
+      "name": "ndk_front_missing",
+      "ok": true,
+      "differences": [
+        "files",
+        "logs",
+        "trace",
+        "final_state",
+        "coverage"
+      ],
+      "expected_behavior_change": true,
+      "coverage": {
+        "ndk_events": 192,
+        "thermal_reads": 0,
+        "hbm_writes": 0,
+        "lux_reads": 0,
+        "signal_callbacks": 0,
+        "backlight_writes": 7,
+        "injected_io_failures": 0,
+        "learn_commits": 0,
+        "sunlight_entries": 0
+      }
+    },
+    {
+      "name": "ndk_manager_missing",
+      "ok": true,
+      "differences": [],
+      "expected_behavior_change": false,
+      "coverage": {
+        "ndk_events": 0,
+        "thermal_reads": 0,
+        "hbm_writes": 0,
+        "lux_reads": 57,
+        "signal_callbacks": 0,
+        "backlight_writes": 7,
+        "injected_io_failures": 0,
+        "learn_commits": 0,
+        "sunlight_entries": 0
+      }
+    },
+    {
+      "name": "ownership_lock_failure",
+      "ok": true,
+      "differences": [],
+      "expected_behavior_change": false,
+      "coverage": {
+        "ndk_events": 0,
+        "thermal_reads": 0,
+        "hbm_writes": 0,
+        "lux_reads": 15,
+        "signal_callbacks": 0,
+        "backlight_writes": 0,
+        "injected_io_failures": 0,
+        "learn_commits": 0,
+        "sunlight_entries": 0
+      }
+    },
+    {
+      "name": "ndk_optional_symbols_missing",
+      "ok": true,
+      "differences": [],
+      "expected_behavior_change": false,
+      "coverage": {
+        "ndk_events": 96,
+        "thermal_reads": 0,
+        "hbm_writes": 0,
+        "lux_reads": 0,
+        "signal_callbacks": 0,
+        "backlight_writes": 7,
+        "injected_io_failures": 0,
+        "learn_commits": 0,
+        "sunlight_entries": 0
+      }
+    },
+    {
+      "name": "backlight_open_failure",
+      "ok": true,
+      "differences": [],
+      "expected_behavior_change": false,
+      "coverage": {
+        "ndk_events": 0,
+        "thermal_reads": 0,
+        "hbm_writes": 0,
+        "lux_reads": 41,
+        "signal_callbacks": 0,
+        "backlight_writes": 12,
+        "injected_io_failures": 32,
+        "learn_commits": 0,
+        "sunlight_entries": 0
+      }
+    },
+    {
+      "name": "backlight_write_failure",
+      "ok": true,
+      "differences": [],
+      "expected_behavior_change": false,
+      "coverage": {
+        "ndk_events": 0,
+        "thermal_reads": 0,
+        "hbm_writes": 0,
+        "lux_reads": 41,
+        "signal_callbacks": 0,
+        "backlight_writes": 44,
+        "injected_io_failures": 32,
+        "learn_commits": 0,
+        "sunlight_entries": 0
+      }
+    },
+    {
+      "name": "backlight_short_write",
+      "ok": true,
+      "differences": [],
+      "expected_behavior_change": false,
+      "coverage": {
+        "ndk_events": 0,
+        "thermal_reads": 0,
+        "hbm_writes": 0,
+        "lux_reads": 16,
+        "signal_callbacks": 0,
+        "backlight_writes": 7,
+        "injected_io_failures": 7,
+        "learn_commits": 0,
+        "sunlight_entries": 0
+      }
+    },
+    {
+      "name": "backlight_readback_invalid",
+      "ok": true,
+      "differences": [],
+      "expected_behavior_change": false,
+      "coverage": {
+        "ndk_events": 0,
+        "thermal_reads": 0,
+        "hbm_writes": 0,
+        "lux_reads": 55,
+        "signal_callbacks": 0,
+        "backlight_writes": 10,
+        "injected_io_failures": 34,
+        "learn_commits": 0,
+        "sunlight_entries": 0
+      }
+    },
+    {
+      "name": "backlight_readback_mismatch",
+      "ok": true,
+      "differences": [],
+      "expected_behavior_change": false,
+      "coverage": {
+        "ndk_events": 0,
+        "thermal_reads": 0,
+        "hbm_writes": 0,
+        "lux_reads": 18,
+        "signal_callbacks": 0,
+        "backlight_writes": 13,
+        "injected_io_failures": 25,
+        "learn_commits": 0,
+        "sunlight_entries": 0
+      }
+    },
+    {
+      "name": "sunlight_thermal_cooldown_combo",
+      "ok": true,
+      "differences": [],
+      "expected_behavior_change": false,
+      "coverage": {
+        "ndk_events": 450,
+        "thermal_reads": 18,
+        "hbm_writes": 22,
+        "lux_reads": 0,
+        "signal_callbacks": 0,
+        "backlight_writes": 109,
+        "injected_io_failures": 0,
+        "learn_commits": 0,
+        "sunlight_entries": 2
+      }
+    },
+    {
+      "name": "learn_screen_cancel_combo",
+      "ok": true,
+      "differences": [],
+      "expected_behavior_change": false,
+      "coverage": {
+        "ndk_events": 0,
+        "thermal_reads": 0,
+        "hbm_writes": 0,
+        "lux_reads": 59,
+        "signal_callbacks": 0,
+        "backlight_writes": 7,
+        "injected_io_failures": 0,
+        "learn_commits": 0,
+        "sunlight_entries": 0
+      }
+    },
+    {
+      "name": "ndk_gap_wake_fallback_combo",
+      "ok": true,
+      "differences": [],
+      "expected_behavior_change": false,
+      "coverage": {
+        "ndk_events": 42,
+        "thermal_reads": 0,
+        "hbm_writes": 0,
+        "lux_reads": 0,
+        "signal_callbacks": 0,
+        "backlight_writes": 0,
+        "injected_io_failures": 0,
+        "learn_commits": 0,
+        "sunlight_entries": 0
+      }
+    },
+    {
+      "name": "registered_term_cleanup",
+      "ok": true,
+      "differences": [],
+      "expected_behavior_change": false,
+      "coverage": {
+        "ndk_events": 66,
+        "thermal_reads": 0,
+        "hbm_writes": 2,
+        "lux_reads": 0,
+        "signal_callbacks": 1,
+        "backlight_writes": 25,
+        "injected_io_failures": 0,
+        "learn_commits": 0,
+        "sunlight_entries": 1
+      }
+    },
+    {
+      "name": "registered_int_cleanup",
+      "ok": true,
+      "differences": [],
+      "expected_behavior_change": false,
+      "coverage": {
+        "ndk_events": 0,
+        "thermal_reads": 0,
+        "hbm_writes": 0,
+        "lux_reads": 26,
+        "signal_callbacks": 1,
+        "backlight_writes": 7,
+        "injected_io_failures": 0,
+        "learn_commits": 0,
+        "sunlight_entries": 0
+      }
+    },
+    {
+      "name": "long_run",
+      "ok": true,
+      "differences": [],
+      "expected_behavior_change": false,
+      "coverage": {
+        "ndk_events": 2655,
+        "thermal_reads": 0,
+        "hbm_writes": 3,
+        "lux_reads": 0,
+        "signal_callbacks": 0,
+        "backlight_writes": 159,
+        "injected_io_failures": 0,
+        "learn_commits": 0,
+        "sunlight_entries": 1
+      }
+    }
+  ],
+  "baseline_commit": "abe393e05a71831cd86abe9062ffa50d90991b7c",
+  "full_main_replay": true,
+  "original_elf_differential": false,
+  "android_device_verified": false,
+  "ui_subscription_exercised": false,
+  "indoor_stability_exercised": true,
+  "legacy_configuration_override": "indoor_stability=0, preference_learning=0: healthy baseline comparison",
+  "log_comparison": "Chinese format strings reversed without changing argument values; only event_age warnings omitted",
+  "default_configuration_cases": [
+    {
+      "name": "sysfs_fractional",
+      "ok": true,
+      "bounded_target": true,
+      "protected_full_trace_unchanged": false
+    },
+    {
+      "name": "sysfs_rise_fall",
+      "ok": true,
+      "bounded_target": true,
+      "protected_full_trace_unchanged": false
+    },
+    {
+      "name": "thermal_hot",
+      "ok": true,
+      "bounded_target": true,
+      "protected_full_trace_unchanged": true
+    },
+    {
+      "name": "sunlight_hbm",
+      "ok": true,
+      "bounded_target": true,
+      "protected_full_trace_unchanged": true
+    },
+    {
+      "name": "ndk_front_back_prox",
+      "ok": true,
+      "bounded_target": true,
+      "protected_full_trace_unchanged": false
+    },
+    {
+      "name": "ndk_rise_fall",
+      "ok": true,
+      "bounded_target": true,
+      "protected_full_trace_unchanged": false
+    },
+    {
+      "name": "ndk_missing_required",
+      "ok": true,
+      "bounded_target": true,
+      "protected_full_trace_unchanged": false
+    },
+    {
+      "name": "ndk_hot_hbm",
+      "ok": true,
+      "bounded_target": true,
+      "protected_full_trace_unchanged": true
+    },
+    {
+      "name": "learn_dormant",
+      "ok": true,
+      "bounded_target": true,
+      "protected_full_trace_unchanged": false
+    },
+    {
+      "name": "learn_populated",
+      "ok": true,
+      "bounded_target": true,
+      "protected_full_trace_unchanged": false
+    },
+    {
+      "name": "learn_commit",
+      "ok": true,
+      "bounded_target": true,
+      "protected_full_trace_unchanged": false
+    },
+    {
+      "name": "learn_existing_cell_commit",
+      "ok": true,
+      "bounded_target": true,
+      "protected_full_trace_unchanged": false
+    },
+    {
+      "name": "reload_reset_flags",
+      "ok": true,
+      "bounded_target": true,
+      "protected_full_trace_unchanged": false
+    },
+    {
+      "name": "registered_signal_reload",
+      "ok": true,
+      "bounded_target": true,
+      "protected_full_trace_unchanged": false
+    },
+    {
+      "name": "manual_auto_edges",
+      "ok": true,
+      "bounded_target": true,
+      "protected_full_trace_unchanged": false
+    },
+    {
+      "name": "screen_wake_edges",
+      "ok": true,
+      "bounded_target": true,
+      "protected_full_trace_unchanged": false
+    },
+    {
+      "name": "external_brightness",
+      "ok": true,
+      "bounded_target": true,
+      "protected_full_trace_unchanged": false
+    },
+    {
+      "name": "thermal_cool_exit",
+      "ok": true,
+      "bounded_target": true,
+      "protected_full_trace_unchanged": false
+    },
+    {
+      "name": "ndk_proximity_block",
+      "ok": true,
+      "bounded_target": true,
+      "protected_full_trace_unchanged": true
+    },
+    {
+      "name": "adjustment_edges",
+      "ok": true,
+      "bounded_target": true,
+      "protected_full_trace_unchanged": false
+    },
+    {
+      "name": "sunlight_exit",
+      "ok": true,
+      "bounded_target": true,
+      "protected_full_trace_unchanged": true
+    },
+    {
+      "name": "ndk_front_invalid_back_valid",
+      "ok": true,
+      "bounded_target": true,
+      "protected_full_trace_unchanged": false
+    },
+    {
+      "name": "ndk_front_missing",
+      "ok": true,
+      "bounded_target": true,
+      "protected_full_trace_unchanged": false
+    },
+    {
+      "name": "ndk_manager_missing",
+      "ok": true,
+      "bounded_target": true,
+      "protected_full_trace_unchanged": false
+    },
+    {
+      "name": "ownership_lock_failure",
+      "ok": true,
+      "bounded_target": true,
+      "protected_full_trace_unchanged": false
+    },
+    {
+      "name": "ndk_optional_symbols_missing",
+      "ok": true,
+      "bounded_target": true,
+      "protected_full_trace_unchanged": false
+    },
+    {
+      "name": "backlight_open_failure",
+      "ok": true,
+      "bounded_target": true,
+      "protected_full_trace_unchanged": false
+    },
+    {
+      "name": "backlight_write_failure",
+      "ok": true,
+      "bounded_target": true,
+      "protected_full_trace_unchanged": false
+    },
+    {
+      "name": "backlight_short_write",
+      "ok": true,
+      "bounded_target": true,
+      "protected_full_trace_unchanged": false
+    },
+    {
+      "name": "backlight_readback_invalid",
+      "ok": true,
+      "bounded_target": true,
+      "protected_full_trace_unchanged": false
+    },
+    {
+      "name": "backlight_readback_mismatch",
+      "ok": true,
+      "bounded_target": true,
+      "protected_full_trace_unchanged": false
+    },
+    {
+      "name": "sunlight_thermal_cooldown_combo",
+      "ok": true,
+      "bounded_target": true,
+      "protected_full_trace_unchanged": false
+    },
+    {
+      "name": "learn_screen_cancel_combo",
+      "ok": true,
+      "bounded_target": true,
+      "protected_full_trace_unchanged": false
+    },
+    {
+      "name": "ndk_gap_wake_fallback_combo",
+      "ok": true,
+      "bounded_target": true,
+      "protected_full_trace_unchanged": false
+    },
+    {
+      "name": "registered_term_cleanup",
+      "ok": true,
+      "bounded_target": true,
+      "protected_full_trace_unchanged": true
+    },
+    {
+      "name": "registered_int_cleanup",
+      "ok": true,
+      "bounded_target": true,
+      "protected_full_trace_unchanged": false
+    },
+    {
+      "name": "long_run",
+      "ok": true,
+      "bounded_target": true,
+      "protected_full_trace_unchanged": false
+    },
+    {
+      "name": "indoor_jitter_switch_witness",
+      "ok": true,
+      "legacy_backlight_writes": 7,
+      "stable_backlight_writes": 6
+    }
+  ],
+  "scene_adaptation_cases": [
+    {
+      "name": "dual_stable",
+      "ok": true,
+      "wait_boundaries": 300,
+      "held_wait_boundaries": 0,
+      "ndk_events": 590,
+      "relations": [
+        "stable"
+      ]
+    },
+    {
+      "name": "rear_flashlight",
+      "ok": true,
+      "wait_boundaries": 300,
+      "held_wait_boundaries": 0,
+      "ndk_events": 590,
+      "relations": [
+        "back_only",
+        "stable"
+      ]
+    },
+    {
+      "name": "front_only_rise",
+      "ok": true,
+      "wait_boundaries": 300,
+      "held_wait_boundaries": 1,
+      "ndk_events": 524,
+      "relations": [
+        "front_only",
+        "stable"
+      ],
+      "front_accept_delay_ms": 3000
+    },
+    {
+      "name": "paired_rise",
+      "ok": true,
+      "wait_boundaries": 300,
+      "held_wait_boundaries": 0,
+      "ndk_events": 524,
+      "relations": [
+        "common_rise",
+        "stable"
+      ],
+      "front_accept_delay_ms": 1000
+    },
+    {
+      "name": "paired_fall",
+      "ok": true,
+      "wait_boundaries": 300,
+      "held_wait_boundaries": 0,
+      "ndk_events": 554,
+      "relations": [
+        "common_fall",
+        "stable"
+      ]
+    },
+    {
+      "name": "front_occlusion",
+      "ok": true,
+      "wait_boundaries": 300,
+      "held_wait_boundaries": 1,
+      "ndk_events": 590,
+      "relations": [
+        "front_only",
+        "stable"
+      ]
+    },
+    {
+      "name": "divergent",
+      "ok": true,
+      "wait_boundaries": 300,
+      "held_wait_boundaries": 2,
+      "ndk_events": 554,
+      "relations": [
+        "divergent",
+        "stable"
+      ]
+    },
+    {
+      "name": "onchange_quiet",
+      "ok": true,
+      "wait_boundaries": 300,
+      "held_wait_boundaries": 0,
+      "ndk_events": 2,
+      "relations": [
+        "stable"
+      ]
+    },
+    {
+      "name": "onchange_front_rise",
+      "ok": true,
+      "wait_boundaries": 300,
+      "held_wait_boundaries": 2,
+      "ndk_events": 3,
+      "relations": [
+        "front_only",
+        "stable"
+      ],
+      "front_accept_delay_ms": 2000
+    },
+    {
+      "name": "onchange_back_only",
+      "ok": true,
+      "wait_boundaries": 300,
+      "held_wait_boundaries": 0,
+      "ndk_events": 1,
+      "relations": [
+        "single"
+      ]
+    },
+    {
+      "name": "onchange_dark_zero",
+      "ok": true,
+      "wait_boundaries": 300,
+      "held_wait_boundaries": 3,
+      "ndk_events": 3,
+      "relations": [
+        "front_only",
+        "stable"
+      ]
+    },
+    {
+      "name": "onchange_low_lux_rise",
+      "ok": true,
+      "wait_boundaries": 300,
+      "held_wait_boundaries": 2,
+      "ndk_events": 3,
+      "relations": [
+        "front_only",
+        "stable"
+      ]
+    }
+  ],
+  "preference_cases": [
+    {
+      "name": "preference_neutral",
+      "ok": true,
+      "target": 1081,
+      "learned_samples": 0
+    },
+    {
+      "name": "preference_brighter",
+      "ok": true,
+      "target": 1297,
+      "learned_samples": 0
+    },
+    {
+      "name": "custom_flat",
+      "ok": true,
+      "target": 1574,
+      "learned_samples": 0
+    },
+    {
+      "name": "preference_thermal",
+      "ok": true,
+      "target": 3277,
+      "learned_samples": 0
+    },
+    {
+      "name": "learn_user",
+      "ok": true,
+      "target": 1081,
+      "learned_samples": 1
+    },
+    {
+      "name": "ignore_system",
+      "ok": true,
+      "target": 1081,
+      "learned_samples": 0
+    },
+    {
+      "name": "learn_off",
+      "ok": true,
+      "target": 1081,
+      "learned_samples": 0
+    }
+  ],
+  "fixture_toolkit": "D:\\IOS\\ios-brightness-dev",
+  "source_sha256": {
+    "csrc/brightness_preference.c": "1ce43c1929701f6c0d98c774898aee2a780e5e0f3f3e78ea398ecb755badbd0d",
+    "csrc/apply_brightness_frame.c": "ffd736842b423f09693170af75458c82dad49b6175ecc193e1fa45b4458f1b64",
+    "csrc/curve_pct_for_lux.c": "47d14f430b23cdc0cff314a2946ed463a770079126d27ca6a3eba8cdd6df6f5b",
+    "csrc/data.c": "e9e419ee47de76db6e66df95c5e47e7ef5b32b5948e0d9f5c1a7a4f4173d23d9",
+    "csrc/hbm_find_node.c": "13f96e0e32a4c4c9c3473b1e3c6474ae700db588db86e6270734f2329bbcb220",
+    "csrc/hbm_scan_bounded.c": "6060e1db2f064af8edd63896215d9c4f82fc5016a3be641fd3a22effee1fec3f",
+    "csrc/highlux_deactivate.c": "b5839d3d7da4c8403210010aab9a9a8c12b38df710e7b60a8d6cbbea6c40d3e0",
+    "csrc/load_config.c": "06e9d96faf51bd58cdabe773678075d97ce1422cfe4d021015cd29dd887039e5",
+    "csrc/load_learn.c": "a4acb33f2f171db9d378c0e04fa89dea7dda04cdb978facf8495d5858218fba6",
+    "csrc/poll_sensors.c": "9f500996d5c9c650f7458c2a68be4c1ee4d4ce26e2ac34de45eaeb8660c7d05d",
+    "csrc/read_lux_fallback.c": "2542dbbd655ad336633023f8ea9a231009a9a87e7289057c01ce54708f0c1a8c",
+    "csrc/read_screen.c": "22380627ded900f82a07500cda7464c72eeabcb38fe07de415bdd973875ac447",
+    "csrc/refresh_battery_state.c": "c60e88f7e9ebb74f9968f9982340f16166d39c3868aefec06948b241aae57af3",
+    "csrc/refresh_display_state_on_edge.c": "087c615a7371f600a84a0b89eaf96bfa917d18400da79a082b963be9be2899c1",
+    "csrc/refresh_power_wakefulness.c": "04882edda4445c5399b01d79a6ed83322ed0f8e494f78205d170bd8e55ad0638",
+    "csrc/refresh_settings.c": "05c7ec6d26e1b48c83ae12342986e1d73df58af442f402c095b2880bdaf9d5b5",
+    "csrc/save_learn.c": "446c52b32af45f51d1ae2f22657c416e13a6bd9b254881e24da51944c087e242",
+    "csrc/set_light_sensors_enabled.c": "71b05a277ce3915684db2265cedd064e93945c976c939bfb279d0e297c797977",
+    "csrc/sig_h.c": "7992ed586e43ecb49deaf7de9f72c5dd3e97e5851be8aff179001c93e6f543b4",
+    "csrc/sig_learn_reset.c": "8664bb64829d3be69df3c472d3ce548542b8c0e28249b341889303d236fa5b0a",
+    "csrc/sig_reload.c": "a5db76fd2b0b6ec76f7d9df16dba4188513757b11a23dbfd8122e9a5d640f0ad",
+    "csrc/sig_reload_learn.c": "71c372f189ad2d067788324e3e8a1919400e645840412fd184bf62fecc960d3f",
+    "csrc/trans_update.c": "07d3570292d6a2ec4b46ba92230141aee94b2a51dd04f1e350ee91d3052f616c",
+    "csrc/write_state_file.c": "ea6e09b38bb9b829cc4502883584329d1e12e82381376f8c709911e37d87a34e",
+    "csrc/domain_api.c": "775029ebdb174cad226e0ffbcf46b88a0b75a311365efbbb556a25afb537224e",
+    "csrc/domain_api_more.c": "f5e7adc613a07397e6a50a7352ea0b21f906ffdeead2d2c11e3bce7a8a2cfcf7",
+    "csrc/main_business.c": "a1da11cf94ac6c1530b6f24d69daf639a9a0ca886ad0fba01859bb0dd7b48551",
+    "csrc/business_startup.c": "bd10e10bd036cc7cd353cacd0518d07c99925c1f2bd48745ed10f51c057f7e12",
+    "csrc/business_debounce.c": "13f268f8e0ec83477c78b8af8aaf62ce50745a7a9b2f635fddaea60f99906e8d",
+    "csrc/business_learning.c": "8b1f21927cc3854bca71448ef0122f4d0c67a34e63513a66805613aad451007a",
+    "csrc/business_thermal.c": "2882514f0eedb714d14a045b4f7b88d6dc71dd34ab1a766ccbf0f4888dc59b1b",
+    "csrc/business_sunlight.c": "ac5d65b4e5cd76117da0db86f77f75ad24fe7ff55869ea7c8ebd6bacd96f4d1d",
+    "csrc/business_sensor_init.c": "32fc012e076f03f342e45c549526b3b50eea94745705c937969887bb758d0038",
+    "csrc/business_literals.c": "a6dff1f84027c31a1f94b87a7ebaa967e0647fe253392e5409903c15b534d809",
+    "csrc/state.c": "b466dc2f70b9019e4360851929b61e074a47d5f92f48bad4e2cdef6010df72c6",
+    "csrc/platform_native.c": "47a90d2ed7eda0655cfc4a96e75da090eb25fa86db4e0f75ed472ea1a71beabe",
+    "csrc/actuator.h": "9a87c2b62492b7329f08b4cdc094f9f723706f9443e7658dcb10f26df0f917fd",
+    "csrc/backlight_paths.h": "72ebda39f1256610b16ab50133d6c70b5866ed6476c09e810b747dacaa7cc84b",
+    "csrc/brightness_curve.h": "be350549b5574279c96899325962305648824492aad2ddbd7ddad3e095f71089",
+    "csrc/brightness_preference.h": "33ac689582ee9d25b7a8eae33028cfacc6b66808dca2f1d0a962174088bc4932",
+    "csrc/business_api.h": "ebee667d50317635834e705f3264556365ea74b059163a2cb5b799758013ce2f",
+    "csrc/business_state_views.h": "cab3aaa2d3fc7e2465801d126a35d8b4d67fe40e60715a15815c61f3b08da61d",
+    "csrc/business_support.h": "0eda78969c3771c3cf0790d41043549d84423e5a566b1a56d2231b57cd304702",
+    "csrc/domain_io.h": "6be4265de9d969d71364d28a27d0c20bda1456cc0a5d60c6d0d1a6e5e5f8a8b7",
+    "csrc/functions.h": "52974ab9b0dab5d7646a434aa76dccac0e2ad3e992d7e66b8095dabc7c3c7458",
+    "csrc/install_probe.h": "a42d5ddc536607ae81a2e1ed4d0613db48785af47959c599d536757ed0cad3ec",
+    "csrc/learning.h": "06d00e4c5626b77f100437809cac10977360a1761c33aadf9c6c1c2e5e4a2174",
+    "csrc/log_locale.h": "e8d5dc039314d4c05a7ac06bd71ba82d5d9120ac97cf34ccb8af487b9e429993",
+    "csrc/log_timestamp.h": "63d669d6384bc205e7a1d11755415fb66093958194d24b1b70b7d12f136d0dcc",
+    "csrc/native_calls.h": "3fc7ee412ee752b51d0e103b76a3fbcc1f703e75043657a76e4e70f756a05b87",
+    "csrc/native_runtime.h": "e51aac18a103cca7bd6d57978b287c59b3b203ee40be0a4661522d982a36f339",
+    "csrc/runtime.h": "91e3b5099801c64dbbd16c5122971032caaa48a34dd2aee8ae0fce7c014fda18",
+    "csrc/scene_adaptation.h": "da2bb193ca8cc7cd7513982fbaf6addccc86ea0982fd790ccc5dd6dd7492c169",
+    "csrc/state.h": "b78498122c4de3c54c73858ade51f5597588f415bfb2810ec0267a07d55765fb",
+    "csrc/state_layout.h": "53d3cca5acfedab424b5c1853e7ebebce859eea668bd415c062a4d80dcb037b8",
+    "csrc/state_observer.h": "b26110a06c86e2640f67b71a4265e7496786a8e8d6dddc9a6485bab31f69005d",
+    "csrc/temporal_stability.h": "52b32350142efe3c2adcc88abc54da9eaff7866519fdab1109f3ccd23df00f05"
+  },
+  "temporal_configuration_override": "preference_learning=0 in existing temporal/dual-sensor cases; new preference/curve paths covered separately in seven full-main cases"
+}

@@ -1,0 +1,8 @@
+# LumaCurve — 流光亮度
+id=luma_curve
+name=LumaCurve · 流光亮度
+version=1.0.0
+versionCode=10000
+author=酷安@戎Shang
+description=[LumaCurve核心✘] 让屏幕随环境平稳调节。以前置光感为主，结合双侧场景判断与时域滤波；支持可编辑亮度曲线、缓慢局部偏好学习和命名预设，并提供持续阳光增强与高温限亮保护。
+updateJson=https://raw.githubusercontent.com/RongShangs/LumaCurve/main/update.json

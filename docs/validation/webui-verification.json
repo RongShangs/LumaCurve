@@ -1,0 +1,194 @@
+{
+  "ok": true,
+  "browser": "Chromium/Edge headless",
+  "device_bridge": "mock callback contract; no physical device",
+  "checks": [
+    {
+      "name": "Header lower corners center upward and navigation upper corners center downward, both toward the horizontal middle",
+      "ok": true
+    },
+    {
+      "name": "Browser preview is explicitly labelled and device actions are disabled",
+      "ok": true
+    },
+    {
+      "name": "All four pages and expanded settings fit 320/390/768/1280 px",
+      "ok": true
+    },
+    {
+      "name": "FAFAFA base surfaces, sticky header and simplified settings/log pages",
+      "ok": true
+    },
+    {
+      "name": "Status, Settings and Logs share the same header height on phone and desktop widths",
+      "ok": true
+    },
+    {
+      "name": "Display-only status graphic, no manual refresh or interval label, separate text and connector lanes",
+      "ok": true
+    },
+    {
+      "name": "Action buttons are filled and aligned; bottom navigation remains transparent",
+      "ok": true
+    },
+    {
+      "name": "About hides the shared header and presents its own icon and title without punctuation",
+      "ok": true
+    },
+    {
+      "name": "Current author, links, GPL and bottom-only upstream credit",
+      "ok": true
+    },
+    {
+      "name": "Automatic update line precedes project links; free optional support opens local QR codes with close, Escape and focus restoration",
+      "ok": true
+    },
+    {
+      "name": "Update checks handle current/new versions, reject foreign download URLs and recover after network failure",
+      "ok": true
+    },
+    {
+      "name": "KernelSU pause/resume controls work from Settings and are absent from the status canvas",
+      "ok": true
+    },
+    {
+      "name": "Small readings action shares the story title row below the phone",
+      "ok": true
+    },
+    {
+      "name": "Borderless fixed status page fits four phone viewports; details dialog closes by button or Escape",
+      "ok": true
+    },
+    {
+      "name": "Sensor units, processing relationship, continuous visible refresh and no redundant title/copy row",
+      "ok": true
+    },
+    {
+      "name": "Scene relations render actual paired/unilateral states, including elapsed holds and honest on-change age",
+      "ok": true
+    },
+    {
+      "name": "Background visibility stops reads and foreground return refreshes immediately",
+      "ok": true
+    },
+    {
+      "name": "UI observation lease is renewed only by visible status reads and stops in the background",
+      "ok": true
+    },
+    {
+      "name": "Wake observation takes priority over stale sensor wording and explains when the engine will take over",
+      "ok": true
+    },
+    {
+      "name": "Diagram uses real target/current coordinates and responds to source, thermal, sunlight, hold and stale flags",
+      "ok": true
+    },
+    {
+      "name": "Status polling stops while another page is being viewed",
+      "ok": true
+    },
+    {
+      "name": "Scene adaptation retains the saved configuration key, defaults on and can be changed through the boolean editor",
+      "ok": true
+    },
+    {
+      "name": "All fields have recommendations; boolean/text modal validation and defaults work",
+      "ok": true
+    },
+    {
+      "name": "Settings rows use compact spacing while retaining hints, recommendations and value editors",
+      "ok": true
+    },
+    {
+      "name": "Slider modal cancel/confirm, recommendations and keyboard-safe footer/dialog",
+      "ok": true
+    },
+    {
+      "name": "Actual shell commands preserve bytes, atomically save, reject genuine conflicts and report comparison failures separately",
+      "ok": true
+    },
+    {
+      "name": "UTF-8 config save and readback preserve exact bytes despite bridge newline trimming and CRLF conversion",
+      "ok": true
+    },
+    {
+      "name": "Existing CRLF and missing-final-newline configurations can both be edited and saved",
+      "ok": true
+    },
+    {
+      "name": "Invalid temperature relationship and sunlight duration are rejected without writes",
+      "ok": true
+    },
+    {
+      "name": "Atomic conflict and reload failure never show a false success",
+      "ok": true
+    },
+    {
+      "name": "Logs lead with recent content, aligned refresh/copy/export actions and collapsed diagnostics",
+      "ok": true
+    },
+    {
+      "name": "State read failure clears stale metrics; logs render as text, never HTML",
+      "ok": true
+    },
+    {
+      "name": "Log copy, full-current-log export to active-user Downloads and export failure reporting",
+      "ok": true
+    },
+    {
+      "name": "Log policy is persisted through validated control arguments",
+      "ok": true
+    },
+    {
+      "name": "About intro describes the module without process markers or donation claims",
+      "ok": true
+    },
+    {
+      "name": "External URLs resolve a generic web handler and launch an explicit browser, without MAIN selectors",
+      "ok": true
+    },
+    {
+      "name": "Site/blog/license links, resolver fallback, missing browser and launch failures preserve the WebUI",
+      "ok": true
+    },
+    {
+      "name": "Engine controls lead Settings; learning is inside the curve editor, defaults on and unrelated saves preserve curve learning",
+      "ok": true
+    },
+    {
+      "name": "Curve learning can be disabled without resetting learned points",
+      "ok": true
+    },
+    {
+      "name": "Real Bash preset writes preserve UTF-8, create/delete atomically, reject concurrent changes and clean temporary files",
+      "ok": true
+    },
+    {
+      "name": "Curve anchors edit/save with monotonic validation; named persistent presets save/load/delete without applying the engine configuration",
+      "ok": true
+    },
+    {
+      "name": "Original sensor and conditioned control inputs stay distinct; complete configured curve and exact linear sub-1% target marker render together",
+      "ok": true
+    },
+    {
+      "name": "Thermal UI distinguishes disabled, scanning, absent, unreadable, suspect and trusted sources; debounce confirmation explains its role",
+      "ok": true
+    },
+    {
+      "name": "Timestamped logs initially scroll to latest, preserve manual scroll-up and follow bottom while watching new lines",
+      "ok": true
+    },
+    {
+      "name": "No JavaScript runtime errors in preview or device bridge flows",
+      "ok": true
+    }
+  ],
+  "source_sha256": {
+    "module/webroot/app.js": "09b71369be2319cbb00c6c6d287f6c7d4beeb734a9c09d968b76c23af4354c6b",
+    "module/webroot/index.html": "ff02819041713bfdc2a9ee8c50c1fcde3f0c66fb9ab9d44330b20403beedcfd7",
+    "module/webroot/styles.css": "30437e509340e7868dc5c2993bc67fd27da1fae9e8bf92fa6316a205602bea3f",
+    "module/webroot/curve_math.js": "47a639710b9bdf345d6272f9131391cd089aadd51ea44f2d86f00c5908ca66a6",
+    "module/webroot/kernelsu.js": "f66d7266f94976aaabf25b6fdb13ea215b078e18d35c5ca018b711e0d793446a"
+  }
+}

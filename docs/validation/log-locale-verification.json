@@ -1,0 +1,15 @@
+{
+  "ok": true,
+  "translated_formats": 56,
+  "printf_arguments_unchanged": true,
+  "io_paths": [
+    "production",
+    "test-abi"
+  ],
+  "quiet_event_age_warning_removed": true,
+  "source_sha256": {
+    "csrc/log_locale.h": "e8d5dc039314d4c05a7ac06bd71ba82d5d9120ac97cf34ccb8af487b9e429993",
+    "csrc/domain_io.h": "6be4265de9d969d71364d28a27d0c20bda1456cc0a5d60c6d0d1a6e5e5f8a8b7",
+    "csrc/main_business.c": "a1da11cf94ac6c1530b6f24d69daf639a9a0ca886ad0fba01859bb0dd7b48551"
+  }
+}

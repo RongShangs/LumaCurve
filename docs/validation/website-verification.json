@@ -1,0 +1,26 @@
+{
+  "ok": true,
+  "checks": [
+    "Standalone local HTML loads with local assets",
+    "Author avatar and profile links are in the top bar",
+    "Full scene, curve, learning, transition and protection mechanisms plus fourteen default anchors",
+    "Resource figures explicitly attributed to author measurements",
+    "Curve demo uses 201 complete samples and truthful default endpoints",
+    "No horizontal overflow on four phone/tablet/desktop sizes",
+    "Every local asset, license and module/source download resolves",
+    "Website module/source downloads match dist and SHA-256",
+    "No network JS, CSS, fonts, frameworks or device bridge",
+    "Desktop/mobile screenshots rendered without JavaScript errors"
+  ],
+  "source_sha256": {
+    "website/index.html": "630fbe30ef40e5bf75562fedaedc30df7656a0ee79b3ab51b94909ee73a67726",
+    "website/assets/site.css": "b55ee7bbff44ed5810fb041561f731c89f0d10a5cd78a6da94fd21209e4c43be",
+    "website/assets/site.js": "6b263f1ead7206e5e8495ace4c4527750e80f6f0316523510d4cb46260433950",
+    "website/assets/icon.svg": "d379ab4235e36286ec541c66f05f9c39f8d99416bc170aeacd91d429208ff517",
+    "website/assets/curve_math.js": "47a639710b9bdf345d6272f9131391cd089aadd51ea44f2d86f00c5908ca66a6",
+    "tools/sync_website.py": "bd446d1e17f93484076947d03a921efd73a7c31f35dc7a2e37c59b23e9dbb2a7",
+    "tests/website.cjs": "915924dbcb7f1480cc192a5e4aafb29051ca1a9f5a2d842483faec1136b67236"
+  },
+  "website": "D:\\IOS\\web",
+  "hosted": false
+}

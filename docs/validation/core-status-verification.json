@@ -1,0 +1,21 @@
+{
+  "ok": true,
+  "checks": [
+    "single live executable",
+    "unrelated executable rejected",
+    "dead PID rejected",
+    "multiple cores flagged",
+    "malformed PID rejected",
+    "stopped and paused distinguished",
+    "atomic failure preserves metadata",
+    "prefix never duplicated and version preserved",
+    "concurrent metadata modification is preserved",
+    "ten-second checks preserve sixty-second maintenance cadence"
+  ],
+  "android_device_verified": false,
+  "source_sha256": {
+    "module/core_status.sh": "d87f773e230e0ecd704491d35d6d4db4f1ca9ffa3a3bb236ceff9fc8aa593aed",
+    "module/service.sh": "2e3c67d6f4824c663db5c533dc10a1061a9bd893cd39fbaef42279bfb3c5c74b",
+    "module/luma_curvectl.sh": "8a187e0665238c2c3b69297d23a733b5e4f15393246fcbff4b73411ae9ed8623"
+  }
+}
