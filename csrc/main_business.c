@@ -975,7 +975,11 @@ wake_lux_filter:
           if (result == 1) {
             if (ios_state.g_proximity_near == 0) {
               prefix_word = VIEW4((uint8_t *)(ios_state.g_brightness_owner) + 0);
-              if (prefix_word == 0x6d656164 && VIEW4((uint8_t *)(ios_state.g_brightness_owner) + 3) == 0x6e6f6d) {
+              if (prefix_word == 0x6d656164 && VIEW4((uint8_t *)(ios_state.g_brightness_owner) + 3) == 0x6e6f6d
+#ifdef LUMA_FRAMEWORK_BACKEND
+                  && false /* Framework/HAL movement is expected, not an external writer. */
+#endif
+                 ) {
                 stream = fopen(ios_backlight_brightness(),"r");
                 VIEW4((uint8_t *)(scratch) + 0) = 0xffffffff;
                 if (stream != (FILE *)0x0) {

@@ -3,7 +3,8 @@ import java.lang.reflect.*;
 /** Read-only settings bridge using a registered external-provider token. */
 public final class LumaFrameworkProbeSettings {
     static final String[] KEYS={"screen_brightness_mode","screen_auto_brightness_adj","screen_brightness"};
-    static void settings() throws Exception {
+    static void settings() throws Exception { readSettings(false); }
+    public static String[] readSettings(boolean quiet) throws Exception {
         Class<?> activity=Class.forName("android.app.ActivityManager");
         Object am=LumaFrameworkProbe.invoke(activity,"getService",new Class<?>[0]);
         int user=(Integer)LumaFrameworkProbe.invoke(activity,"getCurrentUser",new Class<?>[0]);
@@ -24,16 +25,18 @@ public final class LumaFrameworkProbeSettings {
             try {
                 int pid=(Integer)LumaFrameworkProbe.invoke(Class.forName("android.os.Process"),"myPid",new Class<?>[0]);
                 LumaFrameworkProbe.invoke(builder,"setPid",new Class<?>[]{int.class},pid);
-            } catch(NoSuchMethodException absent) {System.out.println("ATTRIBUTION pid_builder_unavailable");}
+            } catch(NoSuchMethodException absent) {if(!quiet)System.out.println("ATTRIBUTION pid_builder_unavailable");}
             Object attribution=LumaFrameworkProbe.invoke(builder,"build",new Class<?>[0]);
-            System.out.println("SETTINGS_PROVIDER external user="+user);
+            if(!quiet)System.out.println("SETTINGS_PROVIDER external user="+user);
             boolean valid=true;
+            String[] values=new String[KEYS.length];int index=0;
             for(String key:KEYS) {
                 Object reply=LumaFrameworkProbe.invoke(provider,"call",
                     new Class<?>[]{sourceClass,String.class,String.class,String.class,bundleClass},
                     attribution,"settings","GET_system",key,extras);
                 String value=reply==null?null:(String)LumaFrameworkProbe.invoke(reply,"getString",new Class<?>[]{String.class},"value");
-                System.out.println("SETTING "+key+"="+value);
+                values[index++]=value;
+                if(!quiet)System.out.println("SETTING "+key+"="+value);
                 try {
                     if("screen_brightness_mode".equals(key))valid&="0".equals(value)||"1".equals(value);
                     else if("screen_auto_brightness_adj".equals(key)){
@@ -43,14 +46,16 @@ public final class LumaFrameworkProbeSettings {
                 }catch(RuntimeException invalid){valid=false;}
             }
             if(!valid)throw new IllegalStateException("missing or invalid settings: no valid mode/preference snapshot");
-            System.out.println("SETTINGS_VALUES valid");
+            if(!quiet)System.out.println("SETTINGS_VALUES valid");
+            return values;
         } finally {
             if(holder!=null) {
                 try {
                     LumaFrameworkProbe.invoke(am,"removeContentProviderExternalAsUser",
                         new Class<?>[]{String.class,binderInterface,int.class},"settings",token,user);
-                    System.out.println("PROVIDER_RELEASE confirmed_call_completed");
+                    if(!quiet)System.out.println("PROVIDER_RELEASE confirmed_call_completed");
                 } catch(Throwable failure) {
+                    if(quiet)throw new IllegalStateException("external provider release failed",failure);
                     System.out.println("PROVIDER_RELEASE_UNAVAILABLE "+failure);
                     // The token also dies when this short-lived probe process exits.
                 }

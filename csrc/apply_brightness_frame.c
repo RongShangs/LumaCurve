@@ -4,6 +4,7 @@
 #include "business_api.h"
 #include "actuator_diagnostics.h"
 #include <errno.h>
+#include "framework_backend.h"
 static int write_errno(void) {
 #if defined(IOS_PRODUCTION) && !defined(IOS_TEST_ABI)
     return errno;
@@ -20,6 +21,9 @@ static void governor_reason(const char *text) {
 }
 uint64_t ios_frame_apply(DomainIo *io, uint64_t now, int32_t *current, int32_t target,
                             bool emergency) {
+#ifdef LUMA_FRAMEWORK_BACKEND
+    (void)io;(void)emergency;return luma_framework_apply(now,current,target);
+#endif
     int32_t old = *current;
     if (old == target) {
         if (!TIME(g_last_write_ms) || now - TIME(g_last_write_ms) > 1199)

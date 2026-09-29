@@ -16,6 +16,7 @@
 #include "backlight_write_diagnostics.h"
 #include "backlight_handle.h"
 #include "core_build.h"
+#include "framework_backend.h"
 
 _Static_assert(sizeof(void *) == 8 && sizeof(long) == 8, "Android LP64 is required");
 _Static_assert(offsetof(struct stat, st_mtim) == 88, "Unexpected Android stat layout");
@@ -163,12 +164,22 @@ fail:
     return NULL;
 }
 
-FILE * ios_native_fopen(const char * a, const char * b) { return fopen(a,b); }
+FILE * ios_native_fopen(const char * a, const char * b) {
+#ifdef LUMA_FRAMEWORK_BACKEND
+    if(!strncmp(a,"/sys/",5)&&strcmp(b,"r")){errno=EPERM;return NULL;}
+    char path[512];a=luma_framework_path(a,path,sizeof(path));if(!a)return NULL;
+#endif
+    return fopen(a,b);
+}
 int ios_native_fclose(FILE * a) { return fclose(a); }
 char * ios_native_fgets(char * a, int b, FILE * c) { return fgets(a,b,c); }
 size_t ios_native_fwrite(const void * a, size_t b, size_t c, FILE * d) { return fwrite(a,b,c,d); }
 int ios_native_fflush(FILE * a) { return fflush(a); }
 int ios_native_open(const char * a, int b, unsigned c) {
+#ifdef LUMA_FRAMEWORK_BACKEND
+    if(!strncmp(a,"/sys/",5)&&(b&O_ACCMODE)!=O_RDONLY){errno=EPERM;return -1;}
+    char path[512];a=luma_framework_path(a,path,sizeof(path));if(!a)return -1;
+#endif
     if ((b & O_ACCMODE) == O_WRONLY && !strcmp(a,ios_backlight_brightness()) &&
         luma_owned_backlight_fd >= 0)
         return luma_owned_backlight_fd;
@@ -201,7 +212,14 @@ int64_t ios_native_write(int a, const void * b, size_t c) {
     errno=error; return result;
 }
 int ios_native_clock_gettime(int a, void * b) { return clock_gettime((clockid_t)a,(struct timespec *)b); }
-int ios_native_usleep(unsigned a) { return usleep(a); }
+int ios_native_usleep(unsigned a) {
+#ifdef LUMA_FRAMEWORK_BACKEND
+    while(a>200000){if(usleep(200000))return -1;a-=200000;luma_framework_pulse();}
+    int result=usleep(a);luma_framework_pulse();return result;
+#else
+    return usleep(a);
+#endif
+}
 uintptr_t ios_native_signal(int a, void (*b)(int)) { return (uintptr_t)signal(a,b); }
 int ios_native_getpid(void) { return getpid(); }
 int ios_native_setpriority(int a, unsigned b, int c) { return setpriority(a,b,c); }
@@ -212,13 +230,33 @@ int ios_native_dlclose(void * a) { return dlclose(a); }
 void * ios_native_opendir(const char * a) { return opendir(a); }
 void * ios_native_readdir(void * a) { return readdir(a); }
 int ios_native_closedir(void * a) { return closedir(a); }
-int ios_native_access(const char * a, int b) { return access(a,b); }
-int ios_native_stat(const char * a, void * b) { return stat(a,(struct stat *)b); }
+int ios_native_access(const char * a, int b) {
+#ifdef LUMA_FRAMEWORK_BACKEND
+    char path[512];a=luma_framework_path(a,path,sizeof(path));if(!a)return -1;
+#endif
+    return access(a,b);
+}
+int ios_native_stat(const char * a, void * b) {
+#ifdef LUMA_FRAMEWORK_BACKEND
+    char path[512];a=luma_framework_path(a,path,sizeof(path));if(!a)return -1;
+#endif
+    return stat(a,(struct stat *)b);
+}
 int ios_native_chmod(const char * a, unsigned b) {
+#ifdef LUMA_FRAMEWORK_BACKEND
+    if(!strcmp(a,ios_backlight_brightness()))return (b&0222)?luma_framework_release():luma_framework_acquire();
+    if(!strncmp(a,"/sys/",5)){errno=EPERM;return -1;}
+#endif
     if (strcmp(a,ios_backlight_brightness())) return chmod(a,b);
     return (b & 0222) ? luma_backlight_release(a,b) : luma_backlight_acquire(a,b);
 }
-int ios_native_backlight_ready(void) { return luma_owned_backlight_fd >= 0; }
+int ios_native_backlight_ready(void) {
+#ifdef LUMA_FRAMEWORK_BACKEND
+    return luma_framework_ready();
+#else
+    return luma_owned_backlight_fd >= 0;
+#endif
+}
 void * ios_native_memset(void * a, int b, size_t c) { return memset(a,b,c); }
 void * ios_native_memcpy(void * a, const void * b, size_t c) { return memcpy(a,b,c); }
 char * ios_native_strncpy(char * a, const char * b, size_t c) { return strncpy(a,b,c); }
@@ -230,8 +268,18 @@ FILE * ios_native_popen(const char * a, const char * b) { return popen(a,b); }
 int ios_native_pclose(FILE * a) { return pclose(a); }
 int64_t ios_native_time(void * a) { return time(a); }
 void * ios_native_localtime(const void * a) { return localtime(a); }
-int ios_native_unlink(const char * a) { return unlink(a); }
-int ios_native_rename(const char * a, const char * b) { return rename(a,b); }
+int ios_native_unlink(const char * a) {
+#ifdef LUMA_FRAMEWORK_BACKEND
+    char path[512];a=luma_framework_path(a,path,sizeof(path));if(!a)return -1;
+#endif
+    return unlink(a);
+}
+int ios_native_rename(const char * a, const char * b) {
+#ifdef LUMA_FRAMEWORK_BACKEND
+    char first[512],second[512];a=luma_framework_path(a,first,sizeof(first));b=luma_framework_path(b,second,sizeof(second));if(!a||!b)return -1;
+#endif
+    return rename(a,b);
+}
 int ios_native_atoi(const char * a) { return atoi(a); }
 int64_t ios_native_strtol(const char * a, char ** b, int c) { return strtol(a,b,c); }
 uint64_t ios_native_parse_double(DomainIo *io, const char *text) { io->real_result = atof(text); return 0; }
@@ -248,11 +296,18 @@ uint64_t ios_native_format_values(DomainIo *io, char *buffer, size_t capacity, c
  if (capacity) { size_t n=length < capacity-1 ? length : capacity-1; memcpy(buffer,text,n); buffer[n]=0; }
  free(text); return length;
 }
+#ifndef LUMA_FRAMEWORK_BACKEND
 #include "install_probe.h"
+#endif
 int main(int argc, char **argv) {
+#ifdef LUMA_FRAMEWORK_BACKEND
+    (void)argv;
+    if(argc!=1||luma_framework_initialize()){fprintf(stderr,"Isolated framework launcher and runtime directory required\n");return 2;}
+#else
     if (argc == 2 && !strcmp(argv[1], "--build-info")) { puts(LUMA_CORE_BUILD); return 0; }
     if (argc == 2 && !strcmp(argv[1], "--check-install")) return luma_install_probe();
     if (argc != 1) { fprintf(stderr,"Usage: luma_curve_daemon [--check-install]\n"); return 2; }
+#endif
     fprintf(stdout,"[LumaCurve] 核心构建：%s\n",LUMA_CORE_BUILD); fflush(stdout);
     ios_reset_data();
 #ifdef IOS_BUSINESS_MAIN

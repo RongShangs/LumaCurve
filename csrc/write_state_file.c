@@ -9,6 +9,7 @@
 #include "temporal_stability.h"
 #include "actuator_diagnostics.h"
 #include "core_build.h"
+#include "framework_backend.h"
 #include "backlight_paths.h"
 
 typedef struct StateOutput {
@@ -279,6 +280,19 @@ static int publish_state(DomainIo *io, const StateFrame *frame) {
         state_word(io, stream, "actuator_last_request=%d\n", luma_write_request);
         state_word(io, stream, "actuator_last_bytes=%d\n", (uint32_t)luma_write_bytes);
         state_text(io, stream, "actuator_write_stage=%s\n", luma_write_stage);
+#ifdef LUMA_FRAMEWORK_BACKEND
+        const LumaFrameworkSnapshot *fw=&luma_framework_snapshot;
+        state_text(io, stream, "output_backend=%s\n", "framework_temporary_experimental");
+        state_text(io, stream, "curve_coordinate=%s\n", "legacy_raw_fraction_nominal");
+        state_real(io, stream, "framework_algorithm_goal=%.7f\n", fw->goal);
+        state_real(io, stream, "framework_limited_goal=%.7f\n", fw->limited);
+        state_real(io, stream, "framework_request=%.7f\n", fw->request);
+        state_real(io, stream, "framework_base=%.7f\n", fw->base);
+        state_real(io, stream, "framework_adjusted=%.7f\n", fw->adjusted);
+        state_word(io, stream, "framework_actual_node=%d\n", fw->node);
+        state_word(io, stream, "framework_owned=%d\n", fw->active);
+        state_word(io, stream, "framework_feedback_age_ms=%llu\n", frame->now>=fw->sampled_ms?frame->now-fw->sampled_ms:0);
+#endif
         char curve[256];
         if (luma_curve_format(curve, sizeof(curve))) state_text(io, stream, "curve_points=%s\n", curve);
         if (luma_curve_learned_format(curve, sizeof(curve))) state_text(io, stream, "curve_learned_points=%s\n", curve);

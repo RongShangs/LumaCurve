@@ -4,7 +4,9 @@
 #include <ctype.h>
 #include <errno.h>
 #include <limits.h>
+#include "framework_backend.h"
 
+#ifndef LUMA_FRAMEWORK_BACKEND
 static bool trailing_space(const char *end) {
     while (isspace((unsigned char)*end)) end++;
     return *end == 0;
@@ -26,7 +28,22 @@ static bool setting_adjustment(const char *text, float *value) {
     *value = fmaxf(-1, fminf(1, parsed));
     return true;
 }
+#endif
 int ios_settings_refresh(DomainIo *io) {
+#ifdef LUMA_FRAMEWORK_BACKEND
+    uint64_t now=domain_now_ms(io);
+    if(now>=TIME(last_settings_ms)&&now-TIME(last_settings_ms)<500&&INT(cached_auto)>=0)return 0;
+    SET_TIME(last_settings_ms,now);
+    if(luma_framework_refresh()){
+        SET_INT(cached_auto,-1);SET_FLAG(cached_auto_adj_valid,0);
+        memcpy(STRING(settings_read_error),"framework_read_failed",22);return -1;
+    }
+    LumaFrameworkSnapshot *s=&luma_framework_snapshot;
+    SET_INT(cached_auto,s->mode);SET_FLOAT(cached_auto_adj,s->adjustment);SET_FLAG(cached_auto_adj_valid,1);SET_INT(cached_slider,s->slider);
+    memcpy(STRING(settings_read_source),"framework_provider",19);STRING(settings_read_error)[0]=0;
+    memcpy(STRING(cached_slider_source),"auto_adj",9);
+    luma_preference_settings(io,now,s->mode,s->adjustment,s->slider);return 0;
+#else
     int64_t stamp[2] = {0};
     int result = (int)CALL(io, clock_gettime, 1, ARG(stamp));
     if (result != 0) return result;
@@ -91,6 +108,7 @@ int ios_settings_refresh(DomainIo *io) {
     }
     else memcpy(STRING(settings_read_error), "settings_read_failed", 21);
     return mode_ok && adj_ok && slider_ok ? 0 : -1;
+#endif
 }
 #ifndef IOS_PRODUCTION
 void ios_refresh_settings(IosCpu *caller) {

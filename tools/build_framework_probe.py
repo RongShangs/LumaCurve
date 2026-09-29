@@ -13,11 +13,15 @@ temporary=subprocess.run(['java','-cp',str(classes),'LumaFrameworkProbeTemporary
 print(temporary.stdout.splitlines()[-1])
 session=subprocess.run(['java','-cp',str(classes),'LumaFrameworkOutputSessionTest'],capture_output=True,text=True,check=True)
 print(session.stdout.splitlines()[-1])
+ramp=subprocess.run(['java','-cp',str(classes),'LumaFrameworkOutputRampTest'],capture_output=True,text=True,check=True)
+print(ramp.stdout.splitlines()[-1])
+lease=subprocess.run(['java','-cp',str(classes),'LumaFrameworkOutputLeaseTest'],capture_output=True,text=True,check=True)
+print(lease.stdout.splitlines()[-1])
 inputs=[f for f in classes.glob('LumaFramework*.class') if 'Test' not in f.name]
 jar=folder/'LumaFrameworkProbe.jar'
 subprocess.run(['java','-cp',str(args.sdk/'build-tools'/args.build_tools/'lib/d8.jar'),'com.android.tools.r8.D8','--min-api','26','--lib',str(args.sdk/'platforms/android-37.0/android.jar'),'--output',str(jar)]+[str(f) for f in inputs],check=True)
 with zipfile.ZipFile(jar) as z:assert z.testzip() is None and 'classes.dex' in z.namelist()
-report={'ok':True,'host_cases':10,'temporary_host_cases':12,'output_session_host_cases':12,'android_device_verified':False,'jar_sha256':hashlib.sha256(jar.read_bytes()).hexdigest(),
+report={'ok':True,'host_cases':10,'temporary_host_cases':12,'output_session_host_cases':12,'ramp_host_cases':6,'client_lease_verified':True,'android_device_verified':False,'jar_sha256':hashlib.sha256(jar.read_bytes()).hexdigest(),
         'source_sha256':{f.relative_to(ROOT).as_posix():hashlib.sha256(f.read_bytes()).hexdigest() for f in compile_sources}}
 (folder/'verification.json').write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8')
 print(jar)
