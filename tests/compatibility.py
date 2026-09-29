@@ -7,7 +7,7 @@ out=ROOT/'build/compatibility';out.mkdir(parents=True,exist_ok=True)
 exe=out/'probe-test.exe'
 subprocess.run([a.cc,'-std=c11','-O1','-Wall','-Wextra','-Werror','-I'+str(ROOT/'csrc'),str(ROOT/'tests/install_probe.c'),'-lm','-o',str(exe)],check=True)
 r=subprocess.run([str(exe)],text=True,capture_output=True);print(r.stdout);print(r.stderr);r.check_returncode()
-checks=['Native probe: ten cases and no brightness write/truncate']
+checks=['Native probe: fourteen cases, current-value write/readback and failure rejection']
 def shpath(path):
  s=Path(path).resolve().as_posix();return '/'+s[0].lower()+s[2:] if len(s)>1 and s[1]==':' else s
 for name,body in [
@@ -19,11 +19,13 @@ for name,body in [
  ('successful probe','lc_compat_probe "$engine" "$folder"'),
  ('failed probe','probe_status=2; ! lc_compat_probe "$engine" "$folder"'),
  ('bad protocol','probe_text="result=pass"; ! lc_compat_probe "$engine" "$folder"'),
+ ('unverified write','probe_text="probe_protocol=1\nresult=pass\nactual_brightness_write=unverified"; ! lc_compat_probe "$engine" "$folder"'),
  ('timeout','probe_status=124; ! lc_compat_probe "$engine" "$folder"')]:
  with tempfile.TemporaryDirectory(prefix='luma-compat-') as td:
   code=f'''export PATH=/usr/bin:/bin:$PATH; export LANG=C.UTF-8
 folder='{shpath(td)}'; engine="$folder/engine"; probe_status=0
 probe_text='probe_protocol=1
+actual_brightness_write=verified_current_value
 result=pass'
 ui_print() {{ :; }}; id() {{ printf 0; }}; settings() {{ printf '1\\n'; }}
 timeout() {{ if [ "$2" = "$engine" ]; then [ "$3" = --check-install ] || exit 99; printf '%s\\n' "$probe_text"; return "$probe_status"; else shift; "$@"; fi; }}

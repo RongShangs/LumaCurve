@@ -16,10 +16,13 @@ trap 'rm -f "$NEW"' EXIT
 unzip -p "$ZIP" system/bin/luma_curve_daemon > "$NEW"
 chmod 0755 "$NEW"
 echo "待测试核心：$("$NEW" --build-info)"
-"$NEW" --check-install || { echo '核心能力检查失败，当前核心保持不变。' >&2; exit 1; }
 WAS_PAUSED=0
 [ ! -f "$PAUSE" ] || WAS_PAUSED=1
 sh "$CTL" pause
+if ! "$NEW" --check-install; then
+  [ "$WAS_PAUSED" = 1 ] || sh "$CTL" resume
+  echo '核心写入检查失败，已保留旧核心并恢复原运行状态。' >&2; exit 1
+fi
 # The pause marker prevents the existing service watchdog from restarting during replacement.
 if ! cp -p "$BIN" "$BACKUP" || ! mv -f "$NEW" "$BIN"; then
   [ "$WAS_PAUSED" = 1 ] || sh "$CTL" resume

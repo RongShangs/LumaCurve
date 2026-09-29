@@ -83,6 +83,10 @@ static int publish_state(DomainIo *io, const StateFrame *frame) {
     bool allowed = frame->screen != 0 && !strcmp(frame->mode, "auto") &&
                    !strcmp(STRING(g_brightness_owner), "daemon");
     bool can_write = allowed && TIME(g_wake_readonly_until) <= frame->now;
+#if defined(IOS_PRODUCTION) && !defined(IOS_TEST_ABI)
+    allowed = allowed && ios_native_backlight_ready();
+    can_write = can_write && allowed;
+#endif
     if (can_write) {
         if (FLAG(g_external_write_hold) == 1 && frame->now < TIME(g_external_write_hold_until))
             can_write = false;

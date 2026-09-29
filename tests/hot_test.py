@@ -14,7 +14,14 @@ with tempfile.TemporaryDirectory(prefix='hot-test-',dir=ROOT/'build') as td:
  mod=root/'module';(mod/'system/bin').mkdir(parents=True)
  binary=mod/'system/bin/luma_curve_daemon';pause=root/'pause'
  old=b'#!/bin/sh\n[ "$1" != --build-info ] || echo old\nexit 0\n'
- new=b'#!/bin/sh\n[ "$1" != --build-info ] || echo test02\nexit 0\n'
+ # A running old daemon locks the node: the probe must run AFTER pause.
+ new=('''#!/bin/sh
+[ "$1" != --build-info ] || echo test03
+if [ "$1" = --check-install ]; then
+  [ -f "'''+shellpath(pause)+'''" ] || exit 2
+fi
+exit 0
+''').encode()
  ctl=mod/'luma_curvectl.sh'
  ctl.write_text('''#!/bin/sh
 case "$1" in

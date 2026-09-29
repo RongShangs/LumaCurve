@@ -20,12 +20,12 @@ lc_compat_probe() {
   ui_print "- 运行引擎兼容性探测（最多 12 秒，不接管亮度）"
   timeout 12 "$_lc_engine" --check-install > "$_lc_report" 2>&1
   _lc_result=$?
-  [ "$_lc_result" -eq 0 ] && grep -qx 'probe_protocol=1' "$_lc_report" && grep -qx 'result=pass' "$_lc_report" || {
+  [ "$_lc_result" -eq 0 ] && grep -qx 'probe_protocol=1' "$_lc_report" && grep -qx 'result=pass' "$_lc_report" && grep -qx 'actual_brightness_write=verified_current_value' "$_lc_report" || {
     while IFS= read -r _lc_line; do ui_print "  $_lc_line"; done < "$_lc_report"
     lc_compat_fail "引擎探测未通过或超时（退出码 $_lc_result），停止安装。"; return 1;
   }
   ui_print "  [通过] 新引擎可以在当前系统中加载执行"
-  ui_print "  [通过] 背光节点数值有效，具备打开写入的权限"
+  ui_print "  [通过] 主屏背光已写回当前值，读回一致"
   if grep -qx 'ndk_als=1' "$_lc_report"; then
     ui_print "  [通过] 检测到 NDK 支持的环境光传感器"
   else
@@ -36,6 +36,6 @@ lc_compat_probe() {
   case "$_lc_settings_result:$_lc_mode" in 0:0|0:1) ui_print "  [通过] 系统亮度设置可读取" ;;
     *) ui_print "  [提醒] 当前亮度模式读取异常，重启后需检查 settings_read_error。" ;; esac
   [ -d /sys/class/thermal ] || ui_print "  [提醒] 温控节点未确认，重启后检查可信温度。"
-  ui_print "  [待验证] 光感连续事件、实际亮度写入和服务启动后的 SELinux 权限"
+  ui_print "  [待验证] 光感连续事件、持续背光控制和服务启动后的 SELinux 权限"
   ui_print "  检测通过表示基础能力满足，不能代替重启后的实机验收。"
 }

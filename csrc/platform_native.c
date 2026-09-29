@@ -14,6 +14,7 @@
 #include "log_timestamp.h"
 #include "backlight_paths.h"
 #include "backlight_write_diagnostics.h"
+#include "backlight_handle.h"
 #include "core_build.h"
 
 _Static_assert(sizeof(void *) == 8 && sizeof(long) == 8, "Android LP64 is required");
@@ -168,6 +169,9 @@ char * ios_native_fgets(char * a, int b, FILE * c) { return fgets(a,b,c); }
 size_t ios_native_fwrite(const void * a, size_t b, size_t c, FILE * d) { return fwrite(a,b,c,d); }
 int ios_native_fflush(FILE * a) { return fflush(a); }
 int ios_native_open(const char * a, int b, unsigned c) {
+    if ((b & O_ACCMODE) == O_WRONLY && !strcmp(a,ios_backlight_brightness()) &&
+        luma_owned_backlight_fd >= 0)
+        return luma_owned_backlight_fd;
     int fd=open(a,b,(mode_t)c), error=errno;
     if ((b & O_ACCMODE) != O_RDONLY && !strcmp(a,ios_backlight_brightness())) {
         if (fd < 0) luma_backlight_write_error("open",error);
@@ -176,6 +180,8 @@ int ios_native_open(const char * a, int b, unsigned c) {
     errno=error; return fd;
 }
 int ios_native_close(int a) {
+    /* Per-frame close ends the logical operation, not the ownership lease. */
+    if (a == luma_owned_backlight_fd && a >= 0) return 0;
     int result=close(a), error=errno;
     if (a==luma_backlight_fd) {
         luma_backlight_fd=-1;
@@ -184,6 +190,11 @@ int ios_native_close(int a) {
     errno=error; return result;
 }
 int64_t ios_native_write(int a, const void * b, size_t c) {
+    if (a == luma_owned_backlight_fd && a >= 0 && lseek(a,0,SEEK_SET) < 0) {
+        int error=errno;
+        luma_backlight_write_error("seek",error);
+        return -1;
+    }
     int64_t result=write(a,b,c); int error=errno;
     if (a==luma_backlight_fd && (result < 0 || (size_t)result != c))
         luma_backlight_write_error(result < 0 ? "write" : "short_write",result < 0 ? error : EIO);
@@ -203,7 +214,11 @@ void * ios_native_readdir(void * a) { return readdir(a); }
 int ios_native_closedir(void * a) { return closedir(a); }
 int ios_native_access(const char * a, int b) { return access(a,b); }
 int ios_native_stat(const char * a, void * b) { return stat(a,(struct stat *)b); }
-int ios_native_chmod(const char * a, unsigned b) { return chmod(a,b); }
+int ios_native_chmod(const char * a, unsigned b) {
+    if (strcmp(a,ios_backlight_brightness())) return chmod(a,b);
+    return (b & 0222) ? luma_backlight_release(a,b) : luma_backlight_acquire(a,b);
+}
+int ios_native_backlight_ready(void) { return luma_owned_backlight_fd >= 0; }
 void * ios_native_memset(void * a, int b, size_t c) { return memset(a,b,c); }
 void * ios_native_memcpy(void * a, const void * b, size_t c) { return memcpy(a,b,c); }
 char * ios_native_strncpy(char * a, const char * b, size_t c) { return strncpy(a,b,c); }

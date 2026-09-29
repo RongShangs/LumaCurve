@@ -1,4 +1,4 @@
-/* Installer-only capability probe. Never enter the daemon or alter device nodes. */
+/* Installer-only probe: write the current value, never change mode or take ownership. */
 #pragma once
 #include "backlight_paths.h"
 static int probe_integer(const char *path, int *value) {
@@ -72,14 +72,25 @@ static int luma_install_probe(void) {
     }
     int fd=open(backlight.brightness,O_WRONLY);
     if(fd<0) {puts("result=fail");puts("reason=backlight_permission");return 2;}
-    close(fd); /* No write, chmod, brightness mode change or HBM operation. */
+    int current=-1, readback=-1;
+    char text[32];
+    int length=probe_integer(backlight.brightness,&current) ?
+        snprintf(text,sizeof(text),"%d\n",current) : -1;
+    int verified=length>0 && (size_t)length<sizeof(text) &&
+        write(fd,text,(size_t)length)==length;
+    if(close(fd)<0) verified=0;
+    if(!verified || !probe_integer(backlight.brightness,&readback) || readback!=current) {
+        puts("actual_brightness_write=failed");
+        puts("result=fail");puts("reason=backlight_write_or_readback");return 2;
+    }
     puts("backlight=read_and_write_open_ok");
+    puts("actual_brightness_write=verified_current_value");
     printf("backlight_path=%s\n", backlight.brightness);
     int ndk=probe_ndk_als(),fallback=probe_sysfs_als();
     printf("ndk_als=%d\nsysfs_als=%d\n",ndk,fallback);
     if(!ndk && !fallback) {puts("result=fail");puts("reason=no_supported_light_sensor");return 2;}
     int power=-1;
     printf("screen_node=%s\n",probe_integer(backlight.power,&power)?"readable":"unverified");
-    puts("sensor_events=unverified");puts("actual_brightness_write=unverified");
+    puts("sensor_events=unverified");
     puts("result=pass");return 0;
 }

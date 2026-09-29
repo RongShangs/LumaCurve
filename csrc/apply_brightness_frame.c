@@ -104,6 +104,14 @@ uint64_t ios_frame_apply(DomainIo *io, uint64_t now, int32_t *current, int32_t t
     if (!written) {
         SET_INT(g_last_write_result, -1);
         SET_INT(g_write_readback_mismatch_streak, 0);
+#if defined(IOS_PRODUCTION) && !defined(IOS_TEST_ABI)
+        SET_INT(g_last_write_readback, -1);
+        /* A failed write relinquishes the lock instead of claiming control. */
+        CALL(io, chmod, ARG(ios_backlight_brightness()), 0644);
+        memcpy(STRING(g_brightness_owner), "write_failed_passthrough", 25);
+        governor_reason("write_failed");
+        clear_transition();
+#endif
         return result;
     }
     SET_TIME(g_last_write_ms, domain_now_ms(io));
