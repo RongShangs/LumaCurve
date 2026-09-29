@@ -29,6 +29,12 @@ public final class LumaFrameworkProbeTemporaryTest {
                 for(int i=32;i<=60;i++)if(f.values.get(i)>f.values.get(i-1))throw new AssertionError("fall reversed");
             }
         }
-        System.out.println("Temporary framework controller: 8 cases PASS; device not verified");
+        for(int c=0;c<4;c++){
+            Fake f=new Fake();if(c==1)f.start=f.max;if(c==2)f.failSample=250;if(c==3)f.failRequest=80;
+            boolean error=false;try{LumaFrameworkProbeTemporary.run(f,true);}catch(Exception e){error=true;}
+            if(error!=(c>=2)||!f.cleared)throw new AssertionError("sustained case "+c);
+            if(c<2&&(f.samples!=600||f.requests!=151))throw new AssertionError("sustained incomplete");
+        }
+        System.out.println("Temporary framework controller: 12 cases PASS; device not verified");
     }
 }

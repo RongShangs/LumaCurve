@@ -12,6 +12,9 @@ public final class LumaFrameworkProbeTemporary {
         void delay() throws Exception;
     }
     static void run(Bridge b) throws Exception {
+        run(b,false);
+    }
+    static void run(Bridge b,boolean sustained) throws Exception {
         float start=b.current(),min=b.minimum(),max=b.maximum();
         if (!LumaFrameworkProbe.finite(start)||!LumaFrameworkProbe.finite(min)||!LumaFrameworkProbe.finite(max)||
             min<0||max>1||min>=max||start<min||start>max)
@@ -19,19 +22,20 @@ public final class LumaFrameworkProbeTemporary {
         float up=Math.min(max,start+.01f),down=Math.max(min,start-.01f);
         System.out.printf(Locale.ROOT,"SAVED temporary=NaN current=%.7f min=%.7f max=%.7f%n",start,min,max);
         try {
+            int frames=sustained?50:30, plateau=sustained?200:40;
             b.request(start); hold(b,"base",start,20);
-            ramp(b,"rise",start,up); hold(b,"upper",up,40);
-            ramp(b,"fall",up,down); hold(b,"lower",down,40);
-            ramp(b,"return",down,start); hold(b,"final",start,20);
+            ramp(b,"rise",start,up,frames); hold(b,"upper",up,plateau);
+            ramp(b,"fall",up,down,frames); hold(b,"lower",down,plateau);
+            ramp(b,"return",down,start,frames); hold(b,"final",start,sustained?30:20);
         } finally { b.request(Float.NaN); System.out.println("RELEASE_REQUEST sent"); }
         System.out.println("result=request_sequence_completed (device stability requires trace analysis)");
     }
     static void hold(Bridge b,String phase,float target,int n) throws Exception {
         for(int i=0;i<n;i++){b.sample(phase,target);b.delay();}
     }
-    static void ramp(Bridge b,String phase,float from,float to) throws Exception {
-        for(int i=1;i<=30;i++) {
-            float value=i==30?to:Math.max(Math.min(from,to),Math.min(Math.max(from,to),from+(to-from)*(i/30f)));
+    static void ramp(Bridge b,String phase,float from,float to,int frames) throws Exception {
+        for(int i=1;i<=frames;i++) {
+            float value=i==frames?to:Math.max(Math.min(from,to),Math.min(Math.max(from,to),from+(to-from)*(i/(float)frames)));
             b.request(value); b.sample(phase,value);b.delay();
         }
     }
@@ -73,7 +77,7 @@ public final class LumaFrameworkProbeTemporary {
             if(args.length!=1)throw new IllegalArgumentException("preflight | test | release");
             if("release".equals(args[0])) {b.request(Float.NaN);System.out.println("RELEASE_REQUEST sent");}
             else if("preflight".equals(args[0])) {b.preflight();System.out.println("PREFLIGHT ok brightness="+b.current()+" min="+b.minimum()+" max="+b.maximum());}
-            else if("test".equals(args[0])) {b.preflight();run(b);}
+            else if("test".equals(args[0])||"sustained".equals(args[0])) {b.preflight();run(b,"sustained".equals(args[0]));}
             else throw new IllegalArgumentException("unknown operation");
         } catch(Throwable e){e.printStackTrace();System.exit(2);}
     }

@@ -3,11 +3,17 @@
 set -u
 [ "$(id -u)" = 0 ] || { echo '请先执行 su。' >&2; exit 1; }
 [ "$#" = 0 ] || { echo '用法：sh ./probe_framework03_android.sh' >&2; exit 1; }
+PROFILE=${LUMA_FRAMEWORK_PROFILE:-test}
+case "$PROFILE" in
+  test) BUILD=03; DEADLINE=45;;
+  sustained) BUILD=04; DEADLINE=100;;
+  *) echo '未知测试配置，未进行控制。' >&2; exit 1;;
+esac
 HERE=${0%/*}; HERE=$(cd "$HERE" && pwd) || exit 1
 for FILE in LumaFrameworkProbe.jar process_scope.sh probe_temporary_runtime.sh probe_temporary_watchdog.sh; do
   [ -r "$HERE/$FILE" ] || { echo '请完整解压探测包。' >&2; exit 1; }
 done
-OUT="./luma-framework03-$(date +%Y%m%d-%H%M%S)-$$"
+OUT="./luma-framework$BUILD-$(date +%Y%m%d-%H%M%S)-$$"
 mkdir -p "$OUT" || exit 1
 OUT=$(cd "$OUT" && pwd) || exit 1
 {
@@ -35,12 +41,12 @@ if ! grep -q 'mDisplayId=0' "$OUT/before-main.txt" ||
   echo '主屏必须开启系统自动亮度且没有现存临时请求；未进行控制。' >&2; exit 1
 fi
 timeout 10 sh "$HERE/probe_temporary_runtime.sh" "$RUN/probe.jar" "$APP" preflight > "$OUT/preflight.txt" 2>&1 || { cat "$OUT/preflight.txt"; exit 1; }
-echo '即将暂停模块，进行约 21 秒的小幅升降与保持测试。'
+echo "即将暂停模块，进行小幅升降与保持测试，配置=$PROFILE。"
 sh "$CTL" pause > "$OUT/pause.txt" 2>&1 || { echo '暂停失败，未进行控制。' >&2; exit 1; }
 [ -z "$(pidof luma_curve_daemon 2>/dev/null)" ] || { echo '模块仍在运行，未进行控制。' >&2; exit 1; }
 # The independent watchdog owns all final release/resume actions, including if
 # this interactive shell disappears. Its files must survive until recovery.
-nohup sh "$HERE/probe_temporary_watchdog.sh" "$RUN" "$OUT" "$RESUME" "$APP" > "$OUT/watchdog.txt" 2>&1 </dev/null &
+nohup sh "$HERE/probe_temporary_watchdog.sh" "$RUN" "$OUT" "$RESUME" "$APP" "$DEADLINE" > "$OUT/watchdog.txt" 2>&1 </dev/null &
 GUARD=$!
 for ATTEMPT in 1 2 3 4 5; do
   [ -f "$RUN/armed" ] && break
@@ -50,7 +56,7 @@ done
 if [ ! -f "$RUN/armed" ]; then
   echo '恢复进程未就绪，未进行控制；模块保持暂停。' >&2; exit 1
 fi
-sh "$HERE/probe_temporary_runtime.sh" "$RUN/probe.jar" "$APP" test > "$OUT/trace.txt" 2>&1 &
+sh "$HERE/probe_temporary_runtime.sh" "$RUN/probe.jar" "$APP" "$PROFILE" > "$OUT/trace.txt" 2>&1 &
 TEST=$!; echo "$TEST" > "$RUN/test.pid"
 wait "$TEST"; RESULT=$?
 touch "$RUN/test-finished"

@@ -4,7 +4,7 @@ import subprocess,tempfile
 ROOT=Path(__file__).resolve().parents[1]; BASH='C:/msys64/usr/bin/bash.exe'
 def sp(p):
  s=p.resolve().as_posix();return '/'+s[0].lower()+s[2:]
-cases=('normal','originally_paused','firmware_mismatch','preflight_failure','existing_temporary')
+cases=('normal','sustained','originally_paused','firmware_mismatch','preflight_failure','existing_temporary')
 with tempfile.TemporaryDirectory(dir=ROOT/'build',prefix='framework03-shell-') as td:
  for case in cases:
   d=Path(td)/case;d.mkdir();runtime=d/'runtime';runtime.mkdir()
@@ -21,7 +21,7 @@ esac
   (d/'LumaFrameworkProbe.jar').write_bytes(b'fixture')
   payload=f'''case "$3" in
 preflight) {'exit 2' if case=='preflight_failure' else 'echo PREFLIGHT ok'};;
-test) sleep .05; echo result=request_sequence_completed;;
+test|sustained) sleep .05; echo result=request_sequence_completed;;
 release) echo RELEASE_REQUEST sent;;
 esac
 '''
@@ -47,14 +47,15 @@ case "$1" in
 esac
 }}
 '''
+  if case=='sustained':prefix+='LUMA_FRAMEWORK_PROFILE=sustained; export LUMA_FRAMEWORK_PROFILE\n'
   runner=d/'runner.sh';runner.write_text(prefix+script,encoding='utf-8',newline='\n')
   # Android app_process is executable; our file is just the placeholder.
   subprocess.run([BASH,'-c',"/usr/bin/chmod +x '"+sp(app)+"'"],check=True)
   result=subprocess.run([BASH,sp(runner)],cwd=d,capture_output=True,timeout=15)
-  ok=case in ('normal','originally_paused')
+  ok=case in ('normal','sustained','originally_paused')
   assert (result.returncode==0)==ok,(case,result.stdout,result.stderr)
   commands=log.read_text().splitlines() if log.exists() else []
-  assert commands==(['pause','resume'] if case=='normal' else ['pause'] if case=='originally_paused' else []),(case,commands)
+  assert commands==(['pause','resume'] if case in ('normal','sustained') else ['pause'] if case=='originally_paused' else []),(case,commands)
   assert pause.exists()==(case=='originally_paused'),case
   assert running.exists()==(case!='originally_paused'),case
-print('Framework03 wrapper: 5 cases PASS; no Android APIs exercised')
+print('Framework03/04 wrapper: 6 cases PASS; no Android APIs exercised')

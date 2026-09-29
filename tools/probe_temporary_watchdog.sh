@@ -1,14 +1,16 @@
 #!/system/bin/sh
 # Independent recovery process. Only the recorded experiment PID may be killed.
 set -u
-[ "$#" = 4 ] || exit 1
+[ "$#" = 4 ] || [ "$#" = 5 ] || exit 1
 RUN=$1; OUT=$2; RESUME=$3; APP=$4
+DEADLINE=${5:-45}
+case "$DEADLINE" in 45|100) :;; *) exit 1;; esac
 case "$RUN" in /data/local/tmp/luma-framework03.*) :;; *) exit 1;; esac
 HERE=${0%/*}
 . "$HERE/process_scope.sh"
 if ! lc_scope_detach_self; then touch "$RUN/guard-failed"; exit 1; fi
 touch "$RUN/armed"
-for TICK in $(seq 1 45); do
+for TICK in $(seq 1 "$DEADLINE"); do
   [ -f "$RUN/test-finished" ] && break
   sleep 1
 done
@@ -17,10 +19,10 @@ if [ ! -f "$RUN/test-finished" ]; then
   PID=$(cat "$RUN/test.pid" 2>/dev/null || :)
   case "$PID" in ''|*[!0-9]*) :;; *)
     # Verify PID still names this probe before signaling; no broad killall.
-    if tr '\000' ' ' < "/proc/$PID/cmdline" 2>/dev/null | grep -q 'LumaFrameworkProbeTemporary test'; then
+    if tr '\000' ' ' < "/proc/$PID/cmdline" 2>/dev/null | grep -Eq 'LumaFrameworkProbeTemporary (test|sustained)( |$)'; then
       kill -TERM "$PID" 2>/dev/null || :
       sleep 1
-      if tr '\000' ' ' < "/proc/$PID/cmdline" 2>/dev/null | grep -q 'LumaFrameworkProbeTemporary test'; then kill -KILL "$PID" 2>/dev/null || :; fi
+      if tr '\000' ' ' < "/proc/$PID/cmdline" 2>/dev/null | grep -Eq 'LumaFrameworkProbeTemporary (test|sustained)( |$)'; then kill -KILL "$PID" 2>/dev/null || :; fi
     fi;;
   esac
 fi
