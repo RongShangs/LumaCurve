@@ -1,6 +1,0 @@
-/build/
-/dist/
-/update.json
-/.github/workflows/
-__pycache__/
-*.pyc
