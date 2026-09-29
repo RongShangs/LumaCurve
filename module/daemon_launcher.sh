@@ -7,4 +7,7 @@ DAEMON="$MODDIR/system/bin/luma_curve_daemon"
 [ -x "$DAEMON" ] && [ -r "$MODDIR/process_scope.sh" ] || exit 1
 . "$MODDIR/process_scope.sh"
 lc_scope_detach_self || exit 1
+if [ -r "$MODDIR/framework-broker.jar" ]; then
+  exec sh "$MODDIR/framework_daemon_launcher.sh"
+fi
 exec "$DAEMON"

@@ -282,11 +282,17 @@ static int publish_state(DomainIo *io, const StateFrame *frame) {
         state_text(io, stream, "actuator_write_stage=%s\n", luma_write_stage);
 #ifdef LUMA_FRAMEWORK_BACKEND
         const LumaFrameworkSnapshot *fw=&luma_framework_snapshot;
-        state_text(io, stream, "output_backend=%s\n", "framework_temporary_experimental");
-        state_text(io, stream, "curve_coordinate=%s\n", "legacy_raw_fraction_nominal");
+        state_text(io, stream, "output_backend=%s\n", getenv("LUMA_FRAMEWORK_PRODUCTION") ?
+            "hyperos4_framework" : "framework_temporary_experimental");
+        state_text(io, stream, "curve_coordinate=%s\n", getenv("LUMA_FRAMEWORK_PRODUCTION") ?
+            "legacy_raw_backlight_code_calibrated" : "legacy_raw_fraction_nominal");
         state_real(io, stream, "framework_algorithm_goal=%.7f\n", fw->goal);
         state_real(io, stream, "framework_limited_goal=%.7f\n", fw->limited);
         state_real(io, stream, "framework_request=%.7f\n", fw->request);
+        if (getenv("LUMA_FRAMEWORK_PRODUCTION") && fw->active && isfinite(fw->limited) && fw->limited >= 0)
+            state_word(io, stream, "framework_effective_target_br=%d\n", (int)lroundf(fw->limited * 17848.0f));
+        if (getenv("LUMA_FRAMEWORK_PRODUCTION"))
+            state_real(io, stream, "framework_panel_codes_per_float=%.1f\n", 17848.0f);
         state_real(io, stream, "framework_base=%.7f\n", fw->base);
         state_real(io, stream, "framework_adjusted=%.7f\n", fw->adjusted);
         state_word(io, stream, "framework_actual_node=%d\n", fw->node);

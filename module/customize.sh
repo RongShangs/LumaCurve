@@ -41,6 +41,8 @@ lc_install_module() {
   for _lc_exec in system/bin/luma_curve_daemon service.sh post-fs-data.sh check_status.sh uninstall.sh luma_curvectl.sh; do
     set_perm "$MODPATH/$_lc_exec" 0 0 0755 || lc_install_fail "设置执行权限失败。"
   done
+  [ ! -r "$MODPATH/framework-broker.jar" ] ||
+    set_perm "$MODPATH/framework_daemon_launcher.sh" 0 0 0755 || lc_install_fail "设置框架启动器权限失败。"
   lc_compat_probe "$MODPATH/system/bin/luma_curve_daemon" "$MODPATH" || lc_install_fail "设备能力检测失败，已中止安装并恢复数据。"
   ios_upgrade_finish "$MODPATH/luma_curve.conf" || lc_install_fail "配置恢复失败，已中止安装。"
   ui_print "[4/4] 完成模块切换"
@@ -48,7 +50,12 @@ lc_install_module() {
   rm -f "$LC_INSTALL_BOOTSTRAP" "$UPGRADE_BOOTSTRAP" "$COMPAT_BOOTSTRAP"
   ui_print ""
   ui_print "安装完成。请重启设备，再从管理器打开 WebUI。"
-  ui_print "后续可在管理器检查更新并直接安装。"
+  if [ -r "$MODPATH/framework-broker.jar" ]; then
+    ui_print "当前是 HyperOS 4 本地体验构建，框架引擎会在重启后接管。"
+    ui_print "此内核尚未推送 GitHub；管理器更新源不会提供它。"
+  else
+    ui_print "后续可在管理器检查更新并直接安装。"
+  fi
   ui_print "官网：https://lc.rongshangs.top"
 }
 

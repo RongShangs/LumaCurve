@@ -59,6 +59,7 @@ daemon_pids() {
 
 release_display_nodes_if_idle() {
   [ -z "$(daemon_pids)" ] || return 1
+  [ ! -r "$MODDIR/framework-broker.jar" ] || return 0
   _lc_release_path=$(luma_backlight_path)
   [ -z "$_lc_release_path" ] || chmod 0644 "$_lc_release_path" 2>/dev/null
   hbm_node=$(sed -n 's/^hbm_node_path=//p' "$CONF_FILE" 2>/dev/null | tail -n 1)
@@ -166,6 +167,12 @@ start_daemon() {
   nohup sh "$MODDIR/daemon_launcher.sh" >> "$LOG_FILE" 2>&1 &
   echo $! > "$PID_FILE"
   sleep 1
+  if [ -r "$MODDIR/framework-broker.jar" ]; then
+    attempts=0
+    while [ "$attempts" -lt 5 ] && [ -z "$(daemon_pids)" ]; do
+      attempts=$((attempts + 1)); sleep 1
+    done
+  fi
   if reconcile_singleton; then
     background_daemon
     log_msg "引擎已启动，PID=$(cat "$PID_FILE" 2>/dev/null)"

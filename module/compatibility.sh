@@ -17,6 +17,27 @@ lc_compat_environment() {
 lc_compat_probe() {
   _lc_engine="$1"
   _lc_report="$2/compatibility-report.txt"
+  if [ -r "$2/framework-broker.jar" ]; then
+    ui_print "- 核对主屏框架、固件和只读接口（不修改亮度）"
+    for _lc_pair in \
+      'framework.jar:1d2bf53f6c2684103dadbeef0d2665a7f033b7746a75f3e7404145dd999600fd' \
+      'services.jar:ac53add4b7f559780affd6c7a614f405cefad18f2cb07cb769c7a1afbbae5c20'; do
+      _lc_file=${_lc_pair%%:*}; _lc_expected=${_lc_pair#*:}
+      _lc_hash=$(sha256sum "/system/framework/$_lc_file" 2>/dev/null) || { lc_compat_fail "固件文件缺失：$_lc_file"; return 1; }
+      [ "${_lc_hash%% *}" = "$_lc_expected" ] || { lc_compat_fail "固件已变化：$_lc_file，当前包只适配已验证的 HyperOS 4。"; return 1; }
+    done
+    _lc_app=/system/bin/app_process; [ -x "$_lc_app" ] || _lc_app=/system/bin/app_process64
+    CLASSPATH="$2/framework-broker.jar" timeout 12 "$_lc_app" /system/bin LumaFrameworkProbeTemporary preflight > "$_lc_report" 2>&1
+    _lc_result=$?
+    [ "$_lc_result" = 0 ] && grep -q '^MAIN_DISPLAY verified$' "$_lc_report" &&
+      grep -q '^PREFLIGHT ok brightness=' "$_lc_report" || {
+      while IFS= read -r _lc_line; do ui_print "  $_lc_line"; done < "$_lc_report"
+      lc_compat_fail "主屏框架预检未通过；请保持主屏亮起，并停用其他亮度控制。"; return 1;
+    }
+    ui_print "  [通过] 主屏标识、框架亮度接口及固件均匹配"
+    ui_print "  运行时仍会核对当前背光与框架反馈；不匹配就交还系统。"
+    return 0
+  fi
   ui_print "- 运行引擎兼容性探测（最多 12 秒，不接管亮度）"
   timeout 12 "$_lc_engine" --check-install > "$_lc_report" 2>&1
   _lc_result=$?

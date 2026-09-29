@@ -204,6 +204,11 @@
   var owners = {daemon: '模块调节', manual: '系统手动', wake_readonly: '唤醒观察', screen_off_passthrough: '系统接管', lock_failed_passthrough: '权限受限', system_owned: '系统接管'};
   function withUnit(value, digits, unit) { var text = format(value, digits); return text === '—' ? text : text + unit; }
   function sensorReading(value) { return value === undefined || value === '' || !Number.isFinite(Number(value)) || Number(value) < 0 ? '—' : withUnit(value,1,' lux'); }
+  function effectiveTarget(s) {
+    var limited = Number(s.framework_effective_target_br);
+    return s.output_backend === 'hyperos4_framework' && s.framework_owned === '1' &&
+      s.framework_effective_target_br !== undefined && Number.isFinite(limited) ? limited : Number(s.target_br);
+  }
   function renderSensors(s) {
     var sources = {front: '前置光感', back: '后置光感（备用）', ndk: '系统光感', unknown: '未确定', none: '暂无来源'};
     set('sensor-source', sources[s.lux_source] || (s.lux_source || '—'));
@@ -223,7 +228,7 @@
   function renderTrend(s, fresh) {
     var now = Date.now(), raw = Number(s.lux), smooth = Number(s.smooth);
     if (fresh && s.lux !== undefined && s.smooth !== undefined && isFinite(raw) && isFinite(smooth) && raw >= 0 && smooth >= 0 && historyStamp !== s.updated_unix) {
-      history.push({time:now,raw:raw,smooth:smooth,target:Number(s.target_br)/Number(s.max_br)*100,current:Number(s.current_br)/Number(s.max_br)*100}); historyStamp = s.updated_unix;
+      history.push({time:now,raw:raw,smooth:smooth,target:effectiveTarget(s)/Number(s.max_br)*100,current:Number(s.current_br)/Number(s.max_br)*100}); historyStamp = s.updated_unix;
     }
     history = history.filter(function (point) { return now - point.time <= 60000; }).slice(-90);
     var ceiling = Math.max(1, ...history.map(function (point) { return Math.max(point.raw, point.smooth); }));
@@ -285,7 +290,7 @@
     $('output-wire').setAttribute('data-active', String(canWrite && s.transition_active === '1' && s.target_hold_active !== '1'));
     $('output-wire').setAttribute('data-blocked', String(!paused && (s.target_hold_active === '1' || s.daemon_can_write === '0')));
     $('engine-scene').setAttribute('data-idle', String(paused || !canWrite));
-    var maximum = Number(s.max_br), target = Number(s.target_br), current = Number(s.current_br), lux = Number(s.smooth);
+    var maximum = Number(s.max_br), target = effectiveTarget(s), current = Number(s.current_br), lux = Number(s.smooth);
     var valid = maximum > 0 && s.target_br !== undefined && s.current_br !== undefined && s.smooth !== undefined && isFinite(target) && isFinite(current) && isFinite(lux) && lux >= 0;
     $('response-target').setAttribute('visibility', valid ? 'visible' : 'hidden'); $('response-current').setAttribute('visibility', valid ? 'visible' : 'hidden');
     $('response-trail').setAttribute('points', ''); drawCurve('response', curveFromState(s));
@@ -305,7 +310,7 @@
   }
   function renderState(s) {
     lastState = s;
-    var maximum = Number(s.max_br), current = Number(s.current_br), target = Number(s.target_br);
+    var maximum = Number(s.max_br), current = Number(s.current_br), target = effectiveTarget(s);
     var pct = maximum > 0 && isFinite(current) ? Math.max(0, Math.min(100, current / maximum * 100)) : NaN;
     set('brightness', isFinite(pct) ? pct.toFixed(1) : '—');
     set('target', maximum > 0 && isFinite(target) ? (target / maximum * 100).toFixed(1) + '%' : '—');
@@ -341,6 +346,10 @@
     else if (s.low_lux_bright_spike_guard === '1') { heading = '正在确认环境变化'; description = '光感突然变亮，先确认一下，避免屏幕误升亮。'; }
     else if (s.fast_dark_candidate === '1') { heading = '正在确认环境变化'; description = '光感突然变暗，确认后再降低亮度。'; }
     else if (s.target_hold_active === '1') { heading = '正在确认新的亮度'; description = '先保持原亮度，避免屏幕来回调整。'; }
+    else if (s.output_backend === 'hyperos4_framework' && s.framework_owned === '1' && Number(s.target_br) > target + Math.max(32, maximum * .01)) {
+      heading = Math.abs(target - current) < Math.max(32, maximum * .005) ? '已达系统当前上限' : '正在接近可用亮度';
+      description = '曲线希望更亮，系统当前亮度范围限制了目标。';
+    }
     else if (s.daemon_can_write === '0') { heading = '暂时保持当前亮度'; description = '正在等待背光写入条件，之后继续调节。'; }
     else if (s.fast_dark === '1') { heading = '环境变暗了'; description = '屏幕正在加快降低亮度。'; }
     else if (s.sunlight_active === '1') { heading = '阳光增强已开启'; description = '环境持续强光，正在提高屏幕亮度。'; }

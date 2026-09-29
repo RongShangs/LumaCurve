@@ -39,6 +39,7 @@ if [ -n "$pids" ]; then
 fi
 rm -f "$PID_FILE"
 
+if [ ! -r "${0%/*}/framework-broker.jar" ]; then
 hbm_node=$(sed -n 's/^hbm_node_path=//p' "$CONF_FILE" 2>/dev/null | tail -n 1)
 hbm_off=$(sed -n 's/^hbm_off_value=//p' "$CONF_FILE" 2>/dev/null | tail -n 1)
 [ -n "$hbm_off" ] || hbm_off=0
@@ -56,6 +57,7 @@ for node in \
   [ -e "$node" ] && printf '%s' "$hbm_off" > "$node" 2>/dev/null
 done
 [ -z "$_lc_release_path" ] || chmod 0644 "$_lc_release_path" 2>/dev/null
+fi
 
 rm -f /data/local/tmp/luma_curve.log
 rm -f /data/local/tmp/luma_curve.log.*

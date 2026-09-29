@@ -33,6 +33,7 @@ int luma_framework_initialize(void) {
     return 0;
 }
 const char *luma_framework_path(const char *path,char *buffer,size_t capacity) {
+    if(getenv("LUMA_FRAMEWORK_PRODUCTION") && !strcmp(getenv("LUMA_FRAMEWORK_PRODUCTION"),"1"))return path;
     const char *mapped=luma_framework_map_path(run_directory,path,buffer,capacity);
     if(!mapped)errno=EINVAL;
     return mapped;
