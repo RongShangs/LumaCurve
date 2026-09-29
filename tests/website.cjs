@@ -19,6 +19,16 @@ async function main(){
   for(const width of [360,390,768,1440]){await page.setViewportSize({width,height:900});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));}checks.push('No horizontal overflow on four phone/tablet/desktop sizes');
   const localLinks=await page.locator('[href],[src]').evaluateAll(nodes=>nodes.map(n=>n.getAttribute('href')||n.getAttribute('src')).filter(s=>s&&!s.startsWith('#')&&!s.startsWith('https://')));
   for(const target of localLinks)assert.ok(fs.existsSync(path.resolve(site,target)),target);checks.push('Every local asset, license and module/source download resolves');
+  assert.equal(await page.locator('.hero .actions a').first().getAttribute('href'),'downloads/luma_curve-1.0.0.zip');
+  assert.equal(await page.locator('.hero .actions a').first().getAttribute('download'),'');checks.push('Hero download button directly downloads the module instead of scrolling');
+  for (const selector of ['.hero .actions a[download]', '.download-actions a[download]']) {
+    const links=page.locator(selector);
+    for(let i=0;i<await links.count();i++) {
+      const pending=page.waitForEvent('download');await links.nth(i).click();const download=await pending;
+      assert.equal(await download.failure(),null);const file=await download.path();
+      assert.equal(crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex'),crypto.createHash('sha256').update(fs.readFileSync(path.join(root,'dist',download.suggestedFilename()))).digest('hex'));
+    }
+  }checks.push('Real browser downloads from hero and both module/source buttons complete with matching bytes');
   const sums=fs.readFileSync(path.join(site,'downloads/SHA256SUMS.txt'),'utf8');
   for(const line of sums.trim().split(/\r?\n/)){const [digest,name]=line.split('  ');assert.equal(crypto.createHash('sha256').update(fs.readFileSync(path.join(site,'downloads',name))).digest('hex'),digest);assert.equal(digest,crypto.createHash('sha256').update(fs.readFileSync(path.join(root,'dist',name))).digest('hex'));}checks.push('Website module/source downloads match dist and SHA-256');
   assert.equal(await page.locator('script[src^="http"]').count(),0);assert.equal(await page.locator('link[href^="http"][rel="stylesheet"]').count(),0);checks.push('No network JS, CSS, fonts, frameworks or device bridge');
