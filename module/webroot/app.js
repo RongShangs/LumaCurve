@@ -332,6 +332,7 @@
     }
     else if (s.brightness_owner !== 'daemon') { heading = '当前由系统调节亮度'; description = '流光亮度正在等待接管。'; }
     else if (s.heat_guard_active === '1') { heading = '正在限制亮度'; description = '温度偏高，屏幕暂时调暗，降温后恢复。'; }
+    else if (s.framework_user_hold === '1') { heading = '保持你的亮度'; description = '已按你的手动设置保持；环境明显变化或锁屏后恢复自动曲线。'; }
     else if (s.sensor_stale === '1' || s.sensor_hold_active === '1' || s.lux_valid === '0') { heading = '暂时保持亮度'; description = '当前读数尚不能确认环境变化，先保持亮度。'; }
     else if (s.low_lux_bright_spike_guard === '1') { heading = '正在确认环境变化'; description = '光感突然变亮，先确认一下，避免屏幕误升亮。'; }
     else if (s.fast_dark_candidate === '1') { heading = '正在确认环境变化'; description = '光感突然变暗，确认后再降低亮度。'; }

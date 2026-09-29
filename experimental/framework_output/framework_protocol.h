@@ -6,9 +6,9 @@
 /* Invalid or missing feedback is unknown, never manual or success. */
 static inline int luma_framework_parse(const char *text,LumaFrameworkSnapshot *v) {
     char extra;
-    if(sscanf(text,"OK %d %f %d %d %d %d %f %f %f %f %f %f %f %d %c",&v->mode,&v->adjustment,&v->slider,&v->on,&v->window,&v->node,
-        &v->minimum,&v->maximum,&v->base,&v->adjusted,&v->goal,&v->limited,&v->request,&v->active,&extra)!=14||
-       (v->mode!=0&&v->mode!=1)||(v->on!=0&&v->on!=1)||(v->window!=0&&v->window!=1)||(v->active!=0&&v->active!=1)||
+    if(sscanf(text,"OK %d %f %d %d %d %d %f %f %f %f %f %f %f %d %d %c",&v->mode,&v->adjustment,&v->slider,&v->on,&v->window,&v->node,
+        &v->minimum,&v->maximum,&v->base,&v->adjusted,&v->goal,&v->limited,&v->request,&v->active,&v->user_hold,&extra)!=15||
+       (v->mode!=0&&v->mode!=1)||(v->on!=0&&v->on!=1)||(v->window!=0&&v->window!=1)||(v->active!=0&&v->active!=1)||(v->user_hold!=0&&v->user_hold!=1)||
        v->slider<0||v->node<0||v->node>16383||!isfinite(v->adjustment)||fabsf(v->adjustment)>1||
        !isfinite(v->minimum)||!isfinite(v->maximum)||v->minimum<0||v->maximum>1||v->minimum>=v->maximum||
        !isfinite(v->base)||!isfinite(v->adjusted)||!isfinite(v->goal)||!isfinite(v->limited)||!isfinite(v->request)||

@@ -1,27 +1,39 @@
-/** Give an automatic-mode slider gesture to the system, then retain its local bias. */
+/** Keep an automatic-mode slider choice until a confirmed scene change or screen lock. */
 public final class LumaFrameworkSliderOverride {
-    private long releaseUntil;
-    private float referenceGoal;
-    private float factor=1f;
-    private boolean pending;
+    private long releaseUntil, sceneSince;
+    private float heldBrightness, anchorLux=Float.NaN;
+    private boolean pending, holding;
+    private int sceneSamples;
 
-    public boolean observe(long now, int mode, float previous, float current, float goal) {
+    public boolean observe(long now, int mode, float previous, float current) {
         if (mode!=1 || !Float.isFinite(previous) || !Float.isFinite(current) ||
             Math.abs(previous-current)<.0001f) return false;
-        if (Float.isFinite(goal) && goal>0) referenceGoal=goal;
-        pending=referenceGoal>0;
-        releaseUntil=now+2500;
+        pending=true;holding=false;releaseUntil=now+2500;
+        sceneSamples=0;sceneSince=0;
         return true;
     }
     public boolean waiting(long now){return pending && now<releaseUntil;}
     public boolean pending(){return pending;}
-    public float settle(long now,float systemAdjusted) {
-        if (!pending || now<releaseUntil || !Float.isFinite(systemAdjusted) || systemAdjusted<=0)
+    public boolean holding(){return holding;}
+    public float heldBrightness(){return heldBrightness;}
+    public float settle(long now,float systemAdjusted,float lux) {
+        if (!pending || now<releaseUntil || !Float.isFinite(systemAdjusted) || systemAdjusted<=0 || systemAdjusted>1)
             throw new IllegalStateException("slider brightness not settled");
-        factor=Math.max(.25f,Math.min(4f,systemAdjusted/referenceGoal));
-        pending=false;
-        return factor;
+        heldBrightness=systemAdjusted;anchorLux=validLux(lux)?lux:Float.NaN;
+        pending=false;holding=true;sceneSamples=0;sceneSince=0;
+        return heldBrightness;
     }
-    public float apply(float unadjusted){return unadjusted*factor;}
-    public float factor(){return factor;}
+    private static boolean validLux(float lux){return Float.isFinite(lux)&&lux>=0;}
+    public boolean scene(long now,float lux) {
+        if (!holding || !validLux(lux)) return false;
+        if (!validLux(anchorLux)) {anchorLux=lux;return false;}
+        boolean large=Math.abs(Math.log1p(lux)-Math.log1p(anchorLux))>=Math.log(2) && Math.abs(lux-anchorLux)>=3f;
+        if (!large) {sceneSamples=0;sceneSince=0;return false;}
+        if (sceneSamples==0) {sceneSamples=1;sceneSince=now;return false;}
+        if (now<sceneSince || now-sceneSince<1000) return false;
+        if (++sceneSamples<2) return false;
+        clear();return true;
+    }
+    public float apply(float unadjusted){return holding?heldBrightness:unadjusted;}
+    public void clear(){pending=false;holding=false;sceneSamples=0;sceneSince=0;anchorLux=Float.NaN;}
 }

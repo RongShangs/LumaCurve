@@ -18,8 +18,10 @@ static struct {
     unsigned samples;
     float points[14], baseline[14], pending_lux;
     int anchor;
+    int pending_dir;
+    unsigned gesture_count;
     uint64_t learned_ms;
-    uint64_t changed_ms, applied_ms, saved_ms;
+    uint64_t changed_ms, last_gesture_ms, applied_ms, saved_ms;
     char event[2048];
     const char *evidence;
 } pref;
@@ -108,6 +110,7 @@ void luma_preference_configure(DomainIo *io) {
         if (!pref.configured) pref.effective = pref.offset;
     }
     pref.configured = true; pref.pending_log = 0; pref.changed_ms = 0;
+    pref.pending_dir = 0; pref.gesture_count = 0; pref.last_gesture_ms = 0;
     if (!luma_preference_learning) pref.evidence = "disabled";
     save(io, 0);
 }
@@ -117,7 +120,7 @@ void luma_preference_configure(DomainIo *io) {
 void luma_preference_settings(DomainIo *io, uint64_t now, int mode, float adj, long slider) {
     bool changed = !pref.settings_seen || mode != pref.last_mode || adj != pref.last_adj || slider != pref.last_slider;
     pref.settings_seen = true; pref.last_mode = mode; pref.last_adj = adj; pref.last_slider = slider;
-    if (mode != 1) { pref.changed_ms = 0; pref.pending_log = 0; }
+    if (mode != 1) { pref.changed_ms = 0; pref.pending_log = 0; pref.pending_dir = 0; pref.gesture_count = 0; }
     if (!luma_preference_learning || !changed) return;
     uintptr_t pipe = (uintptr_t)CALL(io, popen, ARG(
         "set -o pipefail 2>/dev/null || exit 1; timeout 2 dumpsys display 2>/dev/null | grep 'BrightnessEvent:.*logicalId=0' | tail -n 1"), ARG("r"));
@@ -136,13 +139,24 @@ void luma_preference_settings(DomainIo *io, uint64_t now, int mode, float adj, l
     if (strncmp(end, "(user_set)", 10)) return;
     float from = strtof(initial + strlen(", initBrt="), &end);
     if (*end != ',' || !isfinite(to) || !isfinite(from) || to <= 0 || to > 1 || from <= 0 || from > 1) return;
-    if (pref.changed_ms && (now < pref.changed_ms || now - pref.changed_ms > 8000)) pref.pending_log = 0;
     float lux = FLOAT(g_actuator_smooth_lux);
     if (!isfinite(lux) || lux < 0 || (pref.learned_ms && now >= pref.learned_ms && now - pref.learned_ms < 60000)) return;
+    float delta = logf(to / from);
+    if (!isfinite(delta) || fabsf(delta) < .03f) return;
+    int direction = delta > 0 ? 1 : -1;
     unsigned anchor = luma_curve_nearest(lux);
-    if (!pref.changed_ms || pref.anchor != (int)anchor) pref.pending_log = 0;
-    pref.anchor = (int)anchor; pref.pending_lux = lux;
-    pref.pending_log += logf(to / from); pref.changed_ms = now; pref.evidence = "user_set";
+    bool same_scene = pref.changed_ms && now >= pref.changed_ms && now - pref.changed_ms <= 600000 &&
+        pref.anchor == (int)anchor && pref.pending_dir == direction &&
+        fabsf(log1pf(lux) - log1pf(pref.pending_lux)) <= logf(1.5f);
+    if (!same_scene) {
+        pref.pending_log = 0; pref.gesture_count = 0; pref.pending_lux = lux;
+        pref.anchor = (int)anchor; pref.pending_dir = direction; pref.last_gesture_ms = 0;
+    }
+    if (!pref.gesture_count || (now >= pref.last_gesture_ms && now - pref.last_gesture_ms >= 5000)) {
+        if (pref.gesture_count < UINT_MAX) pref.gesture_count++;
+        pref.last_gesture_ms = now;
+    }
+    pref.pending_log += delta; pref.changed_ms = now; pref.evidence = "user_set";
 }
 static bool safe(uint64_t now) {
     return INT(cached_auto) == 1 && FLAG(g_lux_valid) && !FLAG(g_sensor_hold_active) &&
@@ -152,12 +166,15 @@ static bool safe(uint64_t now) {
 }
 int luma_preference_apply(DomainIo *io, uint64_t now, int target) {
     if (!pref.configured) return target;
-    if (pref.changed_ms && (now < pref.changed_ms || now - pref.changed_ms > 30000 || !safe(now))) {
-        pref.changed_ms = 0; pref.pending_log = 0;
+    if (pref.changed_ms && (now < pref.changed_ms || now - pref.changed_ms > 600000 || !safe(now) ||
+        !isfinite(FLOAT(g_actuator_smooth_lux)) || FLOAT(g_actuator_smooth_lux) < 0 ||
+        luma_curve_nearest(FLOAT(g_actuator_smooth_lux)) != (unsigned)pref.anchor ||
+        fabsf(log1pf(FLOAT(g_actuator_smooth_lux)) - log1pf(pref.pending_lux)) > logf(1.5f))) {
+        pref.changed_ms = 0; pref.pending_log = 0; pref.pending_dir = 0; pref.gesture_count = 0;
     }
-    if (luma_preference_learning && pref.changed_ms && now - pref.changed_ms >= 8000) {
+    if (luma_preference_learning && pref.changed_ms && pref.gesture_count >= 2 && now - pref.changed_ms >= 8000) {
         float lux = FLOAT(g_actuator_smooth_lux);
-        float step = fmaxf(-.005f, fminf(.005f, pref.pending_log * .02f));
+        float step = fmaxf(-.0025f, fminf(.0025f, pref.pending_log * .02f));
         if (isfinite(lux) && lux >= 0 && luma_curve_nearest(lux) == (unsigned)pref.anchor &&
             fabsf(log1pf(lux) - log1pf(pref.pending_lux)) <= logf(1.5f) && fabsf(step) >= .0005f) {
             unsigned i = (unsigned)pref.anchor;
@@ -170,7 +187,7 @@ int luma_preference_apply(DomainIo *io, uint64_t now, int target) {
                 pref.dirty = true; pref.learned_ms = now;
             }
         }
-        pref.changed_ms = 0; pref.pending_log = 0;
+        pref.changed_ms = 0; pref.pending_log = 0; pref.pending_dir = 0; pref.gesture_count = 0;
     }
     save(io, now);
     if (pref.applied_ms && now >= pref.applied_ms) {

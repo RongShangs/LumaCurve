@@ -297,6 +297,7 @@ static int publish_state(DomainIo *io, const StateFrame *frame) {
         state_real(io, stream, "framework_adjusted=%.7f\n", fw->adjusted);
         state_word(io, stream, "framework_actual_node=%d\n", fw->node);
         state_word(io, stream, "framework_owned=%d\n", fw->active);
+        state_word(io, stream, "framework_user_hold=%d\n", fw->user_hold);
         state_word(io, stream, "framework_feedback_age_ms=%llu\n", frame->now>=fw->sampled_ms?frame->now-fw->sampled_ms:0);
 #endif
         char curve[256];

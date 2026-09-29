@@ -16,7 +16,7 @@ def run(change=None):
     else:assert result.returncode and 'Assertion' in result.stderr and 'failed' in result.stderr,(label,result.stdout,result.stderr)
     return exe,result
 exe,result=run();neg=[]
-for change in [('intent','brightness_preference.c','if (strncmp(end, "(user_set)", 10)) return;','if (false) return;'),('delay','brightness_preference.c','now - pref.changed_ms >= 8000','now - pref.changed_ms >= 1'),('step','brightness_preference.c','fminf(.005f, pref.pending_log * .02f)','fminf(.05f, pref.pending_log * .02f)'),('atomic','brightness_preference.c','if (ok && (int)CALL(io, rename','if ((int)CALL(io, rename'),('curve-order','curve_pct_for_lux.c','(i && value / 100 < parsed[i - 1])','false')]:
+for change in [('intent','brightness_preference.c','if (strncmp(end, "(user_set)", 10)) return;','if (false) return;'),('delay','brightness_preference.c','now - pref.changed_ms >= 8000','now - pref.changed_ms >= 1'),('step','brightness_preference.c','fminf(.0025f, pref.pending_log * .02f)','fminf(.05f, pref.pending_log * .02f)'),('atomic','brightness_preference.c','if (ok && (int)CALL(io, rename','if ((int)CALL(io, rename'),('curve-order','curve_pct_for_lux.c','(i && value / 100 < parsed[i - 1])','false')]:
     run(change);neg.append({'name':change[0],'semantic_failure_detected':True})
 points=subprocess.check_output([str(exe),'--curve'],text=True)
 js="const m=require('./module/webroot/curve_math.js');const rows=JSON.parse(process.argv[1]);for(const [x,y] of rows)if(Math.abs(m.base(x,m.defaults,2.2)-y)>.0001)throw Error([x,y,m.base(x,m.defaults,2.2)]);"

@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include <stddef.h>
 typedef struct LumaFrameworkSnapshot {
-    int mode, slider, on, window, node, active;
+    int mode, slider, on, window, node, active, user_hold;
     float adjustment, minimum, maximum, base, adjusted, goal, limited, request;
     uint64_t sampled_ms;
 } LumaFrameworkSnapshot;

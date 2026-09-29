@@ -20,7 +20,7 @@ public final class LumaFrameworkOutputBroker implements LumaFrameworkOutputSessi
     long settingsStamp,sequence,lastClientSequence=-1;
     long frameTicks,providerReads,displayReads,heartbeats;
     int mode,slider;
-    float adjustment,initial,goal=-1,rawGoal=-1,limited=-1,request;
+    float adjustment,initial,goal=-1,rawGoal=-1,limited=-1,request,lastLux=Float.NaN;
     static long now(){return System.nanoTime()/1000000;}
     LumaFrameworkOutputBroker(File folder)throws Exception {
         run=folder;trace=new PrintWriter(new File(production?"/dev/null":new File(folder,"framework.trace").getPath()),"UTF-8");
@@ -52,16 +52,18 @@ public final class LumaFrameworkOutputBroker implements LumaFrameworkOutputSessi
             int nextMode=Integer.parseInt(values[0]);
             float nextAdjustment=Float.parseFloat(values[1]);
             if(production&&settingsStamp!=0&&(acquired||sliderOverride.pending())&&
-               sliderOverride.observe(t,nextMode,adjustment,nextAdjustment,rawGoal)){
+               sliderOverride.observe(t,nextMode,adjustment,nextAdjustment)){
                 event("USER_SLIDER,adjustment="+nextAdjustment+",system_handoff=2500ms");
                 if(acquired)release();
             }
+            if(nextMode!=1)sliderOverride.clear();
             mode=nextMode;adjustment=nextAdjustment;slider=Integer.parseInt(values[2]);settingsStamp=now();
         }
         Object display=LumaFrameworkProbe.invoke(android.global,"getDisplayInfo",new Class<?>[]{int.class},0);
         displayReads++;
         if(display==null||!"local:4630946949513469331".equals(display.getClass().getField("uniqueId").get(display)))throw new IllegalStateException("wrong main display");
         boolean on=display.getClass().getField("state").getInt(display)==2;
+        if(!on)sliderOverride.clear();
         Object info=android.info();
         int node=Integer.parseInt(LumaFrameworkProbe.file("/sys/class/backlight/panel0-backlight/brightness").trim());
         snapshot=new LumaFrameworkOutputSession.Snapshot(now(),mode==1?LumaFrameworkOutputSession.Mode.AUTO:LumaFrameworkOutputSession.Mode.MANUAL,on,
@@ -85,6 +87,14 @@ public final class LumaFrameworkOutputBroker implements LumaFrameworkOutputSessi
         return id&&clear;
     }
     void event(String text){events.println(now()+","+text);events.flush();}
+    void sceneLux(long time,float lux) {
+        if(!Float.isFinite(lux)||lux<0)return;
+        lastLux=lux;
+        if(sliderOverride.scene(time,lux)){
+            event("USER_SLIDER_HOLD_END,scene_change,lux="+lux);
+            if(hasGoal&&rawGoal>=0)goal=rawGoal;
+        }
+    }
     synchronized int nextTickDelayMs() {
         return LumaFrameworkOutputCadence.nextDelay(acquired,hasGoal,request,limited,snapshot.adjustedBrightness);
     }
@@ -104,10 +114,12 @@ public final class LumaFrameworkOutputBroker implements LumaFrameworkOutputSessi
             frameTicks++;
             refresh();long t=now();
             if(acquired&&(!client.alive(t)||!LumaFrameworkOutputSession.usable(snapshot,t))){
+                if(!client.alive(t))sliderOverride.clear();
                 event("RELEASE_CAUSE,"+(!client.alive(t)?"client_lease":"control_conditions"));release();
             }
             session.tick(t);
             if(acquired&&frameLiveness.expired(session.state())){
+                sliderOverride.clear();
                 event("RELEASE_CAUSE,frame_lease");acquired=false;hasGoal=false;frameLiveness.release();goal=limited=-1;
             }
             if(acquired&&hasGoal){
@@ -133,8 +145,9 @@ public final class LumaFrameworkOutputBroker implements LumaFrameworkOutputSessi
         String[] words=line.trim().split(" +");
         // Heartbeat only extends the independent client lease. The frame loop checks
         // current mode, screen and feedback even when there is no new target.
-        if(words.length==1&&words[0].equals("P")) {
+        if((words.length==1||words.length==2)&&words[0].equals("P")) {
             long t=now();if(!acquired||!LumaFrameworkOutputSession.usable(snapshot,t))throw new IllegalStateException("heartbeat without ownership");
+            if(words.length==2)sceneLux(t,Float.parseFloat(words[1]));
             client.renew(t);
             heartbeats++;
             return response();
@@ -150,13 +163,14 @@ public final class LumaFrameworkOutputBroker implements LumaFrameworkOutputSessi
             if(production&&!LumaLegacyBacklightCoordinate.plausibleAnchor(snapshot.node,snapshot.adjustedBrightness))
                 throw new IllegalStateException("backlight coordinate calibration unavailable");
             if(!acquired){
-                if(production&&sliderOverride.pending())event("USER_SLIDER_BIAS,factor="+sliderOverride.settle(t,snapshot.adjustedBrightness));
+                if(production&&sliderOverride.pending())event("USER_SLIDER_HOLD,brightness="+sliderOverride.settle(t,snapshot.adjustedBrightness,lastLux));
                 initial=snapshot.adjustedBrightness;ramp.reset(initial,t);request=initial;
                 goal=limited=-1;frameLiveness.acquire();event("ACQUIRE,anchor="+initial);
             }
             acquired=true;client.renew(t);ramp.stamp=t;break;
         case "T":
-            if(words.length!=4||!acquired||!LumaFrameworkOutputSession.usable(snapshot,t))throw new IllegalStateException("goal without ownership");
+            if((words.length!=4&&words.length!=5)||!acquired||!LumaFrameworkOutputSession.usable(snapshot,t))throw new IllegalStateException("goal without ownership");
+            if(words.length==5)sceneLux(t,Float.parseFloat(words[4]));
             long seq=Long.parseLong(words[1]);int raw=Integer.parseInt(words[2]),max=Integer.parseInt(words[3]);
             if(seq<=lastClientSequence||max!=16383||raw<0||raw>max)throw new IllegalArgumentException("invalid sequence or raw goal");
             lastClientSequence=seq;
@@ -164,16 +178,17 @@ public final class LumaFrameworkOutputBroker implements LumaFrameworkOutputSessi
             float desired=production?Math.max(0f,Math.min(1f,sliderOverride.apply(rawGoal))):rawGoal;
             if(!hasGoal||goal!=desired)event((production?"GOAL,framework_target=":"GOAL,legacy_fraction=")+desired);
             goal=desired;hasGoal=true;client.renew(t);break;
-        case "P":if(words.length!=1)throw new IllegalArgumentException();client.renew(t);break;
+        case "P":if(words.length!=1&&words.length!=2)throw new IllegalArgumentException();if(words.length==2)sceneLux(t,Float.parseFloat(words[1]));client.renew(t);break;
         case "R":if(words.length!=1)throw new IllegalArgumentException();release();break;
+        case "X":if(words.length!=1)throw new IllegalArgumentException();sliderOverride.clear();release();break;
         default:throw new IllegalArgumentException("unknown RPC");
         }
         if(acquired&&!LumaFrameworkOutputSession.usable(snapshot,now()))release();
         return response();
     }
     String response() {
-        return String.format(Locale.ROOT,"OK %d %.7f %d %d %d %d %.7f %.7f %.7f %.7f %.7f %.7f %.7f %d\n",mode,adjustment,slider,
-            snapshot.on?1:0,snapshot.windowOverride?1:0,snapshot.node,snapshot.min,snapshot.max,snapshot.baseBrightness,snapshot.adjustedBrightness,goal,limited,request,acquired?1:0);
+        return String.format(Locale.ROOT,"OK %d %.7f %d %d %d %d %.7f %.7f %.7f %.7f %.7f %.7f %.7f %d %d\n",mode,adjustment,slider,
+            snapshot.on?1:0,snapshot.windowOverride?1:0,snapshot.node,snapshot.min,snapshot.max,snapshot.baseBrightness,snapshot.adjustedBrightness,goal,limited,request,acquired?1:0,sliderOverride.holding()?1:0);
     }
     public static void main(String[] args)throws Exception {
         if(args.length!=2||!args[0].matches("[A-Za-z0-9._-]{1,90}")||!args[1].startsWith("/data/local/tmp/luma-framework-core.")||args[1].contains(".."))
@@ -184,7 +199,7 @@ public final class LumaFrameworkOutputBroker implements LumaFrameworkOutputSessi
         Thread frames=new Thread(()->{for(;;){broker.tick();try{Thread.sleep(broker.nextTickDelayMs());}catch(InterruptedException e){return;}}},"Luma-framework-frames");
         frames.setDaemon(true);frames.start();
         new File(broker.run,"broker-ready").createNewFile();
-        System.out.println(broker.production?"BROKER_READY build=20260930-framework-lean01 output=normal_range_ramp":
+        System.out.println(broker.production?"BROKER_READY build=20260930-framework-hold01 output=normal_range_ramp":
             "BROKER_READY build=20260930-framework-core-test04 budget=acquisition+/-0.01");
         for(;;){
             Object socket=LumaFrameworkProbe.invoke(server,"accept",new Class<?>[0]);

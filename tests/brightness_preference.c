@@ -48,37 +48,41 @@ static void observation(unsigned id,float from,float to,bool user,int mode,uint6
     luma_preference_settings(&io,now,mode,(float)id/100,(long)id);
 }
 static void train(unsigned id,float from,float to,uint64_t now) {
-    observation(id,from,to,true,1,now);luma_preference_apply(&io,now,1000);
-    luma_preference_apply(&io,now+8000,1000);
+    observation(id*2,from,to,true,1,now);luma_preference_apply(&io,now,1000);
+    observation(id*2+1,from,to,true,1,now+6000);luma_preference_apply(&io,now+6000,1000);
+    luma_preference_apply(&io,now+14000,1000);
 }
 int main(int argc,char **argv) {
     if (argc>1 && !strcmp(argv[1],"--curve")) {
         luma_curve_reset();for(unsigned i=0;i<=200;i++){float lux=powf(100001,(float)i/200)-1;printf("%.6f %.6f\n",lux,ios_brightness_for_lux(lux,2.2f)*100);}return 0;
     }
     ready();observation(0,.3f,.4f,true,1,10000);assert(!luma_preference_pending());
-    observation(1,.3f,.6f,false,1,20000);luma_preference_apply(&io,28000,1000);
+    observation(1,.3f,.6f,false,1,20000);
+    observation(2,.3f,.6f,false,1,26000);luma_preference_apply(&io,34000,1000);
     assert(luma_preference_samples()==0 && luma_preference_offset()==0);
     observation(2,.3f,.6f,true,0,30000);assert(!luma_preference_pending());
     event[0]=0;luma_preference_settings(&io,40000,1,.04f,4);assert(!luma_preference_pending());
     puts("intent: startup history, automatic writes, manual-mode and missing evidence do not learn PASS");
     observation(5,.3f,.45f,true,1,50000);luma_preference_apply(&io,50000,1000);
     observation(6,.45f,.6f,true,1,52000);luma_preference_apply(&io,59999,1000);assert(luma_preference_samples()==0);
-    int applied=luma_preference_apply(&io,60000,1000);
+    observation(7,.45f,.6f,true,1,57000);luma_preference_apply(&io,64999,1000);assert(luma_preference_samples()==0);
+    int applied=luma_preference_apply(&io,65000,1000);
     assert(applied==1000 && luma_preference_samples()==1 && luma_preference_offset()==0);
-    assert(fabsf(luma_preference_point(5,.066f)-.066f*1.005f)<1e-7f);
+    float base5=luma_curve_base_point(5);
+    assert(fabsf(luma_preference_point(5,base5)-base5*1.0025f)<1e-7f);
     for(unsigned i=0;i<14;i++) if(i!=5) assert(luma_preference_point(i,luma_curve_base_point(i))==luma_curve_base_point(i));
     assert(*record && !luma_preference_dirty());
-    train(7,.6f,.3f,65000);assert(luma_preference_samples()==1);
-    train(8,.6f,.3f,125000);assert(luma_preference_samples()==2);
-    assert(luma_preference_point(5,.066f)<.066f*1.005f);
-    puts("learning: 8-second confirmation, nearest anchor only, 0.5% relative cap, 60-second cooldown and opposite correction PASS");
-    float learned=luma_preference_point(5,.066f);
-    luma_preference_configure(&io);assert(luma_preference_point(5,.066f)==learned);
+    train(8,.6f,.3f,70000);assert(luma_preference_samples()==1);
+    train(9,.6f,.3f,140000);assert(luma_preference_samples()==2);
+    assert(luma_preference_point(5,base5)<base5*1.0025f);
+    puts("learning: repeated same-direction gestures, 8-second quiet period, nearest anchor, 0.25% cap and cooldown PASS");
+    float learned=luma_preference_point(5,base5);
+    luma_preference_configure(&io);assert(luma_preference_point(5,base5)==learned);
     luma_preference_reset();luma_preference_learning=1;luma_preference_configure(&io);
-    assert(fabsf(luma_preference_point(5,.066f)-learned)<1e-7f && luma_preference_samples()==2);
+    assert(fabsf(luma_preference_point(5,base5)-learned)<1e-7f && luma_preference_samples()==2);
     luma_preference_learning=0;luma_preference_configure(&io);train(9,.3f,.6f,200000);assert(luma_preference_samples()==2);
     luma_preference_revision=1;luma_preference_configure(&io);
-    assert(luma_preference_point(5,.066f)==.066f && luma_preference_samples()==0);
+    assert(luma_preference_point(5,base5)==base5 && luma_preference_samples()==0);
     puts("persistence: unrelated reload and restart retain local curve, disabled learning retains shape, explicit curve reset clears learning PASS");
     for (int bad=1;bad<=5;bad++) {
         ready();strcpy(record,"old-safe-record\n");failure=bad;luma_preference_revision=1;luma_preference_configure(&io);
@@ -101,12 +105,20 @@ int main(int argc,char **argv) {
         luma_preference_apply(&io,28000,1000);assert(!luma_preference_samples());
     }
     ready();observation(0,.3f,.4f,false,1,10000);
-    for(unsigned i=1;i<=60;i++)train(i,.1f,.9f,20000+(uint64_t)i*70000);
-    assert(fabsf(luma_preference_point(5,.066f)-.066f*1.2f)<1e-7f);
-    for(unsigned i=1;i<=120;i++)train(i,.9f,.1f,5000000+(uint64_t)i*70000);
-    assert(fabsf(luma_preference_point(5,.066f)-.056f)<1e-7f); /* neighboring anchor wins over the -20% bound */
+    observation(1,.3f,.6f,true,1,20000);
+    observation(2,.6f,.3f,true,1,26000);
+    luma_preference_apply(&io,34000,1000);assert(luma_preference_samples()==0);
+    observation(3,.3f,.6f,true,1,40000);
+    observation(4,.3f,.6f,true,1,46000);
+    ios_state.g_actuator_smooth_lux=500;
+    luma_preference_apply(&io,54000,1000);assert(luma_preference_samples()==0);
+    ready();observation(0,.3f,.4f,false,1,10000);
+    for(unsigned i=1;i<=100;i++)train(i,.1f,.9f,20000+(uint64_t)i*80000);
+    assert(fabsf(luma_preference_point(5,base5)-base5*1.2f)<1e-7f);
+    for(unsigned i=1;i<=160;i++)train(i,.9f,.1f,9000000+(uint64_t)i*80000);
+    assert(fabsf(luma_preference_point(5,base5)-luma_curve_base_point(4))<1e-7f); /* neighboring anchor wins over the -20% bound */
     assert(luma_curve_nearest(90)==5 && luma_curve_nearest(7)==2);
-    puts("bounds/safety: sensor/thermal/wake/owner/invalid/changed-scene guards, nearest log-lux anchor and +/-20% long-term limits PASS");
+    puts("bounds/safety: reversal, scene change, sensor/thermal/wake/owner guards and +/-20% long-term limits PASS");
     float points[14];assert(luma_curve_parse("0.1,0.2,0.75,1.15,5.6,6.6,8.9,9.9,10.9,12.2,22,25,65,85",points));
     assert(!luma_curve_parse("0.1,0.2,0.75,1.15,5.6,6.6,8.9,9.9,10.9,12.2,22,25,65,nan",points));
     assert(!luma_curve_parse("0.1,0.2,0.75,1.15,5.6,6.6,8.9,9.9,10.9,12.2,22,25,65,20",points));
