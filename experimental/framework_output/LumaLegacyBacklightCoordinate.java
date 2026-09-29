@@ -9,10 +9,15 @@ public final class LumaLegacyBacklightCoordinate {
         return raw/PANEL_CODES_PER_FLOAT;
     }
     public static boolean plausibleAnchor(int node,float adjusted) {
-        if(node<100||node>16383||!LumaFrameworkOutputSession.finite(adjusted)||adjusted<=.005f)return false;
+        if(node<1||node>16383||!LumaFrameworkOutputSession.finite(adjusted)||adjusted<=0)return false;
+        float ratio=node/adjusted;
+        // The panel is nonlinear near minimum brightness. Check only a broad
+        // sanity envelope there; the display ID, mode and live feedback are
+        // verified independently before and during ownership.
+        if(adjusted<.05f)return ratio>=5000f&&ratio<=80000f;
         // Only the low range was measured closely. A wide high-range sanity
         // envelope avoids rejecting a valid nonlinear panel response.
-        if(adjusted>.10f){float ratio=node/adjusted;return ratio>=8000f&&ratio<=30000f;}
+        if(adjusted>.10f)return ratio>=8000f&&ratio<=30000f;
         float expected=adjusted*PANEL_CODES_PER_FLOAT;
         return Math.abs(node-expected)<=Math.max(80f,expected*.07f);
     }

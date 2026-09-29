@@ -244,7 +244,15 @@ int ios_native_stat(const char * a, void * b) {
 }
 int ios_native_chmod(const char * a, unsigned b) {
 #ifdef LUMA_FRAMEWORK_BACKEND
-    if(!strcmp(a,ios_backlight_brightness()))return (b&0222)?luma_framework_release():luma_framework_acquire();
+    if(!strcmp(a,ios_backlight_brightness())) {
+        if(b&0222)return luma_framework_release();
+        /* Legacy chmod is an ownership hint, not a sysfs permission change in
+         * this backend. A temporarily unavailable broker must not latch the
+         * recovered main loop into lock_failed_passthrough forever. The actual
+         * frame call retries acquisition and reports whether it was accepted. */
+        (void)luma_framework_acquire();
+        return 0;
+    }
     if(!strncmp(a,"/sys/",5)){errno=EPERM;return -1;}
 #endif
     if (strcmp(a,ios_backlight_brightness())) return chmod(a,b);

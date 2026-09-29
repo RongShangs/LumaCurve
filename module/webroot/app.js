@@ -324,7 +324,8 @@
     else $('brightness-meter').removeAttribute('aria-valuenow');
     set('lux', format(s.lux, 1)); set('smooth', format(s.smooth, 1));
     set('mode', s.mode === 'auto' ? '自动亮度' : s.mode === 'manual' ? '手动亮度' : '—');
-    set('owner', owners[s.brightness_owner] || s.brightness_owner || '—');
+    set('owner', s.output_backend === 'hyperos4_framework' && s.brightness_owner === 'lock_failed_passthrough' ?
+      '系统接管' : owners[s.brightness_owner] || s.brightness_owner || '—');
     set('sunlight', s.sunlight_active === '1' ? (s.hbm_active === '1' ? '增强 + HBM' : '增强中') : '未触发');
     set('thermal', s.heat_guard_active === '1' ? '限制亮度中' : '未触发');
     set('transition', s.transition_active === '1' ? '平滑调节中' : '稳定');
@@ -340,7 +341,15 @@
     else if (s.mode === 'manual') { status = '手动模式'; heading = '你正在手动调节亮度'; description = '开启系统自动亮度后，流光亮度会继续运行。'; }
     else if (s.screen === '0' || s.brightness_owner === 'screen_off_passthrough') { status = '屏幕休眠'; heading = '屏幕已熄灭'; description = '当前由系统控制，等待再次亮屏。'; }
     else if (s.brightness_owner === 'wake_readonly') { status = '唤醒观察'; heading = '刚刚亮屏'; description = '先保留系统亮度，等光感读数稳定后再接管。'; }
-    else if (s.brightness_owner === 'lock_failed_passthrough') { status = '权限受限'; heading = '当前由系统调节亮度'; description = '未能取得背光写入权限，请检查模块运行情况。'; warning = true; }
+    else if (s.brightness_owner === 'lock_failed_passthrough') {
+      status = s.output_backend === 'hyperos4_framework' ? '框架未接管' : '权限受限';
+      heading = '当前由系统调节亮度';
+      description = s.output_backend === 'hyperos4_framework' ? '框架输出暂未满足接管条件，系统继续调节。' : '未能取得背光写入权限，请检查模块运行情况。';
+      warning = true;
+    }
+    else if (s.output_backend === 'hyperos4_framework' && s.brightness_owner === 'daemon' && s.framework_owned === '0') {
+      status = '等待接管'; heading = '当前由系统调节亮度'; description = '正在核对主屏状态，稍后继续接管。';
+    }
     else if (s.brightness_owner !== 'daemon') { heading = '当前由系统调节亮度'; description = '流光亮度正在等待接管。'; }
     else if (s.heat_guard_active === '1') { heading = '正在限制亮度'; description = '温度偏高，屏幕暂时调暗，降温后恢复。'; }
     else if (s.sensor_stale === '1' || s.sensor_hold_active === '1' || s.lux_valid === '0') { heading = '暂时保持亮度'; description = '当前读数尚不能确认环境变化，先保持亮度。'; }
