@@ -4,30 +4,30 @@ import hashlib,json,subprocess,zipfile
 from source_lists import sources_for
 ROOT=Path(__file__).resolve().parents[1]
 sha=lambda b:hashlib.sha256(b).hexdigest()
-native=json.loads((ROOT/'build/framework-core-test02/build.json').read_text())
+native=json.loads((ROOT/'build/framework-core-test03/build.json').read_text())
 java=json.loads((ROOT/'build/framework-probe/verification.json').read_text())
-assert java['ok'] and java['ramp_host_cases']==9 and java['client_lease_verified']
+assert java['ok'] and java['ramp_host_cases']==11 and java['output_session_host_cases']==16 and java['client_lease_verified']
 for report in (native,java):
  for source,digest in report['source_sha256'].items():assert sha((ROOT/source).read_bytes())==digest,source
-assert sha((ROOT/'build/framework-core-test02/luma_framework_core').read_bytes())==native['sha256']
+assert sha((ROOT/'build/framework-core-test03/luma_framework_core').read_bytes())==native['sha256']
 assert sha((ROOT/'build/framework-probe/LumaFrameworkProbe.jar').read_bytes())==java['jar_sha256']
 for filename in ('framework_core_recovery.py','framework_core_shell.py','framework_core_selection.py'):
  subprocess.run(['python',str(ROOT/'tests'/filename)],check=True)
 subprocess.run(['C:/msys64/mingw64/bin/gcc.exe','-Wall','-Wextra','-Werror','-std=c11','-DLUMA_FRAMEWORK_BACKEND',
  '-I'+str(ROOT/'csrc'),'-I'+str(ROOT/'experimental/framework_output'),str(ROOT/'tests/framework_protocol.c'),
- '-o',str(ROOT/'build/framework-core-test02/protocol-test.exe')],check=True)
-subprocess.run([str(ROOT/'build/framework-core-test02/protocol-test.exe')],check=True)
+ '-o',str(ROOT/'build/framework-core-test03/protocol-test.exe')],check=True)
+subprocess.run([str(ROOT/'build/framework-core-test03/protocol-test.exe')],check=True)
 files={
- 'build/framework-core-test02/luma_framework_core':'luma_framework_core',
+ 'build/framework-core-test03/luma_framework_core':'luma_framework_core',
  'build/framework-probe/LumaFrameworkProbe.jar':'LumaFrameworkProbe.jar',
  'module/process_scope.sh':'process_scope.sh','module/luma_curve.conf':'luma_curve.conf',
  'tools/probe_temporary_runtime.sh':'probe_temporary_runtime.sh',
  'tools/test_framework_core_android.sh':'test_framework_core_android.sh',
  'tools/framework_core_runtime.sh':'framework_core_runtime.sh','tools/framework_core_watchdog.sh':'framework_core_watchdog.sh',
- 'docs/framework-core-test02使用说明.md':'README.md','docs/framework-core-test01实机结果.md':'PREVIOUS-RESULT.md',
+ 'docs/framework-core-test03使用说明.md':'README.md','docs/framework-core-test02实机结果.md':'PREVIOUS-RESULT.md',
  'LICENSE':'LICENSE','docs/来源与许可证.md':'PROVENANCE.md',
- 'build/framework-core-test02/build.json':'native-build.json','build/framework-probe/verification.json':'java-verification.json',
- 'build/framework-core-test02/selection-verification.json':'selection-verification.json',
+ 'build/framework-core-test03/build.json':'native-build.json','build/framework-probe/verification.json':'java-verification.json',
+ 'build/framework-core-test03/selection-verification.json':'selection-verification.json',
 }
 sources=sources_for()+list((ROOT/'csrc').glob('*.h'))+list((ROOT/'experimental/framework_output').glob('*'))+list((ROOT/'tools/framework_probe').glob('*.java'))
 sources += [ROOT/'tools'/name for name in ('build_framework_core.py','build_framework_probe.py','source_lists.py')]
@@ -37,9 +37,9 @@ for f in sources:
 payload={name:sha((ROOT/source).read_bytes()) for source,name in files.items()}
 manifest={'build':native['build'],'android_device_verified':False,'github_published':False,'installed_module_replaced':False,
  'output_budget':'each acquisition feedback +/-0.01, live bounds take precedence','curve_coordinate':'legacy_raw_fraction_nominal',
- 'checks':{'native_protocol_cases':15,'recovery_fixtures':6,'wrapper_fixtures':6,'session_cases':12,'ramp_cases':9,'independent_client_lease':True,'selection_negative_mutations':3},
+ 'checks':{'native_protocol_cases':15,'recovery_fixtures':6,'wrapper_fixtures':6,'session_cases':16,'ramp_cases':11,'independent_client_lease':True,'selection_negative_mutations':3},
  'payload_sha256':payload}
-dist=ROOT/'dist';dist.mkdir(exist_ok=True);target=dist/'LumaCurve-framework-core-test02.zip'
+dist=ROOT/'dist';dist.mkdir(exist_ok=True);target=dist/'LumaCurve-framework-core-test03.zip'
 with zipfile.ZipFile(target,'w',zipfile.ZIP_DEFLATED) as z:
  for source,name in files.items():
   data=(ROOT/source).read_bytes()
@@ -54,5 +54,5 @@ with zipfile.ZipFile(target) as z:
  assert 'module.prop' not in z.namelist()
 assert not any('firmware' in name.lower() or name.endswith('framework.jar') or name.endswith('services.jar') for name in files.values())
 manifest['archive_sha256']=sha(target.read_bytes());manifest['size']=target.stat().st_size
-(dist/'framework-core-test02-manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
+(dist/'framework-core-test03-manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
 print(target);print('SHA256',manifest['archive_sha256'])

@@ -1,14 +1,14 @@
 public final class LumaFrameworkOutputSessionTest {
     static class Fake implements LumaFrameworkOutputSession.Bridge {
         LumaFrameworkOutputSession.Mode mode=LumaFrameworkOutputSession.Mode.AUTO;
-        boolean on=true,override,failSet,failRelease,failRead,clearVisible=true;long stamp=1000;float last;int writes,releases;
+        boolean on=true,override,failSet,failRelease,failRead,clearVisible=true;long stamp=1000;float last,adjusted=.2f;int writes,releases;
         public LumaFrameworkOutputSession.Snapshot read()throws Exception{
             if(failRead)throw new Exception("read");
-            return new LumaFrameworkOutputSession.Snapshot(stamp,mode,on,override,.1f,.2f,.00036f,.374f,1753);
+            return new LumaFrameworkOutputSession.Snapshot(stamp,mode,on,override,.1f,adjusted,.00036f,.374f,1753);
         }
         public void temporary(float v)throws Exception {
             if(Float.isNaN(v)){releases++;if(failRelease)throw new Exception("release");}
-            else{writes++;if(failSet)throw new Exception("set");last=v;}
+            else{writes++;if(failSet)throw new Exception("set");last=adjusted=v;}
         }
         public boolean temporaryCleared(){return clearVisible;}
     }
@@ -46,6 +46,35 @@ public final class LumaFrameworkOutputSessionTest {
                 f.clearVisible=true;s.tick(2000);check(s.state()==LumaFrameworkOutputSession.State.IDLE);
             }
         }
-        System.out.println("Typed framework output session: 12 cases PASS; not integrated into production");
+        {
+            Fake f=new Fake();LumaFrameworkOutputSession s=new LumaFrameworkOutputSession(f);
+            s.submit(1,1000,LumaFrameworkOutputSession.Unit.FRAMEWORK_FLOAT,.15f,1000);
+            f.stamp=1900;s.submit(2,1900,LumaFrameworkOutputSession.Unit.FRAMEWORK_FLOAT,.15f,1000);
+            check(f.writes==1&&s.binderWrites()==1&&s.unchangedRequests()==1);
+            s.tick(2000);check(f.releases==0);s.tick(2900);check(f.releases==1);
+            f.stamp=3000;s.submit(3,3000,LumaFrameworkOutputSession.Unit.FRAMEWORK_FLOAT,.15f,1000);
+            check(f.writes==2);
+        }
+        {
+            Fake f=new Fake();LumaFrameworkOutputSession s=new LumaFrameworkOutputSession(f);
+            s.submit(1,1000,LumaFrameworkOutputSession.Unit.FRAMEWORK_FLOAT,.15f,1000);
+            f.override=true;
+            boolean rejected=false;try{s.submit(2,1100,LumaFrameworkOutputSession.Unit.FRAMEWORK_FLOAT,.15f,1000);}catch(Exception expected){rejected=true;}
+            check(rejected&&f.writes==1&&f.releases==1);
+        }
+        {
+            Fake f=new Fake();LumaFrameworkOutputSession s=new LumaFrameworkOutputSession(f);
+            s.submit(1,1000,LumaFrameworkOutputSession.Unit.FRAMEWORK_FLOAT,.15f,1000);
+            s.submit(2,1100,LumaFrameworkOutputSession.Unit.FRAMEWORK_FLOAT,.16f,1000);
+            check(f.writes==2&&s.unchangedRequests()==0);
+        }
+        {
+            Fake f=new Fake();LumaFrameworkOutputSession s=new LumaFrameworkOutputSession(f);
+            s.submit(1,1000,LumaFrameworkOutputSession.Unit.FRAMEWORK_FLOAT,.15f,1000);
+            f.adjusted=.12f;
+            s.submit(2,1100,LumaFrameworkOutputSession.Unit.FRAMEWORK_FLOAT,.15f,1000);
+            check(f.writes==2&&f.adjusted==.15f);
+        }
+        System.out.println("Typed framework output session: 16 cases PASS; isolated experimental backend");
     }
 }

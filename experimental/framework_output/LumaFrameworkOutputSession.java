@@ -1,4 +1,4 @@
-/** Typed framework-output boundary. Not yet connected to the maintained C engine.
+/** Typed experimental framework-output boundary. Default installed engine is unchanged.
  * Caller must tick with monotonic time and run an independent crash watchdog.
  */
 public final class LumaFrameworkOutputSession {
@@ -32,8 +32,13 @@ public final class LumaFrameworkOutputSession {
     final Bridge bridge;
     private State state=State.IDLE;
     private long deadline,lastSequence=-1,lastClock=-1;
+    private boolean applied;
+    private float appliedValue;
+    private long binderWrites,unchangedRequests;
     public LumaFrameworkOutputSession(Bridge bridge){this.bridge=bridge;}
     public State state(){return state;}
+    public long binderWrites(){return binderWrites;}
+    public long unchangedRequests(){return unchangedRequests;}
     static boolean finite(float v){return !Float.isNaN(v)&&!Float.isInfinite(v);}
     void clock(long now) {
         if(now<0||now<lastClock)throw new IllegalArgumentException("monotonic clock required");lastClock=now;
@@ -51,9 +56,15 @@ public final class LumaFrameworkOutputSession {
         try{snapshot=bridge.read();}catch(Exception failure){releaseAfterFailure(failure);throw failure;}
         if(!usable(snapshot,now)){release();throw new IllegalStateException("mode/power/override/feedback forbids control");}
         float limited=Math.max(snapshot.min,Math.min(snapshot.max,desired));
+        boolean unchanged=state==State.OWNED&&applied&&Float.floatToIntBits(appliedValue)==Float.floatToIntBits(limited)&&
+            Math.abs(snapshot.adjustedBrightness-appliedValue)<=.000001f;
         // A Binder failure may happen after mutation: claim responsibility before calling.
         state=State.OWNED;deadline=now+leaseMs;
-        try{bridge.temporary(limited);}catch(Exception failure){releaseAfterFailure(failure);throw failure;}
+        if(unchanged)unchangedRequests++;
+        else {
+            try{bridge.temporary(limited);}catch(Exception failure){releaseAfterFailure(failure);throw failure;}
+            appliedValue=limited;applied=true;binderWrites++;
+        }
         lastSequence=sequence;
         return new Request(sequence,now,desired,limited,snapshot);
     }
@@ -71,6 +82,7 @@ public final class LumaFrameworkOutputSession {
     }
     public void release()throws Exception {
         if(state==State.IDLE)return;
+        applied=false;
         state=State.RELEASE_PENDING;
         bridge.temporary(Float.NaN);
         if(!bridge.temporaryCleared())throw new IllegalStateException("temporary release not confirmed");

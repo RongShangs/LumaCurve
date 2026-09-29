@@ -18,7 +18,7 @@ RUN=$(mktemp -d /data/local/tmp/luma-framework-core.XXXXXX) || exit 2
 chmod 0700 "$RUN"
 cp "$HERE/LumaFrameworkProbe.jar" "$RUN/probe.jar" && cp "$HERE/luma_framework_core" "$RUN/luma_framework_core" || exit 2
 chmod 0700 "$RUN/luma_framework_core"
-OUT="$HERE/luma-framework-core-test02-$(date +%Y%m%d-%H%M%S)-$$"
+OUT="$HERE/luma-framework-core-test03-$(date +%Y%m%d-%H%M%S)-$$"
 mkdir "$OUT" || exit 2
 { date; id; getprop ro.build.version.incremental; } > "$OUT/environment.txt"
 timeout 10 dumpsys display > "$OUT/before-display.txt" 2>&1
@@ -50,7 +50,7 @@ for TRY in $(seq 1 15); do [ -f "$RUN/broker-ready" ] && break; kill -0 "$BROKER
 if [ ! -f "$RUN/broker-ready" ]; then echo '框架后端启动失败，执行恢复。'; finish; wait "$GUARD"; exit 2; fi
 nohup sh "$HERE/framework_core_runtime.sh" "$RUN" "$APP" core "$SOCKET" > "$OUT/core.log" 2>&1 </dev/null &
 CORE=$!; echo "$CORE" > "$RUN/core.pid"
-echo '完整核心测试约 2 分钟，输出限制为起始框架亮度 ±0.01。不要安装或重启模块。'
+echo '完整核心测试约 2 分钟，每次接管限制为当时框架亮度 ±0.01。不要安装或重启模块。'
 RESULT=0
 for TICK in $(seq 1 120); do
   if ! kill -0 "$CORE" 2>/dev/null || ! kill -0 "$BROKER" 2>/dev/null; then RESULT=2; break; fi

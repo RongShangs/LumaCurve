@@ -1,6 +1,6 @@
 """Analyze full-core numerical output and control windows; no optical claims."""
 from pathlib import Path
-import argparse,csv,json,statistics,math
+import argparse,csv,json,statistics,math,re
 p=argparse.ArgumentParser();p.add_argument('report',type=Path);a=p.parse_args()
 rows=[]
 for line in csv.DictReader((a.report/'framework.trace').open(encoding='utf-8')):
@@ -25,6 +25,30 @@ for group in groups:
       'goal_start':s[0]['algorithm_goal'],'goal_end':s[-1]['algorithm_goal'],
       'node_start':s[0]['node'],'node_end':s[-1]['node'],
       'tail_node_min':min(r['node'] for r in tail),'tail_node_max':max(r['node'] for r in tail)})
+process_file=a.report/'process-samples.txt'
+event_file=a.report/'framework.events'
+if process_file.exists() and event_file.exists():
+    clock=re.search(r'CPU_CLK_TCK,value=(\d+)',event_file.read_text(encoding='utf-8'))
+    summary['process_usage']={'verified_clk_tck':int(clock[1]) if clock else None,'processes':[],
+        'scope':'direct core and broker processes only; excludes system_server, children and tracing overhead; CPU=one core 100%'}
+    samples={}; text=process_file.read_text(encoding='utf-8')
+    marks=list(re.finditer(r'--- tick=(\d+) pid=(\d+) ---\n',text))
+    for i,m in enumerate(marks):
+        block=text[m.end():marks[i+1].start() if i+1<len(marks) else len(text)]
+        lines=block.splitlines(); stat=lines[1]; fields=stat[stat.rfind(')')+2:].split()
+        rss=re.search(r'VmRSS:\s+(\d+)',block)
+        if not rss:raise ValueError('missing process RSS')
+        samples.setdefault(m[2],[]).append({'uptime':float(lines[0].split()[0]),'ticks':int(fields[11])+int(fields[12]),
+            'rss_kib':int(rss[1]),'threads':int(fields[17]),'start_ticks':int(fields[19]),'comm':stat[stat.find('(')+1:stat.rfind(')')]})
+    for pid,items in samples.items():
+        if len(items)<2:continue
+        if len({v['start_ticks'] for v in items})!=1:raise ValueError('PID reuse in usage samples')
+        elapsed=items[-1]['uptime']-items[0]['uptime']; ticks=items[-1]['ticks']-items[0]['ticks']
+        if elapsed<=0 or ticks<0:raise ValueError('invalid process times')
+        summary['process_usage']['processes'].append({'pid':pid,'comm':items[0]['comm'],'samples':len(items),
+            'duration_s':elapsed,'cpu_one_core_percent':ticks/int(clock[1])/elapsed*100 if clock else None,
+            'rss_mib_min':min(v['rss_kib'] for v in items)/1024,'rss_mib_max':max(v['rss_kib'] for v in items)/1024,
+            'max_threads':max(v['threads'] for v in items)})
 (a.report/'trace-summary.json').write_text(json.dumps(summary,indent=2)+'\n',encoding='utf-8')
 import matplotlib
 matplotlib.use('Agg')

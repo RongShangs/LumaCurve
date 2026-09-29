@@ -76,6 +76,7 @@ public final class LumaFrameworkOutputBroker implements LumaFrameworkOutputSessi
         if(responsible)event("RELEASE_BEGIN,mode="+mode);
         session.release();
         if(responsible)event("RELEASE_CONFIRMED,mode="+mode);
+        if(responsible)event("OUTPUT_COUNTS,binder_writes="+session.binderWrites()+",unchanged_requests="+session.unchangedRequests());
     }
     synchronized void tick() {
         try {
@@ -133,7 +134,7 @@ public final class LumaFrameworkOutputBroker implements LumaFrameworkOutputSessi
         Thread frames=new Thread(()->{for(;;){broker.tick();try{Thread.sleep(100);}catch(InterruptedException e){return;}}},"Luma-framework-frames");
         frames.setDaemon(true);frames.start();
         new File(broker.run,"broker-ready").createNewFile();
-        System.out.println("BROKER_READY build=20260929-framework-core-test02 budget=initial+/-0.01");
+        System.out.println("BROKER_READY build=20260930-framework-core-test03 budget=acquisition+/-0.01");
         for(;;){
             Object socket=LumaFrameworkProbe.invoke(server,"accept",new Class<?>[0]);
             try {

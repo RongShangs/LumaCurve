@@ -12,6 +12,10 @@ public final class LumaFrameworkOutputRampTest {
         r.reset(.35f,10200);check(Math.abs(r.next(.5f,0,1,10300)-.354f)<.000001);
         rejected=false;try{r.reset(Float.NaN,10400);}catch(IllegalArgumentException expected){rejected=true;}check(rejected);
         rejected=false;try{r.reset(.35f,10200);}catch(IllegalArgumentException expected){rejected=true;}check(rejected);
-        System.out.println("perceptual ramp: 9 cases PASS");
+        r.reset(.2f,10400);float target=.2001f;
+        check(r.next(target,0,1,10500)==target);
+        for(int n=1;n<=1000;n++)check(r.next(target,0,1,10500+n*100)==target);
+        check(r.next(.19f,0,1,110600)<target);
+        System.out.println("perceptual ramp: 11 cases PASS");
     }
 }

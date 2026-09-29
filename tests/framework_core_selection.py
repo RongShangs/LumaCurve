@@ -1,7 +1,7 @@
 """Compile the live candidate helpers and reject targeted semantic regressions."""
 from pathlib import Path
 import subprocess,json,hashlib
-ROOT=Path(__file__).resolve().parents[1];out=ROOT/'build/framework-core-test02';out.mkdir(parents=True,exist_ok=True)
+ROOT=Path(__file__).resolve().parents[1];out=ROOT/'build/framework-core-test03';out.mkdir(parents=True,exist_ok=True)
 header=ROOT/'csrc/framework_wake.h';debounce=ROOT/'csrc/business_debounce.c'
 common=['C:/msys64/mingw64/bin/gcc.exe','-Wall','-Wextra','-Werror','-std=c11','-DIOS_PRODUCTION']
 fixture=ROOT/'tests/framework_core_selection.c'

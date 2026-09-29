@@ -12,8 +12,12 @@ public final class LumaFrameworkOutputRamp {
     public float next(float goal,float min,float max,long now)throws Exception {
         if(now<stamp||!LumaFrameworkOutputSession.finite(goal)||min<0||max>1||min>=max)throw new IllegalArgumentException("invalid ramp input");
         float dt=Math.min(200,now-stamp)/1000f;stamp=now;
-        float from=coordinate.encode(request),to=coordinate.encode(Math.max(min,Math.min(max,goal)));
+        float target=Math.max(min,Math.min(max,goal));
+        if(request==target)return request;
+        float from=coordinate.encode(request),to=coordinate.encode(target);
         float distance=.04f*dt;
+        // Exact arrival prevents round-trip noise from creating endless tiny submissions.
+        if(Math.abs(to-from)<=distance){request=target;return request;}
         float step=from+Math.max(-distance,Math.min(distance,to-from));
         request=Math.max(min,Math.min(max,coordinate.decode(step)));
         if(!LumaFrameworkOutputSession.finite(request))throw new IllegalStateException("invalid coordinate conversion");
