@@ -1,6 +1,6 @@
 # LumaCurve 本地体验包：HyperOS 4 主屏框架接管
 
-文件：`dist/luma_curve-1.0.0-local-framework-fix01.zip`。这是正常 KernelSU 模块 ZIP，可从管理器安装并重启使用，不需要运行两分钟的实验脚本。模块 ID `luma_curve`，版本仍为 `1.0.0 / 10000`；当前更改仅在本地 Git 和本地 ZIP，未推送 GitHub、未替换官网包。ZIP 自带 GPL-3.0 许可及对应 C/Java 源码。前一个本地包 `dist/luma_curve-1.0.0-local-framework.zip` 保留作回退。
+文件：`dist/luma_curve-1.0.0-local-framework-fix02.zip`。这是正常 KernelSU 模块 ZIP，可从管理器安装并重启使用，不需要运行两分钟的实验脚本。模块 ID `luma_curve`，版本仍为 `1.0.0 / 10000`；当前更改仅在本地 Git 和本地 ZIP，未推送 GitHub、未替换官网包。ZIP 自带 GPL-3.0 许可及对应 C/Java 源码。前两个本地包保留作回退。
 
 ## 实际行为
 
@@ -12,10 +12,11 @@
 - 框架桥稳定时降低读取频率；日志按既有轮转策略维护。无需保留实验用的 100ms 数值轨迹文件。
 - 本地修订 02：稳定后以实际物理背光作漂移基线，避免将仅在低亮度测得的比例外推到高亮度后误放权；框架帧租约延长到 3 秒，并记录释放原因。自动模式下检测到系统亮度滑块调整，会暂时交还系统约 2.5 秒，随后从系统新亮度重新接管，并在本次运行中保持该次调整的局部倍率。
 - 新默认曲线将 0～10 lux 的背光锚点提升至 2%～4.2%。升级时仅将未经编辑的旧默认曲线迁移至新版；用户自定义曲线及预设保持原样。
+- 本地修订 03：WebUI 设置页支持配置版本 12；首次亮度帧提交前不再把尚未启动的帧租约误判为过期。修订 02 实机日志证实该误判会导致接管和放权反复循环，核心虽显示运行但未持续输出。
 
 ## 安装与回退
 
-安装器检查 ARM64、基础系统工具、两份框架 JAR 的 SHA-256，以及主屏只读接口；固件不匹配时拒绝安装。启动时再次核对 JAR，OTA 后固件变化则交还系统，不强行调用未知接口。安装完成后重启，在状态页查看 `output_backend=hyperos4_framework`、`core_build=20260930-framework-local02` 和 `framework_owned`；详细读数中的 `actuator_write_successes` 是 C→Java 请求接受次数，不是物理写入次数。
+安装器检查 ARM64、基础系统工具、两份框架 JAR 的 SHA-256，以及主屏只读接口；固件不匹配时拒绝安装。启动时再次核对 JAR，OTA 后固件变化则交还系统，不强行调用未知接口。安装完成后重启，在状态页查看 `output_backend=hyperos4_framework`、`core_build=20260930-framework-local03` 和 `framework_owned`；详细读数中的 `actuator_write_successes` 是 C→Java 请求接受次数，不是物理写入次数。
 
 如果需要回到先前版本，在 KernelSU 中先暂停此模块，再安装本地保存的旧版模块 ZIP 并重启。原配置、学习数据与预设由已有升级脚本管理；安装 ZIP 中没有执行实验脚本的临时配置覆盖。
 

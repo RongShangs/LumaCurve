@@ -13,6 +13,7 @@ public final class LumaFrameworkOutputBroker implements LumaFrameworkOutputSessi
     final LumaFrameworkOutputLease client=new LumaFrameworkOutputLease();
     final LumaFrameworkOutputFeedback feedback=new LumaFrameworkOutputFeedback();
     final LumaFrameworkSliderOverride sliderOverride=new LumaFrameworkSliderOverride();
+    final LumaFrameworkFrameLiveness frameLiveness=new LumaFrameworkFrameLiveness();
     LumaFrameworkOutputSession.Snapshot snapshot;
     LumaFrameworkOutputRamp ramp;
     boolean acquired,hasGoal,outputHealthy=true;
@@ -90,6 +91,7 @@ public final class LumaFrameworkOutputBroker implements LumaFrameworkOutputSessi
     void release()throws Exception {
         boolean responsible=acquired||session.state()!=LumaFrameworkOutputSession.State.IDLE;
         acquired=false;hasGoal=false;goal=limited=-1;
+        frameLiveness.release();
         feedback.reset();
         if(responsible)event("RELEASE_BEGIN,mode="+mode);
         session.release();
@@ -105,8 +107,8 @@ public final class LumaFrameworkOutputBroker implements LumaFrameworkOutputSessi
                 event("RELEASE_CAUSE,"+(!client.alive(t)?"client_lease":"control_conditions"));release();
             }
             session.tick(t);
-            if(acquired&&session.state()==LumaFrameworkOutputSession.State.IDLE){
-                event("RELEASE_CAUSE,frame_lease");acquired=false;hasGoal=false;goal=limited=-1;
+            if(acquired&&frameLiveness.expired(session.state())){
+                event("RELEASE_CAUSE,frame_lease");acquired=false;hasGoal=false;frameLiveness.release();goal=limited=-1;
             }
             if(acquired&&hasGoal){
                 // Each new ownership session stays near its real initial feedback.
@@ -114,6 +116,7 @@ public final class LumaFrameworkOutputBroker implements LumaFrameworkOutputSessi
                     Math.max(snapshot.min,Math.min(snapshot.max,Math.max(initial-.01f,Math.min(initial+.01f,goal))));
                 request=ramp.next(limited,snapshot.min,snapshot.max,now());
                 session.submit(++sequence,now(),LumaFrameworkOutputSession.Unit.FRAMEWORK_FLOAT,request,3000);
+                frameLiveness.submit();
                 if(production&&feedback.failed(now(),request,limited,snapshot.adjustedBrightness,snapshot.node)){
                     outputHealthy=false;event("OUTPUT_FAULT,physical_readback_mismatch");release();
                 }
@@ -149,7 +152,7 @@ public final class LumaFrameworkOutputBroker implements LumaFrameworkOutputSessi
             if(!acquired){
                 if(production&&sliderOverride.pending())event("USER_SLIDER_BIAS,factor="+sliderOverride.settle(t,snapshot.adjustedBrightness));
                 initial=snapshot.adjustedBrightness;ramp.reset(initial,t);request=initial;
-                goal=limited=-1;event("ACQUIRE,anchor="+initial);
+                goal=limited=-1;frameLiveness.acquire();event("ACQUIRE,anchor="+initial);
             }
             acquired=true;client.renew(t);ramp.stamp=t;break;
         case "T":
@@ -181,7 +184,7 @@ public final class LumaFrameworkOutputBroker implements LumaFrameworkOutputSessi
         Thread frames=new Thread(()->{for(;;){broker.tick();try{Thread.sleep(broker.nextTickDelayMs());}catch(InterruptedException e){return;}}},"Luma-framework-frames");
         frames.setDaemon(true);frames.start();
         new File(broker.run,"broker-ready").createNewFile();
-        System.out.println(broker.production?"BROKER_READY build=20260930-framework-local02 output=normal_range_ramp":
+        System.out.println(broker.production?"BROKER_READY build=20260930-framework-local03 output=normal_range_ramp":
             "BROKER_READY build=20260930-framework-core-test04 budget=acquisition+/-0.01");
         for(;;){
             Object socket=LumaFrameworkProbe.invoke(server,"accept",new Class<?>[0]);

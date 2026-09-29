@@ -3,6 +3,7 @@
   'use strict';
   var BASE = '/data/local/tmp/luma_curve';
   var CTL = '/data/adb/modules/luma_curve/luma_curvectl.sh';
+  var CONFIG_VERSION = '12';
   var device = window.KSU && window.KSU.hasKernelSU();
   var active = 'status', configText = '', configReady = false, configBusy = false;
   var commandBusy = false, stateBusy = false, stateText = '', lastState = null, demo = false;
@@ -598,7 +599,7 @@
     if (!device) { set('config-notice', '浏览器预览仅显示默认设置；设备操作不可用。'); renderForm(defaults); return Promise.resolve(); }
     configBusy = true; syncButtons();
     return readConfigText().then(function (text) {
-      var values = parse(text); if (values.config_version !== '11') throw new Error('配置版本不兼容，暂不允许保存');
+      var values = parse(text); if (values.config_version !== CONFIG_VERSION) throw new Error('配置版本不兼容，暂不允许保存');
       configText = text; configReady = true; configBusy = false; preferenceEdited = false; renderForm(values); syncLogDays(values.log_retention_days);
       learnedDraft = null; curvePointEditing = false; curveDraft = parseCurve(values.curve_points); curveCustom = values.curve_custom === '1'; renderCurveEditor(); refreshPreference(); readPresets();
       $('config-notice').hidden = true;
