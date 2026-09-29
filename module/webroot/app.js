@@ -86,26 +86,6 @@
     hbm_node_path: '留空自动检测', hbm_on_value: '通常为 1，以设备节点为准', hbm_off_value: '通常为 0，以设备节点为准'
   };
   function $(id) { return document.getElementById(id); }
-  var updateBusy = false, updateController = null;
-  function checkUpdate() {
-    if (updateBusy) return;
-    updateBusy = true;
-    var controller = new AbortController(), timer = setTimeout(function () { controller.abort(); }, 12000);
-    updateController = controller;
-    $('update-download').hidden = true; set('update-status', '自动检查更新中…');
-    fetch('https://raw.githubusercontent.com/RongShangs/LumaCurve/main/update.json', {signal: controller.signal, cache: 'no-store'})
-      .then(function (response) { if (!response.ok) throw new Error(response.status === 404 ? '更新尚未发布' : '更新服务暂不可用'); return response.json(); })
-      .then(function (info) {
-        if (updateController !== controller) return;
-        if (!Number.isSafeInteger(info.versionCode) || info.versionCode < 1 ||
-          typeof info.version !== 'string' || !/^\d+\.\d+\.\d+$/.test(info.version) ||
-          info.zipUrl !== 'https://github.com/RongShangs/LumaCurve/releases/download/v' + info.version + '/luma_curve-' + info.version + '.zip') throw new Error('更新信息格式异常');
-        if (info.versionCode <= 10000) { set('update-status', '自动检查更新：已是最新版本 1.0.0'); return; }
-        $('update-download').href = info.zipUrl; $('update-download').hidden = false;
-        set('update-status', '自动检查更新：发现 ' + info.version);
-      }).catch(function (error) { if (updateController === controller) set('update-status', '自动检查更新：' + (error.name === 'AbortError' ? '网络超时，下次进入重试' : error.message)); })
-      .finally(function () { clearTimeout(timer); if (updateController === controller) { updateBusy = false; updateController = null; } });
-  }
   ['wechat', 'alipay'].forEach(function (type) {
     $('donate-' + type).addEventListener('click', function () {
       var name = type === 'wechat' ? '微信' : '支付宝';
@@ -711,7 +691,7 @@
     document.documentElement.classList.toggle('status-page', name === 'status');
     document.documentElement.classList.toggle('about-page', name === 'about');
     syncStatusLayout();
-    window.scrollTo(0, 0); if (name === 'about') { checkUpdate(); } if (name === 'status') pollState(); if (name === 'tools') { pollState(); loadLog(true); } if (name === 'settings') { refreshPreference(); renderCurveEditor(); }
+    window.scrollTo(0, 0); if (name === 'status') pollState(); if (name === 'tools') { pollState(); loadLog(true); } if (name === 'settings') { refreshPreference(); renderCurveEditor(); }
   }
   document.querySelectorAll('[data-panel]').forEach(function (b) { b.addEventListener('click', function () { location.hash = b.dataset.panel; switchPanel(b.dataset.panel); }); });
   window.addEventListener('hashchange', function () { switchPanel(location.hash.slice(1)); });
