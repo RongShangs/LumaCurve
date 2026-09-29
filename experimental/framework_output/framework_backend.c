@@ -18,6 +18,7 @@
 LumaFrameworkSnapshot luma_framework_snapshot = {.mode=-1,.node=-1,.goal=-1,.limited=-1};
 static const char *socket_name, *run_directory;
 static int requested_ownership;
+static uint64_t last_pulse_ms;
 static uint64_t sequence;
 static uint64_t clock_ms(void) {
     struct timespec t; if(clock_gettime(CLOCK_MONOTONIC,&t))return 0;
@@ -62,14 +63,16 @@ end:
 int luma_framework_refresh(void){return rpc("Q\n");}
 int luma_framework_ready(void){return requested_ownership&&luma_framework_snapshot.active&&luma_framework_snapshot.mode==1&&luma_framework_snapshot.on&&!luma_framework_snapshot.window;}
 int luma_framework_acquire(void){if(rpc("A\n"))return -1;requested_ownership=luma_framework_snapshot.active;return requested_ownership?0:-1;}
-int luma_framework_release(void){requested_ownership=0;return rpc("R\n");}
+int luma_framework_release(void){requested_ownership=0;last_pulse_ms=0;return rpc("R\n");}
 void luma_framework_pulse(void) {
     if(!requested_ownership)return;
     uint64_t now=clock_ms();
     if(INT(cached_auto)!=1||INT(g_proximity_near)||strcmp(STRING(g_brightness_owner),"daemon")||now<TIME(g_wake_readonly_until)){
         (void)luma_framework_release();return;
     }
+    if(last_pulse_ms&&now>=last_pulse_ms&&now-last_pulse_ms<1000)return;
     if(rpc("P\n")){requested_ownership=0;SET_INT(cached_auto,-1);return;}
+    last_pulse_ms=now;
     SET_INT(cached_auto,luma_framework_snapshot.mode);
 }
 uint64_t luma_framework_apply(uint64_t now,int32_t *current,int32_t target) {

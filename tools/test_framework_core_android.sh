@@ -18,7 +18,7 @@ RUN=$(mktemp -d /data/local/tmp/luma-framework-core.XXXXXX) || exit 2
 chmod 0700 "$RUN"
 cp "$HERE/LumaFrameworkProbe.jar" "$RUN/probe.jar" && cp "$HERE/luma_framework_core" "$RUN/luma_framework_core" || exit 2
 chmod 0700 "$RUN/luma_framework_core"
-OUT="$HERE/luma-framework-core-test03-$(date +%Y%m%d-%H%M%S)-$$"
+OUT="$HERE/luma-framework-core-test04-$(date +%Y%m%d-%H%M%S)-$$"
 mkdir "$OUT" || exit 2
 { date; id; getprop ro.build.version.incremental; } > "$OUT/environment.txt"
 timeout 10 dumpsys display > "$OUT/before-display.txt" 2>&1
@@ -61,6 +61,7 @@ for TICK in $(seq 1 120); do
         cat /proc/uptime 2>/dev/null;
         cat "/proc/$PID/stat" 2>/dev/null;
         grep -E '^(Name|State|Pid|Threads|VmRSS|VmHWM):' "/proc/$PID/status" 2>/dev/null;
+        grep -E '^(Pss|Private_Clean|Private_Dirty|Shared_Clean|Shared_Dirty):' "/proc/$PID/smaps_rollup" 2>/dev/null || :;
         cat "/proc/$PID/cgroup" 2>/dev/null;
       } >> "$OUT/process-samples.txt"
     done

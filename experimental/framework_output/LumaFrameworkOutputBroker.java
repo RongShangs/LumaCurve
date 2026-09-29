@@ -14,6 +14,7 @@ public final class LumaFrameworkOutputBroker implements LumaFrameworkOutputSessi
     LumaFrameworkOutputRamp ramp;
     boolean acquired,hasGoal;
     long settingsStamp,sequence,lastClientSequence=-1;
+    long frameTicks,providerReads,displayReads,heartbeats;
     int mode,slider;
     float adjustment,initial,goal=-1,limited=-1,request;
     static long now(){return System.nanoTime()/1000000;}
@@ -42,9 +43,11 @@ public final class LumaFrameworkOutputBroker implements LumaFrameworkOutputSessi
         long t=now();
         if(settingsStamp==0||t-settingsStamp>=500){
             String[] values=LumaFrameworkProbeSettings.readSettings(true);
+            providerReads++;
             mode=Integer.parseInt(values[0]);adjustment=Float.parseFloat(values[1]);slider=Integer.parseInt(values[2]);settingsStamp=now();
         }
         Object display=LumaFrameworkProbe.invoke(android.global,"getDisplayInfo",new Class<?>[]{int.class},0);
+        displayReads++;
         if(display==null||!"local:4630946949513469331".equals(display.getClass().getField("uniqueId").get(display)))throw new IllegalStateException("wrong main display");
         boolean on=display.getClass().getField("state").getInt(display)==2;
         Object info=android.info();
@@ -70,16 +73,21 @@ public final class LumaFrameworkOutputBroker implements LumaFrameworkOutputSessi
         return id&&clear;
     }
     void event(String text){events.println(now()+","+text);events.flush();}
+    synchronized int nextTickDelayMs() {
+        return LumaFrameworkOutputCadence.nextDelay(acquired,hasGoal,request,limited,snapshot.adjustedBrightness);
+    }
     void release()throws Exception {
         boolean responsible=acquired||session.state()!=LumaFrameworkOutputSession.State.IDLE;
         acquired=false;hasGoal=false;goal=limited=-1;
         if(responsible)event("RELEASE_BEGIN,mode="+mode);
         session.release();
         if(responsible)event("RELEASE_CONFIRMED,mode="+mode);
-        if(responsible)event("OUTPUT_COUNTS,binder_writes="+session.binderWrites()+",unchanged_requests="+session.unchangedRequests());
+        if(responsible)event("OUTPUT_COUNTS,binder_writes="+session.binderWrites()+",unchanged_requests="+session.unchangedRequests()+
+            ",frame_ticks="+frameTicks+",provider_reads="+providerReads+",display_reads="+displayReads+",heartbeats="+heartbeats);
     }
     synchronized void tick() {
         try {
+            frameTicks++;
             refresh();long t=now();
             if(acquired&&(!client.alive(t)||!LumaFrameworkOutputSession.usable(snapshot,t)))release();
             session.tick(t);
@@ -98,7 +106,16 @@ public final class LumaFrameworkOutputBroker implements LumaFrameworkOutputSessi
     }
     synchronized String command(String line)throws Exception {
         if(line==null||line.length()>120)throw new IllegalArgumentException("invalid RPC");
-        String[] words=line.trim().split(" +");refresh();long t=now();
+        String[] words=line.trim().split(" +");
+        // Heartbeat only extends the independent client lease. The frame loop checks
+        // current mode, screen and feedback even when there is no new target.
+        if(words.length==1&&words[0].equals("P")) {
+            long t=now();if(!acquired||!LumaFrameworkOutputSession.usable(snapshot,t))throw new IllegalStateException("heartbeat without ownership");
+            client.renew(t);
+            heartbeats++;
+            return response();
+        }
+        refresh();long t=now();
         switch(words[0]) {
         case "Q":if(words.length!=1)throw new IllegalArgumentException();break;
         case "A":
@@ -122,6 +139,9 @@ public final class LumaFrameworkOutputBroker implements LumaFrameworkOutputSessi
         default:throw new IllegalArgumentException("unknown RPC");
         }
         if(acquired&&!LumaFrameworkOutputSession.usable(snapshot,now()))release();
+        return response();
+    }
+    String response() {
         return String.format(Locale.ROOT,"OK %d %.7f %d %d %d %d %.7f %.7f %.7f %.7f %.7f %.7f %.7f %d\n",mode,adjustment,slider,
             snapshot.on?1:0,snapshot.windowOverride?1:0,snapshot.node,snapshot.min,snapshot.max,snapshot.baseBrightness,snapshot.adjustedBrightness,goal,limited,request,acquired?1:0);
     }
@@ -131,10 +151,10 @@ public final class LumaFrameworkOutputBroker implements LumaFrameworkOutputSessi
         LumaFrameworkOutputBroker broker=new LumaFrameworkOutputBroker(new File(args[1]));
         Object server=Class.forName("android.net.LocalServerSocket").getConstructor(String.class).newInstance(args[0]);
         Runtime.getRuntime().addShutdownHook(new Thread(()->{synchronized(broker){try{broker.release();}catch(Exception e){System.err.println(e);}}}));
-        Thread frames=new Thread(()->{for(;;){broker.tick();try{Thread.sleep(100);}catch(InterruptedException e){return;}}},"Luma-framework-frames");
+        Thread frames=new Thread(()->{for(;;){broker.tick();try{Thread.sleep(broker.nextTickDelayMs());}catch(InterruptedException e){return;}}},"Luma-framework-frames");
         frames.setDaemon(true);frames.start();
         new File(broker.run,"broker-ready").createNewFile();
-        System.out.println("BROKER_READY build=20260930-framework-core-test03 budget=acquisition+/-0.01");
+        System.out.println("BROKER_READY build=20260930-framework-core-test04 budget=acquisition+/-0.01");
         for(;;){
             Object socket=LumaFrameworkProbe.invoke(server,"accept",new Class<?>[0]);
             try {

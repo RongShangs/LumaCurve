@@ -37,9 +37,10 @@ if process_file.exists() and event_file.exists():
         block=text[m.end():marks[i+1].start() if i+1<len(marks) else len(text)]
         lines=block.splitlines(); stat=lines[1]; fields=stat[stat.rfind(')')+2:].split()
         rss=re.search(r'VmRSS:\s+(\d+)',block)
+        pss=re.search(r'^Pss:\s+(\d+)',block,re.MULTILINE)
         if not rss:raise ValueError('missing process RSS')
         samples.setdefault(m[2],[]).append({'uptime':float(lines[0].split()[0]),'ticks':int(fields[11])+int(fields[12]),
-            'rss_kib':int(rss[1]),'threads':int(fields[17]),'start_ticks':int(fields[19]),'comm':stat[stat.find('(')+1:stat.rfind(')')]})
+            'rss_kib':int(rss[1]),'pss_kib':int(pss[1]) if pss else None,'threads':int(fields[17]),'start_ticks':int(fields[19]),'comm':stat[stat.find('(')+1:stat.rfind(')')]})
     for pid,items in samples.items():
         if len(items)<2:continue
         if len({v['start_ticks'] for v in items})!=1:raise ValueError('PID reuse in usage samples')
@@ -49,6 +50,9 @@ if process_file.exists() and event_file.exists():
             'duration_s':elapsed,'cpu_one_core_percent':ticks/int(clock[1])/elapsed*100 if clock else None,
             'rss_mib_min':min(v['rss_kib'] for v in items)/1024,'rss_mib_max':max(v['rss_kib'] for v in items)/1024,
             'max_threads':max(v['threads'] for v in items)})
+        pss_values=[v['pss_kib'] for v in items if v['pss_kib'] is not None]
+        if pss_values:
+            summary['process_usage']['processes'][-1].update({'pss_mib_min':min(pss_values)/1024,'pss_mib_max':max(pss_values)/1024})
 (a.report/'trace-summary.json').write_text(json.dumps(summary,indent=2)+'\n',encoding='utf-8')
 import matplotlib
 matplotlib.use('Agg')
