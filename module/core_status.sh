@@ -1,5 +1,5 @@
 #!/system/bin/sh
-# Process identity only: a live core is not a promise of healthy sensor data.
+# Process identity and freezer wait: running is not a promise of healthy sensors.
 lc_core_status() {
   _lc_pids=$(pidof luma_curve_daemon 2>/dev/null)
   set -- $_lc_pids
@@ -12,6 +12,8 @@ lc_core_status() {
   kill -0 "$1" 2>/dev/null || { printf '%s\n' stopped; return; }
   _lc_exe=$(readlink "/proc/$1/exe" 2>/dev/null)
   [ "$_lc_exe" = "$DAEMON" ] || { printf '%s\n' unknown; return; }
+  _lc_wchan=$(cat "/proc/$1/wchan" 2>/dev/null || :)
+  case "$_lc_wchan" in *freezer*) printf '%s\n' frozen; return;; esac
   printf '%s\n' running
 }
 
@@ -30,6 +32,7 @@ lc_core_description_refresh() {
     paused) _lc_marker='[LumaCurve核心Ⅱ]';;
     stopped) _lc_marker='[LumaCurve核心✘]';;
     multiple) _lc_marker='[LumaCurve核心！]';;
+    frozen) _lc_marker='[LumaCurve核心冻结]';;
     *) _lc_marker='[LumaCurve核心？]';;
   esac
   _lc_description="$_lc_marker $_lc_base"

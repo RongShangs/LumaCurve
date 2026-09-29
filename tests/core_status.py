@@ -11,11 +11,14 @@ with tempfile.TemporaryDirectory(prefix='luma-core-status-') as td:
     prop = folder / 'module.prop'
     prop.write_bytes((ROOT / 'module/module.prop').read_bytes())
     base = shellpath(folder)
+    fakeproc = folder/'proc/431'; fakeproc.mkdir(parents=True)
+    source = (ROOT/'module/core_status.sh').read_text(encoding='utf-8').replace('/proc/', base+'/proc/')
+    helper=folder/'core_status.sh'; helper.write_text(source,encoding='utf-8',newline='\n')
     script = rf'''
 set -eu
 export PATH=/usr/bin:/bin:$PATH; export LANG=C.UTF-8
 MODDIR='{base}'; DAEMON="$MODDIR/system/bin/luma_curve_daemon"; PAUSE_FILE="$MODDIR/pause"
-. '{shellpath(ROOT / 'module/core_status.sh')}'
+. '{shellpath(helper)}'
 pidof() {{ printf '%s' "$mock_pids"; }}
 kill() {{ [ "$mock_alive" = yes ]; }}
 readlink() {{ printf '%s' "$mock_exe"; }}
@@ -26,6 +29,11 @@ grep -q '^description=\[LumaCurve核心✔\] ' "$MODDIR/module.prop"
 signature=$(cksum "$MODDIR/module.prop")
 lc_core_description_refresh
 [ "$signature" = "$(cksum "$MODDIR/module.prop")" ]
+printf 'do_freezer_trap' > '{base}/proc/431/wchan'
+[ "$(lc_core_status)" = frozen ]; lc_core_description_refresh
+grep -q '^description=\[LumaCurve核心冻结\] ' "$MODDIR/module.prop"
+printf 'nanosleep' > '{base}/proc/431/wchan'
+[ "$(lc_core_status)" = running ]
 mock_exe=/another/module/luma_curve_daemon
 [ "$(lc_core_status)" = unknown ]; lc_core_description_refresh
 grep -q '^description=\[LumaCurve核心？\] ' "$MODDIR/module.prop"
@@ -66,7 +74,7 @@ lc_core_watch_wait
 '''
     result = subprocess.run([args.bash, '-c', script], capture_output=True, text=True, encoding='utf-8')
     assert result.returncode == 0, (result.stdout, result.stderr)
-names = ['single live executable', 'unrelated executable rejected', 'dead PID rejected',
+names = ['single live executable', 'frozen core is not reported running', 'unrelated executable rejected', 'dead PID rejected',
          'multiple cores flagged', 'malformed PID rejected', 'stopped and paused distinguished',
          'atomic failure preserves metadata', 'prefix never duplicated and version preserved',
          'concurrent metadata modification is preserved',

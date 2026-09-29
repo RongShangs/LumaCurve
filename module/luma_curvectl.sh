@@ -117,7 +117,8 @@ start_daemon_now() {
     background_daemon_now
     return 0
   fi
-  nohup "$DAEMON" >> "$LOG_FILE" 2>&1 &
+  [ -r "$MODDIR/daemon_launcher.sh" ] && [ -r "$MODDIR/process_scope.sh" ] || { echo 'daemon launcher missing'; return 1; }
+  nohup sh "$MODDIR/daemon_launcher.sh" >> "$LOG_FILE" 2>&1 &
   echo $! > "$PID_FILE"
   sleep 1
   pids=$(daemon_pids)

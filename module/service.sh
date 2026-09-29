@@ -162,7 +162,8 @@ start_daemon() {
   reconcile_singleton && { log_msg "引擎已运行，单实例检查通过"; return; }
   [ -f "$DAEMON" ] && [ -x "$DAEMON" ] || { log_msg "引擎文件缺失： $DAEMON"; return; }
   rm -f "$PID_FILE"
-  nohup "$DAEMON" >> "$LOG_FILE" 2>&1 &
+  [ -r "$MODDIR/daemon_launcher.sh" ] && [ -r "$MODDIR/process_scope.sh" ] || { log_msg "核心启动辅助脚本缺失"; return 1; }
+  nohup sh "$MODDIR/daemon_launcher.sh" >> "$LOG_FILE" 2>&1 &
   echo $! > "$PID_FILE"
   sleep 1
   if reconcile_singleton; then

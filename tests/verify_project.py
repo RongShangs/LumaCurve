@@ -21,6 +21,10 @@ def main():
     assert core_status['ok'] and len(core_status['checks'])>=9
     for name,digest in core_status['source_sha256'].items(): assert sha((ROOT/name).read_bytes())==digest,name
     passed('Module identity, release version, live core indicator and maintainer')
+    scope=json.loads((ROOT/'build/process-scope-verification.json').read_text(encoding='utf-8'))
+    assert scope['ok'] and len(scope['checks'])==14
+    for name,digest in scope['source_sha256'].items(): assert sha((ROOT/name).read_bytes())==digest,name
+    passed('Verified launcher detaches its own process; migration failures stop startup and removed-migration negative is detected')
     state_source=(ROOT/'csrc/write_state_file.c').read_text(encoding='utf-8')
     assert re.search(r'state_text\(io, stream, "version=%s\\n", "([^"]+)"\);',state_source).group(1)==properties['version'],'State version must match module version'
     passed('Device state reports the current module version')
