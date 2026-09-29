@@ -9,7 +9,7 @@ NDK=Path('D:/App/SDK/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64')
 OUT=ROOT/'build/framework-module-local';OUT.mkdir(parents=True,exist_ok=True)
 JAVA=ROOT/'build/framework-probe/LumaFrameworkProbe.jar'
 proof=json.loads((ROOT/'build/framework-probe/verification.json').read_text(encoding='utf-8'))
-assert proof['ok'] and proof['legacy_coordinate_cases']==8 and proof['physical_feedback_cases']==9
+assert proof['ok'] and proof['legacy_coordinate_cases']==10 and proof['physical_feedback_cases']==10 and proof['slider_override_cases']==11
 sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
 assert sha(JAVA)==proof['jar_sha256']
 for source,digest in proof['source_sha256'].items():assert sha(ROOT/source)==digest,source
@@ -40,7 +40,7 @@ for source in corresponding:
  destination=stage/'source'/source.relative_to(ROOT)
  destination.parent.mkdir(parents=True,exist_ok=True)
  shutil.copy2(source,destination)
-info={'local_only':True,'published':False,'build':'20260930-framework-local01',
+info={'local_only':True,'published':False,'build':'20260930-framework-local02',
       'firmware_framework_sha256':'1d2bf53f6c2684103dadbeef0d2665a7f033b7746a75f3e7404145dd999600fd',
       'firmware_services_sha256':'ac53add4b7f559780affd6c7a614f405cefad18f2cb07cb769c7a1afbbae5c20',
       'panel_unique_id':'local:4630946949513469331','panel_codes_per_framework_float':17848,
@@ -49,7 +49,7 @@ info={'local_only':True,'published':False,'build':'20260930-framework-local01',
       'daemon_sha256':sha(binary),'jar_sha256':sha(stage/'framework-broker.jar'),
       'source_sha256':{p.relative_to(ROOT).as_posix():sha(p) for p in sources+sorted((ROOT/'csrc').glob('*.h'))}}
 (stage/'local-build-info.json').write_text(json.dumps(info,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
-target=ROOT/'dist/luma_curve-1.0.0-local-framework.zip';target.parent.mkdir(exist_ok=True)
+target=ROOT/'dist/luma_curve-1.0.0-local-framework-fix01.zip';target.parent.mkdir(exist_ok=True)
 with zipfile.ZipFile(target,'w',zipfile.ZIP_DEFLATED) as archive:
  for source in sorted(stage.rglob('*')):
   if not source.is_file():continue
@@ -69,7 +69,7 @@ with zipfile.ZipFile(target) as archive:
     'source/experimental/framework_output/LumaLegacyBacklightCoordinate.java'))
  image=archive.read('system/bin/luma_curve_daemon')
  assert image[:6]==b'\x7fELF\x02\x01' and struct.unpack_from('<HH',image,16)==(3,183)
- assert b'20260930-framework-local01' in image
+ assert b'20260930-framework-local02' in image
  with zipfile.ZipFile(stage/'framework-broker.jar') as dex:
   assert dex.testzip() is None and 'classes.dex' in dex.namelist()
 print(target);print('SHA256',sha(target))
