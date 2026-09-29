@@ -7,6 +7,7 @@ public final class LumaFrameworkProbe {
     static Object invoke(Object object, String name, Class<?>[] types, Object... args) throws Exception {
         Class<?> cls = object instanceof Class ? (Class<?>) object : object.getClass();
         Method method = cls.getMethod(name, types);
+        if (!Modifier.isPublic(method.getDeclaringClass().getModifiers())) method.setAccessible(true);
         try { return method.invoke(object instanceof Class ? null : object, args); }
         catch (InvocationTargetException error) {
             Throwable cause = error.getCause();
