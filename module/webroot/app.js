@@ -689,7 +689,6 @@
   }
   function switchPanel(name) {
     if (['status', 'settings', 'tools', 'about'].indexOf(name) < 0) name = 'status'; active = name;
-    if (name !== 'about' && updateController) { updateController.abort(); updateController = null; updateBusy = false; }
     document.querySelectorAll('.panel').forEach(function (p) { var selected = p.id === 'panel-' + name; p.hidden = !selected; p.classList.toggle('active', selected); });
     document.querySelectorAll('[data-panel]').forEach(function (b) { var selected = b.dataset.panel === name; b.classList.toggle('active', selected); if (selected) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
     document.documentElement.classList.toggle('status-page', name === 'status');

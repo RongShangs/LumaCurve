@@ -1,6 +1,6 @@
 # LumaCurve 本地体验包：HyperOS 4 主屏框架接管
 
-文件：`dist/luma_curve-1.0.0-local-framework-fix05.zip`。这是正常 KernelSU 模块 ZIP，可从管理器安装并重启使用，不需要运行两分钟的实验脚本。模块 ID `luma_curve`，版本仍为 `1.0.0 / 10000`；当前更改仅在本地 Git 和本地 ZIP，未上传 GitHub、未替换官网包。ZIP 自带 GPL-3.0 许可及对应 C/Java 源码。前几个本地包保留作回退。
+文件：`dist/luma_curve-1.0.0-local-framework-fix06.zip`。这是正常 KernelSU 模块 ZIP，可从管理器安装并重启使用，不需要运行两分钟的实验脚本。模块 ID `luma_curve`，版本仍为 `1.0.0 / 10000`；当前更改仅在本地 Git 和本地 ZIP，未上传 GitHub、未替换官网包。ZIP 自带 GPL-3.0 许可及对应 C/Java 源码。前几个本地包保留作回退。
 
 若安装前曾通过设置页或命令暂停，引擎会保留暂停状态；这时重启后不会产生 daemon 进程。安装器现在会提示，WebUI 在无状态文件时也会显示「已暂停」。在设置页点「恢复」，或以 root 执行 `sh /data/adb/modules/luma_curve/luma_curvectl.sh resume` 即可启动，无须重启和重新安装。
 
