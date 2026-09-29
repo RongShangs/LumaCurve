@@ -1,6 +1,7 @@
 #!/system/bin/sh
 # Read-only display capture. No settings/chmod/brightness writes or daemon changes.
 set -u
+[ "$(id -u)" = 0 ] || { echo '请先执行 su，再运行采集脚本。' >&2; exit 1; }
 PHASE=${1:-idle}
 SECONDS_TO_CAPTURE=${2:-30}
 PARENT=${3:-./luma-display-probe}
@@ -33,10 +34,12 @@ snapshot() {
 }
 snapshot before
 printf 'uptime_s,brightness,actual_brightness,bl_power\n' > "$OUT/backlight.csv"
-COUNT=$((SECONDS_TO_CAPTURE * 10))
+read -r started unused < /proc/uptime
+deadline=$(( ${started%%.*} + SECONDS_TO_CAPTURE ))
 index=0
-while [ "$index" -lt "$COUNT" ]; do
+while :; do
   read -r stamp unused < /proc/uptime
+  [ "${stamp%%.*}" -lt "$deadline" ] || break
   printf '%s,%s,%s,%s\n' "$stamp" "$(value "$NODE/brightness")" "$(value "$NODE/actual_brightness")" "$(value "$NODE/bl_power")" >> "$OUT/backlight.csv"
   if [ $((index % 10)) -eq 0 ]; then
     printf '\n--- uptime=%s ---\n' "$stamp" >> "$OUT/state.txt"
