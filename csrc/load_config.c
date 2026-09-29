@@ -262,6 +262,16 @@ int ios_configuration_reload(DomainIo *io) {
     ios_hbm_discover(io);
     ios_temporal_reset();
     ios_scene_reset(false);
+    /* A saved curve is an explicit user decision, not a new ALS event.
+       Let the next control pass adopt its protected target once; the actuator
+       still performs a smooth transition and all ownership/thermal caps apply.
+       Re-reading an unchanged curve must not bypass environmental filtering. */
+    if (backup.curve_custom != luma_curve_custom ||
+        (luma_curve_custom && memcmp(backup.curve_points, luma_curve_points,
+                                    sizeof(luma_curve_points)) != 0)) {
+        SET_FLAG(g_target_debounce_init, 0);
+        SET_INT(g_target_candidate_dir, 0);
+    }
     if (backup.hbm_was_active && INT(cfg_hl_hbm_enable))
         write_hbm(io, true, true);
     SET_FLAG(g_config_valid, 0);

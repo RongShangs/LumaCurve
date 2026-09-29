@@ -31,6 +31,7 @@ mutations=[
  ('scene-timestamp-pairing','business_debounce.c','if (onset_gap > UINT64_C(1500000000) || sample_gap > UINT64_C(1500000000))','if (onset_gap > UINT64_C(150000000000) || sample_gap > UINT64_C(150000000000))'),
  ('scene-onchange-only','business_debounce.c','ios_scene_reporting_mode(front) == 1','ios_scene_reporting_mode(front) >= -1'),
  ('scene-timed-smoothing','business_debounce.c','if (!luma_indoor_stability || (!front && !back)','if (true || !luma_indoor_stability || (!front && !back)'),
+ ('curve-reload-adoption','load_config.c','SET_FLAG(g_target_debounce_init, 0);','SET_FLAG(g_target_debounce_init, 1);'),
 ]
 negative=[]
 for item in mutations:
@@ -42,4 +43,4 @@ report={'ok':True,'host':'Windows GCC with controlled libc/NDK boundaries',
         'checks':result.stdout.splitlines(),'negative':negative,'android_device_verified':False,
         'source_sha256':{n:hashlib.sha256((ROOT/n).read_bytes()).hexdigest() for n in sources}}
 (ROOT/'build/core-reliability-verification.json').write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8')
-print('9 independently compiled semantic mutations rejected')
+print(f'{len(negative)} independently compiled semantic mutations rejected')

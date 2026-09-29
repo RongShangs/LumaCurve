@@ -7,7 +7,7 @@
     "IO/migration: five write failures preserve old record, retry works, corruption rejected, legacy bias preserved without global training PASS",
     "bounds/safety: sensor/thermal/wake/owner/invalid/changed-scene guards, nearest log-lux anchor and +/-20% long-term limits PASS",
     "curve: complete ordered anchors, strict finite/range/count validation, equal plateaus, custom interpolation and output bounds PASS",
-    "[2026-09-29 18:00:39] timestamp: console prefix and unchanged data streams PASS",
+    "[2026-09-29 18:48:07] timestamp: console prefix and unchanged data streams PASS",
     "201 production C versus JavaScript curve samples MATCH"
   ],
   "negative": [
@@ -38,10 +38,10 @@
     "csrc/brightness_preference.h": "33ac689582ee9d25b7a8eae33028cfacc6b66808dca2f1d0a962174088bc4932",
     "csrc/brightness_curve.h": "be350549b5574279c96899325962305648824492aad2ddbd7ddad3e095f71089",
     "csrc/log_timestamp.h": "63d669d6384bc205e7a1d11755415fb66093958194d24b1b70b7d12f136d0dcc",
-    "csrc/platform_native.c": "47a90d2ed7eda0655cfc4a96e75da090eb25fa86db4e0f75ed472ea1a71beabe",
-    "csrc/load_config.c": "06e9d96faf51bd58cdabe773678075d97ce1422cfe4d021015cd29dd887039e5",
+    "csrc/platform_native.c": "de6c87f69f7c894f95f57ac1078103060e7d254eda9f25def417f683e9723e72",
+    "csrc/load_config.c": "4b57a70c3621387bfe7fec372268c4b256c34be7e27b334f462ec54e466ad2e7",
     "csrc/refresh_settings.c": "05c7ec6d26e1b48c83ae12342986e1d73df58af442f402c095b2880bdaf9d5b5",
-    "csrc/main_business.c": "a1da11cf94ac6c1530b6f24d69daf639a9a0ca886ad0fba01859bb0dd7b48551",
+    "csrc/main_business.c": "be0bce276e1effb9037127a618e084229e004a9e9234954427720a351823f34b",
     "csrc/write_state_file.c": "ea6e09b38bb9b829cc4502883584329d1e12e82381376f8c709911e37d87a34e",
     "module/webroot/curve_math.js": "47a639710b9bdf345d6272f9131391cd089aadd51ea44f2d86f00c5908ca66a6",
     "module/upgrade_data.sh": "df124a63fb5c22809099d061845ade1306048700127aa0034559e1a869a598d3",

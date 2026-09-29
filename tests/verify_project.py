@@ -97,7 +97,7 @@ def main():
         header_text=(ROOT/'csrc/domain_io.h').read_text(encoding='utf-8').replace('#include "log_locale.h"\n','').replace('    format = luma_log_format(format);\n','')
         assert header_text==(args.upstream/'csrc/domain_io.h').read_text(encoding='utf-8')
         for header in (ROOT/'csrc').glob('*.h'):
-            if header.name not in ('state_observer.h','install_probe.h','backlight_paths.h','temporal_stability.h','scene_adaptation.h','log_locale.h','domain_io.h','brightness_preference.h','brightness_curve.h','log_timestamp.h'): assert header.read_text(encoding='utf-8')==(args.upstream/'csrc'/header.name).read_text(encoding='utf-8'),header.name
+            if header.name not in ('state_observer.h','install_probe.h','backlight_paths.h','temporal_stability.h','scene_adaptation.h','log_locale.h','domain_io.h','brightness_preference.h','brightness_curve.h','log_timestamp.h','backlight_write_diagnostics.h'): assert header.read_text(encoding='utf-8')==(args.upstream/'csrc'/header.name).read_text(encoding='utf-8'),header.name
         passed('Untouched units and hash-pinned pre-optimization fixtures match the branded recovered baseline')
     for name in ('core-optimization-verification.json','core-main-replay-verification.json'):
         core=json.loads((ROOT/'build'/name).read_text(encoding='utf-8'))
@@ -109,6 +109,8 @@ def main():
             assert len(core['scene_adaptation_cases'])==12 and all(c['ok'] for c in core['scene_adaptation_cases'])
             assert len(core['default_configuration_cases'])==38 and all(c['ok'] for c in core['default_configuration_cases'])
             assert len(core['preference_cases'])==7 and all(c['ok'] for c in core['preference_cases'])
+            assert len(core['curve_reload_cases'])==4 and all(c['ok'] and c['backlight_writes']>0 for c in core['curve_reload_cases'])
+            assert core['sensor_latency_negative_detected']
         else:assert len(core['negative'])==4 and all(c['semantic_failure_detected'] for c in core['negative'])
     passed('Current source hashes bind core regressions, semantic negatives, 37 baseline replays, 38 default temporal cases and 12 dual-sensor main scenarios')
     preference=json.loads((ROOT/'build/preference-verification.json').read_text(encoding='utf-8'))
@@ -117,10 +119,14 @@ def main():
     for source,wanted in preference['source_sha256'].items(): assert sha((ROOT/source).read_bytes())==wanted,source
     passed('Gradual preference, intent gates, persistence/IO rollback, strict custom curves, timestamps and 201 C/JS curve comparisons; five semantic negatives')
     reliability=json.loads((ROOT/'build/core-reliability-verification.json').read_text(encoding='utf-8'))
-    assert reliability['ok'] and len(reliability['negative'])==9
+    assert reliability['ok'] and len(reliability['negative'])==10
     assert all(c['semantic_failure_detected'] for c in reliability['negative'])
     for source,wanted in reliability['source_sha256'].items(): assert sha((ROOT/source).read_bytes())==wanted,source
-    passed('Production lux/clock, NDK enable, screen cache, backlight selection and temporal/config regressions with nine semantic negatives')
+    passed('Production lux/clock, NDK enable, screen cache, backlight selection and temporal/config regressions with ten semantic negatives; four curve reload/IO latency main cases')
+    diagnostics=json.loads((ROOT/'build/backlight-diagnostics-verification.json').read_text(encoding='utf-8'))
+    assert diagnostics['ok'] and len(diagnostics['checks'])==4
+    for source,wanted in diagnostics['source_sha256'].items(): assert sha((ROOT/source).read_bytes())==wanted,source
+    passed('Production native backlight error stages, throttling, preserved errno and syscall return values')
     compatibility=json.loads((ROOT/'build/compatibility-verification.json').read_text(encoding='utf-8'))
     assert compatibility['ok'] and len(compatibility['checks'])>=10
     for source,wanted in compatibility['source_sha256'].items(): assert sha((ROOT/source).read_bytes())==wanted,source

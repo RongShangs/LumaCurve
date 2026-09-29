@@ -195,12 +195,18 @@ static void test_config(void) {
     config="indoor_stability=1junk\n";assert(ios_configuration_reload(&io)==0);assert(luma_indoor_stability);
     puts("config: indoor switch parsed strictly and invalid reload rolls back PASS");
     config="preference_learning=0\ncurve_custom=1\ncurve_points=10,10,10,10,10,10,10,10,10,10,10,10,10,10\n";
+    ios_state.g_target_debounce_init=1;ios_state.g_target_candidate_dir=1;
     assert(ios_configuration_reload(&io)==1);assert(!luma_preference_learning && luma_curve_custom);
+    assert(!ios_state.g_target_debounce_init && !ios_state.g_target_candidate_dir);
     assert(fabsf(ios_brightness_for_lux(100,2.2f)-.1f)<1e-6f);
+    ios_state.g_target_debounce_init=1;ios_state.g_target_candidate_dir=-1;
+    assert(ios_configuration_reload(&io)==1);
+    assert(ios_state.g_target_debounce_init==1 && ios_state.g_target_candidate_dir==-1);
     config="preference_learning=1\ncurve_custom=0\npreference_offset=nan\n";
     assert(ios_configuration_reload(&io)==0 && !luma_preference_learning && luma_curve_custom);
     config="preference_learning=1\ncurve_custom=1\ncurve_points=1,2,3\n";
     assert(ios_configuration_reload(&io)==0 && !luma_preference_learning && luma_curve_custom);
+    assert(ios_state.g_target_debounce_init==1 && ios_state.g_target_candidate_dir==-1);
     config="preference_revision=1.5\n";assert(ios_configuration_reload(&io)==0);
     config="preference_learning=2\n";assert(ios_configuration_reload(&io)==0);
     puts("config: preference default/disable, curve parse and transactional invalid reload rollback PASS");

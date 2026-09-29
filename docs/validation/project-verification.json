@@ -46,7 +46,11 @@
       "ok": true
     },
     {
-      "name": "Production lux/clock, NDK enable, screen cache, backlight selection and temporal/config regressions with nine semantic negatives",
+      "name": "Production lux/clock, NDK enable, screen cache, backlight selection and temporal/config regressions with ten semantic negatives; four curve reload/IO latency main cases",
+      "ok": true
+    },
+    {
+      "name": "Production native backlight error stages, throttling, preserved errno and syscall return values",
       "ok": true
     },
     {
@@ -62,8 +66,8 @@
       "ok": true
     }
   ],
-  "module_sha256": "39a103ec383dbaf0a73f61bfd1c4988d68fee8fb03c9bce7c2ec0db790374657",
-  "elf_sha256": "8988bdfb0f6dab667472656f8d2f76afac2b1f0bf02196baed50313d9d7b459c",
+  "module_sha256": "389cff5e9b5270ab13b297613f433fd2b129f1c1ba466280ba8257426428694f",
+  "elf_sha256": "e7677bc5319150b7b4e9b5703e4c9ae33d829273ba41bed498934cb61909eebd",
   "android_device_verified": false,
   "upstream_source_comparison": true,
   "full_original_elf_differential_rerun": false

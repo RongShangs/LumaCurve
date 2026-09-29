@@ -62,6 +62,12 @@ class Fork(scenarios.Fixture,native.NativeMachine):
                                      'hold_ms':left(self.now_us//1000),
                                      'holding':bool(native.library.luma_test_scene_holding()),'state':scenarios.state(self)})
         super().wait(duration)
+        if self.case.get('curve_reload') and not hasattr(self, 'curve_reload_ms') and self.now_us >= 60000000:
+            self.curve_reload_ms = self.now_us // 1000
+            path = '/data/local/tmp/ios_brightness.conf'
+            for key, value in self.case['curve_reload'].items():
+                self.files[path] = re.sub('^' + key + '=.*$', key + '=' + str(value), self.files[path], flags=re.M)
+            self.write('g_reload_config', 1)
         if self.case.get('indoor_jitter'):
             self.files[self.lux_path]=str([17,23,18,22][(self.sleeps//7)%4])+'\n'
     def dynamic(self,address):
@@ -86,6 +92,7 @@ class Fork(scenarios.Fixture,native.NativeMachine):
                 struct.pack_into('<q',event,16,self.now_us*1000)
                 struct.pack_into('<f',event,24,value);payload+=event
             if payload:self.uc.mem_write(a[1],bytes(payload))
+            if count:self.now_us += self.case.get('sensor_io_latency_us',0)
             self.coverage['ndk_events']+=count;self.finish_import(count);return
         if self.case.get('on_change') and address==0x891000:
             self.finish_import(1);return
@@ -282,12 +289,55 @@ for name,config,learn,user in [('preference_neutral',{},0,False),('preference_br
     if name in ('ignore_system','learn_off'):assert sample==0 and float(values.get('preference_offset',0))==0,(name,values)
     preference_cases.append({'name':name,'ok':True,'target':target,'learned_samples':sample})
     print('preference main '+json.dumps(preference_cases[-1]),flush=True)
+curve_reload_cases=[]
+for name,points,thermal in [('quiet_front_raise', '60', 0), ('quiet_front_lower', '0.1', 0), ('quiet_front_thermal', '100', 70000), ('sensor_io_latency', '60', 0)]:
+    case={'name':name,'ndk':True,'on_change':True,'scene_sequence':[(0,.9,11)],'waits':180,
+          'indoor_stability':1,'preference_learning':0,
+          'curve_reload':{'curve_custom':1,'curve_points':','.join([points]*14),'preference_revision':1}}
+    if name=='quiet_front_lower':case['preference_config']={'curve_custom':1,'curve_points':','.join(['60']*14)}
+    if name=='sensor_io_latency':case.update(on_change=False,sensor_io_latency_us=25000,scene_sequence=[(0,100,7),(65,600,7)])
+    if thermal:case['thermal']=thermal
+    machine=Fork(case);result=scenarios.observe(machine)
+    after=[p for p in machine.scene_trace if 1000 <= p['time_us']//1000-machine.curve_reload_ms <= 12000]
+    assert after,(name,'no control passes after reload')
+    word=lambda p,k:int.from_bytes(bytes.fromhex(p['state'][k]),'little',signed=True)
+    maximum=word(after[0],'g_max')
+    reached=[p for p in after if (word(p,'g_tr_1')>=maximum*.55 if points=='60' else
+             word(p,'g_tr_1')<=maximum*.002 if points=='0.1' else
+             word(p,'g_tr_1')<=maximum*.201 and word(p,'g_heat_guard_active')==1)]
+    assert reached,(name,'explicit curve edit did not reach protected transition target',
+                    [(p['time_us']//1000-machine.curve_reload_ms,word(p,'g_tr_1')) for p in after])
+    if thermal:assert all(word(p,'g_tr_1')<=maximum*.201 for p in after)
+    if name=='sensor_io_latency':
+        assert all(word(p,'g_sensor_hold_active')==0 for p in after),(name,'new samples misclassified as future/stale')
+        final=dict(line.split('=',1) for line in result['files']['/data/local/tmp/ios_brightness_state'].splitlines() if '=' in line)
+        assert float(final['smooth'])>550 and final['sensor_stale']=='0',(name,final)
+    assert result['coverage']['backlight_writes']>0,(name,'no actual actuator writes')
+    curve_reload_cases.append({'name':name,'ok':True,'target_delay_ms':reached[0]['time_us']//1000-machine.curve_reload_ms,
+                               'target':word(reached[0],'g_tr_1'),'backlight_writes':result['coverage']['backlight_writes'],
+                               'on_change_sensor':case['on_change']})
+    print('curve reload main '+json.dumps(curve_reload_cases[-1]),flush=True)
+mutated=out/'main-without-post-poll-clock.c'
+text=(ROOT/'csrc/main_business.c').read_text(encoding='utf-8')
+assert text.count('now_ms = domain_now_ms(&io);')==4
+mutated.write_text(text.replace('now_ms = domain_now_ms(&io);','/* removed post-poll clock refresh */'),encoding='utf-8')
+negative_dll=out/'latency-negative.dll'
+negative_sources=[mutated if s.name=='main_business.c' else s for s in sources_for() if s.name!='platform_native.c']
+subprocess.run([a.cc,'-shared','-O1','-std=c11','-DIOS_PRODUCTION','-DIOS_TEST_ABI','-DIOS_BUSINESS_MAIN','-mfma','-ffp-contract=off','-fno-strict-aliasing','-I'+str(ROOT/'csrc')]+[str(s) for s in negative_sources]+[str(ROOT/'tests/scene_trace_bridge.c'),str(a.fixtures/'tests/native_io_bridge.c'),'-lm','-o',str(negative_dll)],check=True)
+broken=ctypes.CDLL(str(negative_dll));broken.ios_test_ram.restype=ctypes.c_uint64;broken.ios_test_ro.restype=ctypes.c_uint64
+broken.ios_test_call.argtypes=[ctypes.c_uint64,ctypes.POINTER(native.Cpu)];broken.ios_test_hook.argtypes=[native.HOOK]
+native.library=broken;scenarios.library=broken
+machine=Fork(case);result=scenarios.observe(machine)
+assert any(int.from_bytes(bytes.fromhex(p['state']['g_sensor_hold_active']),'little')==1
+           for p in machine.scene_trace if p['time_us']//1000>machine.curve_reload_ms), 'latency mutant did not reproduce false sensor hold'
+print('post-poll clock negative: false sensor hold reproduced',flush=True)
 report={'ok':len(records)==len(scenarios.CASES) and all(r['ok'] for r in records),'cases':records,
         'baseline_commit':manifest['git_commit'],'full_main_replay':True,'original_elf_differential':False,
         'android_device_verified':False,'ui_subscription_exercised':False,'indoor_stability_exercised':True,
         'legacy_configuration_override':'indoor_stability=0, preference_learning=0: healthy baseline comparison',
         'log_comparison':'Chinese format strings reversed without changing argument values; only event_age warnings omitted',
-        'default_configuration_cases':default_cases,'scene_adaptation_cases':scene_cases,'preference_cases':preference_cases,'fixture_toolkit':str(a.fixtures)}
+        'default_configuration_cases':default_cases,'scene_adaptation_cases':scene_cases,'preference_cases':preference_cases,
+        'curve_reload_cases':curve_reload_cases,'sensor_latency_negative_detected':True,'fixture_toolkit':str(a.fixtures)}
 report['source_sha256']={s.relative_to(ROOT).as_posix():hashlib.sha256(s.read_bytes()).hexdigest() for s in sources_for()+list((ROOT/'csrc').glob('*.h'))}
 (ROOT/'build/core-main-replay-verification.json').write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8')
 raise SystemExit(0 if report['ok'] else 1)

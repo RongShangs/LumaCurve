@@ -216,6 +216,7 @@ int ios_business_main(void)
           ios_state.g_wake_guard_until = 0;
           if (ios_state.g_ndk_ok == 1) {
             poll_sensors();
+            now_ms = domain_now_ms(&io);
             if (ios_scene_sensor_fresh(&ios_state, true, now_ms) &&
                (((float_bits(ios_state.g_front_lux) < 0x80000000 && (float_bits(ABS(ios_state.g_front_lux)) - 0x800000U) >> 0x18 < 0x7f)
                 || float_bits(ios_state.g_front_lux) - 1U < 0x7fffff) || ABS(ios_state.g_front_lux) == 0.0f)) {
@@ -453,6 +454,9 @@ screen_poll_finished:
         events_processed = 0;
         if ((ios_state.g_ndk_ok == 1) && (ios_state.g_light_sensors_enabled != 0)) {
           events_processed = poll_sensors();
+          /* Polling records arrival times after the loop's original clock read.
+             Compare freshness against the clock after that IO, never before it. */
+          now_ms = domain_now_ms(&io);
         }
         previous_loop_ms = now_ms;
         if ((2999 < now_ms - last_screen_check_ms) &&
@@ -556,6 +560,7 @@ screen_poll_finished:
             ios_state.current_poll_ms = 1000;
             if (ios_state.g_ndk_ok == 1) {
               poll_sensors();
+              now_ms = domain_now_ms(&io);
               if (ios_scene_sensor_fresh(&ios_state, true, now_ms) &&
                  (((float_bits(ios_state.g_front_lux) < 0x80000000 &&
                    (float_bits(ABS(ios_state.g_front_lux)) - 0x800000U) >> 0x18 < 0x7f) ||
@@ -810,6 +815,7 @@ ownership_sensor_ready:
             selected_brightness = ios_state.g_wake_lux_sample_count;
             if (ios_state.g_ndk_ok == 1) {
               delta_or_limit = poll_sensors();
+              now_ms = domain_now_ms(&io);
               selected_brightness = ios_state.g_wake_lux_sample_count;
               events_processed = delta_or_limit + events_processed;
               if (ios_scene_sensor_fresh(&ios_state, true, now_ms) &&

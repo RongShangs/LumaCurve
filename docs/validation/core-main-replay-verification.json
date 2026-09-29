@@ -1053,6 +1053,41 @@
       "learned_samples": 0
     }
   ],
+  "curve_reload_cases": [
+    {
+      "name": "quiet_front_raise",
+      "ok": true,
+      "target_delay_ms": 1000,
+      "target": 9830,
+      "backlight_writes": 90,
+      "on_change_sensor": true
+    },
+    {
+      "name": "quiet_front_lower",
+      "ok": true,
+      "target_delay_ms": 1000,
+      "target": 16,
+      "backlight_writes": 41,
+      "on_change_sensor": true
+    },
+    {
+      "name": "quiet_front_thermal",
+      "ok": true,
+      "target_delay_ms": 1000,
+      "target": 3277,
+      "backlight_writes": 29,
+      "on_change_sensor": true
+    },
+    {
+      "name": "sensor_io_latency",
+      "ok": true,
+      "target_delay_ms": 1050,
+      "target": 9830,
+      "backlight_writes": 86,
+      "on_change_sensor": false
+    }
+  ],
+  "sensor_latency_negative_detected": true,
   "fixture_toolkit": "D:\\IOS\\ios-brightness-dev",
   "source_sha256": {
     "csrc/brightness_preference.c": "1ce43c1929701f6c0d98c774898aee2a780e5e0f3f3e78ea398ecb755badbd0d",
@@ -1062,7 +1097,7 @@
     "csrc/hbm_find_node.c": "13f96e0e32a4c4c9c3473b1e3c6474ae700db588db86e6270734f2329bbcb220",
     "csrc/hbm_scan_bounded.c": "6060e1db2f064af8edd63896215d9c4f82fc5016a3be641fd3a22effee1fec3f",
     "csrc/highlux_deactivate.c": "b5839d3d7da4c8403210010aab9a9a8c12b38df710e7b60a8d6cbbea6c40d3e0",
-    "csrc/load_config.c": "06e9d96faf51bd58cdabe773678075d97ce1422cfe4d021015cd29dd887039e5",
+    "csrc/load_config.c": "4b57a70c3621387bfe7fec372268c4b256c34be7e27b334f462ec54e466ad2e7",
     "csrc/load_learn.c": "a4acb33f2f171db9d378c0e04fa89dea7dda04cdb978facf8495d5858218fba6",
     "csrc/poll_sensors.c": "9f500996d5c9c650f7458c2a68be4c1ee4d4ce26e2ac34de45eaeb8660c7d05d",
     "csrc/read_lux_fallback.c": "2542dbbd655ad336633023f8ea9a231009a9a87e7289057c01ce54708f0c1a8c",
@@ -1081,7 +1116,7 @@
     "csrc/write_state_file.c": "ea6e09b38bb9b829cc4502883584329d1e12e82381376f8c709911e37d87a34e",
     "csrc/domain_api.c": "775029ebdb174cad226e0ffbcf46b88a0b75a311365efbbb556a25afb537224e",
     "csrc/domain_api_more.c": "f5e7adc613a07397e6a50a7352ea0b21f906ffdeead2d2c11e3bce7a8a2cfcf7",
-    "csrc/main_business.c": "a1da11cf94ac6c1530b6f24d69daf639a9a0ca886ad0fba01859bb0dd7b48551",
+    "csrc/main_business.c": "be0bce276e1effb9037127a618e084229e004a9e9234954427720a351823f34b",
     "csrc/business_startup.c": "bd10e10bd036cc7cd353cacd0518d07c99925c1f2bd48745ed10f51c057f7e12",
     "csrc/business_debounce.c": "13f268f8e0ec83477c78b8af8aaf62ce50745a7a9b2f635fddaea60f99906e8d",
     "csrc/business_learning.c": "8b1f21927cc3854bca71448ef0122f4d0c67a34e63513a66805613aad451007a",
@@ -1090,9 +1125,10 @@
     "csrc/business_sensor_init.c": "32fc012e076f03f342e45c549526b3b50eea94745705c937969887bb758d0038",
     "csrc/business_literals.c": "a6dff1f84027c31a1f94b87a7ebaa967e0647fe253392e5409903c15b534d809",
     "csrc/state.c": "b466dc2f70b9019e4360851929b61e074a47d5f92f48bad4e2cdef6010df72c6",
-    "csrc/platform_native.c": "47a90d2ed7eda0655cfc4a96e75da090eb25fa86db4e0f75ed472ea1a71beabe",
+    "csrc/platform_native.c": "de6c87f69f7c894f95f57ac1078103060e7d254eda9f25def417f683e9723e72",
     "csrc/actuator.h": "9a87c2b62492b7329f08b4cdc094f9f723706f9443e7658dcb10f26df0f917fd",
     "csrc/backlight_paths.h": "72ebda39f1256610b16ab50133d6c70b5866ed6476c09e810b747dacaa7cc84b",
+    "csrc/backlight_write_diagnostics.h": "fdcb0c52f5c3bc6babb7c6b08f4cdbddae0f678da976190d15f64faa658c77af",
     "csrc/brightness_curve.h": "be350549b5574279c96899325962305648824492aad2ddbd7ddad3e095f71089",
     "csrc/brightness_preference.h": "33ac689582ee9d25b7a8eae33028cfacc6b66808dca2f1d0a962174088bc4932",
     "csrc/business_api.h": "ebee667d50317635834e705f3264556365ea74b059163a2cb5b799758013ce2f",
@@ -1112,6 +1148,5 @@
     "csrc/state_layout.h": "53d3cca5acfedab424b5c1853e7ebebce859eea668bd415c062a4d80dcb037b8",
     "csrc/state_observer.h": "b26110a06c86e2640f67b71a4265e7496786a8e8d6dddc9a6485bab31f69005d",
     "csrc/temporal_stability.h": "52b32350142efe3c2adcc88abc54da9eaff7866519fdab1109f3ccd23df00f05"
-  },
-  "temporal_configuration_override": "preference_learning=0 in existing temporal/dual-sensor cases; new preference/curve paths covered separately in seven full-main cases"
+  }
 }

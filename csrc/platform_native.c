@@ -12,6 +12,8 @@
 #include <errno.h>
 #include <stdarg.h>
 #include "log_timestamp.h"
+#include "backlight_paths.h"
+#include "backlight_write_diagnostics.h"
 
 _Static_assert(sizeof(void *) == 8 && sizeof(long) == 8, "Android LP64 is required");
 _Static_assert(offsetof(struct stat, st_mtim) == 88, "Unexpected Android stat layout");
@@ -164,9 +166,28 @@ int ios_native_fclose(FILE * a) { return fclose(a); }
 char * ios_native_fgets(char * a, int b, FILE * c) { return fgets(a,b,c); }
 size_t ios_native_fwrite(const void * a, size_t b, size_t c, FILE * d) { return fwrite(a,b,c,d); }
 int ios_native_fflush(FILE * a) { return fflush(a); }
-int ios_native_open(const char * a, int b, unsigned c) { return open(a,b,(mode_t)c); }
-int ios_native_close(int a) { return close(a); }
-int64_t ios_native_write(int a, const void * b, size_t c) { return write(a,b,c); }
+int ios_native_open(const char * a, int b, unsigned c) {
+    int fd=open(a,b,(mode_t)c), error=errno;
+    if ((b & O_ACCMODE) != O_RDONLY && !strcmp(a,ios_backlight_brightness())) {
+        if (fd < 0) luma_backlight_write_error("open",error);
+        else luma_backlight_fd=fd;
+    }
+    errno=error; return fd;
+}
+int ios_native_close(int a) {
+    int result=close(a), error=errno;
+    if (a==luma_backlight_fd) {
+        luma_backlight_fd=-1;
+        if (result < 0) luma_backlight_write_error("close",error);
+    }
+    errno=error; return result;
+}
+int64_t ios_native_write(int a, const void * b, size_t c) {
+    int64_t result=write(a,b,c); int error=errno;
+    if (a==luma_backlight_fd && (result < 0 || (size_t)result != c))
+        luma_backlight_write_error(result < 0 ? "write" : "short_write",result < 0 ? error : EIO);
+    errno=error; return result;
+}
 int ios_native_clock_gettime(int a, void * b) { return clock_gettime((clockid_t)a,(struct timespec *)b); }
 int ios_native_usleep(unsigned a) { return usleep(a); }
 uintptr_t ios_native_signal(int a, void (*b)(int)) { return (uintptr_t)signal(a,b); }

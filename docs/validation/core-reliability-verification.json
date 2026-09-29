@@ -66,6 +66,11 @@
       "name": "scene-timed-smoothing",
       "compiled": true,
       "semantic_failure_detected": true
+    },
+    {
+      "name": "curve-reload-adoption",
+      "compiled": true,
+      "semantic_failure_detected": true
     }
   ],
   "android_device_verified": false,
@@ -78,7 +83,7 @@
     "csrc/business_sensor_init.c": "32fc012e076f03f342e45c549526b3b50eea94745705c937969887bb758d0038",
     "csrc/set_light_sensors_enabled.c": "71b05a277ce3915684db2265cedd064e93945c976c939bfb279d0e297c797977",
     "csrc/business_debounce.c": "13f268f8e0ec83477c78b8af8aaf62ce50745a7a9b2f635fddaea60f99906e8d",
-    "csrc/load_config.c": "06e9d96faf51bd58cdabe773678075d97ce1422cfe4d021015cd29dd887039e5",
+    "csrc/load_config.c": "4b57a70c3621387bfe7fec372268c4b256c34be7e27b334f462ec54e466ad2e7",
     "csrc/backlight_paths.h": "72ebda39f1256610b16ab50133d6c70b5866ed6476c09e810b747dacaa7cc84b",
     "csrc/temporal_stability.h": "52b32350142efe3c2adcc88abc54da9eaff7866519fdab1109f3ccd23df00f05",
     "csrc/scene_adaptation.h": "da2bb193ca8cc7cd7513982fbaf6addccc86ea0982fd790ccc5dd6dd7492c169"
