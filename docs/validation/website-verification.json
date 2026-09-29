@@ -8,20 +8,20 @@
     "Curve demo uses 201 complete samples and truthful default endpoints",
     "No horizontal overflow on four phone/tablet/desktop sizes",
     "Every local asset, license and module/source download resolves",
-    "Hero download button directly downloads the module instead of scrolling",
-    "Real browser downloads from hero and both module/source buttons complete with matching bytes",
+    "Hero download button navigates to the visible download section",
+    "Real browser downloads from both module/source buttons complete with matching bytes",
     "Website module/source downloads match dist and SHA-256",
     "No network JS, CSS, fonts, frameworks or device bridge",
     "Desktop/mobile screenshots rendered without JavaScript errors"
   ],
   "source_sha256": {
-    "website/index.html": "962ad4f96aa03b34cfc2e8d0481486aef9e197c6b88b311588e3d3ba6b93df35",
+    "website/index.html": "630fbe30ef40e5bf75562fedaedc30df7656a0ee79b3ab51b94909ee73a67726",
     "website/assets/site.css": "b55ee7bbff44ed5810fb041561f731c89f0d10a5cd78a6da94fd21209e4c43be",
     "website/assets/site.js": "6b263f1ead7206e5e8495ace4c4527750e80f6f0316523510d4cb46260433950",
     "website/assets/icon.svg": "d379ab4235e36286ec541c66f05f9c39f8d99416bc170aeacd91d429208ff517",
     "website/assets/curve_math.js": "47a639710b9bdf345d6272f9131391cd089aadd51ea44f2d86f00c5908ca66a6",
     "tools/sync_website.py": "bd446d1e17f93484076947d03a921efd73a7c31f35dc7a2e37c59b23e9dbb2a7",
-    "tests/website.cjs": "b6f66cfa174d04d4fa8ca68a8b17c47d2f8c7dbaa728a2f4e1b0aceb41460fbe"
+    "tests/website.cjs": "22801963b152be65a47d5b31bb6ec54bbaa171f49ca5ea0f6cb017261e326391"
   },
   "website": "D:\\IOS\\web",
   "hosted": false
