@@ -57,7 +57,7 @@ public final class LumaFrameworkOutputSession {
         if(!usable(snapshot,now)){release();throw new IllegalStateException("mode/power/override/feedback forbids control");}
         float limited=Math.max(snapshot.min,Math.min(snapshot.max,desired));
         boolean unchanged=state==State.OWNED&&applied&&Float.floatToIntBits(appliedValue)==Float.floatToIntBits(limited)&&
-            Math.abs(snapshot.adjustedBrightness-appliedValue)<=.000001f;
+            Math.abs(snapshot.adjustedBrightness-appliedValue)<=LumaFrameworkOutputCadence.SETTLED_TOLERANCE;
         // A Binder failure may happen after mutation: claim responsibility before calling.
         state=State.OWNED;deadline=now+leaseMs;
         if(unchanged)unchangedRequests++;

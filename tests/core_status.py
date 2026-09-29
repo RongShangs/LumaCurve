@@ -67,10 +67,10 @@ grep -q '^# concurrent-upgrade$' "$MODDIR/module.prop"
 grep -q '^description=\[LumaCurve核心✔\] ' "$MODDIR/module.prop"
 unset -f cksum
 sleep_count=0; refresh_count=0
-sleep() {{ [ "$1" = 10 ]; sleep_count=$((sleep_count+1)); }}
+sleep() {{ [ "$1" = 20 ]; sleep_count=$((sleep_count+1)); }}
 lc_core_description_refresh() {{ refresh_count=$((refresh_count+1)); }}
 lc_core_watch_wait
-[ "$sleep_count" -eq 6 ] && [ "$refresh_count" -eq 6 ]
+[ "$sleep_count" -eq 3 ] && [ "$refresh_count" -eq 3 ]
 '''
     result = subprocess.run([args.bash, '-c', script], capture_output=True, text=True, encoding='utf-8')
     assert result.returncode == 0, (result.stdout, result.stderr)
@@ -78,7 +78,7 @@ names = ['single live executable', 'frozen core is not reported running', 'unrel
          'multiple cores flagged', 'malformed PID rejected', 'stopped and paused distinguished',
          'atomic failure preserves metadata', 'prefix never duplicated and version preserved',
          'concurrent metadata modification is preserved',
-         'ten-second checks preserve sixty-second maintenance cadence']
+         'twenty-second checks preserve sixty-second maintenance cadence']
 report = {'ok': True, 'checks': names, 'android_device_verified': False,
           'source_sha256': {name: hashlib.sha256((ROOT/name).read_bytes()).hexdigest()
                             for name in ('module/core_status.sh', 'module/service.sh', 'module/luma_curvectl.sh')}}

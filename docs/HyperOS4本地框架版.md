@@ -1,6 +1,6 @@
 # LumaCurve 本地体验包：HyperOS 4 主屏框架接管
 
-文件：`dist/luma_curve-1.0.0-local-framework-fix06.zip`。这是正常 KernelSU 模块 ZIP，可从管理器安装并重启使用，不需要运行两分钟的实验脚本。模块 ID `luma_curve`，版本仍为 `1.0.0 / 10000`；当前更改仅在本地 Git 和本地 ZIP，未上传 GitHub、未替换官网包。ZIP 自带 GPL-3.0 许可及对应 C/Java 源码。前几个本地包保留作回退。
+文件：`dist/luma_curve-1.0.0-local-framework-lean01.zip`。这是正常 KernelSU 模块 ZIP，可从管理器安装并重启使用，不需要运行两分钟的实验脚本。模块 ID `luma_curve`，版本仍为 `1.0.0 / 10000`；当前更改仅在本地 Git 和本地 ZIP，未上传 GitHub、未替换官网包。ZIP 自带 GPL-3.0 许可及对应 C/Java 源码。前几个本地包保留作回退。
 
 若安装前曾通过设置页或命令暂停，引擎会保留暂停状态；这时重启后不会产生 daemon 进程。安装器现在会提示，WebUI 在无状态文件时也会显示「已暂停」。在设置页点「恢复」，或以 root 执行 `sh /data/adb/modules/luma_curve/luma_curvectl.sh resume` 即可启动，无须重启和重新安装。
 
@@ -17,10 +17,11 @@
 - 本地修订 03：WebUI 设置页支持配置版本 12；首次亮度帧提交前不再把尚未启动的帧租约误判为过期。修订 02 实机日志证实该误判会导致接管和放权反复循环，核心虽显示运行但未持续输出。
 - 本地修订 04：极暗环境下不再用中低亮度校准比值拒绝接管；真实设备回传的 `adjustedBrightness=0.0062366`、主屏背光 `211` 现可通过宽范围校验。框架模式的旧 `chmod` 只作为尝试接管提示，暂时不能接管不会锁死主循环。WebUI 不再把框架条件不满足误称为 root 权限受限。
 - 本地修订 05：更新模块简介与关于页，移除关于页的原作者展示；出处仍在源码文档中。GitHub 仓库清空期间不检查不存在的远端更新。
+- 本地节能候选 01：模块描述每 20 秒刷新一次（服务巡检仍为约 60 秒）。框架目标、请求和读回相差不超过约两个背光码时按 500 ms 稳态轮询，并避免重复 Binder 写入；超出容差仍按 100 ms 响应。监管脚本继续每秒检查 broker，以保证暂停后快速放权。C 核心自身采样和亮度渐变参数未改。CPU 降幅需要同条件实机复测，Java broker 内存没有宣称已降低。
 
 ## 安装与回退
 
-安装器检查 ARM64、基础系统工具、两份框架 JAR 的 SHA-256，以及主屏只读接口；固件不匹配时拒绝安装。启动时再次核对 JAR，OTA 后固件变化则交还系统，不强行调用未知接口。安装完成后重启，在状态页查看 `output_backend=hyperos4_framework`、`core_build=20260930-framework-local05` 和 `framework_owned`；详细读数中的 `actuator_write_successes` 是 C→Java 请求接受次数，不是物理写入次数。
+安装器检查 ARM64、基础系统工具、两份框架 JAR 的 SHA-256，以及主屏只读接口；固件不匹配时拒绝安装。启动时再次核对 JAR，OTA 后固件变化则交还系统，不强行调用未知接口。安装完成后重启，在状态页查看 `output_backend=hyperos4_framework`、`core_build=20260930-framework-lean01` 和 `framework_owned`；详细读数中的 `actuator_write_successes` 是 C→Java 请求接受次数，不是物理写入次数。
 
 如果需要回到先前版本，在 KernelSU 中先暂停此模块，再安装本地保存的旧版模块 ZIP 并重启。原配置、学习数据与预设由已有升级脚本管理；安装 ZIP 中没有执行实验脚本的临时配置覆盖。
 

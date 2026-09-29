@@ -54,9 +54,9 @@ lc_core_description_refresh() {
 
 lc_core_watch_wait() {
   _lc_wait_steps=0
-  while [ "$_lc_wait_steps" -lt 6 ]; do
+  while [ "$_lc_wait_steps" -lt 3 ]; do
     lc_core_description_refresh || :
-    sleep 10
+    sleep 20
     _lc_wait_steps=$((_lc_wait_steps + 1))
   done
 }

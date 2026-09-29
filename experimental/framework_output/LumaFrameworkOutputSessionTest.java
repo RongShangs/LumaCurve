@@ -75,6 +75,16 @@ public final class LumaFrameworkOutputSessionTest {
             s.submit(2,1100,LumaFrameworkOutputSession.Unit.FRAMEWORK_FLOAT,.15f,1000);
             check(f.writes==2&&f.adjusted==.15f);
         }
-        System.out.println("Typed framework output session: 16 cases PASS; isolated experimental backend");
+        {
+            Fake f=new Fake();LumaFrameworkOutputSession s=new LumaFrameworkOutputSession(f);
+            s.submit(1,1000,LumaFrameworkOutputSession.Unit.FRAMEWORK_FLOAT,.15f,1000);
+            f.adjusted=.15009f;
+            s.submit(2,1100,LumaFrameworkOutputSession.Unit.FRAMEWORK_FLOAT,.15f,1000);
+            check(f.writes==1&&s.unchangedRequests()==1);
+            f.adjusted=.1503f;
+            s.submit(3,1200,LumaFrameworkOutputSession.Unit.FRAMEWORK_FLOAT,.15f,1000);
+            check(f.writes==2&&s.unchangedRequests()==1);
+        }
+        System.out.println("Typed framework output session: 17 cases PASS; isolated experimental backend");
     }
 }
