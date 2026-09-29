@@ -97,7 +97,7 @@ def main():
         header_text=(ROOT/'csrc/domain_io.h').read_text(encoding='utf-8').replace('#include "log_locale.h"\n','').replace('    format = luma_log_format(format);\n','')
         assert header_text==(args.upstream/'csrc/domain_io.h').read_text(encoding='utf-8')
         for header in (ROOT/'csrc').glob('*.h'):
-            if header.name not in ('state_observer.h','install_probe.h','backlight_paths.h','temporal_stability.h','scene_adaptation.h','log_locale.h','domain_io.h','brightness_preference.h','brightness_curve.h','log_timestamp.h','backlight_write_diagnostics.h'): assert header.read_text(encoding='utf-8')==(args.upstream/'csrc'/header.name).read_text(encoding='utf-8'),header.name
+            if header.name not in ('state_observer.h','install_probe.h','backlight_paths.h','temporal_stability.h','scene_adaptation.h','log_locale.h','domain_io.h','brightness_preference.h','brightness_curve.h','log_timestamp.h','backlight_write_diagnostics.h','actuator_diagnostics.h','core_build.h'): assert header.read_text(encoding='utf-8')==(args.upstream/'csrc'/header.name).read_text(encoding='utf-8'),header.name
         passed('Untouched units and hash-pinned pre-optimization fixtures match the branded recovered baseline')
     for name in ('core-optimization-verification.json','core-main-replay-verification.json'):
         core=json.loads((ROOT/'build'/name).read_text(encoding='utf-8'))
@@ -127,6 +127,12 @@ def main():
     assert diagnostics['ok'] and len(diagnostics['checks'])==4
     for source,wanted in diagnostics['source_sha256'].items(): assert sha((ROOT/source).read_bytes())==wanted,source
     passed('Production native backlight error stages, throttling, preserved errno and syscall return values')
+    for report_name,expected in [('android-actuator-verification.json',3),('hot-test-verification.json',5)]:
+        report=json.loads((ROOT/'build'/report_name).read_text(encoding='utf-8'))
+        assert report['ok'] and len(report.get('cases',report.get('checks',[])))==expected
+        for source,wanted in report['source_sha256'].items(): assert sha((ROOT/source).read_bytes())==wanted,source
+        if report_name.startswith('android-'):assert report['elf_sha256']==metadata['sha256']
+    passed('Actual production ARM64 ELF writes/readbacks and errno failures; isolated hot-test validation, rollback and pause preservation')
     compatibility=json.loads((ROOT/'build/compatibility-verification.json').read_text(encoding='utf-8'))
     assert compatibility['ok'] and len(compatibility['checks'])>=10
     for source,wanted in compatibility['source_sha256'].items(): assert sha((ROOT/source).read_bytes())==wanted,source

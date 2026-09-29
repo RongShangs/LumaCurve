@@ -8,7 +8,7 @@
   ],
   "android_device_verified": false,
   "source_sha256": {
-    "csrc/platform_native.c": "de6c87f69f7c894f95f57ac1078103060e7d254eda9f25def417f683e9723e72",
+    "csrc/platform_native.c": "35101a720a8886cca2c28ef7753c88c3decb4a17a8a06dbc13c0756b485b9cc7",
     "csrc/backlight_write_diagnostics.h": "fdcb0c52f5c3bc6babb7c6b08f4cdbddae0f678da976190d15f64faa658c77af",
     "tests/backlight_diagnostics.py": "f571ec01a72ffdb437cb18a4d9635d5d1844bad644625f70a276cb4f0391764f"
   }

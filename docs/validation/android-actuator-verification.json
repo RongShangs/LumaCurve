@@ -1,0 +1,41 @@
+{
+  "ok": true,
+  "cases": [
+    {
+      "name": "arm_sysfs_write",
+      "ok": true,
+      "attempts": 65,
+      "successes": 65,
+      "stage": "readback_ok",
+      "errno": 0
+    },
+    {
+      "name": "arm_ndk_write",
+      "ok": true,
+      "attempts": 65,
+      "successes": 65,
+      "stage": "readback_ok",
+      "errno": 0
+    },
+    {
+      "name": "arm_write_failure",
+      "ok": true,
+      "attempts": 238,
+      "successes": 0,
+      "stage": "write_failed",
+      "errno": 30
+    }
+  ],
+  "actual_android_elf": true,
+  "android_device_verified": false,
+  "elf_sha256": "ae9fb34a0cebf4bfa17c016005046e1f914de7e373c778081b7e70f950b6e14d",
+  "source_sha256": {
+    "csrc/apply_brightness_frame.c": "fffa84c3c35a04414425ceff3dd3c4833d556212b70a73b2bcd02de7695a87a4",
+    "csrc/state.c": "5046dcc1d60828c0c9919529df21b7e1426430448f181b262682be3663b81bbf",
+    "csrc/write_state_file.c": "945da6fa0abd1353b630c16f4c18e78c3220dbed59152310f56e6014adf1a005",
+    "csrc/platform_native.c": "35101a720a8886cca2c28ef7753c88c3decb4a17a8a06dbc13c0756b485b9cc7",
+    "csrc/core_build.h": "5c6abc4a55b43e3789e670eef6c5bccba485f8b13c3fe7ee312ffc979bf8ce84",
+    "csrc/actuator_diagnostics.h": "54618dcae90aef035bdec04c2bdd19ed284d29c100d6d6ce53038445adb3f92f",
+    "tests/android_actuator.py": "4215cb772a04c836117646e40dfde2cd5c28662309f23ba18874d446f656193a"
+  }
+}

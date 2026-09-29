@@ -5,6 +5,11 @@
 #include "scene_adaptation.h"
 #include "brightness_preference.h"
 #include "brightness_curve.h"
+#include "actuator_diagnostics.h"
+uint64_t luma_write_attempts, luma_write_successes;
+int luma_write_errno, luma_write_request;
+int64_t luma_write_bytes = -1;
+const char *luma_write_stage = "not_attempted";
 IosState ios_state;
 const IosState ios_default_state = {
     .fini_array_with_sentinels = {255,255,255,255,255,255,255,255,76,79,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
@@ -80,6 +85,9 @@ const IosState ios_default_state = {
     .prev_slider_val = -1,
 };
 void ios_reset_data(void) {
+    luma_write_attempts=luma_write_successes=0;
+    luma_write_errno=luma_write_request=0; luma_write_bytes=-1;
+    luma_write_stage="not_attempted";
     ios_state = ios_default_state;
     ios_runtime_io_reset();
     luma_indoor_stability = 1;

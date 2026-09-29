@@ -18,7 +18,7 @@
   "source_sha256": {
     "csrc/install_probe.h": "a42d5ddc536607ae81a2e1ed4d0613db48785af47959c599d536757ed0cad3ec",
     "csrc/backlight_paths.h": "72ebda39f1256610b16ab50133d6c70b5866ed6476c09e810b747dacaa7cc84b",
-    "csrc/platform_native.c": "de6c87f69f7c894f95f57ac1078103060e7d254eda9f25def417f683e9723e72",
+    "csrc/platform_native.c": "35101a720a8886cca2c28ef7753c88c3decb4a17a8a06dbc13c0756b485b9cc7",
     "module/compatibility.sh": "c838e3551507c280ce733c95b22d1e579152c567a8d8f43e4fe02d5ad6f3d0b1",
     "module/upgrade_data.sh": "df124a63fb5c22809099d061845ade1306048700127aa0034559e1a869a598d3",
     "module/customize.sh": "c3d0afed02bf7a6469b3d7ea2f0ab8eeed85f25d4bc21dff93e21d615612c3d6",

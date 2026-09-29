@@ -38,6 +38,7 @@ for library in libraries:
     library.ios_test_call.argtypes=[ctypes.c_uint64,ctypes.POINTER(native.Cpu)]
     library.ios_test_hook.argtypes=[native.HOOK]
 SCENE_FIELDS={'curve_learned_points','preference_anchor','thermal_enabled','thermal_zone_count','thermal_scan_done','scene_relation','scene_hold_active','scene_hold_left_ms','scene_confirm_samples','front_reporting_mode','back_reporting_mode','preference_offset','preference_effective_offset','preference_learning','preference_samples','preference_pending','preference_dirty','preference_evidence','curve_points','curve_custom','curve_gamma','curve_circadian_factor','curve_sunlight_threshold','curve_sunlight_extreme','curve_sunlight_boost','curve_sunlight_min'}
+SCENE_FIELDS.update({'core_build','backlight_path','actuator_write_attempts','actuator_write_successes','actuator_write_errno','actuator_last_request','actuator_last_bytes','actuator_write_stage'})
 def without_scene_fields(text):
     return ''.join(line for line in text.splitlines(keepends=True) if line.split('=',1)[0] not in SCENE_FIELDS)
 LOG_PAIRS=[(json.loads(a),json.loads(b)) for a,b in re.findall(r'\{("(?:\\.|[^"\\])*")\s*,\s*("(?:\\.|[^"\\])*")\}', (ROOT/'csrc/log_locale.h').read_text(encoding='utf-8'))]

@@ -77,7 +77,7 @@
   "source_sha256": {
     "csrc/curve_pct_for_lux.c": "47d14f430b23cdc0cff314a2946ed463a770079126d27ca6a3eba8cdd6df6f5b",
     "csrc/brightness_preference.c": "1ce43c1929701f6c0d98c774898aee2a780e5e0f3f3e78ea398ecb755badbd0d",
-    "csrc/state.c": "b466dc2f70b9019e4360851929b61e074a47d5f92f48bad4e2cdef6010df72c6",
+    "csrc/state.c": "5046dcc1d60828c0c9919529df21b7e1426430448f181b262682be3663b81bbf",
     "csrc/read_screen.c": "22380627ded900f82a07500cda7464c72eeabcb38fe07de415bdd973875ac447",
     "csrc/read_lux_fallback.c": "2542dbbd655ad336633023f8ea9a231009a9a87e7289057c01ce54708f0c1a8c",
     "csrc/business_sensor_init.c": "32fc012e076f03f342e45c549526b3b50eea94745705c937969887bb758d0038",

@@ -7,6 +7,9 @@
 #include "brightness_preference.h"
 #include "brightness_curve.h"
 #include "temporal_stability.h"
+#include "actuator_diagnostics.h"
+#include "core_build.h"
+#include "backlight_paths.h"
 
 typedef struct StateOutput {
     char data[16384];
@@ -264,6 +267,14 @@ static int publish_state(DomainIo *io, const StateFrame *frame) {
                time_left(frame->now, TIME(g_external_write_hold_until)));
     state_word(io, stream, "updated_unix=%llu\n", CALL(io, time, 0));
     if (luma_indoor_stability || luma_curve_custom || luma_preference_learning) {
+        state_text(io, stream, "core_build=%s\n", LUMA_CORE_BUILD);
+        state_text(io, stream, "backlight_path=%s\n", ios_backlight_brightness());
+        state_word(io, stream, "actuator_write_attempts=%llu\n", luma_write_attempts);
+        state_word(io, stream, "actuator_write_successes=%llu\n", luma_write_successes);
+        state_word(io, stream, "actuator_write_errno=%d\n", luma_write_errno);
+        state_word(io, stream, "actuator_last_request=%d\n", luma_write_request);
+        state_word(io, stream, "actuator_last_bytes=%d\n", (uint32_t)luma_write_bytes);
+        state_text(io, stream, "actuator_write_stage=%s\n", luma_write_stage);
         char curve[256];
         if (luma_curve_format(curve, sizeof(curve))) state_text(io, stream, "curve_points=%s\n", curve);
         if (luma_curve_learned_format(curve, sizeof(curve))) state_text(io, stream, "curve_learned_points=%s\n", curve);

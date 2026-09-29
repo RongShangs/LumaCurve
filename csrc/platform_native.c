@@ -14,6 +14,7 @@
 #include "log_timestamp.h"
 #include "backlight_paths.h"
 #include "backlight_write_diagnostics.h"
+#include "core_build.h"
 
 _Static_assert(sizeof(void *) == 8 && sizeof(long) == 8, "Android LP64 is required");
 _Static_assert(offsetof(struct stat, st_mtim) == 88, "Unexpected Android stat layout");
@@ -234,8 +235,10 @@ uint64_t ios_native_format_values(DomainIo *io, char *buffer, size_t capacity, c
 }
 #include "install_probe.h"
 int main(int argc, char **argv) {
+    if (argc == 2 && !strcmp(argv[1], "--build-info")) { puts(LUMA_CORE_BUILD); return 0; }
     if (argc == 2 && !strcmp(argv[1], "--check-install")) return luma_install_probe();
     if (argc != 1) { fprintf(stderr,"Usage: luma_curve_daemon [--check-install]\n"); return 2; }
+    fprintf(stdout,"[LumaCurve] 核心构建：%s\n",LUMA_CORE_BUILD); fflush(stdout);
     ios_reset_data();
 #ifdef IOS_BUSINESS_MAIN
     return ios_business_main();

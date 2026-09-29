@@ -54,6 +54,10 @@
       "ok": true
     },
     {
+      "name": "Actual production ARM64 ELF writes/readbacks and errno failures; isolated hot-test validation, rollback and pause preservation",
+      "ok": true
+    },
+    {
       "name": "Installer compatibility and native read-only probe cases pass for current sources",
       "ok": true
     },
@@ -66,8 +70,8 @@
       "ok": true
     }
   ],
-  "module_sha256": "389cff5e9b5270ab13b297613f433fd2b129f1c1ba466280ba8257426428694f",
-  "elf_sha256": "e7677bc5319150b7b4e9b5703e4c9ae33d829273ba41bed498934cb61909eebd",
+  "module_sha256": "5019ace7eee9c3b053965d6183f7558cea08322bec73ade0b81f22dc1614bcfd",
+  "elf_sha256": "ae9fb34a0cebf4bfa17c016005046e1f914de7e373c778081b7e70f950b6e14d",
   "android_device_verified": false,
   "upstream_source_comparison": true,
   "full_original_elf_differential_rerun": false

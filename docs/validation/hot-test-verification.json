@@ -1,0 +1,31 @@
+{
+  "ok": true,
+  "checks": [
+    {
+      "name": "success",
+      "ok": true
+    },
+    {
+      "name": "wrong-id",
+      "ok": true
+    },
+    {
+      "name": "failed-probe",
+      "ok": true
+    },
+    {
+      "name": "startup-rollback",
+      "ok": true
+    },
+    {
+      "name": "paused-preserved",
+      "ok": true
+    }
+  ],
+  "host_fixture_only": true,
+  "android_device_verified": false,
+  "source_sha256": {
+    "tools/hot_test_android.sh": "f9eb3519e8c870f142336bcf95d94eb9072ea8f137951ffcbd43847e15660b20",
+    "tests/hot_test.py": "5e640299996f0be2ee8eaa3722fda1ed0308074f9345bc7302c63f6bcdaa9b7f"
+  }
+}
