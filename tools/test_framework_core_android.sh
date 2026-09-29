@@ -18,7 +18,7 @@ RUN=$(mktemp -d /data/local/tmp/luma-framework-core.XXXXXX) || exit 2
 chmod 0700 "$RUN"
 cp "$HERE/LumaFrameworkProbe.jar" "$RUN/probe.jar" && cp "$HERE/luma_framework_core" "$RUN/luma_framework_core" || exit 2
 chmod 0700 "$RUN/luma_framework_core"
-OUT="$HERE/luma-framework-core-test01-$(date +%Y%m%d-%H%M%S)-$$"
+OUT="$HERE/luma-framework-core-test02-$(date +%Y%m%d-%H%M%S)-$$"
 mkdir "$OUT" || exit 2
 { date; id; getprop ro.build.version.incremental; } > "$OUT/environment.txt"
 timeout 10 dumpsys display > "$OUT/before-display.txt" 2>&1
@@ -55,6 +55,16 @@ RESULT=0
 for TICK in $(seq 1 120); do
   if ! kill -0 "$CORE" 2>/dev/null || ! kill -0 "$BROKER" 2>/dev/null; then RESULT=2; break; fi
   touch "$RUN/luma_curve_ui_watch"
+  if [ $((TICK % 10)) = 0 ]; then
+    for PID in "$CORE" "$BROKER"; do
+      { printf '\n--- tick=%s pid=%s ---\n' "$TICK" "$PID";
+        cat /proc/uptime 2>/dev/null;
+        cat "/proc/$PID/stat" 2>/dev/null;
+        grep -E '^(Name|State|Pid|Threads|VmRSS|VmHWM):' "/proc/$PID/status" 2>/dev/null;
+        cat "/proc/$PID/cgroup" 2>/dev/null;
+      } >> "$OUT/process-samples.txt"
+    done
+  fi
   if [ -r "$RUN/luma_curve_state" ]; then
     { printf '\n--- tick=%s ---\n' "$TICK"; cat "$RUN/luma_curve_state"; } >> "$OUT/states.txt"
   fi
@@ -63,6 +73,7 @@ done
 finish
 wait "$GUARD" || RESULT=2
 [ ! -r "$RUN/framework.trace" ] || cp "$RUN/framework.trace" "$OUT/framework.trace"
+[ ! -r "$RUN/framework.events" ] || cp "$RUN/framework.events" "$OUT/framework.events"
 [ ! -r "$RUN/luma_curve_state" ] || cp "$RUN/luma_curve_state" "$OUT/final-state.txt"
 cat "$OUT/recovery.txt"
 echo "输出目录：$OUT"

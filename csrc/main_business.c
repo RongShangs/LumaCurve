@@ -5,6 +5,9 @@
 #include "brightness_curve.h"
 #include "business_state_views.h"
 #include "state_observer.h"
+#ifdef LUMA_FRAMEWORK_BACKEND
+#include "framework_wake.h"
+#endif
 /* Complete daemon business flow recovered from 2.5.5.
  * The recovery baseline was validated against the original ELF.
  * Hardware reliability and optional scene-adaptive temporal behavior are maintained
@@ -102,6 +105,10 @@ int ios_business_main(void)
   screen_on = startup.screen_on;
   smooth_lux = startup.smooth_lux;
   raw_lux = startup.raw_lux;
+#ifdef LUMA_FRAMEWORK_BACKEND
+  /* Hysteresis references a real startup goal, never the reset value zero. */
+  luma_framework_start_goal(&ios_state,(int32_t)current_brightness);
+#endif
   if (ios_state.g_run != 0) {
     last_priority_ms = 0;
     last_screen_check_ms = (int64_t)VIEW8(scratch) * 1000 + VIEW8(scratch + 8) / 1000000;
@@ -794,7 +801,11 @@ ownership_sensor_ready:
           if (now_ms <= ios_state.g_wake_readonly_until) {
             interval_or_age_ms = ios_state.g_wake_readonly_until - now_ms;
           }
-          if (((ios_state.g_wake_lux_sample_count < 2) && (interval_or_age_ms < 0xbb9)) && (ios_state.g_wake_readonly_extends < 3))
+          if (((ios_state.g_wake_lux_sample_count < 2) && (interval_or_age_ms < 0xbb9)) && (ios_state.g_wake_readonly_extends < 3)
+#ifdef LUMA_FRAMEWORK_BACKEND
+              && !luma_framework_quiet_wake_ready(&ios_state,now_ms)
+#endif
+             )
           {
             ios_state.g_wake_readonly_extends = ios_state.g_wake_readonly_extends + 1;
             ios_state.g_wake_readonly_until = now_ms + 5000;
@@ -818,6 +829,12 @@ ownership_sensor_ready:
               now_ms = domain_now_ms(&io);
               selected_brightness = ios_state.g_wake_lux_sample_count;
               events_processed = delta_or_limit + events_processed;
+#ifdef LUMA_FRAMEWORK_BACKEND
+              if(luma_framework_seed_quiet_wake(&ios_state,now_ms,&wake_sample_lux)) {
+                raw_lux=smooth_lux=curve_or_upper=wake_sample_lux;
+                goto framework_wake_seed_ready;
+              }
+#endif
               if (ios_scene_sensor_fresh(&ios_state, true, now_ms) &&
                  (((float_bits(ios_state.g_front_lux) < 0x80000000 &&
                    (float_bits(ABS(ios_state.g_front_lux)) - 0x800000U) >> 0x18 < 0x7f) ||
@@ -946,6 +963,9 @@ wake_lux_filter:
                 ios_state.g_sensor_hold_active = 1;
               }
             }
+#ifdef LUMA_FRAMEWORK_BACKEND
+framework_wake_seed_ready:
+#endif
             delta_or_limit = chmod(ios_backlight_brightness(),0x124);
             if (delta_or_limit == 0) {
               memcpy(ios_state.g_brightness_owner, "daemon\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000", 32);

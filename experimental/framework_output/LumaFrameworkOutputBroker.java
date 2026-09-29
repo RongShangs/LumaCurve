@@ -7,6 +7,7 @@ public final class LumaFrameworkOutputBroker implements LumaFrameworkOutputSessi
     final LumaFrameworkProbe.AndroidBridge android=new LumaFrameworkProbe.AndroidBridge();
     final File run;
     final PrintWriter trace;
+    final PrintWriter events;
     final LumaFrameworkOutputSession session=new LumaFrameworkOutputSession(this);
     final LumaFrameworkOutputLease client=new LumaFrameworkOutputLease();
     LumaFrameworkOutputSession.Snapshot snapshot;
@@ -18,6 +19,7 @@ public final class LumaFrameworkOutputBroker implements LumaFrameworkOutputSessi
     static long now(){return System.nanoTime()/1000000;}
     LumaFrameworkOutputBroker(File folder)throws Exception {
         run=folder;trace=new PrintWriter(new File(folder,"framework.trace"),"UTF-8");
+        events=new PrintWriter(new File(folder,"framework.events"),"UTF-8");
         refresh();initial=snapshot.adjustedBrightness;request=initial;
         if(!LumaFrameworkOutputSession.usable(snapshot,now())||initial<snapshot.min||initial>snapshot.max)
             throw new IllegalStateException("initial mode, display, range or feedback invalid");
@@ -29,6 +31,11 @@ public final class LumaFrameworkOutputBroker implements LumaFrameworkOutputSessi
         // Reject wrong firmware conversion signatures/units before any output.
         if(Math.abs(coordinate.decode(coordinate.encode(initial))-initial)>.00001f)throw new IllegalStateException("coordinate roundtrip failed");
         ramp=new LumaFrameworkOutputRamp(coordinate,initial,now());
+        try {
+            int selector=Class.forName("android.system.OsConstants").getField("_SC_CLK_TCK").getInt(null);
+            Object ticks=LumaFrameworkProbe.invoke(Class.forName("android.system.Os"),"sysconf",new Class<?>[]{int.class},selector);
+            event("CPU_CLK_TCK,value="+ticks);
+        }catch(Exception unavailable){event("CPU_CLK_TCK,unavailable");}
         trace.println("time_ms,mode,owned,algorithm_goal,limited_goal,request,base,adjusted,node,min,max");trace.flush();
     }
     void refresh()throws Exception {
@@ -62,14 +69,21 @@ public final class LumaFrameworkOutputBroker implements LumaFrameworkOutputSessi
         }
         return id&&clear;
     }
-    void release()throws Exception {acquired=false;hasGoal=false;goal=limited=-1;session.release();}
+    void event(String text){events.println(now()+","+text);events.flush();}
+    void release()throws Exception {
+        boolean responsible=acquired||session.state()!=LumaFrameworkOutputSession.State.IDLE;
+        acquired=false;hasGoal=false;goal=limited=-1;
+        if(responsible)event("RELEASE_BEGIN,mode="+mode);
+        session.release();
+        if(responsible)event("RELEASE_CONFIRMED,mode="+mode);
+    }
     synchronized void tick() {
         try {
             refresh();long t=now();
             if(acquired&&(!client.alive(t)||!LumaFrameworkOutputSession.usable(snapshot,t)))release();
             session.tick(t);
             if(acquired&&hasGoal){
-                // First full-core test stays within the already measured +/- .01 window.
+                // Each new ownership session stays near its real initial feedback.
                 limited=Math.max(snapshot.min,Math.min(snapshot.max,Math.max(initial-.01f,Math.min(initial+.01f,goal))));
                 request=ramp.next(limited,snapshot.min,snapshot.max,now());
                 session.submit(++sequence,now(),LumaFrameworkOutputSession.Unit.FRAMEWORK_FLOAT,request,1000);
@@ -89,13 +103,19 @@ public final class LumaFrameworkOutputBroker implements LumaFrameworkOutputSessi
         case "A":
             if(words.length!=1||!LumaFrameworkOutputSession.usable(snapshot,t)||session.state()==LumaFrameworkOutputSession.State.RELEASE_PENDING)
                 throw new IllegalStateException("control forbidden");
-            if(!acquired)ramp.request=snapshot.adjustedBrightness;
+            if(!acquired){
+                initial=snapshot.adjustedBrightness;ramp.reset(initial,t);request=initial;
+                goal=limited=-1;event("ACQUIRE,anchor="+initial);
+            }
             acquired=true;client.renew(t);ramp.stamp=t;break;
         case "T":
             if(words.length!=4||!acquired||!LumaFrameworkOutputSession.usable(snapshot,t))throw new IllegalStateException("goal without ownership");
             long seq=Long.parseLong(words[1]);int raw=Integer.parseInt(words[2]),max=Integer.parseInt(words[3]);
             if(seq<=lastClientSequence||max!=16383||raw<0||raw>max)throw new IllegalArgumentException("invalid sequence or raw goal");
-            lastClientSequence=seq;goal=raw/(float)max;hasGoal=true;client.renew(t);break;
+            lastClientSequence=seq;
+            float desired=raw/(float)max;
+            if(!hasGoal||goal!=desired)event("GOAL,legacy_fraction="+desired);
+            goal=desired;hasGoal=true;client.renew(t);break;
         case "P":if(words.length!=1)throw new IllegalArgumentException();client.renew(t);break;
         case "R":if(words.length!=1)throw new IllegalArgumentException();release();break;
         default:throw new IllegalArgumentException("unknown RPC");
@@ -113,7 +133,7 @@ public final class LumaFrameworkOutputBroker implements LumaFrameworkOutputSessi
         Thread frames=new Thread(()->{for(;;){broker.tick();try{Thread.sleep(100);}catch(InterruptedException e){return;}}},"Luma-framework-frames");
         frames.setDaemon(true);frames.start();
         new File(broker.run,"broker-ready").createNewFile();
-        System.out.println("BROKER_READY build=20260929-framework-core-test01 budget=initial+/-0.01");
+        System.out.println("BROKER_READY build=20260929-framework-core-test02 budget=initial+/-0.01");
         for(;;){
             Object socket=LumaFrameworkProbe.invoke(server,"accept",new Class<?>[0]);
             try {

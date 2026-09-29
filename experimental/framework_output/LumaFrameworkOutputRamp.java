@@ -4,7 +4,11 @@ public final class LumaFrameworkOutputRamp {
     final Coordinate coordinate;
     float request;
     long stamp;
-    public LumaFrameworkOutputRamp(Coordinate c,float initial,long now){coordinate=c;request=initial;stamp=now;}
+    public LumaFrameworkOutputRamp(Coordinate c,float initial,long now){coordinate=c;reset(initial,now);}
+    public void reset(float initial,long now) {
+        if(!LumaFrameworkOutputSession.finite(initial)||initial<0||initial>1||now<stamp)throw new IllegalArgumentException("invalid reanchor");
+        request=initial;stamp=now;
+    }
     public float next(float goal,float min,float max,long now)throws Exception {
         if(now<stamp||!LumaFrameworkOutputSession.finite(goal)||min<0||max>1||min>=max)throw new IllegalArgumentException("invalid ramp input");
         float dt=Math.min(200,now-stamp)/1000f;stamp=now;

@@ -14,11 +14,11 @@ done
 stop_owned() {
   _fc_pid=$(cat "$RUN/$1.pid" 2>/dev/null || :)
   case "$_fc_pid" in ''|*[!0-9]*) return;; esac
-  _fc_cmd=$(tr '\000' ' ' < "/proc/$_fc_pid/cmdline" 2>/dev/null || :)
+  _fc_cmd=$({ tr '\000' ' ' < "/proc/$_fc_pid/cmdline"; } 2>/dev/null || :)
   case "$_fc_cmd" in *"$RUN"*"luma_framework_core"*|*"LumaFrameworkOutputBroker "*"$RUN"*) :;; *) return;; esac
   kill -TERM "$_fc_pid" 2>/dev/null || :
   sleep 2
-  _fc_cmd=$(tr '\000' ' ' < "/proc/$_fc_pid/cmdline" 2>/dev/null || :)
+  _fc_cmd=$({ tr '\000' ' ' < "/proc/$_fc_pid/cmdline"; } 2>/dev/null || :)
   case "$_fc_cmd" in *"$RUN"*"luma_framework_core"*|*"LumaFrameworkOutputBroker "*"$RUN"*) kill -KILL "$_fc_pid" 2>/dev/null || :;; esac
 }
 echo 'WATCHDOG stopping isolated core and broker' >> "$OUT/recovery.txt"

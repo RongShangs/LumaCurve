@@ -9,6 +9,9 @@ public final class LumaFrameworkOutputRampTest {
         check(r.next(.8f,0,.15f,10100)==.15f);
         boolean rejected=false;try{r.next(Float.NaN,0,1,10200);}catch(IllegalArgumentException expected){rejected=true;}check(rejected);
         rejected=false;try{r.next(.1f,0,1,10000);}catch(IllegalArgumentException expected){rejected=true;}check(rejected);
-        System.out.println("perceptual ramp: 6 cases PASS");
+        r.reset(.35f,10200);check(Math.abs(r.next(.5f,0,1,10300)-.354f)<.000001);
+        rejected=false;try{r.reset(Float.NaN,10400);}catch(IllegalArgumentException expected){rejected=true;}check(rejected);
+        rejected=false;try{r.reset(.35f,10200);}catch(IllegalArgumentException expected){rejected=true;}check(rejected);
+        System.out.println("perceptual ramp: 9 cases PASS");
     }
 }

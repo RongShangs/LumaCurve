@@ -331,10 +331,13 @@ int32_t ios_business_debounce(IosState *s, uint64_t now_ms, int32_t requested,
             candidate = s->g_target_debounce_br;
         } else {
             direction = requested <= s->g_target_debounce_br ? -1 : 1;
+#ifndef LUMA_FRAMEWORK_BACKEND
+            /* The native actuator historically advances targets in small chunks. */
             float fraction = direction < 0 ? 0.04f : lux < 5.0f ? 0.012f : 0.045f;
             int32_t maximum_step = step_threshold(maximum, fraction, s->cfg_min_step);
             if (maximum_step < difference)
                 candidate = s->g_target_debounce_br + direction * maximum_step;
+#endif
             if (s->g_target_candidate_dir == direction) {
                 int32_t movement = candidate - s->g_target_candidate_br;
                 if (movement < 0) movement = -movement;
