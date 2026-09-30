@@ -160,8 +160,11 @@ public final class LumaFrameworkOutputBroker implements LumaFrameworkOutputSessi
                 throw new IllegalStateException("control forbidden");
             if(production&&sliderOverride.waiting(t))throw new IllegalStateException("user slider owns brightness");
             if(!outputHealthy)throw new IllegalStateException("physical feedback fault; restart required");
-            if(production&&!LumaLegacyBacklightCoordinate.plausibleAnchor(snapshot.node,snapshot.adjustedBrightness))
+            if(production&&!LumaLegacyBacklightCoordinate.plausibleAnchor(snapshot.node,snapshot.adjustedBrightness)){
+                event("ACQUIRE_WAIT,reason=calibration,node="+snapshot.node+",adjusted="+snapshot.adjustedBrightness+
+                    ",base="+snapshot.baseBrightness+",min="+snapshot.min+",max="+snapshot.max);
                 throw new IllegalStateException("backlight coordinate calibration unavailable");
+            }
             if(!acquired){
                 if(production&&sliderOverride.pending())event("USER_SLIDER_HOLD,brightness="+sliderOverride.settle(t,snapshot.adjustedBrightness,lastLux));
                 initial=snapshot.adjustedBrightness;ramp.reset(initial,t);request=initial;
@@ -199,7 +202,7 @@ public final class LumaFrameworkOutputBroker implements LumaFrameworkOutputSessi
         Thread frames=new Thread(()->{for(;;){broker.tick();try{Thread.sleep(broker.nextTickDelayMs());}catch(InterruptedException e){return;}}},"Luma-framework-frames");
         frames.setDaemon(true);frames.start();
         new File(broker.run,"broker-ready").createNewFile();
-        System.out.println(broker.production?"BROKER_READY build=20260930-framework-hold01 output=normal_range_ramp":
+        System.out.println(broker.production?"BROKER_READY build=20260930-framework-hold02 output=normal_range_ramp":
             "BROKER_READY build=20260930-framework-core-test04 budget=acquisition+/-0.01");
         for(;;){
             Object socket=LumaFrameworkProbe.invoke(server,"accept",new Class<?>[0]);
