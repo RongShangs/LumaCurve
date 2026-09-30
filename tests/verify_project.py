@@ -16,7 +16,7 @@ def main():
     properties = dict(line.split('=',1) for line in (ROOT/'module/module.prop').read_text(encoding='utf-8').splitlines() if '=' in line and not line.startswith('#'))
     assert properties['id']=='luma_curve' and properties['version']=='1.0.0' and properties['versionCode']=='10000'
     assert properties['author']=='酷安@戎Shang' and '流光亮度' in properties['name']
-    assert properties['description'].startswith('[LumaCurve核心✘] ') and '凌乱' not in properties['description']
+    assert properties['description'].startswith('[LumaCurve核心❌] ') and '凌乱' not in properties['description']
     core_status=json.loads((ROOT/'build/core-status-verification.json').read_text(encoding='utf-8'))
     assert core_status['ok'] and len(core_status['checks'])>=9
     for name,digest in core_status['source_sha256'].items(): assert sha((ROOT/name).read_bytes())==digest,name

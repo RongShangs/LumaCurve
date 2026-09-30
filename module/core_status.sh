@@ -28,12 +28,9 @@ lc_core_description_refresh() {
     *) _lc_base=$_lc_current;;
   esac
   case "$(lc_core_status)" in
-    running) _lc_marker='[LumaCurve核心✔]';;
-    paused) _lc_marker='[LumaCurve核心Ⅱ]';;
-    stopped) _lc_marker='[LumaCurve核心✘]';;
-    multiple) _lc_marker='[LumaCurve核心！]';;
-    frozen) _lc_marker='[LumaCurve核心冻结]';;
-    *) _lc_marker='[LumaCurve核心？]';;
+    running) _lc_marker='[LumaCurve核心✅]';;
+    stopped) _lc_marker='[LumaCurve核心❌]';;
+    *) _lc_marker='[LumaCurve核心⚠️]';;
   esac
   _lc_description="$_lc_marker $_lc_base"
   [ "$_lc_current" != "$_lc_description" ] || return 0

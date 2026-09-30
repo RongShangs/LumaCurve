@@ -25,28 +25,28 @@ readlink() {{ printf '%s' "$mock_exe"; }}
 mock_pids=431; mock_alive=yes; mock_exe="$DAEMON"
 [ "$(lc_core_status)" = running ]
 lc_core_description_refresh
-grep -q '^description=\[LumaCurve核心✔\] ' "$MODDIR/module.prop"
+grep -q '^description=\[LumaCurve核心✅\] ' "$MODDIR/module.prop"
 signature=$(cksum "$MODDIR/module.prop")
 lc_core_description_refresh
 [ "$signature" = "$(cksum "$MODDIR/module.prop")" ]
 printf 'do_freezer_trap' > '{base}/proc/431/wchan'
 [ "$(lc_core_status)" = frozen ]; lc_core_description_refresh
-grep -q '^description=\[LumaCurve核心冻结\] ' "$MODDIR/module.prop"
+grep -q '^description=\[LumaCurve核心⚠️\] ' "$MODDIR/module.prop"
 printf 'nanosleep' > '{base}/proc/431/wchan'
 [ "$(lc_core_status)" = running ]
 mock_exe=/another/module/luma_curve_daemon
 [ "$(lc_core_status)" = unknown ]; lc_core_description_refresh
-grep -q '^description=\[LumaCurve核心？\] ' "$MODDIR/module.prop"
+grep -q '^description=\[LumaCurve核心⚠️\] ' "$MODDIR/module.prop"
 mock_exe="$DAEMON"; mock_alive=no
 [ "$(lc_core_status)" = stopped ]; lc_core_description_refresh
-grep -q '^description=\[LumaCurve核心✘\] ' "$MODDIR/module.prop"
+grep -q '^description=\[LumaCurve核心❌\] ' "$MODDIR/module.prop"
 mock_alive=yes; mock_pids='431 432'
 [ "$(lc_core_status)" = multiple ]; lc_core_description_refresh
-grep -q '^description=\[LumaCurve核心！\] ' "$MODDIR/module.prop"
+grep -q '^description=\[LumaCurve核心⚠️\] ' "$MODDIR/module.prop"
 mock_pids=invalid; [ "$(lc_core_status)" = unknown ]
 mock_pids=''; [ "$(lc_core_status)" = stopped ]
 touch "$PAUSE_FILE"; [ "$(lc_core_status)" = paused ]; lc_core_description_refresh
-grep -q '^description=\[LumaCurve核心Ⅱ\] ' "$MODDIR/module.prop"
+grep -q '^description=\[LumaCurve核心⚠️\] ' "$MODDIR/module.prop"
 rm "$PAUSE_FILE"; mock_pids=431
 before=$(cat "$MODDIR/module.prop")
 mv() {{ return 1; }}
@@ -64,7 +64,7 @@ cksum() {{
 }}
 if lc_core_description_refresh; then exit 1; fi
 grep -q '^# concurrent-upgrade$' "$MODDIR/module.prop"
-grep -q '^description=\[LumaCurve核心✔\] ' "$MODDIR/module.prop"
+grep -q '^description=\[LumaCurve核心✅\] ' "$MODDIR/module.prop"
 unset -f cksum
 sleep_count=0; refresh_count=0
 sleep() {{ [ "$1" = 20 ]; sleep_count=$((sleep_count+1)); }}
