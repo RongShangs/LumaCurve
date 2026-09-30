@@ -93,9 +93,38 @@
     });
   });
   $('close-donation').addEventListener('click', function () { $('donation-dialog').close(); });
+  $('update-later').addEventListener('click', function () { $('update-dialog').close(); });
+  $('check-update').addEventListener('click', checkUpdate);
   function set(id, value) { $(id).textContent = value; }
   function quote(s) { return "'" + String(s).replace(/'/g, "'\\''") + "'"; }
   function toast(s) { set('toast', s); $('toast').classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(function () { $('toast').classList.remove('show'); }, 3200); }
+  var updateBusy = false, updateShown = false;
+  function checkUpdate() {
+    if (updateBusy) return;
+    updateBusy = true; set('update-status', '正在检查更新…'); $('update-download').hidden = true;
+    var script = document.createElement('script'), finished = false, timer;
+    function finish(message) {
+      if (finished) return;
+      finished = true; updateBusy = false; clearTimeout(timer); script.remove();
+      delete window.LumaCurveUpdate; set('update-status', message);
+    }
+    window.LumaCurveUpdate = function (data) {
+      if (!data || !Number.isSafeInteger(data.versionCode) || !/^\d+\.\d+\.\d+$/.test(data.version) ||
+          data.zipUrl !== 'https://lc.rongshangs.top/downloads/luma_curve-' + data.version + '.zip') {
+        finish('更新信息格式异常'); return;
+      }
+      if (data.versionCode <= 10000) { finish('已是最新版本 · 1.0.0'); return; }
+      $('update-download').href = data.zipUrl; $('update-download').hidden = false;
+      $('update-now').href = data.zipUrl;
+      set('update-message', 'LumaCurve ' + data.version + ' 已发布。下载后可在模块管理器中安装。');
+      finish('发现 ' + data.version + ' 新版本');
+      if (!updateShown && document.visibilityState === 'visible') { updateShown = true; $('update-dialog').showModal(); }
+    };
+    script.onerror = function () { finish('暂时无法检查更新，请稍后重试'); };
+    timer = setTimeout(function () { finish('检查更新超时，请稍后重试'); }, 8000);
+    script.src = 'https://lc.rongshangs.top/update.js?t=' + Date.now();
+    document.head.appendChild(script);
+  }
   // Resolve a generic web URL, then launch that browser with the actual URL.
   // MAIN/APP_BROWSER selectors can inherit the URL and fail intent resolution.
   function browserComponent(text) {
@@ -203,7 +232,7 @@
     var battery = Number(s.battery_pct);
     set('device-battery', s.battery_pct !== undefined && battery >= 0 && battery <= 100 ? battery + '% · ' + (s.charging === '1' ? '充电中' : s.charging === '0' ? '未充电' : '状态未知') : '—');
     set('write-permission', s.daemon_can_write === '1' ? '允许写入' : s.daemon_can_write === '0' ? '暂缓写入' : '—');
-    set('target-confirmation', s.target_hold_active === '1' ? '等待候选稳定' : s.target_hold_active === '0' ? '允许调节，尚需平滑过渡' : '—');
+    set('target-confirmation', s.target_hold_active === '1' ? '正在确认新目标' : s.target_hold_active === '0' ? '目标已确认' : '—');
   }
   function renderTrend(s, fresh) {
     var now = Date.now(), raw = Number(s.lux), smooth = Number(s.smooth);
@@ -286,7 +315,7 @@
       $('engine-scene').style.setProperty('--display-ink', pct < 30 ? '#f4f6fa' : '#1d2a3c');
       $('target-marker').hidden = false; $('target-marker').style.left = Math.max(0, Math.min(100, target / maximum * 100)) + '%';
     } else { $('response-gap').setAttribute('d', ''); $('response-guide').setAttribute('d', ''); $('target-marker').hidden = true; }
-    set('screen-action', stale ? '等待新状态' : paused ? '系统调节' : s.brightness_owner === 'wake_readonly' ? '系统先调节' : guarded || s.lux_valid === '0' || s.target_hold_active === '1' ? '保持亮度' : !canWrite ? '等待调节' : s.transition_active === '1' ? (target > current ? '变亮中' : target < current ? '变暗中' : '收尾中') : '已稳定');
+    set('screen-action', stale ? '等待新状态' : paused ? '系统调节' : s.brightness_owner === 'wake_readonly' ? '系统先调节' : s.framework_user_hold === '1' ? '按你的设置保持' : guarded || s.lux_valid === '0' || s.target_hold_active === '1' ? '保持亮度' : !canWrite ? '等待调节' : s.transition_active === '1' ? (target > current ? '变亮中' : target < current ? '变暗中' : '收尾中') : '已稳定');
   }
   function renderState(s) {
     lastState = s;
@@ -296,7 +325,8 @@
     set('target', maximum > 0 && isFinite(target) ? (target / maximum * 100).toFixed(1) + '%' : '—');
     set('flow-target', $('target').textContent); set('flow-current', isFinite(pct) ? pct.toFixed(1) + '%' : '—');
     set('flow-relation', maximum > 0 && isFinite(target) && isFinite(current) ?
-      (target > current ? '正在变亮' : target < current ? '正在变暗' : '亮度已稳定') + ' · 当前背光 ' + current + ' → 目标 ' + target + ' / 最大 ' + maximum : '等待背光数据');
+      (s.framework_user_hold === '1' ? '保持手动亮度' : s.transition_active !== '1' ? '当前未在调节' : target > current ? '正在变亮' : target < current ? '正在变暗' : '正在完成过渡') +
+      ' · 当前背光 ' + current + ' → 目标 ' + target + ' / 最大 ' + maximum : '等待背光数据');
     renderSensors(s);
     $('brightness-meter').firstElementChild.style.width = (isFinite(pct) ? pct : 0) + '%';
     if (isFinite(pct)) $('brightness-meter').setAttribute('aria-valuenow', pct.toFixed(1));
@@ -306,7 +336,8 @@
     set('owner', s.output_backend === 'hyperos4_framework' && s.brightness_owner === 'lock_failed_passthrough' ?
       '系统接管' : owners[s.brightness_owner] || s.brightness_owner || '—');
     set('sunlight', s.sunlight_active === '1' ? (s.hbm_active === '1' ? '增强 + HBM' : '增强中') : '未触发');
-    set('thermal', s.heat_guard_active === '1' ? '限制亮度中' : '未触发');
+    set('thermal', s.heat_guard_active === '1' ? '限制亮度中' : s.thermal_enabled === '0' ? '已关闭' :
+      Number(s.thermal_trusted_temp) > 0 ? '未触发' : '暂无可信温度');
     set('transition', s.transition_active === '1' ? '平滑调节中' : '稳定');
     var rate = {reactive: '快速追踪', stable: '稳定采样', active: '日常采样', normal: '日常采样'};
     set('sampling', rate[s.sensor_rate_mode] || ((s.target_poll_ms || s.poll_ms || '—') + ' ms'));
@@ -695,7 +726,13 @@
     syncStatusLayout();
     window.scrollTo(0, 0); if (name === 'status') pollState(); if (name === 'tools') { pollState(); loadLog(true); } if (name === 'settings') { refreshPreference(); renderCurveEditor(); }
   }
-  document.querySelectorAll('[data-panel]').forEach(function (b) { b.addEventListener('click', function () { location.hash = b.dataset.panel; switchPanel(b.dataset.panel); }); });
+  function selectPanel(name) {
+    // Tabs are local UI state, not browser history. Android Back can leave WebUI.
+    window.history.replaceState(null, '', '#'+name);
+    switchPanel(name);
+  }
+  document.querySelectorAll('[data-panel]').forEach(function (b) { b.addEventListener('click', function () { selectPanel(b.dataset.panel); }); });
+  document.querySelector('.brand').addEventListener('click', function (event) { event.preventDefault(); selectPanel('status'); });
   window.addEventListener('hashchange', function () { switchPanel(location.hash.slice(1)); });
   document.querySelectorAll('[data-command]').forEach(function (b) { b.addEventListener('click', function () { runCommand(b.dataset.command); }); });
   function syncStatusLayout() {
@@ -777,7 +814,7 @@
   });
   $('preset-delete').addEventListener('click',function () { var index=Number($('preset-select').value); if (!presets[index] || !confirm('删除该预设？当前配置不变。')) return; var next=presets.slice(); next.splice(index,1); savePresets(next); });
   renderForm(defaults); renderCurveEditor(); syncButtons(); if (!device) unavailable();
-  readConfig(); switchPanel(location.hash.slice(1) || 'status');
+  readConfig(); switchPanel(location.hash.slice(1) || 'status'); checkUpdate();
   setInterval(function () { if (active === 'status' && !document.hidden) pollState(); }, 1000);
   setInterval(function () { if (!document.hidden) { if (active === 'settings') refreshPreference(); if (active === 'tools') loadLog(); } }, 5000);
   document.addEventListener('visibilitychange', function () { if (!document.hidden && active === 'status') pollState(); });

@@ -636,9 +636,9 @@ ios_config_migrate() {
         else
           ios_config_find_value "$_ios_runtime" "$_ios_key"
           if [ "$IOS_CONFIG_FOUND" -eq 1 ]; then
-            if [ "$_ios_key" = curve_points ] && [ "$_ios_target_version" = 12 ] &&
-               [ "$_ios_old_default_curve" = 1 ] &&
-               [ "$IOS_CONFIG_VALUE" = '0.1,0.2,0.75,1.15,5.6,6.6,8.9,9.9,10.9,12.2,22,25,65,85' ]; then
+            if [ "$_ios_key" = curve_points ] && [ "$_ios_old_default_curve" = 1 ] &&
+               { [ "$IOS_CONFIG_VALUE" = '0.1,0.2,0.75,1.15,5.6,6.6,8.9,9.9,10.9,12.2,22,25,65,85' ] ||
+                 [ "$IOS_CONFIG_VALUE" = '2,2.8,3.5,4.2,6.5,7.5,10,11,12,13.5,22,25,65,85' ]; }; then
               printf '%s\n' "$_ios_line" >> "$_ios_tmp"
             else
               printf '%s=%s\n' "$_ios_key" "$IOS_CONFIG_VALUE" >> "$_ios_tmp"

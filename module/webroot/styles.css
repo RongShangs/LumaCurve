@@ -64,6 +64,7 @@ html.status-page,html.status-page body{height:100dvh;overflow:hidden;overscroll-
 /* Compact backlight footer with aligned timestamp and explanation. */
 .screen-stage{align-items:center;gap:18px}.output-scale{display:grid;grid-template-columns:1fr auto;gap:8px 12px;align-items:center}.output-label{grid-column:1;font-size:13px;margin:0}.output-scale>.row{grid-column:1/-1;margin:0;font-size:11px}.output-scale>.meter,.output-scale>.brightness-foot{grid-column:1/-1;margin:0}.output-update{grid-column:2;grid-row:1;margin:0}.output-scale .brightness-foot{font-size:10px}.scene-story{border-top:1px solid var(--line);padding:10px 0 0;margin-top:10px}.scene-story-title{gap:9px}.scene-story h1{font-size:14px;font-weight:550}.scene-story .scene-summary{font-size:11px;color:var(--muted);margin-top:4px}.scene-story-title .readings-button{min-height:26px;padding:4px 8px}
 .auto-update{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:12px;color:var(--muted);margin:0 0 14px}.auto-update .button{font-size:11px;min-height:32px;padding:6px 9px;flex-shrink:0}.donation-card{padding:18px;border:1px solid var(--line);border-radius:10px;margin:22px 0}.donation-card p{font-size:12px;color:var(--muted);margin:8px 0 14px}.donation-actions{display:grid;grid-template-columns:1fr 1fr;gap:12px}.donation-dialog{width:calc(100% - 32px);max-width:380px;max-height:calc(100dvh - 32px);overflow:auto;padding:20px;border:1px solid var(--line);border-radius:14px;background:var(--surface);color:var(--ink)}.donation-dialog::backdrop{background:#17213355}.donation-dialog h2{font-size:17px}.donation-dialog img{display:block;width:100%;height:auto;max-height:55dvh;object-fit:contain;background:#fff}.donation-dialog .caption{text-align:center;font-size:12px}.donation-dialog .button{min-height:34px;padding:6px 12px}
+.update-dialog{width:calc(100% - 32px);max-width:380px;max-height:calc(100dvh - 32px);overflow:auto;padding:22px;border:1px solid var(--line);border-radius:14px;background:var(--surface);color:var(--ink)}.update-dialog::backdrop{background:#17213366}.update-dialog h2{font-size:18px;margin:0 0 10px}.update-dialog p{font-size:13px;color:var(--muted)}.update-dialog .dialog-actions{justify-content:flex-end}.update-dialog .caption{font-size:11px;margin-bottom:0}
 @media(max-height:740px){.screen-stage{gap:12px}.output-scale{gap:5px 8px}.scene-story{padding-top:7px;margin-top:7px}.scene-story .scene-summary{font-size:10px}}
 /* The settings editor and status use the same curve coordinates and colors. */
 .curve-base,.curve-preference,.curve-sunlight { fill:none; stroke-width:1.8; vector-effect:non-scaling-stroke; }
@@ -95,7 +96,7 @@ html.status-page,html.status-page body{height:100dvh;overflow:hidden;overscroll-
 #panel-settings .settings-actions{padding:12px 16px;margin:0 0 12px}
 #panel-settings .settings-actions .save-row{margin:0;padding:0;border:0;gap:12px}
 #panel-settings .settings-actions .settings-secondary{justify-content:flex-start;margin-top:9px}
-#panel-settings .settings-actions .settings-secondary .button{flex:0 1 auto;min-height:34px;border:1px solid var(--line);background:var(--surface)}
+#panel-settings .settings-actions .settings-secondary .button{flex:1 1 0;min-height:34px;border:1px solid var(--line);background:var(--surface)}
 #panel-settings .settings-actions .caption{margin:7px 0 0;font-size:11px}
 .curve-overview>svg{display:block;width:100%;max-height:260px;cursor:pointer;touch-action:pan-y}
 .curve-details{border-top:1px solid var(--line);margin-top:12px;padding-top:4px}
@@ -106,4 +107,5 @@ html.status-page,html.status-page body{height:100dvh;overflow:hidden;overscroll-
 .thanks-list ul{list-style:none;padding:0;margin:7px 0 0}
 .thanks-list li{padding:7px 0;border-bottom:1px solid var(--line);font-size:13px;color:#58616d}
 .thanks-list li:last-child{border-bottom:0}
+#update-download[hidden]{display:none}
 @media(max-width:360px){#panel-settings .settings-actions .settings-secondary .button{padding:6px 8px;font-size:11px}}

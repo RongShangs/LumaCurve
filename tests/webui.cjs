@@ -187,29 +187,39 @@ async function main() {
     }
     pass('Automatic update line precedes project links; free optional support opens local QR codes with close, Escape and focus restoration');
 
-    let update={version:'1.0.0',versionCode:10000,zipUrl:'https://github.com/RongShangs/LumaCurve/releases/download/v1.0.0/luma_curve-1.0.0.zip'};
-    await preview.route('https://raw.githubusercontent.com/RongShangs/LumaCurve/main/update.json',route=>route.fulfill({json:update}));
+    let update={version:'1.0.0',versionCode:10000,zipUrl:'https://lc.rongshangs.top/downloads/luma_curve-1.0.0.zip'};
+    await preview.route('https://lc.rongshangs.top/update.js**',route=>route.fulfill({contentType:'text/javascript',body:'window.LumaCurveUpdate('+JSON.stringify(update)+');'}));
     await preview.click('#nav-status');
     await preview.click('#nav-about');
+    await preview.click('#check-update');
     await preview.waitForFunction(()=>document.getElementById('update-status').textContent.includes('已是最新'));
     assert.equal(await preview.locator('#update-download').isVisible(),false);
-    update={version:'1.0.1',versionCode:10001,zipUrl:'https://github.com/RongShangs/LumaCurve/releases/download/v1.0.1/luma_curve-1.0.1.zip'};
-    await preview.click('#nav-status');
-    await preview.click('#nav-about');
+    update={version:'1.0.1',versionCode:10001,zipUrl:'https://lc.rongshangs.top/downloads/luma_curve-1.0.1.zip'};
+    await preview.click('#check-update');
     await preview.waitForFunction(()=>document.getElementById('update-status').textContent.includes('发现 1.0.1'));
     assert.equal(await preview.locator('#update-download').getAttribute('href'),update.zipUrl);
+    assert.equal(await preview.locator('#update-dialog').isVisible(),true);
+    await preview.click('#update-later');
     update.zipUrl='https://untrusted.example/package.zip';
-    await preview.click('#nav-status');
-    await preview.click('#nav-about');
+    await preview.click('#check-update');
     await preview.waitForFunction(()=>document.getElementById('update-status').textContent.includes('更新信息格式异常'));
     assert.equal(await preview.locator('#update-download').isVisible(),false);
-    await preview.unroute('**/update.json');
-    await preview.route('**/update.json',route=>route.abort());
-    await preview.click('#nav-status');
-    await preview.click('#nav-about');
-    await preview.waitForFunction(()=>document.getElementById('update-status').textContent.includes('自动检查更新：') && !document.getElementById('update-status').textContent.includes('检查更新中'));
-    assert.equal(await preview.locator('#check-update').count(),0);
-    pass('Update checks handle current/new versions, reject foreign download URLs and recover after network failure');
+    await preview.unroute('https://lc.rongshangs.top/update.js**');
+    await preview.route('https://lc.rongshangs.top/update.js**',route=>route.abort());
+    await preview.click('#check-update');
+    await preview.waitForFunction(()=>document.getElementById('update-status').textContent.includes('暂时无法检查更新'));
+    const before=await preview.evaluate(()=>history.length);
+    await preview.click('#nav-settings');await preview.click('#nav-tools');await preview.click('#nav-about');
+    assert.equal(await preview.evaluate(()=>history.length),before);
+    pass('Update checks handle current/new versions, reject foreign URLs; tabs do not add browser history');
+
+    const startup = await browser.newPage({viewport:{width:390,height:844},reducedMotion:'reduce'});
+    await startup.route('https://lc.rongshangs.top/update.js**',route=>route.fulfill({contentType:'text/javascript',body:'window.LumaCurveUpdate({"version":"1.0.1","versionCode":10001,"zipUrl":"https://lc.rongshangs.top/downloads/luma_curve-1.0.1.zip"});'}));
+    await startup.goto(url);
+    await startup.waitForFunction(()=>document.getElementById('update-dialog').open);
+    assert.match(await startup.locator('#update-message').innerText(),/1.0.1/);
+    await startup.close();
+    pass('Entering WebUI automatically presents a verified newer version');
 
     const connected = await browser.newPage({viewport:{width:390,height:844},reducedMotion:'reduce'});
     connected.on('pageerror', e=>errors.push(String(e)));
@@ -241,6 +251,7 @@ async function main() {
         else if(command.startsWith('sh ')) {
           if(f.failControl) {errno=1;stderr='控制脚本失败';}
           else {
+            if(command.endsWith(' current-log'))stdout=f.log || '<script>window.injected=true</script>\n正常日志';
             if(command.includes("'pause'"))f.paused=true;
             if(command.includes("'resume'"))f.paused=false;
             if(command.includes("'set-log-retention'"))f.config=f.config.replace(/^log_retention_days=.*$/m,'log_retention_days='+command.match(/'set-log-retention' '(\d+)'/)[1]);
@@ -431,6 +442,7 @@ async function main() {
     await connected.screenshot({path:path.join(root,'build/webui-editor-mobile.png')});
     assert.equal(await connected.locator('.navigation').isVisible(),false);
     await connected.setViewportSize({width:390,height:520});
+    await connected.waitForFunction(()=>parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--visual-height'))<=520);
     const confirmBox=await connected.locator('#editor-confirm').boundingBox();
     assert.ok(confirmBox.y+confirmBox.height<=520);
     await connected.setViewportSize({width:390,height:844});
@@ -516,7 +528,7 @@ async function main() {
     assert.equal(await connected.evaluate(()=>fixture.clipboard),'<script>window.injected=true</script>\n正常日志');
     await connected.click('#export-log');
     await connected.waitForFunction(()=>document.getElementById('export-status').textContent.includes('已导出'));
-    assert.ok(await connected.evaluate(()=>fixture.commands.some(c=>c.startsWith('umask 022;')&&c.includes('am get-current-user')&&c.includes('/storage/emulated/$user_id/Download')&&c.includes("cat '/data/local/tmp/luma_curve.log'"))));
+    assert.ok(await connected.evaluate(()=>fixture.commands.some(c=>c.startsWith('umask 022;')&&c.includes('am get-current-user')&&c.includes('/storage/emulated/$user_id/Download')&&c.includes("sh '/data/adb/modules/luma_curve/luma_curvectl.sh' current-log"))));
     await connected.evaluate(()=>fixture.failExport=true);
     await connected.click('#export-log');
     await connected.waitForFunction(()=>document.getElementById('export-status').textContent.includes('导出失败'));
@@ -554,7 +566,7 @@ async function main() {
     assert.equal(connected.url().split('#')[0],url);
     await connected.evaluate(()=>fixture.failBrowser=false);
     pass('Site/blog/license links, resolver fallback, missing browser and launch failures preserve the WebUI');
-    await connected.evaluate(({template})=>{fixture.config=template;fixture.failAtomic=false;fixture.failControl=false;fixture.failState=false;fixture.overrides={};const base='0.1,0.2,0.75,1.15,5.6,6.6,8.9,9.9,10.9,12.2,22,25,65,85';fixture.preference='format=2\noffset=0\nsamples=2\nconfig_offset=0\nconfig_revision=0\nbase_points='+base+'\nlearned_points='+base.replace(',6.6,',',6.63,')+'\n';},{template});
+    await connected.evaluate(({template})=>{fixture.config=template;fixture.failAtomic=false;fixture.failControl=false;fixture.failState=false;fixture.overrides={};const base='2,2.8,3.5,4.2,6.5,7.5,10,11,12,13.5,22,25,70,90';fixture.preference='format=2\noffset=0\nsamples=2\nconfig_offset=0\nconfig_revision=0\nbase_points='+base+'\nlearned_points='+base.replace(',7.5,',',7.52,')+'\n';},{template});
     await connected.click('#nav-settings');await connected.click('#reload-config');
     await connected.waitForFunction(()=>document.getElementById('preference-status').textContent.includes('已学习 2 次'));
     assert.equal(await connected.locator('#cfg-preference_offset').count(),0);
@@ -564,7 +576,7 @@ async function main() {
     assert.equal(await connected.locator('#curve-editor-plot').isVisible(),true);
     assert.equal(await connected.locator('#curve-details').evaluate(el=>el.open),false);
     assert.equal(await connected.locator('#save-config').evaluate(el=>!!(el.compareDocumentPosition(document.getElementById('curve-editor-plot'))&Node.DOCUMENT_POSITION_FOLLOWING)),true);
-    assert.equal(await connected.locator('#config-fields').locator(':scope > :first-child h2').innerText(),'照度与背光曲线');
+    assert.equal(await connected.locator('#config-fields').locator(':scope > :first-child h2').innerText(),'日常调节');
     await edit(connected,'brighten_speed','1.2');await connected.click('#save-config');
     await connected.waitForFunction(()=>document.getElementById('dirty-status').textContent==='已保存并发送重载');
     assert.match(await connected.evaluate(()=>fixture.config),/^preference_offset=0$/m);assert.match(await connected.evaluate(()=>fixture.config),/^preference_revision=0$/m);
@@ -588,7 +600,7 @@ async function main() {
     await connected.locator('#preset-name').fill('我的日常');await connected.click('#preset-save');
     await connected.waitForFunction(()=>fixture.presetWrites===1);
     const savedConfig=await connected.evaluate(()=>fixture.config);assert.equal(JSON.parse(await connected.evaluate(()=>fixture.presets)).entries[0].points[5],8);
-    await connected.click('#curve-default');assert.equal(await connected.locator('#curve-value').inputValue(),'6.6');
+    await connected.click('#curve-default');assert.equal(await connected.locator('#curve-value').inputValue(),'7.5');
     connected.once('dialog',d=>d.accept());await connected.click('#preset-load');assert.equal(await connected.locator('#curve-value').inputValue(),'8');
     assert.equal(await connected.evaluate(()=>fixture.config),savedConfig);
     connected.once('dialog',d=>d.dismiss());await connected.click('#preset-delete');assert.equal(await connected.evaluate(()=>fixture.presetWrites),1);

@@ -114,14 +114,14 @@ if ! unzip -p "$ZIPFILE" compatibility.sh > "$COMPAT_BOOTSTRAP" 2>/dev/null || [
 fi
 . "$COMPAT_BOOTSTRAP"
 lc_compat_environment || exit 1
-ui_print "[1/4] 检查冲突模块与安装环境"
+ui_print "[1/4] 检查冲突模块、系统和显示接口"
 if ! unzip -p "$ZIPFILE" install_choice.sh > "$LC_INSTALL_BOOTSTRAP" 2>/dev/null || [ ! -s "$LC_INSTALL_BOOTSTRAP" ]; then
   ui_print "安装检查文件解压失败。"
   exit 1
 fi
 . "$LC_INSTALL_BOOTSTRAP"
 lc_check_legacy || { ui_print "安装已取消，原版模块保留。"; exit 1; }
-ui_print "[2/4] 备份流光亮度配置与数据"
+ui_print "[2/4] 备份现有设置与学习数据"
 mkdir -p /data/local/tmp "$MODULES_DIR" 2>/dev/null
 if ! unzip -p "$ZIPFILE" upgrade_data.sh > "$UPGRADE_BOOTSTRAP" 2>/dev/null ||
    [ ! -s "$UPGRADE_BOOTSTRAP" ]; then
@@ -145,11 +145,11 @@ fi
 rm -rf "$INSTALL_STAGE" 2>/dev/null
 mkdir -p "$INSTALL_STAGE/system/bin" "$INSTALL_STAGE/webroot" 2>/dev/null || cancel_before_commit stage_create_failed
 
-ui_print "[3/4] 安装亮度引擎与轻量 WebUI"
-for _file in compatibility.sh install_choice.sh LICENSE core_status.sh daemon_launcher.sh process_scope.sh module.prop service.sh customize.sh luma_curvectl.sh post-fs-data.sh check_status.sh uninstall.sh luma_curve.conf upgrade_data.sh; do
+ui_print "[3/4] 安装亮度引擎与管理界面"
+for _file in compatibility.sh install_choice.sh LICENSE core_status.sh daemon_launcher.sh framework_daemon_launcher.sh framework-broker.jar current_boot_log.sh migrate_log_retention.sh process_scope.sh module.prop service.sh customize.sh luma_curvectl.sh post-fs-data.sh check_status.sh uninstall.sh luma_curve.conf upgrade_data.sh; do
   extract_entry "$_file" "$INSTALL_STAGE/$_file" || cancel_before_commit "extract_failed_$_file"
 done
-for _file in index.html app.js styles.css kernelsu.js avatar.jpg donate-wechat.jpg donate-alipay.jpg LICENSE.txt; do
+for _file in index.html app.js curve_math.js styles.css kernelsu.js avatar.jpg donate-wechat.jpg donate-alipay.jpg LICENSE.txt; do
   extract_entry "webroot/$_file" "$INSTALL_STAGE/webroot/$_file" || cancel_before_commit "extract_failed_webroot_$_file"
 done
 if ! extract_entry system/bin/luma_curve_daemon "$INSTALL_STAGE/system/bin/luma_curve_daemon"; then
@@ -162,8 +162,8 @@ if [ -e "$MODDIR/disable" ]; then
 fi
 
 chmod 0755 "$INSTALL_STAGE" "$INSTALL_STAGE/system" "$INSTALL_STAGE/system/bin" "$INSTALL_STAGE/webroot" || cancel_before_commit stage_directory_chmod_failed
-chmod 0755 "$INSTALL_STAGE/system/bin/luma_curve_daemon" "$INSTALL_STAGE/service.sh" "$INSTALL_STAGE/daemon_launcher.sh" "$INSTALL_STAGE/process_scope.sh" "$INSTALL_STAGE/customize.sh" "$INSTALL_STAGE/luma_curvectl.sh" "$INSTALL_STAGE/post-fs-data.sh" "$INSTALL_STAGE/check_status.sh" "$INSTALL_STAGE/uninstall.sh" || cancel_before_commit stage_executable_chmod_failed
-chmod 0644 "$INSTALL_STAGE/core_status.sh" "$INSTALL_STAGE/module.prop" "$INSTALL_STAGE/luma_curve.conf" "$INSTALL_STAGE/upgrade_data.sh" "$INSTALL_STAGE/webroot/index.html" "$INSTALL_STAGE/webroot/app.js" "$INSTALL_STAGE/webroot/styles.css" "$INSTALL_STAGE/webroot/kernelsu.js" "$INSTALL_STAGE/webroot/avatar.jpg" "$INSTALL_STAGE/webroot/donate-wechat.jpg" "$INSTALL_STAGE/webroot/donate-alipay.jpg" "$INSTALL_STAGE/webroot/LICENSE.txt" "$INSTALL_STAGE/LICENSE" || cancel_before_commit stage_file_chmod_failed
+chmod 0755 "$INSTALL_STAGE/system/bin/luma_curve_daemon" "$INSTALL_STAGE/service.sh" "$INSTALL_STAGE/daemon_launcher.sh" "$INSTALL_STAGE/framework_daemon_launcher.sh" "$INSTALL_STAGE/process_scope.sh" "$INSTALL_STAGE/customize.sh" "$INSTALL_STAGE/luma_curvectl.sh" "$INSTALL_STAGE/post-fs-data.sh" "$INSTALL_STAGE/check_status.sh" "$INSTALL_STAGE/uninstall.sh" || cancel_before_commit stage_executable_chmod_failed
+chmod 0644 "$INSTALL_STAGE/core_status.sh" "$INSTALL_STAGE/framework-broker.jar" "$INSTALL_STAGE/current_boot_log.sh" "$INSTALL_STAGE/migrate_log_retention.sh" "$INSTALL_STAGE/module.prop" "$INSTALL_STAGE/luma_curve.conf" "$INSTALL_STAGE/upgrade_data.sh" "$INSTALL_STAGE/webroot/index.html" "$INSTALL_STAGE/webroot/app.js" "$INSTALL_STAGE/webroot/curve_math.js" "$INSTALL_STAGE/webroot/styles.css" "$INSTALL_STAGE/webroot/kernelsu.js" "$INSTALL_STAGE/webroot/avatar.jpg" "$INSTALL_STAGE/webroot/donate-wechat.jpg" "$INSTALL_STAGE/webroot/donate-alipay.jpg" "$INSTALL_STAGE/webroot/LICENSE.txt" "$INSTALL_STAGE/LICENSE" || cancel_before_commit stage_file_chmod_failed
 [ ! -e "$INSTALL_STAGE/disable" ] || chmod 0644 "$INSTALL_STAGE/disable" || cancel_before_commit disable_marker_chmod_failed
 lc_compat_probe "$INSTALL_STAGE/system/bin/luma_curve_daemon" "$INSTALL_STAGE" || cancel_before_commit compatibility_probe_failed
 
@@ -180,14 +180,15 @@ if ! ios_upgrade_finish "$MODDIR/luma_curve.conf"; then
   cancel_after_commit persistent_data_finish_failed
 fi
 
-ui_print "[4/4] 完成模块切换"
+ui_print "[4/4] 完成安装与数据恢复"
 lc_commit_legacy_removal || cancel_after_commit legacy_switch_failed
 COMMIT_STARTED=0
 rm -rf "$MODULE_BACKUP" "$FAILED_MODULE" 2>/dev/null
 
 ui_print "LumaCurve 1.0.0"
 ui_print "配置与数据已保留。"
-ui_print "轻量 WebUI 已安装。"
+ui_print "亮度引擎与 WebUI 已安装。"
 ui_print "从模块管理器打开 WebUI 进行设置。"
 ui_print ""
-ui_print "安装完成，请重启设备。后续可在管理器检查更新并直接安装。"
+ui_print "安装完成，请重启设备。重启后在 WebUI 确认框架接管与光感状态。"
+ui_print "更新可通过 WebUI 或模块管理器检查。"

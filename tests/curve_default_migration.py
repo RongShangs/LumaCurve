@@ -10,10 +10,11 @@ def shell_path(path):
     return '/' + value[0].lower() + value[2:] if len(value)>2 and value[1]==':' else value
 default = root / 'module/luma_curve.conf'
 old = '0.1,0.2,0.75,1.15,5.6,6.6,8.9,9.9,10.9,12.2,22,25,65,85'
-new = '2,2.8,3.5,4.2,6.5,7.5,10,11,12,13.5,22,25,65,85'
+new = '2,2.8,3.5,4.2,6.5,7.5,10,11,12,13.5,22,25,70,90'
+previous = '2,2.8,3.5,4.2,6.5,7.5,10,11,12,13.5,22,25,65,85'
 source = default.read_text(encoding='utf-8')
 assert 'config_version=12' in source and f'curve_points={new}' in source
-for custom, curve, expected in [(0, old, new), (1, old, old), (0, '3,3,3,4,7,8,11,12,13,14,22,25,65,85', '3,3,3,4,7,8,11,12,13,14,22,25,65,85')]:
+for custom, curve, expected in [(0, old, new), (0, previous, new), (1, previous, previous), (0, '3,3,3,4,7,8,11,12,13,14,22,25,65,85', '3,3,3,4,7,8,11,12,13,14,22,25,65,85')]:
     with tempfile.TemporaryDirectory(dir=root / 'build') as folder:
         path = Path(folder)
         runtime = path / 'luma_curve.conf'
@@ -30,4 +31,4 @@ for custom, curve, expected in [(0, old, new), (1, old, old), (0, '3,3,3,4,7,8,1
         assert 'config_version=12' in output
         assert f'curve_points={expected}' in output
         assert f'curve_custom={custom}' in output
-print('curve default migration: 3 cases PASS')
+print('curve default migration: 4 cases PASS')

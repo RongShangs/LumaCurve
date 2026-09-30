@@ -10,7 +10,7 @@
 static const float lux_anchors[] = {0,    1,    5,    10,   50,    100,   500,
                                     1000, 2000, 5000, 9000, 10000, 35000, 100000};
 static const float pct_anchors[] = {.02f, .028f, .035f, .042f, .065f, .075f, .10f,
-                                    .11f, .12f, .135f,  .22f,  .25f, .65f, .85f};
+                                    .11f, .12f, .135f,  .22f,  .25f, .70f, .90f};
 bool luma_curve_custom;
 float luma_curve_points[14];
 static float circadian_factor = 1;

@@ -4,4 +4,5 @@ name=LumaCurve · 流光亮度
 version=1.0.0
 versionCode=10000
 author=酷安@戎Shangs
-description=[LumaCurve核心❌] 前置优先的双侧光感与场景确认驱动可编辑亮度曲线，经系统显示框架平滑调节主屏；自动亮度下的手动调整会保持至明显场景变化或锁屏，多次同向调整可缓慢学习。支持曲线预设，以及依设备条件生效的阳光增强与温控保护；框架输出已在 HyperOS 4 验证。
+description=[LumaCurve核心❌] 前置优先、双侧参考的场景化亮度引擎；可编辑曲线与缓慢局部自学习，让手动调节保持到明显场景变化或锁屏。通过系统显示框架平滑输出，支持条件阳光增强和极端温控保护。HyperOS 4 适配，GPL-3.0 开源免费。
+updateJson=https://lc.rongshangs.top/update.json

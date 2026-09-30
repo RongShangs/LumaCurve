@@ -12,10 +12,15 @@ async function main(){
   assert.equal(await page.title(),'LumaCurve 流光亮度 · 让屏幕随环境平稳调节');checks.push('Standalone local HTML loads with local assets');
   assert.equal(await page.locator('header .author').count(),1);assert.equal(await page.locator('main>.author').count(),0);checks.push('Author avatar and profile links are in the top bar');
   assert.equal(await page.locator('.mechanism-grid article').count(),8);assert.equal(await page.locator('.anchor-table-wrap tbody tr').count(),7);checks.push('Full scene, curve, learning, transition and protection mechanisms plus fourteen default anchors');
-  assert.match(await page.locator('.resource-stats').innerText(),/30/);assert.match(await page.locator('.resource-stats').innerText(),/0.02/);assert.match(await page.locator('.resource-measurement').innerText(),/作者设备实测/);checks.push('Resource figures explicitly attributed to author measurements');
+  assert.match(await page.locator('.thanks li').innerText(),/戒戒\s+喵喵喵？/);
+  const update=JSON.parse(fs.readFileSync(path.join(site,'update.json'),'utf8'));
+  assert.equal(update.zipUrl,'https://lc.rongshangs.top/downloads/luma_curve-1.0.0.zip');
+  assert.match(fs.readFileSync(path.join(site,'update.js'),'utf8'),/LumaCurveUpdate/);
+  checks.push('Thanks list and matching static module/WebUI update endpoints are present');
+  assert.match(await page.locator('.resource-stats').innerText(),/9.4/);assert.match(await page.locator('.resource-stats').innerText(),/65–71/);assert.match(await page.locator('.resource-measurement').innerText(),/1.26%/);checks.push('Resource figures use measured PSS and single-core CPU');
   assert.equal((await page.locator('#demo-line').getAttribute('points')).split(' ').length,201);
-  await page.locator('#demo-lux').fill('0');assert.match(await page.locator('#demo-output').innerText(),/^0 lux · 0.10%$/);
-  await page.locator('#demo-lux').fill('1000');assert.match(await page.locator('#demo-output').innerText(),/100,000 lux · 85.00%/);checks.push('Curve demo uses 201 complete samples and truthful default endpoints');
+  await page.locator('#demo-lux').fill('0');assert.match(await page.locator('#demo-output').innerText(),/^0 lux · 2.00%$/);
+  await page.locator('#demo-lux').fill('1000');assert.match(await page.locator('#demo-output').innerText(),/100,000 lux · 90.00%/);checks.push('Curve demo uses 201 complete samples and truthful default endpoints');
   for(const width of [360,390,768,1440]){await page.setViewportSize({width,height:900});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));}checks.push('No horizontal overflow on four phone/tablet/desktop sizes');
   const localLinks=await page.locator('[href],[src]').evaluateAll(nodes=>nodes.map(n=>n.getAttribute('href')||n.getAttribute('src')).filter(s=>s&&!s.startsWith('#')&&!s.startsWith('https://')));
   for(const target of localLinks){assert.ok(fs.existsSync(path.resolve(site,target)),target);assert.ok(fs.existsSync(path.resolve(root,'website',target)),'repository website missing '+target);}checks.push('Both website and web directories contain every local asset, license and module/source download');

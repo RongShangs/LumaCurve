@@ -93,8 +93,8 @@
       </section>
       <section id="panel-about" class="panel" aria-labelledby="nav-about" hidden>
         <div class="about-heading"><svg class="module-icon" viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="12" fill="#eaf0fb" stroke="none"/><path d="M10 28c13 0 7-16 20-16" stroke-width="3"/></svg><h1>流光亮度</h1></div>
-        <p class="about-intro">流光亮度依据前后光感判断环境，以前置读数为主，确认场景变化后沿可编辑曲线平滑调节主屏。自动亮度下手动设置的亮度会保持到环境明显变化或锁屏；多次在相近照度下同向调整，可让曲线缓慢学习你的偏好。阳光增强与温控保护以设备实际支持和可信读数为准。当前框架输出面向已验证的 HyperOS 4 固件，安装时会核对系统版本与主屏接口。</p>
-        <div class="auto-update" role="status">新版本尚未发布，当前为本地体验版</div>
+        <p class="about-intro">流光亮度以前置光感为主、后置光感为参考，确认环境变化后沿可编辑曲线平滑调节主屏。自动亮度下的手动选择会保持到明显场景变化或锁屏；多次在相近照度下同向调整，曲线会缓慢学习。阳光增强和极端温控保护依设备能力及可信读数生效。当前版本面向 HyperOS 4，安装时会核对固件与显示接口。</p>
+        <div class="auto-update" role="status"><span id="update-status">正在检查更新…</span><button id="check-update" class="button" type="button">重新检查</button><a id="update-download" class="button" href="#" hidden>下载新版</a></div>
         <div class="project-links"><a href="https://lc.rongshangs.top" target="_blank" rel="noopener noreferrer">官网 ↗</a><a id="github-link" href="https://github.com/RongShangs/LumaCurve" target="_blank" rel="noopener noreferrer">GitHub ↗</a><a href="https://www.gnu.org/licenses/gpl-3.0.html" target="_blank" rel="noopener noreferrer">GPL-3.0 ↗</a></div>
         <dl class="about-facts"><div><dt>模块名称</dt><dd>LumaCurve · 流光亮度</dd></div><div><dt>版本</dt><dd>1.0.0 <span class="muted">/ 10000</span></dd></div><div><dt>模块 ID</dt><dd>luma_curve</dd></div></dl>
         <p class="caption">安装与使用需要支持模块的 Root 环境。实际传感器、温控和高亮能力取决于设备。</p>
@@ -114,6 +114,7 @@
   </div>
   <div id="toast" role="status" aria-live="polite"></div>
   <dialog id="donation-dialog" class="donation-dialog" aria-labelledby="donation-title"><div class="row"><h2 id="donation-title">微信打赏</h2><button class="button" id="close-donation" type="button" aria-label="关闭收款码">关闭</button></div><p class="caption">打赏时可备注「昵称：想说的一句话」，整条备注不超过 30 个字符，以便加入感谢榜。</p><img id="donation-qr" alt="微信收款码" width="320" height="320"><p class="caption">使用对应支付应用扫描收款码即可。</p></dialog>
+  <dialog id="update-dialog" class="update-dialog" aria-labelledby="update-title"><h2 id="update-title">发现新版本</h2><p id="update-message">可以下载新版本安装包。</p><div class="dialog-actions"><button id="update-later" class="button" type="button">稍后</button><a id="update-now" class="button primary" href="#">下载更新</a></div><p class="caption">下载后请在模块管理器中安装并重启设备。</p></dialog>
   <dialog id="readings-dialog" class="readings-dialog" aria-labelledby="readings-title">
     <div class="row readings-title"><h2 id="readings-title">详细读数</h2><button id="close-readings" class="button" type="button">关闭</button></div>
         <div id="advanced-state" class="advanced-state"><dl class="facts reading-mode"><div><dt>亮度模式</dt><dd id="mode">—</dd></div><div><dt>控制状态</dt><dd id="owner">—</dd></div></dl><p id="flow-relation" class="caption">等待环境光和背光数据…</p><dl class="facts"><div><dt>环境照度</dt><dd id="lux">—</dd></div><div><dt>平滑照度</dt><dd id="smooth">—</dd></div><div><dt>目标比例</dt><dd id="flow-target">—</dd></div><div><dt>当前比例</dt><dd id="flow-current">—</dd></div><div><dt>阳光增强</dt><dd id="sunlight">—</dd></div><div><dt>温控保护</dt><dd id="thermal">—</dd></div><div><dt>亮度过渡</dt><dd id="transition">—</dd></div><div><dt>环境采样</dt><dd id="sampling">—</dd></div></dl>

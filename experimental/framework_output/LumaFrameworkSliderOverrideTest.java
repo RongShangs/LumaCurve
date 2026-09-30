@@ -10,13 +10,14 @@ public final class LumaFrameworkSliderOverrideTest {
         try{s.settle(2599,.20f,100);throw new AssertionError();}catch(IllegalStateException expected){}
         near(s.settle(2600,.20f,100),.20f);yes(s.holding());
         near(s.apply(.08f),.20f);
-        yes(!s.scene(3000,130));yes(!s.scene(6000,145));
-        yes(!s.scene(7000,230));yes(!s.scene(7500,230));
-        yes(s.scene(8100,230));yes(!s.holding());near(s.apply(.08f),.08f);
-        yes(s.observe(9000,1,.5f,.7f));near(s.settle(11500,.28f,.5f),.28f);
-        yes(!s.scene(12000,2f));yes(!s.scene(13000,4f));yes(s.scene(14100,4f));
-        yes(s.observe(15000,1,.7f,.8f));near(s.settle(17500,.30f,Float.NaN),.30f);
-        yes(!s.scene(18000,20f));s.clear();yes(!s.holding()&&!s.pending());
+        yes(!s.scene(3000,130));yes(!s.scene(6000,245));
+        yes(!s.scene(7000,330));yes(!s.scene(8500,330));
+        yes(!s.scene(10000,330));yes(s.scene(11000,330));yes(!s.holding());near(s.apply(.08f),.08f);
+        yes(s.observe(12000,1,.5f,.7f));near(s.settle(14500,.28f,.5f),.28f);
+        yes(!s.scene(15000,2f));yes(!s.scene(16000,4f));yes(!s.scene(17100,7f));
+        yes(!s.scene(18000,9f));yes(!s.scene(20000,9f));yes(!s.scene(21100,9f));yes(s.scene(22000,9f));
+        yes(s.observe(23000,1,.7f,.8f));near(s.settle(25500,.30f,Float.NaN),.30f);
+        yes(!s.scene(26000,20f));s.clear();yes(!s.holding()&&!s.pending());
         System.out.println("automatic slider hold: settle, stable scene, confirmed change, repeated gesture and lock reset PASS");
     }
 }

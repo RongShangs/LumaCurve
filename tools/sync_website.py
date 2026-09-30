@@ -1,9 +1,10 @@
 """Assemble a standalone static site and corresponding GPL source downloads."""
 from pathlib import Path
-import argparse, shutil, hashlib
+import argparse, shutil, hashlib, subprocess, sys
 ROOT=Path(__file__).resolve().parents[1]
 p=argparse.ArgumentParser();p.add_argument('--out',type=Path,default=ROOT.parent/'web');a=p.parse_args()
 site=ROOT/'website'
+subprocess.run([sys.executable,str(ROOT/'tools/release_metadata.py')],check=True)
 for name,source in [('avatar.jpg','module/webroot/avatar.jpg'),('LICENSE.txt','LICENSE'),('curve_math.js','module/webroot/curve_math.js')]:
     shutil.copy2(ROOT/source,site/'assets'/name)
 download=site/'downloads';download.mkdir(parents=True,exist_ok=True)

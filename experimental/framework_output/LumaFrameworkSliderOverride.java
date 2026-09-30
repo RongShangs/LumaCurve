@@ -27,11 +27,12 @@ public final class LumaFrameworkSliderOverride {
     public boolean scene(long now,float lux) {
         if (!holding || !validLux(lux)) return false;
         if (!validLux(anchorLux)) {anchorLux=lux;return false;}
-        boolean large=Math.abs(Math.log1p(lux)-Math.log1p(anchorLux))>=Math.log(2) && Math.abs(lux-anchorLux)>=3f;
+        // A short local fluctuation should not cancel an explicit slider choice.
+        boolean large=Math.abs(Math.log1p(lux)-Math.log1p(anchorLux))>=Math.log(3) && Math.abs(lux-anchorLux)>=8f;
         if (!large) {sceneSamples=0;sceneSince=0;return false;}
         if (sceneSamples==0) {sceneSamples=1;sceneSince=now;return false;}
-        if (now<sceneSince || now-sceneSince<1000) return false;
-        if (++sceneSamples<2) return false;
+        if (now<sceneSince || now-sceneSince<3000) return false;
+        if (++sceneSamples<3) return false;
         clear();return true;
     }
     public float apply(float unadjusted){return holding?heldBrightness:unadjusted;}

@@ -2,7 +2,7 @@
 (function (root) {
   'use strict';
   var lux = [0,1,5,10,50,100,500,1000,2000,5000,9000,10000,35000,100000];
-  var points = [0.1,0.2,0.75,1.15,5.6,6.6,8.9,9.9,10.9,12.2,22,25,65,85];
+  var points = [2,2.8,3.5,4.2,6.5,7.5,10,11,12,13.5,22,25,70,90];
   function valid(values) { return Array.isArray(values) && values.length === 14 && values.every(function (v,i) { return Number.isFinite(v) && v >= .1 && v <= 100 && (!i || v >= values[i-1]); }); }
   function edit(values, index, value) {
     if (!valid(values) || !Number.isInteger(index) || index < 0 || index >= 14 || !Number.isFinite(value) || value < .1 || value > 100) return null;

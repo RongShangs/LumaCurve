@@ -14,7 +14,7 @@ lc_install_fail() {
 lc_install_module() {
   ui_print "=============================================="
   ui_print "  LumaCurve · 流光亮度 1.0.0"
-  ui_print "  仿 iOS 曲线的系统亮度引擎 · 酷安@戎Shangs"
+  ui_print "  双侧参考 · 可编辑与自学习曲线 · 酷安@戎Shangs"
   ui_print "=============================================="
   COMPAT_BOOTSTRAP="$TMPDIR/luma_curve_compatibility.sh"
   unzip -p "$ZIPFILE" compatibility.sh > "$COMPAT_BOOTSTRAP" 2>/dev/null || abort "兼容性检测文件解压失败。"
@@ -26,14 +26,14 @@ lc_install_module() {
   unzip -p "$ZIPFILE" install_choice.sh > "$LC_INSTALL_BOOTSTRAP" 2>/dev/null || abort "安装检查文件解压失败。"
   [ -s "$LC_INSTALL_BOOTSTRAP" ] || abort "安装检查文件缺失。"
   . "$LC_INSTALL_BOOTSTRAP"
-  ui_print "[1/4] 检查冲突模块与安装环境"
+  ui_print "[1/4] 检查冲突模块、系统和显示接口"
   lc_check_legacy || abort "安装已取消，原版模块保留。"
-  ui_print "[2/4] 备份流光亮度配置与数据"
+  ui_print "[2/4] 备份现有设置与学习数据"
   unzip -p "$ZIPFILE" upgrade_data.sh > "$UPGRADE_BOOTSTRAP" 2>/dev/null || abort "数据维护文件解压失败。"
   [ -s "$UPGRADE_BOOTSTRAP" ] || abort "数据维护文件缺失。"
   . "$UPGRADE_BOOTSTRAP"
   ios_upgrade_begin || lc_install_fail "数据备份失败，已中止安装。"
-  ui_print "[3/4] 安装亮度引擎与轻量 WebUI"
+  ui_print "[3/4] 安装亮度引擎与管理界面"
   unzip -o "$ZIPFILE" -d "$MODPATH" >&2 || lc_install_fail "解压失败，已恢复数据。"
   [ -s "$MODPATH/system/bin/luma_curve_daemon" ] &&
     [ -s "$MODPATH/luma_curve.conf" ] && [ -s "$MODPATH/webroot/index.html" ] || lc_install_fail "安装包不完整。"
@@ -45,7 +45,7 @@ lc_install_module() {
     set_perm "$MODPATH/framework_daemon_launcher.sh" 0 0 0755 || lc_install_fail "设置框架启动器权限失败。"
   lc_compat_probe "$MODPATH/system/bin/luma_curve_daemon" "$MODPATH" || lc_install_fail "设备能力检测失败，已中止安装并恢复数据。"
   ios_upgrade_finish "$MODPATH/luma_curve.conf" || lc_install_fail "配置恢复失败，已中止安装。"
-  ui_print "[4/4] 完成模块切换"
+  ui_print "[4/4] 完成安装与数据恢复"
   lc_commit_legacy_removal || lc_install_fail "旧模块切换失败；如原版已停止，请重启恢复。"
   rm -f "$LC_INSTALL_BOOTSTRAP" "$UPGRADE_BOOTSTRAP" "$COMPAT_BOOTSTRAP"
   ui_print ""
@@ -55,8 +55,8 @@ lc_install_module() {
     ui_print "需要运行时，请在 WebUI 设置页点「恢复」，无需再次安装。"
   fi
   if [ -r "$MODPATH/framework-broker.jar" ]; then
-    ui_print "当前是 HyperOS 4 本地体验构建，框架引擎会在重启后接管。"
-    ui_print "此内核尚未推送 GitHub；管理器更新源不会提供它。"
+    ui_print "HyperOS 4 显示框架已通过安装预检；重启后请在 WebUI 查看实际接管状态。"
+    ui_print "固件变化或显示接口不匹配时，引擎会交还系统亮度控制。"
   else
     ui_print "后续可在管理器检查更新并直接安装。"
   fi

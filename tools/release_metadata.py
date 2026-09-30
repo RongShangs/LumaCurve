@@ -8,9 +8,11 @@ prop=dict(line.split('=',1) for line in (ROOT/'module/module.prop').read_text(en
 version=prop['version'];code=int(prop['versionCode'],10)
 assert prop['id']=='luma_curve' and re.fullmatch(r'\d+\.\d+\.\d+',version) and code>0
 assert args.tag is None or args.tag=='v'+version,'Tag must match module version'
-repo='https://github.com/RongShangs/LumaCurve'
-raw='https://raw.githubusercontent.com/RongShangs/LumaCurve/main'
-assert prop['updateJson']==raw+'/update.json'
-info={'version':version,'versionCode':code,'zipUrl':f'{repo}/releases/download/v{version}/luma_curve-{version}.zip','changelog':raw+'/CHANGELOG.md'}
-(ROOT/'update.json').write_text(json.dumps(info,indent=2)+'\n',encoding='utf-8')
+site='https://lc.rongshangs.top'
+assert prop['updateJson']==site+'/update.json'
+info={'version':version,'versionCode':code,'zipUrl':f'{site}/downloads/luma_curve-{version}.zip','changelog':site+'/#download'}
+payload=json.dumps(info,ensure_ascii=False,indent=2)+'\n'
+(ROOT/'update.json').write_text(payload,encoding='utf-8')
+(ROOT/'website/update.json').write_text(payload,encoding='utf-8')
+(ROOT/'website/update.js').write_text('window.LumaCurveUpdate('+json.dumps(info,ensure_ascii=False,separators=(',',':'))+');\n',encoding='utf-8')
 print(json.dumps(info))
