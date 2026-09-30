@@ -90,3 +90,20 @@ html.status-page,html.status-page body{height:100dvh;overflow:hidden;overscroll-
 
 /* Compact about links and a full-width community action. */
 .project-links{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:12px 0}.project-links a,.author-links a{display:flex;align-items:center;justify-content:center;min-height:36px;padding:6px 8px;border:1px solid var(--line);border-radius:7px;background:var(--surface);font-size:12px;white-space:nowrap}.author-links{display:flex;gap:8px;margin:0 0 14px}.author-links a{min-height:32px;padding:5px 10px;font-size:11px}.qq-group{display:flex;justify-content:space-between;align-items:center;gap:12px;width:100%;text-align:left;margin:12px 0 18px}.qq-group strong{margin-left:5px;font-variant-numeric:tabular-nums}.qq-group small{color:var(--muted);font-size:11px}.donation-card{margin:22px 0 16px}.thanks-list{padding:16px 0 6px;border-top:1px solid var(--line)}.thanks-list p{font-size:13px;margin:8px 0 0;color:#58616d}@media(max-width:420px){.qq-group{align-items:flex-start;flex-direction:column;gap:2px}}
+
+/* Keep configuration actions near engine controls; the graph remains visible while editing folds below. */
+#panel-settings .settings-actions{padding:12px 16px;margin:0 0 12px}
+#panel-settings .settings-actions .save-row{margin:0;padding:0;border:0;gap:12px}
+#panel-settings .settings-actions .settings-secondary{justify-content:flex-start;margin-top:9px}
+#panel-settings .settings-actions .settings-secondary .button{flex:0 1 auto;min-height:34px;border:1px solid var(--line);background:var(--surface)}
+#panel-settings .settings-actions .caption{margin:7px 0 0;font-size:11px}
+.curve-overview>svg{display:block;width:100%;max-height:260px;cursor:pointer;touch-action:pan-y}
+.curve-details{border-top:1px solid var(--line);margin-top:12px;padding-top:4px}
+.curve-details>summary{padding:10px 4px;color:var(--accent);font-size:13px}
+.curve-details .curve-editor{padding:8px 0 2px}
+.curve-details .curve-editor h3{font-size:14px;margin:0 0 6px}
+.curve-details .curve-editor>p.caption{font-size:12px;line-height:1.5}
+.thanks-list ul{list-style:none;padding:0;margin:7px 0 0}
+.thanks-list li{padding:7px 0;border-bottom:1px solid var(--line);font-size:13px;color:#58616d}
+.thanks-list li:last-child{border-bottom:0}
+@media(max-width:360px){#panel-settings .settings-actions .settings-secondary .button{padding:6px 8px;font-size:11px}}

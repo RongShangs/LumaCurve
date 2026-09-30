@@ -712,8 +712,6 @@
   window.addEventListener('resize', syncStatusLayout);
   $('show-readings').addEventListener('click', function () { $('readings-dialog').showModal(); });
   $('close-readings').addEventListener('click', function () { $('readings-dialog').close(); });
-  $('open-curve-editor').addEventListener('click', function () { $('curve-dialog').showModal(); renderCurveEditor(); });
-  $('close-curve-editor').addEventListener('click', function () { $('curve-dialog').close(); });
   $('copy-qq-group').addEventListener('click', function () { copyText('314981836', 'QQ群号'); });
   $('refresh-diagnostics').addEventListener('click', pollState); $('refresh-log').addEventListener('click', loadLog);
   $('settings-form').addEventListener('submit', saveConfig);
@@ -748,6 +746,7 @@
   $('curve-editor-plot').addEventListener('click',function (event) {
     var box = this.getBoundingClientRect(), coordinate = (event.clientX-box.left)/box.width*360, best = 0;
     window.LumaCurveMath.lux.forEach(function (lux,i) { if (Math.abs(responseX(lux)-coordinate)<Math.abs(responseX(window.LumaCurveMath.lux[best])-coordinate)) best=i; });
+    $('curve-details').open = true;
     $('curve-anchor').value=best; curvePointEditing=false; renderCurveEditor();
   });
   $('curve-range').addEventListener('input',function () { curvePointEditing=true; $('curve-value').value=this.value; });

@@ -156,15 +156,14 @@ async function main() {
     await preview.screenshot({path:path.join(root,'build/webui-status-mobile.png'),fullPage:true});
     await preview.click('#nav-about');
     assert.equal(await preview.locator('.author-card h2').innerText(), '戎Shang');
-    assert.equal(await preview.locator('img[src="original-author.jpg"]').count(),1);
-    assert.equal(await preview.locator('.upstream-credit img').count(),1);
+    assert.equal(await preview.locator('img[src="original-author.jpg"], .upstream-credit').count(),0);
     assert.equal(await preview.locator('a[href="https://lc.rongshangs.top"]').count(),1);
     assert.equal(await preview.locator('a[href="https://rongshangs.top"]').count(),1);
     assert.equal(await preview.locator('a[href="https://www.gnu.org/licenses/gpl-3.0.html"]').count(),1);
     assert.equal(await preview.locator('a[href="https://www.coolapk.com/u/3261403"]').count(),1);
     assert.equal(await preview.locator('#github-link').getAttribute('href'),'https://github.com/RongShangs/LumaCurve');
     assert.equal(await preview.evaluate(()=>{
-      const order=['.about-intro','.project-links','.author-card','.donation-card','.author-links','.upstream-credit'].map(s=>document.querySelector(s));
+      const order=['.about-intro','.project-links','.author-card','.author-links','.donation-card','.thanks-list'].map(s=>document.querySelector(s));
       return order.every((el,i)=>!i || !!(order[i-1].compareDocumentPosition(el)&Node.DOCUMENT_POSITION_FOLLOWING));
     }),true);
     assert.equal(await preview.locator('.header').isVisible(),false);
@@ -172,7 +171,10 @@ async function main() {
     assert.equal(await preview.locator('.about-heading h1').innerText(),'流光亮度');
     pass('About hides the shared header and presents its own icon and title without punctuation');
     await preview.screenshot({path:path.join(root,'build/webui-about-mobile.png'),fullPage:true});
-    pass('Current author, links, GPL and bottom-only upstream credit');
+    assert.match(await preview.locator('.author-card').innerText(),/酷安@戎Shangs/);
+    assert.match(await preview.locator('.donation-card').innerText(),/整条备注不超过 30 个字符/);
+    assert.equal(await preview.locator('.thanks-list li').innerText(),'戒戒：喵喵喵？');
+    pass('Current author, links, GPL, donation note and one-line thank-you entry');
     assert.equal(await preview.evaluate(()=>!!(document.querySelector('.auto-update').compareDocumentPosition(document.querySelector('.project-links'))&Node.DOCUMENT_POSITION_FOLLOWING)),true);
     for(const type of ['wechat','alipay']){
       await preview.click('#donate-'+type);
@@ -558,6 +560,10 @@ async function main() {
     assert.equal(await connected.locator('#cfg-preference_offset').count(),0);
     assert.equal(await connected.locator('#cfg-preference_learning').evaluate(el=>el.checked),true);
     assert.equal(await connected.locator('#panel-settings>.engine-controls').evaluate(el=>!!(el.compareDocumentPosition(document.getElementById('settings-form'))&Node.DOCUMENT_POSITION_FOLLOWING)),true);
+    assert.equal(await connected.locator('#panel-settings>.page-title, #panel-tools>.page-title, #curve-dialog').count(),0);
+    assert.equal(await connected.locator('#curve-editor-plot').isVisible(),true);
+    assert.equal(await connected.locator('#curve-details').evaluate(el=>el.open),false);
+    assert.equal(await connected.locator('#save-config').evaluate(el=>!!(el.compareDocumentPosition(document.getElementById('curve-editor-plot'))&Node.DOCUMENT_POSITION_FOLLOWING)),true);
     assert.equal(await connected.locator('#config-fields').locator(':scope > :first-child h2').innerText(),'照度与背光曲线');
     await edit(connected,'brighten_speed','1.2');await connected.click('#save-config');
     await connected.waitForFunction(()=>document.getElementById('dirty-status').textContent==='已保存并发送重载');
@@ -568,6 +574,7 @@ async function main() {
     assert.match(await connected.evaluate(()=>fixture.config),/^preference_learning=0$/m);
     assert.match(await connected.evaluate(()=>fixture.config),/^preference_revision=0$/m);
     pass('Curve learning can be disabled without resetting learned points');
+    await connected.click('#curve-details summary');
     await connected.locator('#curve-anchor').selectOption('5');await connected.locator('#curve-value').fill('8');await connected.click('#curve-apply');
     assert.match(await connected.locator('#curve-status').innerText(),/锚点已调整/);
     await connected.click('#save-config');

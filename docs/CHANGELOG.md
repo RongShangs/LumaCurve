@@ -1,6 +1,6 @@
 # 0.0.1 · 2026-09-29
 
-- 新工程 LumaCurve / 流光亮度；模块 ID luma_curve，versionCode 00001，维护者酷安@戎Shang。
+- 新工程 LumaCurve / 流光亮度；模块 ID luma_curve，versionCode 00001，维护者酷安@戎Shangs。
 - 仅保留生产 C、必要构建脚本与模块资源，历史反编译资料留在 D:/IOS/reverse-engineering。
 - 独立进程、配置、日志、控制脚本与持久数据路径；安装与卸载不处理原伴生应用。
 - WebUI 重做：状态 / 设置 / 日志 / 关于；#fafafa 底色、无玻璃特效、无大图背景、无第三方前端框架。

@@ -14,7 +14,7 @@ lc_install_fail() {
 lc_install_module() {
   ui_print "=============================================="
   ui_print "  LumaCurve · 流光亮度 1.0.0"
-  ui_print "  仿 iOS 曲线的系统亮度引擎 · 酷安@戎Shang"
+  ui_print "  仿 iOS 曲线的系统亮度引擎 · 酷安@戎Shangs"
   ui_print "=============================================="
   COMPAT_BOOTSTRAP="$TMPDIR/luma_curve_compatibility.sh"
   unzip -p "$ZIPFILE" compatibility.sh > "$COMPAT_BOOTSTRAP" 2>/dev/null || abort "兼容性检测文件解压失败。"
@@ -26,7 +26,7 @@ lc_install_module() {
   unzip -p "$ZIPFILE" install_choice.sh > "$LC_INSTALL_BOOTSTRAP" 2>/dev/null || abort "安装检查文件解压失败。"
   [ -s "$LC_INSTALL_BOOTSTRAP" ] || abort "安装检查文件缺失。"
   . "$LC_INSTALL_BOOTSTRAP"
-  ui_print "[1/4] 检查旧模块与安装环境"
+  ui_print "[1/4] 检查冲突模块与安装环境"
   lc_check_legacy || abort "安装已取消，原版模块保留。"
   ui_print "[2/4] 备份流光亮度配置与数据"
   unzip -p "$ZIPFILE" upgrade_data.sh > "$UPGRADE_BOOTSTRAP" 2>/dev/null || abort "数据维护文件解压失败。"

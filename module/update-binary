@@ -114,7 +114,7 @@ if ! unzip -p "$ZIPFILE" compatibility.sh > "$COMPAT_BOOTSTRAP" 2>/dev/null || [
 fi
 . "$COMPAT_BOOTSTRAP"
 lc_compat_environment || exit 1
-ui_print "[1/4] 检查旧模块与安装环境"
+ui_print "[1/4] 检查冲突模块与安装环境"
 if ! unzip -p "$ZIPFILE" install_choice.sh > "$LC_INSTALL_BOOTSTRAP" 2>/dev/null || [ ! -s "$LC_INSTALL_BOOTSTRAP" ]; then
   ui_print "安装检查文件解压失败。"
   exit 1

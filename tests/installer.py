@@ -28,7 +28,7 @@ lc_stop_legacy_processes() {{ return 0; }}
         assert result.returncode==0,(name,result.stdout,result.stderr)
         checks.append({'name':name,'ok':True})
 old={'modules/ios_auto_brightness/module.prop':b'id=ios_auto_brightness\n','runtime/ios_brightness.conf':b'user_config=kept\n','legacy-data/live/config':b'persistent=kept\n'}
-run('No original: no key read or writes','lc_volume_choice() { return 9; }; lc_check_legacy && [ "$LC_REPLACE_OLD" = 0 ] && [ ! -e "$LC_RUNTIME_DIR/ios_brightness.paused" ]')
+run('No conflict: no key read or writes','lc_volume_choice() { return 9; }; message=$(lc_check_legacy) && [ "$message" = "- 未检测到冲突模块，可以继续安装。" ] && [ "$LC_REPLACE_OLD" = 0 ] && [ ! -e "$LC_RUNTIME_DIR/ios_brightness.paused" ]')
 for decision in (1,2):
     run('Cancel/timeout preserves original '+str(decision),f'lc_volume_choice() {{ return {decision}; }}; ! lc_check_legacy && [ "$LC_REPLACE_OLD" = 0 ] && [ ! -e "$LC_MODULES_DIR/ios_auto_brightness/remove" ] && [ ! -e "$LC_DATA_DIR/legacy-backup" ]',old)
 run('Positive preflight leaves original untouched','lc_volume_choice() { return 0; }; lc_check_legacy && [ "$LC_REPLACE_OLD" = 1 ] && [ ! -e "$LC_MODULES_DIR/ios_auto_brightness/remove" ]',old)

@@ -54,25 +54,16 @@
 
       </section>
       <section id="panel-settings" class="panel" aria-labelledby="nav-settings" hidden>
-        <div class="page-title"><h1>设置</h1></div>
-
         <article class="card engine-controls"><h2>引擎控制</h2><p class="caption">暂停后由系统调节亮度；恢复后继续运行。</p>
         <div class="control-strip"><button class="button" data-command="pause">暂停</button><button class="button primary" data-command="resume">恢复</button><button class="button quiet" data-command="restart">重启</button><p id="command-status" class="feedback" role="status"></p></div>
         </article>
-
+        <div class="card settings-actions" aria-label="配置操作"><div class="save-row"><span id="dirty-status">未修改</span><button id="save-config" class="button primary" type="submit" form="settings-form" disabled>保存并应用</button></div><div class="settings-secondary"><button id="reload-config" class="button quiet" type="button">重新读取</button><button id="restore-defaults" class="button quiet" type="button">恢复默认值</button></div><p class="caption">恢复默认值只修改表单，保存后生效。</p></div>
         <p id="config-notice" class="notice" role="status">正在读取配置…</p>
         <article class="card curve-overview" aria-labelledby="curve-overview-title">
           <h2 id="curve-overview-title">照度与背光曲线</h2>
           <p>建议先保持默认曲线，日常使用时按自己的感受调节亮度。多次在相近照度下同向调整后，模块会缓慢学习该处曲线。</p>
           <label class="learning-toggle" for="cfg-preference_learning"><span>随手动调节学习曲线<small>默认开启，可随时关闭；已学习的曲线会保留。</small></span><input id="cfg-preference_learning" name="preference_learning" type="checkbox"></label>
           <p id="preference-status" class="caption">缓慢学习已开启 · 尚未学习</p>
-          <button id="open-curve-editor" class="button" type="button" aria-haspopup="dialog">查看与手动编辑曲线</button>
-        </article>
-        <dialog id="curve-dialog" class="curve-dialog" aria-labelledby="curve-title">
-        <article class="curve-editor" aria-labelledby="curve-title">
-          <div class="row curve-dialog-title"><h2 id="curve-title">手动编辑曲线</h2><button id="close-curve-editor" class="button" type="button">关闭</button></div>
-          <p class="caption">建议优先通过日常使用缓慢学习；如果有明确偏好，再调整锚点。编辑后回到设置页点击「保存并应用」。</p>
-          <div class="curve-dialog-default"><button id="curve-default" class="button" type="button">恢复默认曲线</button></div>
           <div class="curve-legend"><span class="base-key">基础</span><span class="preference-key">学习后</span><span class="sunlight-key">阳光条件</span></div>
           <svg id="curve-editor-plot" viewBox="0 0 360 166" role="img" aria-label="可编辑亮度曲线，点击选择照度锚点">
             <path class="response-grid" d="M32 12H342M32 66H342M32 120H342M32 12V120M156 12V120M280 12V120M342 12V120"/>
@@ -80,37 +71,38 @@
             <text class="axis-label" x="32" y="143">0</text><text class="axis-label" x="156" y="143" text-anchor="middle">100</text><text class="axis-label" x="280" y="143" text-anchor="middle">10k</text><text class="axis-label" x="342" y="143" text-anchor="end">100k lux</text>
             <polyline id="editor-base" class="curve-base"/><polyline id="editor-preference" class="curve-preference"/><polyline id="editor-sunlight" class="curve-sunlight"/><g id="curve-anchors"></g>
           </svg>
+          <details id="curve-details" class="curve-details"><summary>手动编辑曲线与预设</summary><div class="curve-editor" aria-labelledby="curve-title">
+          <h3 id="curve-title">手动编辑曲线</h3>
+          <p class="caption">建议优先通过日常使用缓慢学习；如果有明确偏好，再调整锚点。编辑后点击上方「保存并应用」。</p>
+          <div class="curve-dialog-default"><button id="curve-default" class="button" type="button">恢复默认曲线</button></div>
           <div class="curve-point-controls"><label>照度锚点<select id="curve-anchor" aria-label="照度锚点"></select></label><label>背光比例 %<input id="curve-value" type="number" min="0.1" max="100" step="0.01" inputmode="decimal"></label><button id="curve-apply" class="button" type="button">调整锚点</button></div>
           <input id="curve-range" class="curve-range" type="range" min="0.1" max="100" step="0.01" aria-label="锚点背光比例">
           <p id="curve-status" class="feedback" role="status">手动可在 0.1%–100% 自由调整；相邻点按需联动，保持曲线不下降。保存并应用后生效。阳光虚线表示满足条件时的增强，仍受保护约束。</p>
           <div class="preset-controls"><label>预设名称<input id="preset-name" maxlength="40" placeholder="例如：我的日常曲线"></label><button id="preset-save" class="button" type="button">保存预设</button></div>
           <div class="preset-controls"><select id="preset-select" aria-label="已保存的曲线预设"><option value="">暂无预设</option></select><button id="preset-load" class="button" type="button">载入</button><button id="preset-delete" class="button" type="button">删除</button></div>
           <p id="preset-status" class="feedback" role="status">预设保存当前完整曲线、学习开关与阳光参数；载入后仍需保存并应用。</p>
+        </div></details>
         </article>
-        </dialog>
-        <form id="settings-form" novalidate><div id="config-fields"></div><p id="config-error" class="feedback error" role="alert"></p><div class="save-row"><span id="dirty-status">未修改</span><button id="save-config" class="button primary" type="submit" disabled>保存并应用</button></div></form>
-        <div class="settings-secondary"><button id="reload-config" class="button quiet" type="button">重新读取</button><button id="restore-defaults" class="button quiet" type="button">恢复默认值</button></div>
-        <p class="caption">恢复默认值只修改表单；点击保存后生效。更新模块会保留 LumaCurve 的个人配置。</p>
+        <form id="settings-form" novalidate><div id="config-fields"></div><p id="config-error" class="feedback error" role="alert"></p></form>
 
       </section>
       <section id="panel-tools" class="panel" aria-labelledby="nav-tools" hidden>
-        <div class="page-title"><h1>日志</h1></div>
         <article class="card log-view"><div class="row"><h2>本次开机日志</h2><span class="caption">显示最近 150 行</span></div><div class="button-row log-actions"><button id="refresh-log" class="button" type="button">刷新</button><button id="copy-log" class="button" type="button" disabled>复制本次开机</button><button id="export-log" class="button" type="button" aria-label="导出本次开机日志到下载目录" title="导出本次开机日志到下载目录" disabled>导出</button></div><pre id="log" aria-label="本次开机日志">等待读取…</pre><p id="export-status" class="feedback" role="status"></p></article>
         <article class="card log-management"><h2>日志管理</h2><div class="log-policy"><label for="log-days">归档保留</label><select id="log-days"><option value="0">仅按大小清理</option><option value="1">1 天</option><option value="3">3 天</option><option value="7">7 天</option><option value="14">14 天</option><option value="30">30 天</option></select><button id="save-log-policy" class="button" type="button">保存</button></div><div class="button-row"><button class="button" data-command="prune-logs" type="button">清理过期归档</button><button id="clear-log" class="button danger" type="button">清空当前日志</button></div><p id="tools-feedback" class="feedback" role="status"></p></article>
         <details class="card diagnostics-card"><summary>设备状态</summary><div class="button-row"><button id="refresh-diagnostics" class="button" type="button">读取状态</button><button id="copy-diagnostics" class="button" type="button">复制状态</button></div><pre id="diagnostics">等待读取…</pre></details>
       </section>
       <section id="panel-about" class="panel" aria-labelledby="nav-about" hidden>
         <div class="about-heading"><svg class="module-icon" viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="12" fill="#eaf0fb" stroke="none"/><path d="M10 28c13 0 7-16 20-16" stroke-width="3"/></svg><h1>流光亮度</h1></div>
-        <p class="about-intro">流光亮度依据前后光感判断环境，以前置读数为主，确认场景变化后沿可编辑曲线平滑调节主屏。自动亮度下手动设置的亮度会保持到环境明显变化或锁屏；多次在相近照度下同向调整，可让曲线缓慢学习你的偏好。阳光增强与温控保护以设备实际支持和可信读数为准。当前框架输出适配已验证的 HyperOS 4 / 小米 17 Pro 固件，安装时会核对系统版本与主屏接口。</p>
+        <p class="about-intro">流光亮度依据前后光感判断环境，以前置读数为主，确认场景变化后沿可编辑曲线平滑调节主屏。自动亮度下手动设置的亮度会保持到环境明显变化或锁屏；多次在相近照度下同向调整，可让曲线缓慢学习你的偏好。阳光增强与温控保护以设备实际支持和可信读数为准。当前框架输出面向已验证的 HyperOS 4 固件，安装时会核对系统版本与主屏接口。</p>
         <div class="auto-update" role="status">新版本尚未发布，当前为本地体验版</div>
         <div class="project-links"><a href="https://lc.rongshangs.top" target="_blank" rel="noopener noreferrer">官网 ↗</a><a id="github-link" href="https://github.com/RongShangs/LumaCurve" target="_blank" rel="noopener noreferrer">GitHub ↗</a><a href="https://www.gnu.org/licenses/gpl-3.0.html" target="_blank" rel="noopener noreferrer">GPL-3.0 ↗</a></div>
         <dl class="about-facts"><div><dt>模块名称</dt><dd>LumaCurve · 流光亮度</dd></div><div><dt>版本</dt><dd>1.0.0 <span class="muted">/ 10000</span></dd></div><div><dt>模块 ID</dt><dd>luma_curve</dd></div></dl>
         <p class="caption">安装与使用需要支持模块的 Root 环境。实际传感器、温控和高亮能力取决于设备。</p>
-        <article class="author-card"><img src="avatar.jpg" width="72" height="72" alt="戎Shang 的头像"><div><span class="caption">开发与维护</span><h2>戎Shang</h2><p>酷安 @戎Shang</p></div></article>
-        <div class="author-links"><a href="https://rongshangs.top" target="_blank" rel="noopener noreferrer">作者博客 ↗</a><a href="https://www.coolapk.com/u/3261403" target="_blank" rel="noopener noreferrer">酷安主页 ↗</a></div>
+        <article class="author-card"><img src="avatar.jpg" width="72" height="72" alt="戎Shang 的头像"><div><span class="caption">开发与维护</span><h2>戎Shang</h2><p>酷安@戎Shangs</p></div></article>
+        <div class="author-links"><a href="https://rongshangs.top" target="_blank" rel="noopener noreferrer">作者博客 ↗</a><a href="https://www.coolapk.com/u/3261403" target="_blank" rel="noopener noreferrer">酷安@戎Shangs ↗</a></div>
         <button id="copy-qq-group" class="button qq-group" type="button"><span>QQ 交流群 <strong>314981836</strong></span><small>入群暗号：1691 · 点击复制群号</small></button>
-        <article class="donation-card"><h2>打赏</h2><p>模块永久免费。如果愿意支持开发，捐赠 2.3 元就很暖心。打赏时请备注您的昵称，我会在下一次更新时将您加入感谢名单。</p><div class="donation-actions"><button class="button" id="donate-wechat" type="button">微信</button><button class="button" id="donate-alipay" type="button">支付宝</button></div></article>
-        <section class="thanks-list" aria-labelledby="thanks-title"><h2 id="thanks-title">感谢名单</h2><p>戒戒</p></section>
+        <article class="donation-card"><h2>打赏</h2><p>模块永久免费。如果愿意支持开发，捐赠 2.3 元就很暖心。打赏时可备注「昵称：想说的一句话」，整条备注不超过 30 个字符；我会在下一次更新时将你加入感谢榜。</p><div class="donation-actions"><button class="button" id="donate-wechat" type="button">微信</button><button class="button" id="donate-alipay" type="button">支付宝</button></div></article>
+        <section class="thanks-list" aria-labelledby="thanks-title"><h2 id="thanks-title">感谢榜</h2><ul><li><span>戒戒：</span><span>喵喵喵？</span></li></ul></section>
       </section>
     </main>
     <nav class="navigation" aria-label="主导航">
@@ -121,7 +113,7 @@
     </nav>
   </div>
   <div id="toast" role="status" aria-live="polite"></div>
-  <dialog id="donation-dialog" class="donation-dialog" aria-labelledby="donation-title"><div class="row"><h2 id="donation-title">微信打赏</h2><button class="button" id="close-donation" type="button" aria-label="关闭收款码">关闭</button></div><p class="caption">感谢支持！打赏时请备注昵称，以便加入感谢名单。</p><img id="donation-qr" alt="微信收款码" width="320" height="320"><p class="caption">使用对应支付应用扫描收款码即可。</p></dialog>
+  <dialog id="donation-dialog" class="donation-dialog" aria-labelledby="donation-title"><div class="row"><h2 id="donation-title">微信打赏</h2><button class="button" id="close-donation" type="button" aria-label="关闭收款码">关闭</button></div><p class="caption">打赏时可备注「昵称：想说的一句话」，整条备注不超过 30 个字符，以便加入感谢榜。</p><img id="donation-qr" alt="微信收款码" width="320" height="320"><p class="caption">使用对应支付应用扫描收款码即可。</p></dialog>
   <dialog id="readings-dialog" class="readings-dialog" aria-labelledby="readings-title">
     <div class="row readings-title"><h2 id="readings-title">详细读数</h2><button id="close-readings" class="button" type="button">关闭</button></div>
         <div id="advanced-state" class="advanced-state"><dl class="facts reading-mode"><div><dt>亮度模式</dt><dd id="mode">—</dd></div><div><dt>控制状态</dt><dd id="owner">—</dd></div></dl><p id="flow-relation" class="caption">等待环境光和背光数据…</p><dl class="facts"><div><dt>环境照度</dt><dd id="lux">—</dd></div><div><dt>平滑照度</dt><dd id="smooth">—</dd></div><div><dt>目标比例</dt><dd id="flow-target">—</dd></div><div><dt>当前比例</dt><dd id="flow-current">—</dd></div><div><dt>阳光增强</dt><dd id="sunlight">—</dd></div><div><dt>温控保护</dt><dd id="thermal">—</dd></div><div><dt>亮度过渡</dt><dd id="transition">—</dd></div><div><dt>环境采样</dt><dd id="sampling">—</dd></div></dl>

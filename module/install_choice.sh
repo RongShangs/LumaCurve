@@ -34,7 +34,7 @@ lc_volume_choice() {
 lc_check_legacy() {
   LC_REPLACE_OLD=0
   if ! lc_old_present; then
-    ui_print "- 未检测到原版模块，可以继续安装。"
+    ui_print "- 未检测到冲突模块，可以继续安装。"
     return 0
   fi
   ui_print ""

@@ -2,12 +2,12 @@
 
 让屏幕随环境平稳调节。以前置光感为主，结合双侧场景判断与时域滤波，减少短暂遮挡与照度抖动；支持可编辑曲线、缓慢局部学习、命名预设、持续阳光增强及高温限亮。
 
-版本 **1.0.0 / 10000**，ID `luma_curve`，作者酷安@戎Shang。沿用 **GPL-3.0**，保留[来源与上游贡献](docs/来源与许可证.md)。
+版本 **1.0.0 / 10000**，ID `luma_curve`，作者酷安@戎Shangs。沿用 **GPL-3.0**，保留[来源与上游贡献](docs/来源与许可证.md)。
 
 - 官网：[lc.rongshangs.top](https://lc.rongshangs.top)
 - 仓库：[RongShangs/LumaCurve](https://github.com/RongShangs/LumaCurve)
 - 博客：[rongshangs.top](https://rongshangs.top)
-- 酷安：[戎Shang](https://www.coolapk.com/u/3261403)
+- [酷安@戎Shangs](https://www.coolapk.com/u/3261403)
 
 ## 曲线与学习
 
@@ -19,7 +19,7 @@
 
 ## 安装与构建
 
-基于 KernelSU，理论面向各类安卓机型，当前包需 Android 8.0+、ARM64、Root、可用光感和背光接口。最佳兼容平台为 HyperOS 4 / 小米 17 Pro（作者提供），其他机型建议实测。曲线可在设置中自由调整。WebUI 控制需要兼容 KernelSU 桥。安装检测基本能力；发现原版 `ios_auto_brightness` 时通过音量键选择继续或取消。旧配置备份而不直接导入；更新保留本模块配置、学习和预设。
+当前框架输出版本面向 HyperOS 4，安装需 Android 8.0+、ARM64、Root、可用光感与显示框架接口；其他系统尚未验证。曲线可在设置中自由调整。WebUI 控制需要兼容 KernelSU 桥。安装检测基本能力；发现冲突模块 `ios_auto_brightness` 时通过音量键选择继续或取消。旧配置备份而不直接导入；更新保留本模块配置、学习和预设。
 
 ```powershell
 cd D:/IOS/LumaCurve
