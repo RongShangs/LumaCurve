@@ -5,8 +5,17 @@ SKIPUNZIP=1
 lc_install_fail() {
   if command -v lc_rollback_legacy_flags >/dev/null 2>&1; then lc_rollback_legacy_flags; fi
   if command -v ios_upgrade_restore >/dev/null 2>&1; then
-    ios_upgrade_restore >/dev/null 2>&1
-    ios_upgrade_release_pause >/dev/null 2>&1
+    if ios_upgrade_restore >/dev/null 2>&1 && ios_upgrade_release_pause >/dev/null 2>&1; then
+    # Restore the previously installed service, respecting a user's pause.
+    if [ ! -f /data/local/tmp/luma_curve.paused ] &&
+       [ ! -f /data/adb/modules/luma_curve/disable ] &&
+       [ ! -f /data/adb/modules/luma_curve/remove ] &&
+       [ -r /data/adb/modules/luma_curve/service.sh ]; then
+      nohup sh /data/adb/modules/luma_curve/service.sh >/dev/null 2>&1 &
+    fi
+    else
+      ui_print "旧配置恢复未完成，请保留安装日志；未自动启动旧核心。"
+    fi
   fi
   abort "$1"
 }
@@ -38,7 +47,7 @@ lc_install_module() {
   [ -s "$MODPATH/system/bin/luma_curve_daemon" ] &&
     [ -s "$MODPATH/luma_curve.conf" ] && [ -s "$MODPATH/webroot/index.html" ] || lc_install_fail "安装包不完整。"
   set_perm_recursive "$MODPATH" 0 0 0755 0644 || lc_install_fail "设置文件权限失败。"
-  for _lc_exec in system/bin/luma_curve_daemon service.sh post-fs-data.sh check_status.sh uninstall.sh luma_curvectl.sh; do
+  for _lc_exec in export_analysis.sh collect_hyperos4_android.sh system/bin/luma_curve_daemon service.sh post-fs-data.sh check_status.sh uninstall.sh luma_curvectl.sh; do
     set_perm "$MODPATH/$_lc_exec" 0 0 0755 || lc_install_fail "设置执行权限失败。"
   done
   [ ! -r "$MODPATH/framework-broker.jar" ] ||
@@ -55,8 +64,8 @@ lc_install_module() {
     ui_print "需要运行时，请在 WebUI 设置页点「恢复」，无需再次安装。"
   fi
   if [ -r "$MODPATH/framework-broker.jar" ]; then
-    ui_print "HyperOS 4 显示框架已通过安装预检；重启后请在 WebUI 查看实际接管状态。"
-    ui_print "固件变化或显示接口不匹配时，引擎会交还系统亮度控制。"
+    ui_print "HyperOS 4 显示能力已通过只读预检；重启后请查看实际接管状态。"
+    ui_print "系统更新后会重新识别；接口或反馈异常时交还系统亮度控制。"
   else
     ui_print "后续可在管理器检查更新并直接安装。"
   fi

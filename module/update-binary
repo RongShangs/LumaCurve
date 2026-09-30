@@ -146,7 +146,7 @@ rm -rf "$INSTALL_STAGE" 2>/dev/null
 mkdir -p "$INSTALL_STAGE/system/bin" "$INSTALL_STAGE/webroot" 2>/dev/null || cancel_before_commit stage_create_failed
 
 ui_print "[3/4] 安装亮度引擎与管理界面"
-for _file in compatibility.sh install_choice.sh LICENSE core_status.sh daemon_launcher.sh framework_daemon_launcher.sh framework-broker.jar current_boot_log.sh migrate_log_retention.sh process_scope.sh module.prop service.sh customize.sh luma_curvectl.sh post-fs-data.sh check_status.sh uninstall.sh luma_curve.conf upgrade_data.sh; do
+for _file in export_analysis.sh collect_hyperos4_android.sh compatibility.sh install_choice.sh LICENSE core_status.sh daemon_launcher.sh framework_daemon_launcher.sh framework-broker.jar current_boot_log.sh migrate_log_retention.sh process_scope.sh module.prop service.sh customize.sh luma_curvectl.sh post-fs-data.sh check_status.sh uninstall.sh luma_curve.conf upgrade_data.sh; do
   extract_entry "$_file" "$INSTALL_STAGE/$_file" || cancel_before_commit "extract_failed_$_file"
 done
 for _file in index.html app.js curve_math.js styles.css kernelsu.js avatar.jpg donate-wechat.jpg donate-alipay.jpg LICENSE.txt; do

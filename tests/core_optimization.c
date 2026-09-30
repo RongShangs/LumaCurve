@@ -135,11 +135,19 @@ static void test_state(void) {
         baseline_write_state_frame(i%2?"auto":"manual",1,154,471,1000,"中文原因",now,i*.1f,i*.11f);
         char old[32768];strcpy(old,published);IosState before=ios_state;fwrite_calls=0;
         assert(ios_write_state_frame(i%2?"auto":"manual",1,154,471,1000,"中文原因",now,i*.1f,i*.11f)==0);
-        if(strcmp(old,published)) {
-            size_t at=0;while(old[at]==published[at])at++;
-            fprintf(stderr,"Frame %u difference at %zu: old %.100s | new %.100s\n",i,at,old+at,published+at);
+        /* Keep all historical fields identical while extending diagnostics. */
+        char *line=old;
+        while(*line) {
+            char *end=strchr(line,'\n');assert(end);size_t length=(size_t)(end-line)+1;
+            char expected[2048];assert(length<sizeof(expected));memcpy(expected,line,length);expected[length]=0;
+            if(!strncmp(expected,"learn_block_reason=",19)) {
+                assert(length+7<sizeof(expected));memmove(expected+7,expected,length+1);memcpy(expected,"legacy_",7);
+            }
+            assert(strstr(published,expected));line=end+1;
         }
-        assert(!strcmp(old,published));assert(!memcmp(&before,&ios_state,sizeof(before)));assert(fwrite_calls==1);
+        assert(strstr(published,"core_build="));assert(strstr(published,"config_applied_hash="));
+        assert(strstr(published,"actuator_write_stage="));assert(strstr(published,"preference_learning="));
+        assert(!memcmp(&before,&ios_state,sizeof(before)));assert(fwrite_calls==1);
     }
     char good[32768];strcpy(good,published);
     for(unsigned failure=0;failure<4;failure++) {
@@ -156,7 +164,7 @@ static void test_state(void) {
     assert(strstr(published,"scene_hold_left_ms=0\n"));
     assert(strstr(published,"front_reporting_mode=-1\n"));
     assert(!memcmp(&saved,&ios_state,sizeof(saved)));
-    puts("state: 100 byte-identical frames, pure snapshots, bounded overflow and 4 IO failure cases PASS");
+    puts("state: 100 historical-field-identical frames with unconditional diagnostics, pure snapshots, bounded overflow and 4 IO failure cases PASS");
 }
 static void test_observer(void) {
     DomainIo io={0};ios_reset_data();ios_state.cached_auto=1;now+=10000;

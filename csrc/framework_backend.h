@@ -5,6 +5,8 @@
 typedef struct LumaFrameworkSnapshot {
     int mode, slider, on, window, node, active, user_hold;
     float adjustment, minimum, maximum, base, adjusted, goal, limited, request;
+    float codes_per_float;
+    int node_maximum;
     uint64_t sampled_ms;
 } LumaFrameworkSnapshot;
 extern LumaFrameworkSnapshot luma_framework_snapshot;

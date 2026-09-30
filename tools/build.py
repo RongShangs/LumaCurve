@@ -126,6 +126,7 @@ if args.package:
     # Stage into an empty directory so removed UI assets cannot leak into a later ZIP.
     module = Path(tempfile.mkdtemp(prefix="module-", dir=out))
     shutil.copytree(ROOT / "module", module, dirs_exist_ok=True)
+    shutil.copy2(ROOT / "tools/collect_hyperos4_android.sh", module / "collect_hyperos4_android.sh")
     daemon = module / "system/bin/luma_curve_daemon"
     daemon.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(target, daemon)
@@ -135,7 +136,7 @@ if args.package:
     (out / "build.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
     (module / "build-info.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
     properties = dict(line.split("=", 1) for line in metadata["module_properties"].splitlines() if "=" in line and not line.startswith("#"))
-    archive = dist / f"{properties['id']}-{properties['version']}.zip"
+    archive = dist / f"{properties['id']}-{properties['version']}-native-reference.zip"
     with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as z:
         for path in sorted(module.rglob("*")):
             if not path.is_file():

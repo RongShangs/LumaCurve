@@ -9,9 +9,12 @@ public final class LumaFrameworkOutputBroker implements LumaFrameworkOutputSessi
     final PrintWriter trace;
     final PrintWriter events;
     final boolean production="1".equals(System.getenv("LUMA_FRAMEWORK_PRODUCTION"));
+    final LumaFrameworkDeviceProfile profile;
     final LumaFrameworkOutputSession session=new LumaFrameworkOutputSession(this);
     final LumaFrameworkOutputLease client=new LumaFrameworkOutputLease();
     final LumaFrameworkOutputFeedback feedback=new LumaFrameworkOutputFeedback();
+    final LumaFrameworkMappingFeedback mappingFeedback=new LumaFrameworkMappingFeedback();
+    final LumaFrameworkConvergence convergence=new LumaFrameworkConvergence();
     final LumaFrameworkSliderOverride sliderOverride=new LumaFrameworkSliderOverride();
     final LumaFrameworkFrameLiveness frameLiveness=new LumaFrameworkFrameLiveness();
     LumaFrameworkOutputSession.Snapshot snapshot;
@@ -19,10 +22,12 @@ public final class LumaFrameworkOutputBroker implements LumaFrameworkOutputSessi
     boolean acquired,hasGoal,outputHealthy=true;
     long settingsStamp,sequence,lastClientSequence=-1;
     long frameTicks,providerReads,displayReads,heartbeats;
+    long retryAfter;int outputFaults;
     int mode,slider;
-    float adjustment,initial,goal=-1,rawGoal=-1,limited=-1,request,lastLux=Float.NaN;
+    float adjustment,initial,goal=-1,rawGoal=-1,limited=-1,request,lastLux=Float.NaN,safetyMaximum=1;
     static long now(){return System.nanoTime()/1000000;}
     LumaFrameworkOutputBroker(File folder)throws Exception {
+        profile=production?new LumaFrameworkDeviceProfile():null;
         run=folder;trace=new PrintWriter(new File(production?"/dev/null":new File(folder,"framework.trace").getPath()),"UTF-8");
         events=production?new PrintWriter(System.out,true):new PrintWriter(new File(folder,"framework.events"),"UTF-8");
         refresh();initial=snapshot.adjustedBrightness;request=initial;
@@ -61,17 +66,22 @@ public final class LumaFrameworkOutputBroker implements LumaFrameworkOutputSessi
         }
         Object display=LumaFrameworkProbe.invoke(android.global,"getDisplayInfo",new Class<?>[]{int.class},0);
         displayReads++;
-        if(display==null||!"local:4630946949513469331".equals(display.getClass().getField("uniqueId").get(display)))throw new IllegalStateException("wrong main display");
+        if(production)profile.check(display);
+        else if(display==null||!"local:4630946949513469331".equals(display.getClass().getField("uniqueId").get(display)))throw new IllegalStateException("wrong main display");
         boolean on=display.getClass().getField("state").getInt(display)==2;
         if(!on)sliderOverride.clear();
         Object info=android.info();
-        int node=Integer.parseInt(LumaFrameworkProbe.file("/sys/class/backlight/panel0-backlight/brightness").trim());
+        int node=production?profile.node():Integer.parseInt(LumaFrameworkProbe.file("/sys/class/backlight/panel0-backlight/brightness").trim());
         snapshot=new LumaFrameworkOutputSession.Snapshot(now(),mode==1?LumaFrameworkOutputSession.Mode.AUTO:LumaFrameworkOutputSession.Mode.MANUAL,on,
             info.getClass().getField("isBrightnessOverrideByWindow").getBoolean(info),LumaFrameworkProbe.floatField(info,"brightness"),
             LumaFrameworkProbe.floatField(info,"adjustedBrightness"),LumaFrameworkProbe.floatField(info,"brightnessMinimum"),LumaFrameworkProbe.floatField(info,"brightnessMaximum"),node);
     }
     public LumaFrameworkOutputSession.Snapshot read(){return snapshot;}
-    public void temporary(float value)throws Exception {LumaFrameworkProbe.invoke(android.global,"setTemporaryBrightness",new Class<?>[]{int.class,float.class},0,value);}
+    public void temporary(float value)throws Exception {
+        if(production&&!Float.isNaN(value)&&!new File(run,"output-owned").exists()&&!new File(run,"output-owned").createNewFile())
+            throw new IOException("cannot record output responsibility");
+        LumaFrameworkProbe.invoke(android.global,"setTemporaryBrightness",new Class<?>[]{int.class,float.class},0,value);
+    }
     public boolean temporaryCleared()throws Exception {
         File dump=new File(run,"release-display.txt");
         Process process=new ProcessBuilder("/system/bin/dumpsys","display").redirectErrorStream(true).redirectOutput(dump).start();
@@ -92,7 +102,7 @@ public final class LumaFrameworkOutputBroker implements LumaFrameworkOutputSessi
         lastLux=lux;
         if(sliderOverride.scene(time,lux)){
             event("USER_SLIDER_HOLD_END,scene_change,lux="+lux);
-            if(hasGoal&&rawGoal>=0)goal=rawGoal;
+            if(hasGoal&&rawGoal>=0)goal=Math.min(rawGoal,safetyMaximum);
         }
     }
     synchronized int nextTickDelayMs() {
@@ -103,8 +113,11 @@ public final class LumaFrameworkOutputBroker implements LumaFrameworkOutputSessi
         acquired=false;hasGoal=false;goal=limited=-1;
         frameLiveness.release();
         feedback.reset();
+        mappingFeedback.reset();
+        convergence.reset();
         if(responsible)event("RELEASE_BEGIN,mode="+mode);
         session.release();
+        if(production)new File(run,"output-owned").delete();
         if(responsible)event("RELEASE_CONFIRMED,mode="+mode);
         if(responsible)event("OUTPUT_COUNTS,binder_writes="+session.binderWrites()+",unchanged_requests="+session.unchangedRequests()+
             ",frame_ticks="+frameTicks+",provider_reads="+providerReads+",display_reads="+displayReads+",heartbeats="+heartbeats);
@@ -129,8 +142,18 @@ public final class LumaFrameworkOutputBroker implements LumaFrameworkOutputSessi
                 request=ramp.next(limited,snapshot.min,snapshot.max,now());
                 session.submit(++sequence,now(),LumaFrameworkOutputSession.Unit.FRAMEWORK_FLOAT,request,3000);
                 frameLiveness.submit();
-                if(production&&feedback.failed(now(),request,limited,snapshot.adjustedBrightness,snapshot.node)){
-                    outputHealthy=false;event("OUTPUT_FAULT,physical_readback_mismatch");release();
+                if(production&&convergence.failed(t,request,limited,snapshot.adjustedBrightness)){
+                    outputHealthy=false;retryAfter=t+30000;outputFaults++;
+                    event("OUTPUT_FAULT,framework_not_converging,retry_count="+outputFaults);release();
+                }
+                if(acquired&&production&&feedback.failed(now(),request,limited,snapshot.adjustedBrightness,snapshot.node)){
+                    outputHealthy=false;retryAfter=t+30000;outputFaults++;event("OUTPUT_FAULT,physical_readback_mismatch");release();
+                }
+                if(acquired&&production&&!profile.calibrated){
+                    if(mappingFeedback.failed(t,request,limited,snapshot.adjustedBrightness,
+                        profile.plausible(snapshot.node,snapshot.adjustedBrightness))){
+                        outputHealthy=false;retryAfter=t+30000;outputFaults++;event("OUTPUT_FAULT,normalized_coordinate_mismatch");release();
+                    }
                 }
             }
             if(!production){trace.printf(Locale.ROOT,"%d,%d,%d,%.7f,%.7f,%.7f,%.7f,%.7f,%d,%.7f,%.7f%n",now(),mode,acquired?1:0,goal,limited,request,
@@ -159,8 +182,11 @@ public final class LumaFrameworkOutputBroker implements LumaFrameworkOutputSessi
             if(words.length!=1||!LumaFrameworkOutputSession.usable(snapshot,t)||session.state()==LumaFrameworkOutputSession.State.RELEASE_PENDING)
                 throw new IllegalStateException("control forbidden");
             if(production&&sliderOverride.waiting(t))throw new IllegalStateException("user slider owns brightness");
-            if(!outputHealthy)throw new IllegalStateException("physical feedback fault; restart required");
-            if(production&&!LumaLegacyBacklightCoordinate.plausibleAnchor(snapshot.node,snapshot.adjustedBrightness)){
+            if(!outputHealthy){
+                if(t<retryAfter||outputFaults>=3)throw new IllegalStateException("output fault; bounded recovery pending or exhausted");
+                outputHealthy=true;
+            }
+            if(production&&(LumaFrameworkDeviceProfile.validNode(profile.backlight)!=profile.maximum||!profile.plausible(snapshot.node,snapshot.adjustedBrightness))){
                 event("ACQUIRE_WAIT,reason=calibration,node="+snapshot.node+",adjusted="+snapshot.adjustedBrightness+
                     ",base="+snapshot.baseBrightness+",min="+snapshot.min+",max="+snapshot.max);
                 throw new IllegalStateException("backlight coordinate calibration unavailable");
@@ -172,13 +198,19 @@ public final class LumaFrameworkOutputBroker implements LumaFrameworkOutputSessi
             }
             acquired=true;client.renew(t);ramp.stamp=t;break;
         case "T":
-            if((words.length!=4&&words.length!=5)||!acquired||!LumaFrameworkOutputSession.usable(snapshot,t))throw new IllegalStateException("goal without ownership");
-            if(words.length==5)sceneLux(t,Float.parseFloat(words[4]));
+            if((production?words.length!=8:(words.length!=4&&words.length!=5))||!acquired||!LumaFrameworkOutputSession.usable(snapshot,t))throw new IllegalStateException("goal without ownership");
+            if(words.length>=5)sceneLux(t,Float.parseFloat(words[4]));
             long seq=Long.parseLong(words[1]);int raw=Integer.parseInt(words[2]),max=Integer.parseInt(words[3]);
-            if(seq<=lastClientSequence||max!=16383||raw<0||raw>max)throw new IllegalArgumentException("invalid sequence or raw goal");
+            if(seq<=lastClientSequence||max!=(production?profile.maximum:16383)||raw<0||raw>max)throw new IllegalArgumentException("invalid sequence or raw goal");
+            if(production){
+                int cap=Integer.parseInt(words[5]);
+                if(cap<1||cap>max)throw new IllegalArgumentException("invalid safety cap");
+                ramp.speeds(Float.parseFloat(words[6]),Float.parseFloat(words[7]));
+                safetyMaximum=profile.convert(cap,max);
+            }
             lastClientSequence=seq;
-            rawGoal=production?LumaLegacyBacklightCoordinate.toFramework(raw,max):raw/(float)max;
-            float desired=production?Math.max(0f,Math.min(1f,sliderOverride.apply(rawGoal))):rawGoal;
+            rawGoal=production?profile.convert(raw,max):raw/(float)max;
+            float desired=production?Math.max(0f,Math.min(1f,sliderOverride.apply(rawGoal,safetyMaximum))):rawGoal;
             if(!hasGoal||goal!=desired)event((production?"GOAL,framework_target=":"GOAL,legacy_fraction=")+desired);
             goal=desired;hasGoal=true;client.renew(t);break;
         case "P":if(words.length!=1&&words.length!=2)throw new IllegalArgumentException();if(words.length==2)sceneLux(t,Float.parseFloat(words[1]));client.renew(t);break;
@@ -190,8 +222,9 @@ public final class LumaFrameworkOutputBroker implements LumaFrameworkOutputSessi
         return response();
     }
     String response() {
-        return String.format(Locale.ROOT,"OK %d %.7f %d %d %d %d %.7f %.7f %.7f %.7f %.7f %.7f %.7f %d %d\n",mode,adjustment,slider,
-            snapshot.on?1:0,snapshot.windowOverride?1:0,snapshot.node,snapshot.min,snapshot.max,snapshot.baseBrightness,snapshot.adjustedBrightness,goal,limited,request,acquired?1:0,sliderOverride.holding()?1:0);
+        return String.format(Locale.ROOT,"OK %d %.7f %d %d %d %d %.7f %.7f %.7f %.7f %.7f %.7f %.7f %d %d %.1f %d\n",mode,adjustment,slider,
+            snapshot.on?1:0,snapshot.windowOverride?1:0,snapshot.node,snapshot.min,snapshot.max,snapshot.baseBrightness,snapshot.adjustedBrightness,rawGoal,limited,request,acquired?1:0,sliderOverride.holding()?1:0,
+            production?profile.codesPerFloat:16383f,production?profile.maximum:16383);
     }
     public static void main(String[] args)throws Exception {
         if(args.length!=2||!args[0].matches("[A-Za-z0-9._-]{1,90}")||!args[1].startsWith("/data/local/tmp/luma-framework-core.")||args[1].contains(".."))
@@ -202,7 +235,9 @@ public final class LumaFrameworkOutputBroker implements LumaFrameworkOutputSessi
         Thread frames=new Thread(()->{for(;;){broker.tick();try{Thread.sleep(broker.nextTickDelayMs());}catch(InterruptedException e){return;}}},"Luma-framework-frames");
         frames.setDaemon(true);frames.start();
         new File(broker.run,"broker-ready").createNewFile();
-        System.out.println(broker.production?"BROKER_READY build=20260930-framework-hold03 output=normal_range_ramp":
+        if(broker.production)System.out.println("DEVICE_PROFILE name="+broker.profile.name+" id="+broker.profile.uniqueId+
+            " backlight="+broker.profile.backlight+" maximum="+broker.profile.maximum+" codes_per_float="+broker.profile.codesPerFloat);
+        System.out.println(broker.production?"BROKER_READY build=20260930-audit-repair01 output=normal_range_ramp":
             "BROKER_READY build=20260930-framework-core-test04 budget=acquisition+/-0.01");
         for(;;){
             Object socket=LumaFrameworkProbe.invoke(server,"accept",new Class<?>[0]);

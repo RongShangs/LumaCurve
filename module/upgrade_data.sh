@@ -145,22 +145,25 @@ ios_atomic_touch() (
 ios_live_lock_acquire() {
   mkdir -p "$IOS_PERSIST_DIR" 2>/dev/null || return 1
   chmod 0700 "$IOS_PERSIST_DIR" 2>/dev/null
+  IOS_LIVE_LOCK_BORROWED=0
+  if [ "$(cat "$IOS_LIVE_LOCK/pid" 2>/dev/null)" = "$$" ]; then
+    IOS_LIVE_LOCK_BORROWED=1; return 0
+  fi
   _ios_lock_attempt=0
   while ! mkdir "$IOS_LIVE_LOCK" 2>/dev/null; do
     _ios_lock_owner=$(cat "$IOS_LIVE_LOCK/pid" 2>/dev/null)
     _ios_lock_now=$(date +%s 2>/dev/null || echo 0)
     _ios_lock_mtime=$(stat -c%Y "$IOS_LIVE_LOCK" 2>/dev/null || echo 0)
     _ios_lock_stale=0
-    if [ "$_ios_lock_now" -gt 0 ] 2>/dev/null &&
-       [ "$_ios_lock_mtime" -gt 0 ] 2>/dev/null &&
-       [ $((_ios_lock_now - _ios_lock_mtime)) -ge 30 ] 2>/dev/null; then
-      _ios_lock_stale=1
-    else
-      case "$_ios_lock_owner" in
-        ''|*[!0-9]*) ;;
-        *) kill -0 "$_ios_lock_owner" 2>/dev/null || _ios_lock_stale=1 ;;
-      esac
-    fi
+    case "$_ios_lock_owner" in
+      ''|*[!0-9]*)
+        if [ "$_ios_lock_now" -gt 0 ] 2>/dev/null &&
+           [ "$_ios_lock_mtime" -gt 0 ] 2>/dev/null &&
+           [ $((_ios_lock_now - _ios_lock_mtime)) -ge 30 ] 2>/dev/null; then
+          _ios_lock_stale=1
+        fi ;;
+      *) kill -0 "$_ios_lock_owner" 2>/dev/null || _ios_lock_stale=1 ;;
+    esac
     if [ "$_ios_lock_stale" -eq 1 ]; then
       rm -rf "$IOS_LIVE_LOCK" 2>/dev/null
       continue
@@ -179,6 +182,7 @@ ios_live_lock_acquire() {
 }
 
 ios_live_lock_release() {
+  [ "${IOS_LIVE_LOCK_BORROWED:-0}" = 1 ] && return 0
   _ios_lock_owner=$(cat "$IOS_LIVE_LOCK/pid" 2>/dev/null)
   [ "$_ios_lock_owner" = "$$" ] || return 0
   rm -rf "$IOS_LIVE_LOCK" 2>/dev/null
@@ -380,6 +384,16 @@ ios_upgrade_stop_service_loop() {
   return 0
 }
 
+ios_upgrade_framework_pids() {
+  for _ios_proc in "${IOS_PROC_ROOT:-/proc}"/[0-9]*; do
+    [ -r "$_ios_proc/cmdline" ] || continue
+    _ios_cmdline=$(tr '\000' ' ' < "$_ios_proc/cmdline" 2>/dev/null)
+    case "$_ios_cmdline" in
+      *'LumaFrameworkOutputBroker luma.framework.prod.'*|*'/luma_curve/framework_daemon_launcher.sh'*)
+        [ "${_ios_proc##*/}" = "$$" ] || printf '%s\n' "${_ios_proc##*/}";;
+    esac
+  done
+}
 ios_upgrade_quiesce_daemon() {
   ios_upgrade_stop_service_loop
   _ios_pids=$(pidof luma_curve_daemon 2>/dev/null)
@@ -398,8 +412,18 @@ ios_upgrade_quiesce_daemon() {
     fi
   fi
   rm -f "$IOS_RUNTIME_PID" 2>/dev/null
-  _lc_release_path=$(luma_backlight_path)
-  [ -z "$_lc_release_path" ] || chmod 0644 "$_lc_release_path" 2>/dev/null
+  _ios_framework_pids=$(ios_upgrade_framework_pids)
+  for _ios_pid in $_ios_framework_pids; do kill -TERM "$_ios_pid" 2>/dev/null || :; done
+  _ios_wait=0
+  while [ -n "$(ios_upgrade_framework_pids)" ]; do
+    _ios_wait=$((_ios_wait+1)); [ "$_ios_wait" -le 20 ] || return 1
+    sleep 1
+  done
+  # The framework backend does not own sysfs permissions.
+  if [ ! -r /data/adb/modules/luma_curve/framework-broker.jar ]; then
+    _lc_release_path=$(luma_backlight_path)
+    [ -z "$_lc_release_path" ] || chmod 0644 "$_lc_release_path" 2>/dev/null
+  fi
   sleep 1
   [ -z "$(pidof luma_curve_daemon 2>/dev/null)" ] || return 1
   return 0
@@ -432,7 +456,14 @@ ios_upgrade_release_pause() {
   return 0
 }
 
-ios_upgrade_begin() {
+ios_upgrade_begin() (
+  ios_live_lock_acquire || return 1
+  trap 'ios_live_lock_release' 0
+  trap 'exit 1' HUP INT TERM
+  ios_upgrade_begin_unlocked "$@"
+)
+
+ios_upgrade_begin_unlocked() {
   umask 077
   _ios_previous_phase=$(ios_upgrade_status_value phase)
   case "$_ios_previous_phase" in
@@ -546,7 +577,14 @@ ios_upgrade_refresh_backup() {
   return 0
 }
 
-ios_upgrade_restore() {
+ios_upgrade_restore() (
+  ios_live_lock_acquire || return 1
+  trap 'ios_live_lock_release' 0
+  trap 'exit 1' HUP INT TERM
+  ios_upgrade_restore_unlocked "$@"
+)
+
+ios_upgrade_restore_unlocked() {
   [ -f "$IOS_UPGRADE_DIR/manifest" ] || return 0
   ios_upgrade_write_status restoring persistent_data || return 1
   while IFS= read -r _ios_name || [ -n "$_ios_name" ]; do
@@ -608,7 +646,14 @@ ios_config_needs_migration() {
   return 1
 }
 
-ios_config_migrate() {
+ios_config_migrate() (
+  ios_live_lock_acquire || return 1
+  trap 'ios_live_lock_release' 0
+  trap 'exit 1' HUP INT TERM
+  ios_config_migrate_unlocked "$@"
+)
+
+ios_config_migrate_unlocked() {
   umask 077
   _ios_default="$1"
   _ios_runtime="$2"
@@ -704,7 +749,14 @@ ios_upgrade_prepare_runtime() {
   return 0
 }
 
-ios_upgrade_finish() {
+ios_upgrade_finish() (
+  ios_live_lock_acquire || return 1
+  trap 'ios_live_lock_release' 0
+  trap 'exit 1' HUP INT TERM
+  ios_upgrade_finish_unlocked "$@"
+)
+
+ios_upgrade_finish_unlocked() {
   _ios_default_conf="$1"
   ios_upgrade_write_status module_installed files_ready || return 1
   ios_upgrade_refresh_backup || return 1

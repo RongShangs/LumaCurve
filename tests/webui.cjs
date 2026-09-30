@@ -16,7 +16,8 @@ function configShellContract(commands) {
   const folder=fs.mkdtempSync(path.join(os.tmpdir(),'luma-config-'));
   const file=path.join(folder,'luma_curve.conf');
   const native=folder.replace(/\\/g,'/').replace(/^([A-Za-z]):/,(_,drive)=>'/'+drive.toLowerCase());
-  const script=command.replaceAll('/data/local/tmp/luma_curve',native+'/luma_curve');
+  const helper=path.join(root,'module/upgrade_data.sh').replace(/\\/g,'/').replace(/^([A-Za-z]):/,(_,drive)=>'/'+drive.toLowerCase());
+  const script='export IOS_PERSIST_DIR='+JSON.stringify(native+'/persist')+'; '+command.replaceAll('/data/local/tmp/luma_curve',native+'/luma_curve').replaceAll('/data/adb/modules/luma_curve/upgrade_data.sh',helper);
   const bash=process.env.BASH_EXECUTABLE||(process.platform==='win32'?'C:/msys64/usr/bin/bash.exe':'bash');
   const run=code=>{
     const result=spawnSync(bash,['-c','export PATH=/usr/bin:/bin:$PATH; '+code],{encoding:'utf8'});
@@ -27,7 +28,7 @@ function configShellContract(commands) {
     fs.writeFileSync(file,payloads[0]);
     let result=run(script);assert.equal(result.status,0,result.stderr);
     assert.deepEqual(fs.readFileSync(file),payloads[1]);
-    assert.deepEqual(fs.readdirSync(folder),['luma_curve.conf']);
+    assert.deepEqual(fs.readdirSync(folder),['luma_curve.conf','persist']);
     result=run(script);assert.notEqual(result.status,0);
     assert.match(result.stderr,/配置已被其他操作修改/);
     assert.deepEqual(fs.readFileSync(file),payloads[1]);
@@ -35,7 +36,7 @@ function configShellContract(commands) {
     result=run('base64() { return 1; }; '+script);assert.notEqual(result.status,0);
     assert.match(result.stderr,/无法读取配置文件进行校验/);
     assert.deepEqual(fs.readFileSync(file),payloads[0]);
-    assert.deepEqual(fs.readdirSync(folder),['luma_curve.conf']);
+    assert.deepEqual(fs.readdirSync(folder),['luma_curve.conf','persist']);
     const read=commands.find(c=>c.startsWith('base64 ')).replace('/data/local/tmp/luma_curve',native+'/luma_curve');
     result=run(read);assert.equal(result.status,0,result.stderr);
     assert.deepEqual(Buffer.from(result.stdout.trim().replace(/\s/g,''),'base64'),payloads[0]);
@@ -55,13 +56,14 @@ function presetShellContract(commands) {
   assert.equal(writes.length,2);const folder=fs.mkdtempSync(path.join(os.tmpdir(),'luma-presets-'));
   const native=folder.replace(/\\/g,'/').replace(/^([A-Za-z]):/,(_,drive)=>'/'+drive.toLowerCase());
   const bash=process.env.BASH_EXECUTABLE||(process.platform==='win32'?'C:/msys64/usr/bin/bash.exe':'bash');
-  const run=command=>spawnSync(bash,['-c','export PATH=/usr/bin:/bin:$PATH; '+command.replaceAll('/data/local/tmp/luma_curve',native+'/luma_curve')],{encoding:'utf8'});
+  const helper=path.join(root,'module/upgrade_data.sh').replace(/\\/g,'/').replace(/^([A-Za-z]):/,(_,drive)=>'/'+drive.toLowerCase());
+  const run=command=>spawnSync(bash,['-c','export PATH=/usr/bin:/bin:$PATH; export IOS_PERSIST_DIR='+JSON.stringify(native+'/persist')+'; '+command.replaceAll('/data/local/tmp/luma_curve',native+'/luma_curve').replaceAll('/data/adb/modules/luma_curve/upgrade_data.sh',helper)],{encoding:'utf8'});
   const file=path.join(folder,'luma_curve_presets.json');
   try {
     let result=run(writes[0]);assert.equal(result.status,0,result.stderr);assert.equal(JSON.parse(fs.readFileSync(file,'utf8')).entries[0].name,'我的日常');
     result=run(writes[1]);assert.equal(result.status,0,result.stderr);assert.equal(JSON.parse(fs.readFileSync(file,'utf8')).entries.length,0);
     const changed='{"format":1,"entries":[],"changed":true}';fs.writeFileSync(file,changed);result=run(writes[1]);assert.notEqual(result.status,0);assert.match(result.stderr,/预设已被修改/);assert.equal(fs.readFileSync(file,'utf8'),changed);
-    assert.deepEqual(fs.readdirSync(folder),['luma_curve_presets.json']);
+    assert.deepEqual(fs.readdirSync(folder),['luma_curve_presets.json','persist']);
     pass('Real Bash preset writes preserve UTF-8, create/delete atomically, reject concurrent changes and clean temporary files');
   } finally {fs.rmSync(folder,{recursive:true,force:true});}
 }
@@ -69,6 +71,8 @@ async function main() {
   const browser = await pw.chromium.launch({executablePath: process.env.BROWSER_EXECUTABLE || undefined, headless: true});
   try {
     const preview = await browser.newPage({viewport: {width:390,height:844}, reducedMotion:'reduce'});
+    // Keep startup checks deterministic; later cases explicitly provide update data.
+    await preview.route('https://lc.rongshangs.top/update.json**',route=>route.abort());
     const errors = []; preview.on('pageerror', e => errors.push(String(e)));
     const url = pathToFileURL(path.join(root,'module/webroot/index.html')).href;
     await preview.goto(url);
@@ -138,7 +142,6 @@ async function main() {
     pass('Display-only status graphic, no manual refresh or interval label, separate text and connector lanes');
     for (const panel of ['status','settings','tools','about']) {
       await preview.click('#nav-'+panel);
-      if(panel==='tools')await preview.locator('.diagnostics-card').evaluate(el=>el.open=true);
       const unfilled=await preview.locator('button:visible:not([data-panel])').evaluateAll(items=>items.filter(el=>{
         const c=getComputedStyle(el);return c.backgroundColor==='rgba(0, 0, 0, 0)'||c.backgroundColor==='transparent';
       }).map(el=>el.id||el.textContent));
@@ -173,7 +176,8 @@ async function main() {
     await preview.screenshot({path:path.join(root,'build/webui-about-mobile.png'),fullPage:true});
     assert.match(await preview.locator('.author-card').innerText(),/酷安@戎Shangs/);
     assert.match(await preview.locator('.donation-card').innerText(),/整条备注不超过 30 个字符/);
-    assert.equal(await preview.locator('.thanks-list li').innerText(),'戒戒：喵喵喵？');
+    assert.deepEqual(await preview.locator('.thanks-list li').allInnerTexts(),['戒戒：喵喵喵？','Starshine：好歹露个脸']);
+    assert.equal(await preview.locator('#thanks-title').innerText(),'感谢名单');
     pass('Current author, links, GPL, donation note and one-line thank-you entry');
     assert.equal(await preview.evaluate(()=>!!(document.querySelector('.auto-update').compareDocumentPosition(document.querySelector('.project-links'))&Node.DOCUMENT_POSITION_FOLLOWING)),true);
     for(const type of ['wechat','alipay']){
@@ -188,7 +192,7 @@ async function main() {
     pass('Automatic update line precedes project links; free optional support opens local QR codes with close, Escape and focus restoration');
 
     let update={version:'1.0.0',versionCode:10000,zipUrl:'https://lc.rongshangs.top/downloads/luma_curve-1.0.0.zip'};
-    await preview.route('https://lc.rongshangs.top/update.js**',route=>route.fulfill({contentType:'text/javascript',body:'window.LumaCurveUpdate('+JSON.stringify(update)+');'}));
+    await preview.route('https://lc.rongshangs.top/update.json**',route=>route.fulfill({contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:JSON.stringify(update)}));
     await preview.click('#nav-status');
     await preview.click('#nav-about');
     await preview.click('#check-update');
@@ -204,8 +208,14 @@ async function main() {
     await preview.click('#check-update');
     await preview.waitForFunction(()=>document.getElementById('update-status').textContent.includes('更新信息格式异常'));
     assert.equal(await preview.locator('#update-download').isVisible(),false);
-    await preview.unroute('https://lc.rongshangs.top/update.js**');
-    await preview.route('https://lc.rongshangs.top/update.js**',route=>route.abort());
+    await preview.unroute('https://lc.rongshangs.top/update.json**');
+    await preview.route('https://lc.rongshangs.top/update.json**',route=>route.fulfill({contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:'window.remoteUpdateExecuted=true;'}));
+    await preview.click('#check-update');
+    await preview.waitForFunction(()=>document.getElementById('update-status').textContent.includes('暂时无法检查更新'));
+    assert.equal(await preview.evaluate(()=>window.remoteUpdateExecuted),undefined);
+    pass('Remote update contents are parsed as bounded JSON and never executed');
+    await preview.unroute('https://lc.rongshangs.top/update.json**');
+    await preview.route('https://lc.rongshangs.top/update.json**',route=>route.abort());
     await preview.click('#check-update');
     await preview.waitForFunction(()=>document.getElementById('update-status').textContent.includes('暂时无法检查更新'));
     const before=await preview.evaluate(()=>history.length);
@@ -214,7 +224,7 @@ async function main() {
     pass('Update checks handle current/new versions, reject foreign URLs; tabs do not add browser history');
 
     const startup = await browser.newPage({viewport:{width:390,height:844},reducedMotion:'reduce'});
-    await startup.route('https://lc.rongshangs.top/update.js**',route=>route.fulfill({contentType:'text/javascript',body:'window.LumaCurveUpdate({"version":"1.0.1","versionCode":10001,"zipUrl":"https://lc.rongshangs.top/downloads/luma_curve-1.0.1.zip"});'}));
+    await startup.route('https://lc.rongshangs.top/update.json**',route=>route.fulfill({contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:'{"version":"1.0.1","versionCode":10001,"zipUrl":"https://lc.rongshangs.top/downloads/luma_curve-1.0.1.zip"}'}));
     await startup.goto(url);
     await startup.waitForFunction(()=>document.getElementById('update-dialog').open);
     assert.match(await startup.locator('#update-message').innerText(),/1.0.1/);
@@ -237,9 +247,11 @@ async function main() {
             else {f.presets=payloads[1];f.presetWrites=(f.presetWrites||0)+1;}
           } else if(f.failAtomic || payloads[0]!==f.config) {errno=1;stderr='配置已被其他操作修改，请重新读取';}
           else {f.config=payloads[1];f.writes++;}
-        } else if(command.startsWith('umask 022;')) {
-          if(f.failExport){errno=1;stderr='下载目录不可写';}
-          else stdout='/storage/emulated/0/Download/LumaCurve-test.log';
+        } else if(command.includes('/export_analysis.sh')) {
+          if(command.includes("'start'")){f.exportMode=command.includes("'analysis'")?'analysis':'log';f.exportTicks=0;stdout='started';}
+          else if(f.failExport)stdout='error\n手机存储根目录不可写';
+          else if(++f.exportTicks===1)stdout='running\n正在收集日志与设备状态';
+          else stdout='done\n导出完成\n/sdcard/LumaCurve-'+f.exportMode+'-test.'+(f.exportMode==='analysis'?'tar.gz':'log');
         } else if(command.startsWith('cmd package resolve-activity')) stdout=f.browserResolve;
         else if(command.startsWith('cmd package query-activities')) stdout=f.browserQuery;
         else if(command.startsWith('am start ')) {
@@ -265,6 +277,7 @@ async function main() {
           if(f.failState) {errno=1;stderr='状态读取失败';}
           else stdout='mode=auto\ncurrent_br=1720\ntarget_br=1860\nmax_br=4095\nlux='+f.lux+'\nsmooth=112.8\nbrightness_owner=daemon\ntransition_active=1\nsunlight_active=0\nheat_guard_active=0\nscreen=1\nlux_source=front\nlux_valid=1\nfront_lux='+f.lux+'\nback_lux=85.2\nfront_lux_age_ms=50\nback_lux_age_ms=80\nlux_age_ms=50\nsensor_rate_us=200000\nsensor_rate_mode=active\ntarget_poll_ms=500\nthermal_trusted_temp=38500\nbattery_pct=76\ncharging=0\ndaemon_can_write=1\ntarget_hold_active=0\nupdated_unix='+Math.floor(Date.now()/1000)+'\n_ui_paused='+(f.paused?1:0);
         }
+        if(command.includes('luma_curve_state')&&!f.failState){var hash=2166136261;new TextEncoder().encode(f.config).forEach(byte=>hash=Math.imul(hash^byte,16777619)>>>0);stdout+='\nconfig_valid=1\nconfig_applied_hash='+hash;}
         if(command.includes('luma_curve_state')&&!f.failState)stdout+='\n'+Object.entries(f.overrides).map(([key,value])=>key+'='+value).join('\n');
         // Reproduce managers that discard trailing newlines and use CRLF.
         if(command.startsWith('base64 ')||command.startsWith('cat '))stdout=stdout.replace(/\r?\n/g,'\r\n').trimEnd();
@@ -453,7 +466,7 @@ async function main() {
     assert.equal(await connected.locator('#edit-brighten_speed').innerText(),'1.4倍');
     pass('Slider modal cancel/confirm, recommendations and keyboard-safe footer/dialog');
     await connected.click('#save-config');
-    await connected.waitForFunction(()=>document.getElementById('dirty-status').textContent==='已保存并发送重载');
+    await connected.waitForFunction(()=>document.getElementById('dirty-status').textContent==='已保存并应用');
     assert.match(await connected.evaluate(()=>fixture.config), /brighten_speed=1.4/);
     assert.match(await connected.evaluate(()=>fixture.config), /future_option=keep/);
     assert.match(await connected.evaluate(()=>fixture.config), /自定义配置应保留/);
@@ -471,7 +484,7 @@ async function main() {
       await connected.waitForFunction(()=>document.getElementById('dirty-status').textContent==='未修改'&&!document.getElementById('save-config').disabled);
       await edit(connected,'brighten_speed',ending==='crlf'?'1.5':'1.6');
       await connected.click('#save-config');
-      await connected.waitForFunction(()=>document.getElementById('dirty-status').textContent==='已保存并发送重载');
+      await connected.waitForFunction(()=>document.getElementById('dirty-status').textContent==='已保存并应用');
       assert.match(await connected.evaluate(()=>fixture.config),/future_option=keep/);
     }
     assert.equal(await connected.evaluate(()=>fixture.writes),3);
@@ -518,22 +531,24 @@ async function main() {
     await connected.evaluate(()=>fixture.failState=false);
     await connected.click('#nav-tools');
     await connected.waitForFunction(()=>document.getElementById('log').textContent.includes('正常日志'));
-    assert.equal(await connected.locator('#panel-tools article').first().getAttribute('class'),'card log-view');
-    assert.equal(await connected.locator('.diagnostics-card').getAttribute('open'),null);
+    assert.equal(await connected.locator('#panel-tools article').first().getAttribute('class'),'card compatibility-overview');
+    assert.equal(await connected.locator('.diagnostics-card,#copy-log,#copy-diagnostics').count(),0);
+    assert.equal(await connected.locator('#compat-engine').innerText(),'正在运行');
     await connected.screenshot({path:path.join(root,'build/webui-logs-mobile.png'),fullPage:true});
-    pass('Logs lead with recent content, aligned refresh/copy/export actions and collapsed diagnostics');
+    pass('Logs show compatibility first, aligned refresh/export/analysis actions and no standalone diagnostics');
     assert.equal(await connected.evaluate(()=>window.injected),undefined);
     pass('State read failure clears stale metrics; logs render as text, never HTML');
-    await connected.click('#copy-log');
-    assert.equal(await connected.evaluate(()=>fixture.clipboard),'<script>window.injected=true</script>\n正常日志');
     await connected.click('#export-log');
     await connected.waitForFunction(()=>document.getElementById('export-status').textContent.includes('已导出'));
-    assert.ok(await connected.evaluate(()=>fixture.commands.some(c=>c.startsWith('umask 022;')&&c.includes('am get-current-user')&&c.includes('/storage/emulated/$user_id/Download')&&c.includes("sh '/data/adb/modules/luma_curve/luma_curvectl.sh' current-log"))));
+    assert.match(await connected.locator('#export-status').innerText(),/\/sdcard\/LumaCurve-log-test.log/);
+    await connected.click('#export-analysis');
+    await connected.waitForFunction(()=>document.getElementById('export-status').textContent.includes('LumaCurve-analysis-test.tar.gz'));
+    assert.ok(await connected.evaluate(()=>fixture.commands.some(c=>c.includes('/export_analysis.sh')&&c.includes("'status'"))));
     await connected.evaluate(()=>fixture.failExport=true);
     await connected.click('#export-log');
     await connected.waitForFunction(()=>document.getElementById('export-status').textContent.includes('导出失败'));
     assert.equal(await connected.locator('#export-log').isDisabled(),false);
-    pass('Log copy, full-current-log export to active-user Downloads and export failure reporting');
+    pass('Root-directory log and analysis exports show phase progress, contain no copy/state section, and report job failures');
     await connected.selectOption('#log-days','14');
     await connected.click('#save-log-policy');
     await connected.waitForFunction(()=>document.getElementById('tools-feedback').textContent==='日志保留策略已保存');
@@ -578,11 +593,11 @@ async function main() {
     assert.equal(await connected.locator('#save-config').evaluate(el=>!!(el.compareDocumentPosition(document.getElementById('curve-editor-plot'))&Node.DOCUMENT_POSITION_FOLLOWING)),true);
     assert.equal(await connected.locator('#config-fields').locator(':scope > :first-child h2').innerText(),'日常调节');
     await edit(connected,'brighten_speed','1.2');await connected.click('#save-config');
-    await connected.waitForFunction(()=>document.getElementById('dirty-status').textContent==='已保存并发送重载');
+    await connected.waitForFunction(()=>document.getElementById('dirty-status').textContent==='已保存并应用');
     assert.match(await connected.evaluate(()=>fixture.config),/^preference_offset=0$/m);assert.match(await connected.evaluate(()=>fixture.config),/^preference_revision=0$/m);
     pass('Engine controls lead Settings; learning is inside the curve editor, defaults on and unrelated saves preserve curve learning');
     await connected.locator('#cfg-preference_learning').uncheck();await connected.click('#save-config');
-    await connected.waitForFunction(()=>document.getElementById('dirty-status').textContent==='已保存并发送重载');
+    await connected.waitForFunction(()=>document.getElementById('dirty-status').textContent==='已保存并应用');
     assert.match(await connected.evaluate(()=>fixture.config),/^preference_learning=0$/m);
     assert.match(await connected.evaluate(()=>fixture.config),/^preference_revision=0$/m);
     pass('Curve learning can be disabled without resetting learned points');
@@ -590,7 +605,7 @@ async function main() {
     await connected.locator('#curve-anchor').selectOption('5');await connected.locator('#curve-value').fill('8');await connected.click('#curve-apply');
     assert.match(await connected.locator('#curve-status').innerText(),/锚点已调整/);
     await connected.click('#save-config');
-    await connected.waitForFunction(()=>document.getElementById('dirty-status').textContent==='已保存并发送重载');
+    await connected.waitForFunction(()=>document.getElementById('dirty-status').textContent==='已保存并应用');
     assert.match(await connected.evaluate(()=>fixture.config),/^curve_custom=1$/m);assert.equal((await connected.evaluate(()=>fixture.config.match(/^curve_points=(.*)$/m)[1])).split(',')[5],'8');
     assert.equal(await connected.locator('#curve-range').getAttribute('max'),'100');
     await connected.locator('#curve-value').fill('50');await connected.click('#curve-apply');assert.match(await connected.locator('#curve-status').innerText(),/联动/);

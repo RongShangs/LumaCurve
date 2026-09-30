@@ -40,7 +40,7 @@ int ios_settings_refresh(DomainIo *io) {
     }
     LumaFrameworkSnapshot *s=&luma_framework_snapshot;
     SET_INT(cached_auto,s->mode);SET_FLOAT(cached_auto_adj,s->adjustment);SET_FLAG(cached_auto_adj_valid,1);SET_INT(cached_slider,s->slider);
-    memcpy(STRING(settings_read_source),"framework_provider",19);STRING(settings_read_error)[0]=0;
+    memcpy(STRING(settings_read_source),"framework",10);STRING(settings_read_error)[0]=0;
     memcpy(STRING(cached_slider_source),"auto_adj",9);
     luma_preference_settings(io,now,s->mode,s->adjustment,s->slider);return 0;
 #else

@@ -4,6 +4,12 @@ public final class LumaFrameworkOutputRamp {
     final Coordinate coordinate;
     float request;
     long stamp;
+    float brightenSpeed=1, darkenSpeed=1;
+    public void speeds(float brighten,float darken) {
+        if(!Float.isFinite(brighten)||!Float.isFinite(darken)||brighten<.5f||brighten>2.5f||darken<.5f||darken>2.5f)
+            throw new IllegalArgumentException("invalid ramp speed");
+        brightenSpeed=brighten;darkenSpeed=darken;
+    }
     public LumaFrameworkOutputRamp(Coordinate c,float initial,long now){coordinate=c;reset(initial,now);}
     public void reset(float initial,long now) {
         if(!LumaFrameworkOutputSession.finite(initial)||initial<0||initial>1||now<stamp)throw new IllegalArgumentException("invalid reanchor");
@@ -15,7 +21,7 @@ public final class LumaFrameworkOutputRamp {
         float target=Math.max(min,Math.min(max,goal));
         if(request==target)return request;
         float from=coordinate.encode(request),to=coordinate.encode(target);
-        float distance=.04f*dt;
+        float distance=.04f*dt*(to>from?brightenSpeed:darkenSpeed);
         // Exact arrival prevents round-trip noise from creating endless tiny submissions.
         if(Math.abs(to-from)<=distance){request=target;return request;}
         float step=from+Math.max(-distance,Math.min(distance,to-from));

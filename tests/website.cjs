@@ -10,9 +10,9 @@ async function main(){
   const page=await browser.newPage({viewport:{width:1440,height:1000}});page.on('pageerror',e=>errors.push(String(e)));
   await page.goto(pathToFileURL(path.join(site,'index.html')).href);await page.waitForFunction(()=>document.getElementById('demo-line').getAttribute('points'));
   assert.equal(await page.title(),'LumaCurve 流光亮度 · 让屏幕随环境平稳调节');checks.push('Standalone local HTML loads with local assets');
-  assert.equal(await page.locator('header .author').count(),1);assert.equal(await page.locator('main>.author').count(),0);checks.push('Author avatar and profile links are in the top bar');
+  assert.equal(await page.locator('header .author').count(),0);assert.equal(await page.locator('main>.author').count(),1);assert.ok(await page.locator('main>.author').evaluate(el=>el.previousElementSibling.id==='download'));checks.push('Author introduction is below downloads at the bottom');
   assert.equal(await page.locator('.mechanism-grid article').count(),8);assert.equal(await page.locator('.anchor-table-wrap tbody tr').count(),7);checks.push('Full scene, curve, learning, transition and protection mechanisms plus fourteen default anchors');
-  assert.match(await page.locator('.thanks li').innerText(),/戒戒\s+喵喵喵？/);
+  assert.deepEqual(await page.locator('.thanks li').allInnerTexts(),['戒戒\n喵喵喵？','Starshine\n好歹露个脸']);
   const update=JSON.parse(fs.readFileSync(path.join(site,'update.json'),'utf8'));
   assert.equal(update.zipUrl,'https://lc.rongshangs.top/downloads/luma_curve-1.0.0.zip');
   assert.match(fs.readFileSync(path.join(site,'update.js'),'utf8'),/LumaCurveUpdate/);

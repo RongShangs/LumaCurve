@@ -87,13 +87,14 @@
 
       </section>
       <section id="panel-tools" class="panel" aria-labelledby="nav-tools" hidden>
-        <article class="card log-view"><div class="row"><h2>本次开机日志</h2><span class="caption">显示最近 150 行</span></div><div class="button-row log-actions"><button id="refresh-log" class="button" type="button">刷新</button><button id="copy-log" class="button" type="button" disabled>复制本次开机</button><button id="export-log" class="button" type="button" aria-label="导出本次开机日志到下载目录" title="导出本次开机日志到下载目录" disabled>导出</button></div><pre id="log" aria-label="本次开机日志">等待读取…</pre><p id="export-status" class="feedback" role="status"></p></article>
+        <article class="card compatibility-overview"><div class="row"><h2>运行与兼容</h2><span id="compat-build" class="caption">等待读取</span></div><div class="compatibility-status-grid"><div><span>亮度引擎</span><strong id="compat-engine">等待读取</strong></div><div><span>显示控制</span><strong id="compat-output">等待读取</strong></div><div><span>环境光感</span><strong id="compat-sensors">等待读取</strong></div><div><span>设备适配</span><strong id="compat-device">等待读取</strong></div></div><p id="compat-summary" class="caption" role="status">正在核对模块运行情况。</p></article>
+        <article class="card log-view"><div class="row"><h2>本次开机日志</h2><span class="caption">显示最近 150 行</span></div><div class="button-row log-actions"><button id="refresh-log" class="button" type="button">刷新</button><button id="export-log" class="button" type="button" disabled>导出日志</button><button id="export-analysis" class="button" type="button" disabled>导出分析包</button></div><pre id="log" aria-label="本次开机日志">等待读取…</pre><p class="caption">日志导出附带设备状态。分析包还包含显示框架、光感与系统配置，仅在本机收集，不自动上传。</p><div id="export-progress" class="export-progress" hidden><progress aria-label="导出进度"></progress><p id="export-status" class="feedback" role="status" aria-live="polite"></p></div></article>
         <article class="card log-management"><h2>日志管理</h2><div class="log-policy"><label for="log-days">归档保留</label><select id="log-days"><option value="0">仅按大小清理</option><option value="1">1 天</option><option value="3">3 天</option><option value="7">7 天</option><option value="14">14 天</option><option value="30">30 天</option></select><button id="save-log-policy" class="button" type="button">保存</button></div><div class="button-row"><button class="button" data-command="prune-logs" type="button">清理过期归档</button><button id="clear-log" class="button danger" type="button">清空当前日志</button></div><p id="tools-feedback" class="feedback" role="status"></p></article>
-        <details class="card diagnostics-card"><summary>设备状态</summary><div class="button-row"><button id="refresh-diagnostics" class="button" type="button">读取状态</button><button id="copy-diagnostics" class="button" type="button">复制状态</button></div><pre id="diagnostics">等待读取…</pre></details>
+
       </section>
       <section id="panel-about" class="panel" aria-labelledby="nav-about" hidden>
         <div class="about-heading"><svg class="module-icon" viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="12" fill="#eaf0fb" stroke="none"/><path d="M10 28c13 0 7-16 20-16" stroke-width="3"/></svg><h1>流光亮度</h1></div>
-        <p class="about-intro">流光亮度以前置光感为主、后置光感为参考，确认环境变化后沿可编辑曲线平滑调节主屏。自动亮度下的手动选择会保持到明显场景变化或锁屏；多次在相近照度下同向调整，曲线会缓慢学习。阳光增强和极端温控保护依设备能力及可信读数生效。当前版本面向 HyperOS 4，安装时会核对固件与显示接口。</p>
+        <p class="about-intro">适配 HyperOS 4 的亮度引擎。包含自学习可编辑的亮度曲线，场景感知，平滑调节与手动偏好保持。</p>
         <div class="auto-update" role="status"><span id="update-status">正在检查更新…</span><button id="check-update" class="button" type="button">重新检查</button><a id="update-download" class="button" href="#" hidden>下载新版</a></div>
         <div class="project-links"><a href="https://lc.rongshangs.top" target="_blank" rel="noopener noreferrer">官网 ↗</a><a id="github-link" href="https://github.com/RongShangs/LumaCurve" target="_blank" rel="noopener noreferrer">GitHub ↗</a><a href="https://www.gnu.org/licenses/gpl-3.0.html" target="_blank" rel="noopener noreferrer">GPL-3.0 ↗</a></div>
         <dl class="about-facts"><div><dt>模块名称</dt><dd>LumaCurve · 流光亮度</dd></div><div><dt>版本</dt><dd>1.0.0 <span class="muted">/ 10000</span></dd></div><div><dt>模块 ID</dt><dd>luma_curve</dd></div></dl>
@@ -101,8 +102,8 @@
         <article class="author-card"><img src="avatar.jpg" width="72" height="72" alt="戎Shang 的头像"><div><span class="caption">开发与维护</span><h2>戎Shang</h2><p>酷安@戎Shangs</p></div></article>
         <div class="author-links"><a href="https://rongshangs.top" target="_blank" rel="noopener noreferrer">作者博客 ↗</a><a href="https://www.coolapk.com/u/3261403" target="_blank" rel="noopener noreferrer">酷安@戎Shangs ↗</a></div>
         <button id="copy-qq-group" class="button qq-group" type="button"><span>QQ 交流群 <strong>314981836</strong></span><small>入群暗号：1691 · 点击复制群号</small></button>
-        <article class="donation-card"><h2>打赏</h2><p>模块永久免费。如果愿意支持开发，捐赠 2.3 元就很暖心。打赏时可备注「昵称：想说的一句话」，整条备注不超过 30 个字符；我会在下一次更新时将你加入感谢榜。</p><div class="donation-actions"><button class="button" id="donate-wechat" type="button">微信</button><button class="button" id="donate-alipay" type="button">支付宝</button></div></article>
-        <section class="thanks-list" aria-labelledby="thanks-title"><h2 id="thanks-title">感谢榜</h2><ul><li><span>戒戒：</span><span>喵喵喵？</span></li></ul></section>
+        <article class="donation-card"><h2>打赏</h2><p>模块永久免费。如果愿意支持开发，捐赠 2.3 元就很暖心。打赏时可备注「昵称：想说的一句话」，整条备注不超过 30 个字符；我会在下一次更新时将你加入感谢名单。</p><div class="donation-actions"><button class="button" id="donate-wechat" type="button">微信</button><button class="button" id="donate-alipay" type="button">支付宝</button></div></article>
+        <section class="thanks-list" aria-labelledby="thanks-title"><h2 id="thanks-title">感谢名单</h2><ul><li><span>戒戒：</span><span>喵喵喵？</span></li><li><span>Starshine：</span><span>好歹露个脸</span></li></ul></section>
       </section>
     </main>
     <nav class="navigation" aria-label="主导航">
@@ -113,7 +114,7 @@
     </nav>
   </div>
   <div id="toast" role="status" aria-live="polite"></div>
-  <dialog id="donation-dialog" class="donation-dialog" aria-labelledby="donation-title"><div class="row"><h2 id="donation-title">微信打赏</h2><button class="button" id="close-donation" type="button" aria-label="关闭收款码">关闭</button></div><p class="caption">打赏时可备注「昵称：想说的一句话」，整条备注不超过 30 个字符，以便加入感谢榜。</p><img id="donation-qr" alt="微信收款码" width="320" height="320"><p class="caption">使用对应支付应用扫描收款码即可。</p></dialog>
+  <dialog id="donation-dialog" class="donation-dialog" aria-labelledby="donation-title"><div class="row"><h2 id="donation-title">微信打赏</h2><button class="button" id="close-donation" type="button" aria-label="关闭收款码">关闭</button></div><p class="caption">打赏时可备注「昵称：想说的一句话」，整条备注不超过 30 个字符，以便加入感谢名单。</p><img id="donation-qr" alt="微信收款码" width="320" height="320"><p class="caption">使用对应支付应用扫描收款码即可。</p></dialog>
   <dialog id="update-dialog" class="update-dialog" aria-labelledby="update-title"><h2 id="update-title">发现新版本</h2><p id="update-message">可以下载新版本安装包。</p><div class="dialog-actions"><button id="update-later" class="button" type="button">稍后</button><a id="update-now" class="button primary" href="#">下载更新</a></div><p class="caption">下载后请在模块管理器中安装并重启设备。</p></dialog>
   <dialog id="readings-dialog" class="readings-dialog" aria-labelledby="readings-title">
     <div class="row readings-title"><h2 id="readings-title">详细读数</h2><button id="close-readings" class="button" type="button">关闭</button></div>

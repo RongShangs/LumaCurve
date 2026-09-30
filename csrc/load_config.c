@@ -7,7 +7,9 @@
 #include <ctype.h>
 #include <errno.h>
 #include <limits.h>
+#include <float.h>
 static bool preference_invalid;
+extern uint32_t luma_config_loaded_hash;
 enum ConfigType { CONFIG_INT, CONFIG_FLOAT };
 typedef struct ConfigField {
     const char *key;
@@ -103,9 +105,12 @@ static bool write_hbm(DomainIo *io, bool on, bool warn) {
 }
 /* Keep the original ordered comparisons: NaN policy is a separate behavior change. */
 static bool outside(float value, float low, float high) {
-    return value < low || value > high;
+    return !isfinite(value) || value < low || value > high;
 }
 static const char *configuration_error(void) {
+    if ((INT(cfg_thermal_cap_enable)!=0 && INT(cfg_thermal_cap_enable)!=1) ||
+        (INT(cfg_charging_heat_guard)!=0 && INT(cfg_charging_heat_guard)!=1) ||
+        (INT(cfg_hl_hbm_enable)!=0 && INT(cfg_hl_hbm_enable)!=1)) return "boolean_invalid";
     if (outside(FLOAT(cfg_alpha_fast), .01f, .95f) || outside(FLOAT(cfg_alpha_mid), .01f, .95f) ||
         outside(FLOAT(cfg_alpha_slow), .01f, .95f))
         return "alpha_out_of_range";
@@ -203,16 +208,23 @@ static void parse_config_line(DomainIo *io, char *line) {
             ? *value - '0' : -1;
         return;
     }
-    CALL(io, atof, ARG(value));
-    float real = (float)domain_real_result(io);
-    uint32_t integer = (uint32_t)CALL(io, atoi, ARG(value));
     for (size_t i = 0; i < CONFIG_FIELD_COUNT; i++) {
         if (!fields[i].key || strcmp(key, fields[i].key))
             continue;
-        if (fields[i].type == CONFIG_FLOAT)
-            state_set_float(fields[i].address, real);
-        else
-            ios_store((uintptr_t)fields[i].address, integer, 4);
+        char *end;errno=0;
+        if (fields[i].type == CONFIG_FLOAT) {
+            double parsed=strtod(value,&end);
+            bool valid=end!=value&&!errno&&isfinite(parsed)&&fabs(parsed)<=FLT_MAX;
+            while(isspace((unsigned char)*end))end++;
+            if(!valid||*end){preference_invalid=true;return;}
+            state_set_float(fields[i].address,(float)parsed);
+        } else {
+            long parsed=strtol(value,&end,10);
+            bool valid=end!=value&&!errno&&parsed>=INT32_MIN&&parsed<=INT32_MAX;
+            while(isspace((unsigned char)*end))end++;
+            if(!valid||*end){preference_invalid=true;return;}
+            ios_store((uintptr_t)fields[i].address,(uint32_t)parsed,4);
+        }
         return;
     }
     if (!strcmp(key, "hbm_node_path"))
@@ -243,10 +255,14 @@ int ios_configuration_reload(DomainIo *io) {
     preference_invalid = false;
     luma_curve_reset();
     luma_preference_learning = 1; luma_preference_base = 0; luma_preference_revision = 0;
+    uint32_t loaded_hash=2166136261u;
     char line[256];
-    while (CALL(io, fgets, ARG(line), sizeof(line), stream))
+    while (CALL(io, fgets, ARG(line), sizeof(line), stream)) {
+        for(const unsigned char *p=(const unsigned char *)line;*p;p++)loaded_hash=(loaded_hash^*p)*16777619u;
+        if(!strchr(line,'\n')&&strlen(line)==sizeof(line)-1)preference_invalid=true;
         parse_config_line(io, line);
-    CALL(io, fclose, stream);
+    }
+    if((int)CALL(io, fclose, stream)!=0)preference_invalid=true;
     SET_INT(cfg_learn_enabled, 0); /* Forced off in the original 2.5.5 reload path. */
     const char *error = preference_invalid ? "preference_invalid" : luma_indoor_stability < 0 ? "indoor_stability_range" : configuration_error();
     if (error) {
@@ -274,6 +290,10 @@ int ios_configuration_reload(DomainIo *io) {
     }
     if (backup.hbm_was_active && INT(cfg_hl_hbm_enable))
         write_hbm(io, true, true);
+    luma_config_loaded_hash=loaded_hash;
+#ifdef LUMA_FRAMEWORK_BACKEND
+    SET_INT(cfg_hl_hbm_enable,0); /* Framework owns display limits; no direct HBM writes. */
+#endif
     SET_FLAG(g_config_valid, 0);
     memcpy(STRING(g_config_error), "-", 2);
     return 1;

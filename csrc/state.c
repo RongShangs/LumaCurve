@@ -96,3 +96,5 @@ void ios_reset_data(void) {
     luma_preference_reset();
     luma_curve_reset();
 }
+
+uint32_t luma_config_loaded_hash;

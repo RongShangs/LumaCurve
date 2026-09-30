@@ -19,7 +19,7 @@
     high_lux_threshold: 5000, high_lux_extreme_lux: 30000, high_lux_boost_max: 0.50,
     high_lux_min_pct: 0.90, high_lux_max_active_ms: 0, high_lux_cooldown_ms: 10000,
     high_lux_temp_thresh: 52000, high_lux_temp_resume: 48000, high_lux_bat_thresh: 10,
-    high_lux_hbm_enable: 1, hbm_node_path: '', hbm_on_value: '1', hbm_off_value: '0'
+    high_lux_hbm_enable: 0, hbm_node_path: '', hbm_on_value: '1', hbm_off_value: '0'
   };
   // [key, label, explanation, min, max, step, displayed units per raw unit, unit]
   var preferenceEdited = false, preferenceBusy = false, preferenceRecord = null;
@@ -43,7 +43,7 @@
       ['high_lux_temp_thresh', '停止增强的温度', '可信温度达到此值后停止阳光增强。', 40, 80, 1, 0.001, '℃'],
       ['high_lux_temp_resume', '允许恢复的温度', '必须低于停止增强的温度。', 35, 79, 1, 0.001, '℃'],
       ['high_lux_bat_thresh', '最低电量', '低于该电量且未充电时不启用阳光增强。', 5, 50, 1, 1, '%'],
-      ['high_lux_hbm_enable', '允许硬件高亮', '需要设备存在可用的 HBM 节点。', 'bool']
+      ['high_lux_hbm_enable', '允许硬件高亮', '当前框架后端不直接写 HBM 节点，硬件高亮上限由系统管理。', 'bool']
     ]},
     {title: '温控保护', hint: '保留默认值即可。恢复门槛低于触发门槛，避免反复进出。', fields: [
       ['thermal_cap_enable', '启用硬温控', '极端温度下限制目标背光。', 'bool'],
@@ -102,13 +102,14 @@
   function checkUpdate() {
     if (updateBusy) return;
     updateBusy = true; set('update-status', '正在检查更新…'); $('update-download').hidden = true;
-    var script = document.createElement('script'), finished = false, timer;
+    var finished = false, timer, abort = new AbortController();
     function finish(message) {
       if (finished) return;
-      finished = true; updateBusy = false; clearTimeout(timer); script.remove();
-      delete window.LumaCurveUpdate; set('update-status', message);
+      finished = true; updateBusy = false; clearTimeout(timer); abort.abort();
+      set('update-status', message);
     }
-    window.LumaCurveUpdate = function (data) {
+    function receive(data) {
+      if (finished) return;
       if (!data || !Number.isSafeInteger(data.versionCode) || !/^\d+\.\d+\.\d+$/.test(data.version) ||
           data.zipUrl !== 'https://lc.rongshangs.top/downloads/luma_curve-' + data.version + '.zip') {
         finish('更新信息格式异常'); return;
@@ -119,11 +120,29 @@
       set('update-message', 'LumaCurve ' + data.version + ' 已发布。下载后可在模块管理器中安装。');
       finish('发现 ' + data.version + ' 新版本');
       if (!updateShown && document.visibilityState === 'visible') { updateShown = true; $('update-dialog').showModal(); }
-    };
-    script.onerror = function () { finish('暂时无法检查更新，请稍后重试'); };
+    }
     timer = setTimeout(function () { finish('检查更新超时，请稍后重试'); }, 8000);
-    script.src = 'https://lc.rongshangs.top/update.js?t=' + Date.now();
-    document.head.appendChild(script);
+    fetch('https://lc.rongshangs.top/update.json?t=' + Date.now(), {signal:abort.signal, cache:'no-store'}).then(async function (response) {
+      if (!response.ok) throw new Error('更新服务暂不可用');
+      if (Number(response.headers.get('content-length')) > 65536) throw new Error('更新信息过大');
+      var text;
+      if (response.body && response.body.getReader) {
+        var reader=response.body.getReader(), decoder=new TextDecoder(), size=0; text='';
+        for (;;) { var part=await reader.read(); if(part.done)break; size+=part.value.length;
+          if(size>65536){ await reader.cancel(); throw new Error('更新信息过大'); }
+          text+=decoder.decode(part.value,{stream:true}); }
+        text+=decoder.decode();
+      } else text=await response.text();
+      if(text.length>65536)throw new Error('更新信息过大');
+      return text;
+    }).catch(function (error) {
+      if(!device||finished)throw error;
+      // Fixed-address bounded download; the response is parsed as data only.
+      return exec('if command -v curl >/dev/null 2>&1; then timeout 7 curl -fLsS --max-time 7 --max-filesize 65536 https://lc.rongshangs.top/update.json; else timeout 7 wget -qO- https://lc.rongshangs.top/update.json; fi | head -c 65537');
+    }).then(function (text) {
+      if(text.length>65536)throw new Error('更新信息过大');
+      receive(JSON.parse(text));
+    }).catch(function () { finish('暂时无法检查更新，请稍后重试'); });
   }
   // Resolve a generic web URL, then launch that browser with the actual URL.
   // MAIN/APP_BROWSER selectors can inherit the URL and fail intent resolution.
@@ -381,7 +400,18 @@
     else if (s.daemon_can_write === '0') set('flow-relation', '暂缓写入，待观察窗或控制权限制解除后调节。');
     $('connection').className = 'badge' + (warning || demo ? ' warn' : '');
     renderScene(s, stale);
-    $('diagnostics').textContent = stateText || '暂无原始状态';
+    renderCompatibility(s);
+  }
+  function renderCompatibility(s,message) {
+    function item(id,text,health){set(id,text);$(id).dataset.health=health || 'warn';}
+    if(!s){item('compat-engine','尚未连接');item('compat-output','等待核心');item('compat-sensors','尚未读取');item('compat-device','尚未核对');set('compat-build','暂无核心状态');set('compat-summary',message || '正在读取设备状态。');return;}
+    var paused=s._ui_paused==='1', framework=s.output_backend==='hyperos4_framework', owned=s.framework_owned==='1';
+    item('compat-engine',paused?'已暂停':s.config_valid==='0'?'配置需要检查':'正在运行',paused||s.config_valid==='0'?'warn':'ok');
+    item('compat-output',paused?'交由系统':s.mode!=='auto'?'系统手动模式':s.screen==='0'?'熄屏，交由系统':owned?'已接管主屏':s.brightness_owner==='wake_readonly'?'唤醒观察中':'系统正在调节',owned?'ok':'warn');
+    item('compat-sensors',s.lux_valid==='1'&&s.sensor_stale!=='1'?'读数可用':s.sensor_hold_active==='1'?'等待有效读数':'暂不可用',s.lux_valid==='1'&&s.sensor_stale!=='1'?'ok':'warn');
+    item('compat-device',framework?'HyperOS 4 框架已连接':'尚未确认框架适配',framework?'ok':'warn');
+    set('compat-build',s.core_build || '核心版本未上报');
+    set('compat-summary',paused?'模块已暂停，亮度由系统调节。':s.config_valid==='0'?'当前配置未通过核心校验，请到设置页检查。':s.framework_user_hold==='1'?'正在保持你的手动亮度，明显场景变化或锁屏后恢复自动调节。':owned?'核心与显示框架已连接。实际输出仍受系统亮度上限与保护条件约束。':'核心正在运行，正在等待显示控制条件；系统继续管理亮度。');
   }
   function unavailable(error, paused) {
     stateText = ''; lastState = null; history = []; historyStamp = '';
@@ -402,7 +432,7 @@
     ['brightness', 'target', 'lux', 'smooth', 'mode', 'owner', 'sunlight', 'thermal', 'transition', 'sampling', 'flow-target', 'flow-current', 'sensor-health', 'sensor-source', 'sensor-age', 'front-lux', 'back-lux', 'front-age', 'back-age', 'sensor-interval', 'loop-interval', 'device-temperature', 'device-battery', 'write-permission', 'target-confirmation'].forEach(function (id) { set(id, '—'); });
     set('flow-relation', '等待环境光和背光数据…');
     $('brightness-meter').firstElementChild.style.width = '0%'; $('brightness-meter').removeAttribute('aria-valuenow');
-    set('diagnostics', error || '未读取到设备状态');
+    renderCompatibility(null, paused ? '模块已暂停，可到设置页恢复。' : '暂未读取到核心状态，请检查引擎是否启动。');
   }
   function pollState() {
     if (demo) { renderState(lastState); return Promise.resolve(); }
@@ -517,7 +547,7 @@
   function savePresets(next, selected) {
     if (!device || presetBusy || !presetsReady || configBusy) return;
     var path = BASE + '_presets.json', pending = path + '.tmp-ui-' + Date.now() + '-' + Math.random().toString(36).slice(2), text = JSON.stringify({format:1,entries:next});
-    var command = 'umask 077; trap '+quote('rm -f '+quote(pending))+' EXIT; current=""; '+
+    var command = 'umask 077; trap '+quote('rm -f '+quote(pending)+'; ios_live_lock_release')+' EXIT; '+configWriteLock()+'current=""; '+
       'if [ -f '+quote(path)+' ]; then raw=$(head -c 32769 '+quote(path)+') || exit 1; current=$(printf %s "$raw" | base64) || exit 1; fi; '+
       'current=$(printf %s "$current" | tr -d '+quote('\\r\\n')+'); '+
       '[ "$current" = '+quote(base64(presetText.trimEnd()))+' ] || { echo "预设已被修改，请重新读取设置" >&2; exit 1; }; '+
@@ -597,8 +627,8 @@
     $('restore-defaults').disabled = !device || !configReady || configBusy;
     $('reload-config').disabled = !device || configBusy;
     document.querySelectorAll('[data-command],#clear-log,#save-log-policy').forEach(function (b) { b.disabled = !device || commandBusy || configBusy; });
-    fields.forEach(function (f) { var button = $('edit-' + f[0]); if (button) button.disabled = !device || !configReady || configBusy; });
-    $('export-log').disabled = !device || exportBusy;
+    fields.forEach(function (f) { var button = $('edit-' + f[0]); if (button) button.disabled = !device || !configReady || configBusy || (lastState && lastState.hbm_control_supported==='0' && (f[0].indexOf('hbm_')===0 || f[0]==='high_lux_hbm_enable')); if(button && lastState && lastState.hbm_control_supported==='0' && (f[0].indexOf('hbm_')===0 || f[0]==='high_lux_hbm_enable')) button.title='当前框架后端不直接控制 HBM，设备高亮上限由系统管理'; });
+    $('export-log').disabled = !device || exportBusy; $('export-analysis').disabled = !device || exportBusy;
   }
   function markDirty() { set('dirty-status', '有未保存的修改'); set('config-error', ''); }
   function readConfigText() {
@@ -667,11 +697,32 @@
     return lines.join('\n').replace(/\n*$/, '\n');
   }
   function base64(text) { return btoa(encodeURIComponent(text).replace(/%([0-9A-F]{2})/g, function (_, hex) { return String.fromCharCode(parseInt(hex, 16)); })); }
+  function configWriteLock() {
+    return '. '+quote('/data/adb/modules/luma_curve/upgrade_data.sh')+' || exit 1; ios_live_lock_acquire || { echo "配置正在被另一操作使用，请稍后重试" >&2; exit 1; }; ';
+  }
+  function configHash(text) {
+    var bytes=new TextEncoder().encode(text), hash=2166136261;
+    bytes.forEach(function (byte) { hash=Math.imul(hash ^ byte,16777619)>>>0; });
+    return String(hash);
+  }
+  function confirmConfigApplied(text) {
+    var expected=configHash(text), until=Date.now()+6000;
+    function check() {
+      return exec('cat '+quote(BASE+'_state')).then(function (raw) {
+        var state=parse(raw);
+        if(state.config_valid==='1' && state.config_applied_hash===expected) return;
+        if(state.config_valid==='0') throw new Error('核心拒绝配置：'+(state.config_error || '校验未通过'));
+        if(Date.now()>=until) throw new Error('等待核心加载配置超时，请检查引擎是否正在运行');
+        return new Promise(function(resolve){setTimeout(resolve,300);}).then(check);
+      });
+    }
+    return check();
+  }
   function atomicConfigWrite(text) {
     var path = BASE + '.conf', token = Date.now() + '-' + Math.random().toString(36).slice(2);
     var pending = path + '.tmp-ui-' + token;
     // Compare the exact previously read file before replacing; preserve edits by another writer.
-    var command = 'umask 077; trap ' + quote('rm -f ' + quote(pending)) + ' EXIT; ' +
+    var command = 'umask 077; trap ' + quote('rm -f ' + quote(pending)+'; ios_live_lock_release') + ' EXIT; ' + configWriteLock() +
       'current=$(base64 ' + quote(path) + ') || { echo "无法读取配置文件进行校验" >&2; exit 1; }; ' +
       'current=$(printf %s "$current" | tr -d ' + quote('\\r\\n') + ') || { echo "配置校验编码失败" >&2; exit 1; }; ' +
       '([ "$current" = ' + quote(base64(configText)) + ' ] || { echo "配置已被其他操作修改，请重新读取" >&2; exit 1; }) && ' +
@@ -687,8 +738,10 @@
       wrote = true; configText = next; return control('reload-config');
     }).then(function () { return readConfigText(); }).then(function (text) {
       if (text !== next) throw new Error('配置文件回读不一致，请重新读取');
+      return confirmConfigApplied(next);
+    }).then(function () {
       preferenceEdited = false; refreshPreference();
-      set('dirty-status', '已保存并发送重载'); set('config-notice', '配置已保存并请求应用，可到状态页查看运行情况。'); toast('配置已保存');
+      set('dirty-status', '已保存并应用'); set('config-notice', '核心已加载当前配置。'); toast('配置已保存');
     }).catch(function (e) {
       set('dirty-status', wrote ? '已保存，重载或确认未完成' : '保存未完成');
       set('config-error', (wrote ? '配置已写入，但后续操作未完成：' : '保存失败：') + e.message);
@@ -708,8 +761,8 @@
       logText = text;
       var lines = text.trimEnd().split('\n');
       set('log', text ? lines.slice(-150).join('\n') : '暂无本次开机日志');
-      box.scrollTop = follow ? box.scrollHeight : previous; $('copy-log').disabled = !text;
-    }).catch(function (e) { logText = ''; $('copy-log').disabled = true; set('log', '读取失败：' + e.message); });
+      box.scrollTop = follow ? box.scrollHeight : previous;
+    }).catch(function (e) { logText = '';  set('log', '读取失败：' + e.message); });
   }
   function syncLogDays(value) {
     var number = Number(value === undefined ? 3 : value); if (!Number.isInteger(number) || number < 0 || number > 30) number = 3;
@@ -750,23 +803,34 @@
   $('show-readings').addEventListener('click', function () { $('readings-dialog').showModal(); });
   $('close-readings').addEventListener('click', function () { $('readings-dialog').close(); });
   $('copy-qq-group').addEventListener('click', function () { copyText('314981836', 'QQ群号'); });
-  $('refresh-diagnostics').addEventListener('click', pollState); $('refresh-log').addEventListener('click', loadLog);
+  $('refresh-log').addEventListener('click', loadLog);
   $('settings-form').addEventListener('submit', saveConfig);
   $('reload-config').addEventListener('click', function () { if ($('dirty-status').textContent === '有未保存的修改' && !confirm('重新读取会丢弃未保存的修改，继续吗？')) return; readConfig(); });
   $('restore-defaults').addEventListener('click', function () { if (!configReady || configBusy || !device) return; if (!confirm('将表单恢复为默认值？保存后才会应用。')) return; preferenceEdited = true; learnedDraft = null; curvePointEditing = false; curveDraft = window.LumaCurveMath.defaults.slice(); curveCustom = false; renderForm(defaults); renderCurveEditor(); markDirty(); });
   $('clear-log').addEventListener('click', function () { if (confirm('清空当前日志？历史归档不会被删除。')) runCommand('clear-log'); });
-  $('copy-diagnostics').addEventListener('click', function () { copyText(stateText, '状态'); });
-  $('copy-log').addEventListener('click', function () { copyText(logText, '日志'); });
-  $('export-log').addEventListener('click', function () {
-    if (!device || exportBusy) return;
-    exportBusy = true; syncButtons(); set('export-status', '正在导出…');
-    var filename = 'LumaCurve-' + new Date().toISOString().replace(/[:.]/g, '-') + '-' + Math.random().toString(36).slice(2, 7) + '.log';
-    var command = 'umask 022; user_id=$(am get-current-user) || exit 1; case "$user_id" in ""|*[!0-9]*) exit 1;; esac; ' +
-      'directory="/storage/emulated/$user_id/Download"; mkdir -p "$directory" && destination="$directory/"' + quote(filename) + ' && ' +
-      '(set -C; sh ' + quote(CTL) + ' current-log > "$destination") && chmod 0644 "$destination" && printf %s "$destination"';
-    exec(command).then(function (path) { set('export-status', '已导出：' + path.trim()); toast('日志已保存到下载目录'); })
-      .catch(function (error) { set('export-status', '导出失败：' + error.message); }).finally(function () { exportBusy = false; syncButtons(); });
-  });
+  function exportDiagnostic(mode) {
+    if(!device || exportBusy) return;
+    exportBusy=true;syncButtons();$('export-progress').hidden=false;document.querySelector('#export-progress progress').hidden=false;
+    set('export-status',mode==='analysis'?'准备收集分析资料，请保持页面打开；通常需要 30～90 秒。':'正在读取日志与设备状态…');
+    var token=Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,10), script='/data/adb/modules/luma_curve/export_analysis.sh', deadline=Date.now()+600000;
+    function command(action){return 'sh '+quote(script)+' '+quote(action)+' '+quote(mode)+' '+quote(token);}
+    function status(){return exec(command('status')).then(function(raw){
+      var lines=raw.trim().split(/\r?\n/), phase=lines[0], detail=lines[1] || '正在导出…';
+      set('export-status',detail);
+      if(phase==='done'){
+        if(!/^\/sdcard\/LumaCurve-(log|analysis)-[a-zA-Z0-9-]+\.(log|tar\.gz)$/.test(lines[2] || ''))throw new Error('导出结果路径异常');
+        set('export-status','已导出：'+lines[2]+'（手机存储根目录）');toast('导出完成');return;
+      }
+      if(phase==='error')throw new Error(detail);
+      if(phase!=='running')throw new Error('无法识别导出进度');
+      if(Date.now()>deadline)throw new Error('等待导出超时，可到手机根目录检查文件。');
+      return new Promise(function(resolve){setTimeout(resolve,800);}).then(status);
+    });}
+    exec(command('start')).then(status).catch(function(error){set('export-status','导出失败：'+error.message);})
+      .finally(function(){exportBusy=false;document.querySelector('#export-progress progress').hidden=true;syncButtons();});
+  }
+  $('export-log').addEventListener('click',function(){exportDiagnostic('log');});
+  $('export-analysis').addEventListener('click',function(){exportDiagnostic('analysis');});
   $('save-log-policy').addEventListener('click', function () {
     if (!device || configBusy || commandBusy) return;
     if ($('dirty-status').textContent === '有未保存的修改' && !confirm('保存日志策略后会重新读取配置，未保存的设置会丢失。继续吗？')) return;

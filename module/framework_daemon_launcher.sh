@@ -6,19 +6,26 @@ DAEMON="$MODDIR/system/bin/luma_curve_daemon"
 JAR="$MODDIR/framework-broker.jar"
 LOG=/data/local/tmp/luma_curve.log
 [ "$(id -u)" = 0 ] && [ -x "$DAEMON" ] && [ -r "$JAR" ] || exit 2
-for PAIR in \
-  'framework.jar:1d2bf53f6c2684103dadbeef0d2665a7f033b7746a75f3e7404145dd999600fd' \
-  'services.jar:ac53add4b7f559780affd6c7a614f405cefad18f2cb07cb769c7a1afbbae5c20'; do
-  NAME=${PAIR%%:*}; EXPECTED=${PAIR#*:}
-  ACTUAL=$(sha256sum "/system/framework/$NAME" 2>/dev/null) || exit 2
-  [ "${ACTUAL%% *}" = "$EXPECTED" ] || {
-    echo "[LumaCurve服务] 固件已变化：$NAME；暂停框架接管，由系统控制亮度。" >> "$LOG"
-    exit 2
-  }
-done
+# Whole-file hashes record OTA changes, but do not substitute for interface and
+# coordinate checks. The broker rediscovers its profile on every startup.
+echo "[LumaCurve服务] 重新识别显示接口，系统=$(getprop ro.build.version.incremental)" >> "$LOG"
+sha256sum /system/framework/framework.jar /system/framework/services.jar >> "$LOG" 2>/dev/null || :
 APP=/system/bin/app_process; [ -x "$APP" ] || APP=/system/bin/app_process64
 RUN=$(mktemp -d /data/local/tmp/luma-framework-core.prod.XXXXXX) || exit 2
 chmod 0700 "$RUN" || exit 2
+OWNER_LOCK=/data/local/tmp/luma-framework-owner.lock
+if ! mkdir "$OWNER_LOCK" 2>/dev/null; then
+  PREVIOUS=$(cat "$OWNER_LOCK/pid" 2>/dev/null || :)
+  case "$PREVIOUS" in ''|*[!0-9]*)
+    LOCK_TIME=$(stat -c%Y "$OWNER_LOCK" 2>/dev/null || echo 0)
+    NOW=$(date +%s)
+    if [ "$LOCK_TIME" -le 0 ] || [ $((NOW-LOCK_TIME)) -lt 30 ]; then rmdir "$RUN"; exit 2; fi
+    PREVIOUS=0;; esac
+  if [ "$PREVIOUS" -ne 0 ] && kill -0 "$PREVIOUS" 2>/dev/null; then rmdir "$RUN"; exit 2; fi
+  rm -f "$OWNER_LOCK/pid"; rmdir "$OWNER_LOCK" 2>/dev/null || exit 2
+  mkdir "$OWNER_LOCK" 2>/dev/null || exit 2
+fi
+printf '%s\n' "$$" > "$OWNER_LOCK/pid" || { rmdir "$OWNER_LOCK" 2>/dev/null; exit 2; }
 SOCKET="luma.framework.prod.$$"
 BROKER= CORE=
 cleanup() {
@@ -33,9 +40,15 @@ cleanup() {
     kill -KILL "$BROKER" 2>/dev/null || :
     wait "$BROKER" 2>/dev/null || :
   fi
-  CLASSPATH="$JAR" timeout 10 "$APP" /system/bin LumaFrameworkProbeTemporary release >> "$LOG" 2>&1 || :
+  if [ -f "$RUN/output-owned" ] && [ "$(cat "$OWNER_LOCK/pid" 2>/dev/null)" = "$$" ]; then
+    CLASSPATH="$JAR" timeout 10 "$APP" /system/bin LumaFrameworkProbeTemporary release >> "$LOG" 2>&1 || :
+  fi
+  rm -f "$RUN/output-owned"
   rm -f "$RUN/broker-ready" "$RUN/release-display.txt"
   rmdir "$RUN" 2>/dev/null || :
+  if [ "$(cat "$OWNER_LOCK/pid" 2>/dev/null)" = "$$" ]; then
+    rm -f "$OWNER_LOCK/pid"; rmdir "$OWNER_LOCK" 2>/dev/null || :
+  fi
 }
 trap cleanup EXIT
 trap 'exit 143' HUP INT TERM

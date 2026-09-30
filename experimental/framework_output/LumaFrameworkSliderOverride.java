@@ -36,5 +36,10 @@ public final class LumaFrameworkSliderOverride {
         clear();return true;
     }
     public float apply(float unadjusted){return holding?heldBrightness:unadjusted;}
+    public float apply(float unadjusted,float safetyMaximum){
+        if(!Float.isFinite(safetyMaximum)||safetyMaximum<0||safetyMaximum>1)
+            throw new IllegalArgumentException("invalid safety maximum");
+        return Math.min(safetyMaximum,apply(unadjusted));
+    }
     public void clear(){pending=false;holding=false;sceneSamples=0;sceneSince=0;anchorLux=Float.NaN;}
 }

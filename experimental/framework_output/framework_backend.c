@@ -114,7 +114,12 @@ uint64_t luma_framework_apply(uint64_t now,int32_t *current,int32_t target) {
         SET_FLAG(g_transition_active,0);
         return now;
     }
-    snprintf(command,sizeof(command),"T %llu %d %d %.3f\n",(unsigned long long)++sequence,target,maximum,scene_lux());
+    int safety=FLAG(g_heat_guard_active)?INT(g_thermal_cap_br):maximum;
+    if(safety<1)safety=1;
+    if(safety>maximum)safety=maximum;
+    snprintf(command,sizeof(command),"T %llu %d %d %.3f %d %.3f %.3f\n",
+        (unsigned long long)++sequence,target,maximum,scene_lux(),safety,
+        FLOAT(cfg_brighten_speed),FLOAT(cfg_darken_speed));
     luma_write_attempts++;
     int result=rpc(command);
     if(result<0||!luma_framework_ready()){

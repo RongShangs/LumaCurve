@@ -184,6 +184,13 @@ static int publish_state(DomainIo *io, const StateFrame *frame) {
     state_text(io, stream, "slider_source=%s\n", STRING(cached_slider_source));
     state_real(io, stream, "auto_brightness_adj=%.4f\n", FLOAT(cached_auto_adj));
     state_word(io, stream, "auto_brightness_adj_valid=%d\n", FLAG(cached_auto_adj_valid));
+    extern uint32_t luma_config_loaded_hash;
+    state_word(io, stream, "config_applied_hash=%u\n", luma_config_loaded_hash);
+#ifdef LUMA_FRAMEWORK_BACKEND
+    state_word(io, stream, "hbm_control_supported=%d\n",0);
+#else
+    state_word(io, stream, "hbm_control_supported=%d\n",1);
+#endif
     state_word(io, stream, "config_valid=%d\n", (FLAG(g_config_valid) ^ 1) & 1);
     state_text(io, stream, "config_error=%s\n", STRING(g_config_error));
     state_text(io, stream, "ownership=%s\n",
@@ -265,13 +272,13 @@ static int publish_state(DomainIo *io, const StateFrame *frame) {
     state_word(io, stream, "sensor_hold_timeout=%d\n", FLAG(g_sensor_hold_timeout));
     state_text(io, stream, "sensor_stale_source=%s\n",
                *STRING(g_sensor_stale_source) ? STRING(g_sensor_stale_source) : "-");
-    state_text(io, stream, "learn_block_reason=%s\n",
+    state_text(io, stream, "legacy_learn_block_reason=%s\n",
                *STRING(g_learn_block_reason) ? STRING(g_learn_block_reason) : "-");
     state_word(io, stream, "external_write_burst_count=%d\n", INT(g_external_write_burst_count));
     state_word(io, stream, "external_write_hold_left_ms=%llu\n",
                time_left(frame->now, TIME(g_external_write_hold_until)));
     state_word(io, stream, "updated_unix=%llu\n", CALL(io, time, 0));
-    if (luma_indoor_stability || luma_curve_custom || luma_preference_learning) {
+    {
         state_text(io, stream, "core_build=%s\n", LUMA_CORE_BUILD);
         state_text(io, stream, "backlight_path=%s\n", ios_backlight_brightness());
         state_word(io, stream, "actuator_write_attempts=%llu\n", luma_write_attempts);
@@ -285,14 +292,14 @@ static int publish_state(DomainIo *io, const StateFrame *frame) {
         state_text(io, stream, "output_backend=%s\n", getenv("LUMA_FRAMEWORK_PRODUCTION") ?
             "hyperos4_framework" : "framework_temporary_experimental");
         state_text(io, stream, "curve_coordinate=%s\n", getenv("LUMA_FRAMEWORK_PRODUCTION") ?
-            "legacy_raw_backlight_code_calibrated" : "legacy_raw_fraction_nominal");
+            "raw_backlight_code_framework_profile" : "legacy_raw_fraction_nominal");
         state_real(io, stream, "framework_algorithm_goal=%.7f\n", fw->goal);
         state_real(io, stream, "framework_limited_goal=%.7f\n", fw->limited);
         state_real(io, stream, "framework_request=%.7f\n", fw->request);
         if (getenv("LUMA_FRAMEWORK_PRODUCTION") && fw->active && isfinite(fw->limited) && fw->limited >= 0)
-            state_word(io, stream, "framework_effective_target_br=%d\n", (int)lroundf(fw->limited * 17848.0f));
+            state_word(io, stream, "framework_effective_target_br=%d\n", (int)fminf(INT(g_max),lroundf(fw->limited * fw->codes_per_float)));
         if (getenv("LUMA_FRAMEWORK_PRODUCTION"))
-            state_real(io, stream, "framework_panel_codes_per_float=%.1f\n", 17848.0f);
+            state_real(io, stream, "framework_panel_codes_per_float=%.1f\n", fw->codes_per_float);
         state_real(io, stream, "framework_base=%.7f\n", fw->base);
         state_real(io, stream, "framework_adjusted=%.7f\n", fw->adjusted);
         state_word(io, stream, "framework_actual_node=%d\n", fw->node);
@@ -314,7 +321,7 @@ static int publish_state(DomainIo *io, const StateFrame *frame) {
         state_real(io, stream, "curve_sunlight_boost=%.3f\n", FLOAT(cfg_hl_boost_max));
         state_real(io, stream, "curve_sunlight_min=%.3f\n", FLOAT(cfg_hl_min_pct));
     }
-    if (luma_preference_learning || luma_preference_offset() != 0 || luma_preference_samples()) {
+    {
         state_real(io, stream, "preference_offset=%.3f\n", luma_preference_offset());
         state_real(io, stream, "preference_effective_offset=%.3f\n", luma_preference_effective());
         state_word(io, stream, "preference_learning=%d\n", luma_preference_learning);

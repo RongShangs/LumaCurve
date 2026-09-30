@@ -4,6 +4,8 @@ int main(void) {
     LumaFrameworkSnapshot s={0};
     assert(!luma_framework_parse("OK 1 0 62 1 0 1200 .0003 .374 .09 .09 -1 -1 .09 0 0\n",&s));
     assert(!luma_framework_parse("OK 1 0 62 1 0 1200 .0003 .374 .09 .09 -1 -1 .09 1 1\n",&s) && s.user_hold==1);
+    assert(!luma_framework_parse("OK 1 0 62 1 0 1244 .0003 .374 .07565 .07565 -1 -1 .07565 1 0 16383 16383\n",&s) && s.codes_per_float==16383);
+    assert(!luma_framework_parse("OK 1 0 62 1 0 20000 .0003 .374 .3 .3 -1 -1 .3 1 0 65535 65535\n",&s) && s.node_maximum==65535);
     const char *bad[]={"ERR\n","OK 1 0 62 1 0 1200 .0003 .374 .09 .09 -1 -1 .09\n",
       "OK 1 0 62 1 0 1200 .0003 .374 .09 .09 -1 -1 .09 0 0 extra\n",
       "OK 2 0 62 1 0 1200 .0003 .374 .09 .09 -1 -1 .09 0 0\n",
@@ -15,6 +17,8 @@ int main(void) {
       "OK 1 0 62 1 0 20000 .0003 .374 .09 .09 -1 -1 .09 0 0\n",
       "OK 1 0 62 1 0 1200 .0003 .374 .09 .09 -1 -1 .09 0 2\n"};
     for(unsigned i=0;i<sizeof(bad)/sizeof(bad[0]);i++)assert(luma_framework_parse(bad[i],&s));
+    assert(luma_framework_parse("OK 1 0 62 1 0 1200 .0003 .374 .09 .09 -1 -1 .09 1 0 nan 16383\n",&s));
+    assert(luma_framework_parse("OK 1 0 62 1 0 20000 .0003 .374 .09 .09 -1 -1 .09 1 0 16383 16383\n",&s));
     char buffer[256];const char *root="/data/local/tmp/luma-framework-core.TEST";
     assert(luma_framework_map_path(root,"/data/local/tmp/luma_curve.conf",buffer,sizeof(buffer))==buffer);
     assert(!strcmp(buffer,"/data/local/tmp/luma-framework-core.TEST/luma_curve.conf"));
@@ -22,5 +26,5 @@ int main(void) {
     assert(luma_framework_map_path(root,node,buffer,sizeof(buffer))==node);
     assert(!luma_framework_map_path(root,"/data/local/tmp/luma_curve../oops",buffer,sizeof(buffer)));
     assert(!luma_framework_map_path(root,"/data/local/tmp/luma_curve.pid",buffer,2));
-    puts("framework protocol: 13 responses and 4 isolation cases PASS");return 0;
+    puts("framework protocol: 17 responses and 4 isolation cases PASS");return 0;
 }
