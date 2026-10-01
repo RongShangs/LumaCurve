@@ -1,0 +1,18 @@
+<resources>
+    <style name="AppTheme" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:fontFamily">sans</item><item name="android:colorAccent">#3265df</item>
+        <item name="android:windowLightStatusBar">true</item><item name="android:statusBarColor">#fafafa</item>
+        <item name="android:navigationBarColor">#fafafa</item><item name="android:windowActionModeOverlay">true</item>
+        <item name="android:buttonStyle">@style/FlatButton</item>
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
+    <style name="FlatButton" parent="android:style/Widget.Material.Button">
+        <item name="android:elevation">0dp</item><item name="android:stateListAnimator">@null</item>
+        <item name="android:textAllCaps">false</item>
+    </style>
+    <style name="LumaDialogFade">
+        <item name="android:windowEnterAnimation">@anim/dialog_fade_in</item>
+        <item name="android:windowExitAnimation">@anim/dialog_fade_out</item>
+    </style>
+    <string-array name="xposed_scope"><item>android</item><item>system</item></string-array>
+</resources>

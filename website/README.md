@@ -1,13 +1,26 @@
-# 静态官网
+# HyperLux 静态官网
 
-无需构建或服务器脚本，将本目录内容放入站点根目录即可。域名为 `lc.rongshangs.top`。`index.html` 可直接本地打开，资源和下载均为相对路径，没有外部字体或框架。
+将本目录的**全部内容**放到 `lc.rongshangs.top` 站点根目录，或直接部署工作目录 `D:/IOS/web/`。`index.html`、`assets/`、`downloads/` 必须同级；只上传网页会导致下载失败。
 
-本目录包含 `downloads`：正式模块安装包、对应 GPL-3.0 源码包及 SHA-256 校验文件，也包含 `update.json` 与 `update.js`。部署时必须整体上传，版本检查和下载才能指向同一批文件。
+无需构建工具或服务端脚本；资源与下载使用相对路径，本地打开也能查看页面。首页展示正式版 **2.0.0** 和更新日志，介绍当前 Root + LSPosed APP 的曲线、手动锚点记忆、系统双参考场景控制、温控及确认时间；不沿用 1.x 模块机制和占用数字。
 
-重新构建版本时，先运行 `python tools/build_framework_probe.py`、`python tools/build_framework_module.py --release` 和 `python tools/package_source.py`，再运行 `python tools/sync_website.py`。它会刷新资源、下载与更新元数据，同时复制完整网站到 `D:/IOS/web`。源码 ZIP 排除 `website/downloads`，避免递归打包。
+页面底部依次是交流群、打赏、感谢名单、作者。点击复制仅复制群号 `314981836`，暗号 `1691` 单独展示。微信与支付宝点击展示收款码。
 
-下载文件必须和页面版本一致。更新版本时同步修改页面版本及两条下载链接。曲线演示使用与 WebUI 相同的数学模型，只展示基础曲线，页面没有设备访问权限。
+下载文件：
 
-部署直接使用本 `website` 目录的内容，也可以使用 `D:/IOS/web` 或执行 `python tools/package_website.py` 生成完整部署 ZIP。放入 `lc.rongshangs.top` 实际站点根目录后，确保 `index.html`、`assets`、`downloads` 同级。
+- `downloads/HyperLux-2.0.0.apk`：安装 APP，在 LSPosed 启用系统框架作用域。
+- `downloads/LumaCurve-2.0.0-source.zip`：对应 GPL-3.0 源码。
+- `downloads/LumaCurve-2.0.0.zip`：APK、源码和恢复工具合集，**不是 KSU 刷入模块**。
+- `downloads/SHA256SUMS.txt`：上述三个文件的校验值。
 
-部署后直接访问 `/downloads/luma_curve-1.0.0.zip`、`/downloads/LumaCurve-1.0.0-source.zip`、`/downloads/SHA256SUMS.txt`、`/update.json` 和 `/update.js`，都应返回 200。页面能打开但下载或更新失败时，先检查这些文件是否同在站点根目录，且 ZIP 与元数据版本一致。
+重建及同步：
+
+```powershell
+python tools/build_refactor_hook_test.py --skip-device-fixtures
+python tools/sync_website.py
+python tools/package_website.py
+```
+
+同步脚本从 APP 清单读取版本，复制最新包、收款码和许可，更新 `update.json` / `update.js`，并复制完整站点到 `D:/IOS/web/`。`dist/LumaCurve-website-2.0.0.zip` 可直接解压到站点根目录。网站版本信息使用 `distribution=apk`；APP 自动更新查询原 GitHub 仓库的正式 APK Release，不再使用旧 KSU 模块更新字段。
+
+部署后检查 `/downloads/HyperLux-2.0.0.apk`、对应源码、完整包、校验文件和 `/update.json` 返回 200，并确认 APK 校验值一致。历史 1.x 文件可能仍保留用于旧链接，首页只引导安装当前 APP。
