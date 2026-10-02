@@ -4,6 +4,13 @@ import argparse,shutil,hashlib,json,xml.etree.ElementTree as ET
 ROOT=Path(__file__).resolve().parents[1]
 p=argparse.ArgumentParser();p.add_argument('--out',type=Path,default=ROOT.parent/'web');a=p.parse_args()
 site=ROOT/'website';assets=site/'assets';assets.mkdir(parents=True,exist_ok=True)
+thanks=json.loads((site/'thanks.json').read_text(encoding='utf-8'))
+assert thanks['schema']==1 and isinstance(thanks['entries'],list) and len(thanks['entries'])<=200
+for entry in thanks['entries']:
+    assert isinstance(entry['name'],str) and entry['name'].strip() and len(entry['name'])<=80
+    assert isinstance(entry['message'],str) and len(entry['message'])<=200
+    assert '\n' not in entry['name']+entry['message'] and '\r' not in entry['name']+entry['message']
+(site/'thanks.js').write_text('window.HyperLuxThanks='+json.dumps(thanks,ensure_ascii=False)+';\n',encoding='utf-8',newline='\n')
 src=ROOT/'experimental/refactor_hook'
 manifest=ET.parse(src/'AndroidManifest.xml').getroot();ns='{http://schemas.android.com/apk/res/android}'
 version=manifest.attrib[ns+'versionName'];code=int(manifest.attrib[ns+'versionCode'])

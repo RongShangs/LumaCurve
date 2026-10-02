@@ -5,6 +5,28 @@ import java.util.*;
 public final class UiText {
     private static final LinkedHashMap<String,String> WORDS=new LinkedHashMap<>();
     static {
+        WORDS.put("名单来自官网，联网时自动更新","From the website; refreshed when online");
+        WORDS.put("暂时无法读取名单","Unable to load the list");
+        WORDS.put("已同步官网感谢名单","Thank-you list synced with the website");
+        WORDS.put("暂未连接官网，显示已保存的名单","Website unavailable; showing the saved list");
+        WORDS.put("记得备注[昵称：想说的话]噢","Please add a note: [nickname: your message]");
+        WORDS.put("将会尽快更新到感谢名单。","You will be added to the thank-you list as soon as possible.");
+        WORDS.put("完全开源免费。欢迎捐赠 2.3 元支持开发。备注「昵称：想说的一句话」，总计不超过 30 个字符，将会尽快更新到感谢名单。","Free and open source. A ¥2.3 donation supports development. Add “nickname: your message” (30 characters total); you will be added to the thank-you list as soon as possible.");
+        WORDS.put("自动滚动","Auto-scroll");
+        WORDS.put("默认关闭。在设定照度以内增加主、辅助光感的变化确认时间。手动调节、熄屏、HDR、闲置与驾驶模式继续沿用系统。","Off by default. Extends main and assist light-change confirmation within the chosen light range. Manual changes, screen off, HDR, idle and driving modes keep system behavior.");
+        WORDS.put("适用照度 5～100 lux；变亮、变暗最短确认各为 1～4 秒。保留系统更长等待；辅助光感采样窗口仅 5 秒，因此确认时间最高 4 秒。","Light range: 5–100 lux. Minimum brightening and dimming confirmation: 1–4 s each. Longer system waits remain. The assist buffer holds 5 s, so the selectable confirmation is capped at 4 s.");
+        WORDS.put("暗光适用照度：","Low-light range: ");
+        WORDS.put("暗光最短变亮确认：","Low-light brightening minimum: ");
+        WORDS.put("暗光最短变暗确认：","Low-light dimming minimum: ");
+        WORDS.put("暗光参数超出可调范围","Low-light parameters are out of range");
+        WORDS.put("1/8 收集曲线、运行状态与本次系统进程日志…","1/8 Collecting curves, runtime state and Hook logs…");
+        WORDS.put("2/8 收集显示、光感、唤醒和温控状态…","2/8 Collecting display, sensors, power and thermal state…");
+        WORDS.put("3/8 收集显示接口、资源覆盖与近期系统记录…","3/8 Collecting display interfaces, overlays and recent system logs…");
+        WORDS.put("4/8 收集固件标识、亮度资源和背光只读信息…","4/8 Collecting firmware identity, brightness resources and read-only backlight data…");
+        WORDS.put("5/8 收集显示配置文件…","5/8 Collecting display configuration files…");
+        WORDS.put("6/8 提取系统与小米显示框架，计算校验值…","6/8 Extracting system and Xiaomi display frameworks and checksums…");
+        WORDS.put("7/8 收集旧模块诊断并再次采集显示快照…","7/8 Collecting legacy diagnostics and a second display snapshot…");
+        WORDS.put("8/8 完成压缩并校验分析包…","8/8 Finishing and verifying the diagnostic archive…");
         WORDS.put("照度跳变：","Light jump: ");
         WORDS.put("系统高亮控制器的当前状态；仍由系统判断何时触发。","Current sunlight high-brightness state. Triggering remains under system control.");
         WORDS.put("阳光增强","Sunlight boost");

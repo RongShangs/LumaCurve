@@ -28,7 +28,7 @@ final class HookRuntime {
     float memoryStrength=1;long memoryEvents,lastMemoryLog;String lastReset="";
     boolean responseEnabled;long brightenDelay=1500,darkenDelay=5000,responseAdjustments,memoryWindow=1500;float memoryLuxRange=.3f,thermalCooling=1;
     boolean smallResponseEnabled;long smallBrightenDelay=5000,smallResponseAdjustments;
-    boolean lowLightEnabled;long lowLightMainAdjustments,lowLightAssistAdjustments;
+    float lowLightLimit=50;long lowLightBrighten=3000,lowLightDarken=4000;boolean lowLightEnabled;long lowLightMainAdjustments,lowLightAssistAdjustments;
     final PipelineHistory pipelineHistory=new PipelineHistory();PipelineHistory.Frame traceFrame;
     final ArrayDeque<JSONObject> outputHistory=new ArrayDeque<>();
     final Map<String,JSONObject> lastOutput=new HashMap<>();
@@ -130,6 +130,7 @@ final class HookRuntime {
                     memoryWindow=memoryMs;memoryLuxRange=memoryRange;memoryPolicy.configure(memoryMs,memoryRange);thermalCooling=cooling;thermalGate.configure(cooling);
                     brightenDelay=bright;darkenDelay=dark;responseEnabled=config.optBoolean("response_override",false);
                     smallBrightenDelay=small;smallResponseEnabled=config.optBoolean("small_brighten_override",false);
+                    lowLightLimit=(float)config.optDouble("low_light_limit",50);lowLightBrighten=config.optLong("low_light_brighten",3000);lowLightDarken=config.optLong("low_light_darken",4000);LowLightPolicy.validate(lowLightLimit,lowLightBrighten,lowLightDarken);
                     lowLightEnabled=config.optBoolean("low_light_stability",false);
                     if(lowLightEnabled&&!LowLightTuning.supported(this))throw new IllegalArgumentException("暗光稳定接口尚未完整兼容");
                     phase="active";message="自定义曲线已接入，官方光感和过渡动画继续运行";
@@ -185,7 +186,7 @@ final class HookRuntime {
                 .put("response_supported",ResponseTuning.supported(owner)).put("response_override",responseEnabled).put("brighten_delay",brightenDelay).put("darken_delay",darkenDelay).put("response_adjustments",responseAdjustments);
             status.put("small_response_supported",ResponseTuning.smallSupported(owner)).put("small_brighten_override",smallResponseEnabled).put("small_brighten_delay",smallBrightenDelay).put("small_response_adjustments",smallResponseAdjustments);
             status.put("low_light_supported",LowLightTuning.supported(this)).put("low_light_stability",lowLightEnabled)
-                .put("low_light_limit_lux",LowLightPolicy.LIMIT_LUX).put("low_light_brighten_ms",LowLightPolicy.BRIGHTEN_MS).put("low_light_darken_ms",LowLightPolicy.DARKEN_MS)
+                .put("low_light_limit_lux",lowLightLimit).put("low_light_brighten_ms",lowLightBrighten).put("low_light_darken_ms",lowLightDarken)
                 .put("low_light_main_adjustments",lowLightMainAdjustments).put("low_light_assist_adjustments",lowLightAssistAdjustments);
             JSONArray trace=new JSONArray();for(PipelineHistory.Frame f:pipelineHistory.snapshot())trace.put(traceJson(f));
             status.put("pipeline_trace",trace).put("output_trace",new JSONArray(outputHistory));
@@ -255,7 +256,7 @@ final class HookRuntime {
             java.lang.reflect.Method idle=abc.getClass().getDeclaredMethod("isInIdleMode");idle.setAccessible(true);
             return LowLightPolicy.applies(true,(Boolean)kernel.get("mUseAutoBrightness"),screen==2,
                 (Boolean)idle.invoke(abc),(Boolean)impl.getClass().getMethod("getDrivingStatus").invoke(impl),hdr,
-                ((Number)HookEntry.get(abc,"mAmbientLux")).floatValue(),candidateLux);
+                ((Number)HookEntry.get(abc,"mAmbientLux")).floatValue(),candidateLux,lowLightLimit);
         }catch(Throwable absent){return false;}
     }
     static float optionalNumber(Object o,String field){try{return ((Number)HookEntry.get(o,field)).floatValue();}catch(Throwable absent){return Float.NaN;}}

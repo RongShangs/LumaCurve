@@ -42,7 +42,7 @@ final class ResponseTuning {
                             if(guard){long existing=Math.max(base,chosen);
                                 long horizon=((Number)HookEntry.get(p.thisObject,"mAmbientLightHorizonLong")).longValue();
                                 long additional=brighten?0:((Number)HookEntry.get(p.thisObject,"mStepModeDarkenDebounceConfig")).longValue();
-                                chosen=LowLightPolicy.withinWindow(LowLightPolicy.chosen(existing,brighten,false),existing,horizon,additional);
+                                chosen=LowLightPolicy.withinWindow(LowLightPolicy.chosen(existing,brighten,false,state.lowLightBrighten,state.lowLightDarken),existing,horizon,additional);
                             }
                             if(chosen==base)return;
                             p.setResult(DelayPolicy.deadline((Long)p.getResult(),(Long)p.args[0],base,chosen));state.responseAdjustments++;if(small)state.smallResponseAdjustments++;if(guard)state.lowLightMainAdjustments++;return;

@@ -1,5 +1,17 @@
 'use strict';
 (function () {
+  function renderThanks(data) {
+    if (!data || data.schema !== 1 || !Array.isArray(data.entries) || data.entries.length > 200) return;
+    if (!data.entries.every(function (entry) { return entry && typeof entry.name === 'string' && entry.name.trim() && entry.name.length <= 80 && typeof entry.message === 'string' && entry.message.length <= 200 && !/[\r\n]/.test(entry.name + entry.message); })) return;
+    var list = document.getElementById('thanks-list'); list.replaceChildren();
+    data.entries.forEach(function (entry) {
+      var line = document.createElement('li'), name = document.createElement('strong'), message = document.createElement('span');
+      name.textContent = entry.name; message.textContent = entry.message; line.append(name, message); list.append(line);
+    });
+  }
+  renderThanks(window.HyperLuxThanks);
+  // The JSON is the live source for both APP and site. thanks.js also supports local file previews.
+  if (location.protocol !== 'file:') fetch('thanks.json', {cache: 'no-store'}).then(function (response) { if (!response.ok) throw new Error('Thanks unavailable'); return response.json(); }).then(renderThanks).catch(function () {});
   // Illustrative OEM logical anchors, not a universal device calibration.
   var slider = document.getElementById('demo-lux');
   var strength = document.getElementById('demo-strength');

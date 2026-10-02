@@ -17,6 +17,7 @@ VERSION_CODE=int(manifest.get('{http://schemas.android.com/apk/res/android}versi
 OUT=ROOT/'build/refactor-hook'
 SDK=Path('D:/App/SDK'); BT=SDK/'build-tools/37.0.0'; ANDROID=SDK/'platforms/android-37.0/android.jar'
 OUT.mkdir(parents=True,exist_ok=True)
+shutil.copy2(ROOT/'website/thanks.json',SRC/'assets/thanks.json')
 DEP=OUT/'deps/api-82.jar';DEP.parent.mkdir(exist_ok=True)
 API_URL='https://api.xposed.info/de/robv/android/xposed/api/82/api-82.jar'
 API_SHA='f48c635f1c7469fdec0e00ad2ea0b7a6b2f5b55065784a35b7ca3a84615e8e25'
@@ -33,6 +34,7 @@ run(['javac','-encoding','UTF-8','--release','8','-cp',str(ANDROID)+';'+str(DEP)
 run(['javac','-encoding','UTF-8','--release','8','-cp',CLASSES,'-d',CLASSES,*sorted((SRC/'tests').glob('*.java'))])
 tested=subprocess.run(['java','-cp',str(CLASSES),'top.rongshangs.lumacurve.refactor.RefactorTest'],check=True,capture_output=True,text=True)
 print(tested.stdout,end='');host_cases=int(re.search(r'(\d+) cases PASS',tested.stdout).group(1))
+run(['python',ROOT/'tests/refactor_diagnostics.py'])
 if not args.skip_device_fixtures:run(['python',ROOT/'tests/refactor_hook_firmware.py'])
 else:print('OEM firmware checks skipped explicitly; runtime compatibility validation remains enabled')
 COMPILED=OUT/'resources.zip';UNSIGNED=OUT/'unsigned.apk'
@@ -52,7 +54,7 @@ run(['java','-jar',BT/'lib/apksigner.jar','verify','--verbose',APK])
 run([BT/'zipalign.exe','-c','4',APK])
 # Root recovery does not load any Xposed classes, and works if the app is uninstalled.
 HELPER=DIST/'luma-refactor-helper.jar'
-names={'RootControl.class','RootSettings.class','CurvePlan.class','ThermalPolicy.class','MemoryPolicy.class','DelayPolicy.class','LegacyModules.class','AppBuild.class'}
+names={'RootControl.class','RootSettings.class','CurvePlan.class','ThermalPolicy.class','MemoryPolicy.class','DelayPolicy.class','LegacyModules.class','AppBuild.class','LowLightPolicy.class','DiagnosticCollector.class'}
 run(['java','-cp',BT/'lib/d8.jar','com.android.tools.r8.D8','--min-api','34','--lib',ANDROID,'--output',HELPER,*[p for p in inputs if p.name in names]])
 run(['C:/msys64/usr/bin/bash.exe','-n',SRC/'restore_refactor_hook_android.sh'])
 meta={'build':BUILD,'version':ARTIFACT_VERSION,'version_code':VERSION_CODE,'test_build':IS_TEST,'app_name':'HyperLux','architecture':'oem_refactor_base_anchor_hook',
@@ -75,7 +77,7 @@ source=DIST/(archive_prefix+'-'+ARTIFACT_VERSION+'-source.zip')
 with zipfile.ZipFile(source,'w',zipfile.ZIP_DEFLATED) as z:
     for p in sorted(SRC.rglob('*')):
         if p.is_file():z.write(p,p.relative_to(ROOT))
-    z.write(ROOT/'LICENSE','LICENSE');z.write(ROOT/'README.md','README.md');z.write(ROOT/'CHANGELOG.md','CHANGELOG.md');z.write(Path(__file__),'tools/build_refactor_hook_test.py');z.write(ROOT/'tests/refactor_hook_firmware.py','tests/refactor_hook_firmware.py')
+    z.write(ROOT/'LICENSE','LICENSE');z.write(ROOT/'README.md','README.md');z.write(ROOT/'CHANGELOG.md','CHANGELOG.md');z.write(Path(__file__),'tools/build_refactor_hook_test.py');z.write(ROOT/'tests/refactor_hook_firmware.py','tests/refactor_hook_firmware.py');z.write(ROOT/'tests/refactor_diagnostics.py','tests/refactor_diagnostics.py')
     for p in sorted((ROOT/'docs/releases').glob('*.md')):z.write(p,p.relative_to(ROOT))
     for name in ['sync_website.py','package_website.py']:z.write(ROOT/'tools'/name,'tools/'+name)
     for p in sorted((ROOT/'website').rglob('*')):

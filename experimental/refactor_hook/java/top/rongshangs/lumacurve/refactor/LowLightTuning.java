@@ -29,7 +29,7 @@ final class LowLightTuning {
                             Object abc=HookEntry.get(impl,"mAutomaticBrightnessController");if(!s.lowLightApplies(abc,impl,HookRuntime.optionalNumber(dual,"mAssistFastAmbientLux")))return;
                             boolean small=bright&&p.args.length==4&&(Float)p.args[1]<(Float)p.args[2];
                             long base=((Number)HookEntry.get(p.thisObject,small?"mSmallBrighteningLightDebounceConfig":bright?"mBrighteningLightDebounceConfig":"mDarkeningLightDebounceConfig")).longValue();
-                            long chosen=LowLightPolicy.chosen(base,bright,true);if(chosen==base)return;
+                            long chosen=LowLightPolicy.chosen(base,bright,true,s.lowLightBrighten,s.lowLightDarken);if(chosen==base)return;
                             p.setResult(DelayPolicy.deadline((Long)p.getResult(),(Long)p.args[0],base,chosen));s.lowLightAssistAdjustments++;return;
                         }catch(Throwable incompatible){return;}
                     }}

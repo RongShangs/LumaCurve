@@ -200,6 +200,19 @@ public final class RefactorTest {
         history.snapshot().clear();check(history.snapshot().size()==24);history.finish(null);check(history.last().sequence==102);
         check(UiText.translate("暗光稳定",true).equals("Low-light stability"));
         check(UiText.translate("当前路径未取得可绘制曲线",true).equals("No drawable curve observed for this path"));
+        // Tunable low-light limits cover both confirmed and candidate light without altering lux.
+        LowLightPolicy.validate(5,1000,1000);LowLightPolicy.validate(100,4000,4000);
+        bad(()->LowLightPolicy.validate(Float.NaN,3000,4000));bad(()->LowLightPolicy.validate(4,3000,4000));
+        bad(()->LowLightPolicy.validate(101,3000,4000));bad(()->LowLightPolicy.validate(50,999,4000));bad(()->LowLightPolicy.validate(50,3000,4001));
+        check(!LowLightPolicy.applies(true,true,true,false,false,false,51,51,50));
+        check(LowLightPolicy.applies(true,true,true,false,false,false,51,51,60));
+        check(LowLightPolicy.applies(true,true,true,false,false,false,200,5,5));
+        check(!LowLightPolicy.applies(true,true,true,false,false,true,1,1,100));
+        check(LowLightPolicy.chosen(1000,true,true,2000,3500)==2000);
+        check(LowLightPolicy.chosen(1000,false,true,2000,3500)==3500);
+        check(LowLightPolicy.chosen(6000,false,true,2000,3500)==6000);
+        check(LowLightPolicy.withinWindow(4000,1000,5000,1000)==1000);
+        check(LowLightPolicy.withinWindow(3500,1000,5000,1000)==3500);
         System.out.println("Refactor curve/adapter/thermal/memory/response/update/modules/stability/trace: "+cases+" cases PASS; OEM calls modeled, device not verified");
     }
 }

@@ -29,6 +29,9 @@ public final class MainActivity extends Activity {
     Switch responseSwitch,smallBrightenSwitch,lowLightSwitch;boolean lowLightStability;TextView branchOverview;SeekBar smallBrightenSlider;TextView smallBrightenLabel;SeekBar memoryWindowSlider,memoryRangeSlider,coolingSlider,brightenSlider,darkenSlider,refreshSlider;
     TextView memoryWindowLabel,memoryRangeLabel,coolingLabel,brightenLabel,darkenLabel,refreshLabel,updateLabel;
     JSONObject pendingUpdate;AlertDialog updateDialog;
+    LinearLayout thanksList;TextView thanksStatus;boolean thanksBusy,autoScroll=true;long thanksChecked;
+    float lowLightLimit=50;long lowLightBrighten=3000,lowLightDarken=4000;
+    SeekBar lowLimitSlider,lowBrightSlider,lowDarkSlider;TextView lowLimitLabel,lowBrightLabel,lowDarkLabel;
     java.lang.Process bridge;BufferedReader bridgeReader;BufferedWriter bridgeWriter;
     final Runnable tick=()->{if(visible){if(!busy&&!permissionBlocked&&(page==0||page==2))run("inspect",null);ui.postDelayed(this.tick,page==0?refreshSeconds*1000:5000);}};
     int dp(float value){return Math.round(value*getResources().getDisplayMetrics().density);}
@@ -63,7 +66,7 @@ public final class MainActivity extends Activity {
     Button button(String name,Runnable task,LinearLayout parent){Button b=action(name,task);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,dp(44));lp.topMargin=dp(8);lp.bottomMargin=dp(4);parent.addView(b,lp);return b;}
     Button compact(String name,Runnable task,LinearLayout parent){Button b=action(name,task);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(44),1);lp.setMargins(dp(3),dp(6),dp(3),dp(4));parent.addView(b,lp);return b;}
     @Override public void onCreate(Bundle saved){
-        super.onCreate(saved);refreshSeconds=getPreferences(0).getInt("refresh_seconds",2);english=!getResources().getConfiguration().getLocales().get(0).getLanguage().equals("zh");getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING);
+        super.onCreate(saved);autoScroll=getPreferences(0).getBoolean("log_auto_scroll",true);refreshSeconds=getPreferences(0).getInt("refresh_seconds",2);english=!getResources().getConfiguration().getLocales().get(0).getLanguage().equals("zh");getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING);
         try{factors=CurvePlan.factors(getPreferences(0).getString("draft",".7,.8,.95,1"));}catch(Exception ignored){}
         root=column();root.setBackgroundColor(BG);setContentView(root);
         header=row(root);header.setPadding(dp(18),0,dp(18),0);header.setLayoutParams(new LinearLayout.LayoutParams(-1,dp(64)));
@@ -81,7 +84,7 @@ public final class MainActivity extends Activity {
     }
     void makeStatus(){
         stateTitle=text("",16,INK);luxReading=text("",20,BLUE);nitReading=text("",20,INK);flow=text("",12,MUTED);thermalState=text("",12,INK);userState=text("",12,MUTED);
-        branchOverview=text("亮度分支：等待读取 · 点击查看",12,BLUE);branchOverview.setMaxLines(2);branchOverview.setEllipsize(android.text.TextUtils.TruncateAt.END);branchOverview.setGravity(Gravity.CENTER);branchOverview.setIncludeFontPadding(false);branchOverview.setPadding(dp(8),0,dp(8),0);branchOverview.setBackground(ripple(Color.TRANSPARENT,10));branchOverview.setClipToOutline(true);branchOverview.setOnClickListener(v->branches());
+        branchOverview=text("亮度分支：等待读取 · 点击查看",12,BLUE);branchOverview.setMaxLines(2);branchOverview.setEllipsize(android.text.TextUtils.TruncateAt.END);branchOverview.setGravity(Gravity.CENTER);branchOverview.setIncludeFontPadding(false);branchOverview.setPadding(dp(8),0,dp(8),0);branchOverview.setBackground(ripple(0xffeef3ff,10));branchOverview.setClipToOutline(true);branchOverview.setOnClickListener(v->branches());
         pipeline=new PipelineBoard();pages[0].addView(pipeline,new LinearLayout.LayoutParams(-1,0,1));
     }
     SeekBar parameter(LinearLayout parent,int maximum,int initial,java.util.function.IntConsumer changed){SeekBar s=new SeekBar(this);s.setMax(maximum);s.setProgress(initial);parent.addView(s,new LinearLayout.LayoutParams(-1,dp(38)));s.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){public void onProgressChanged(SeekBar v,int p,boolean user){if(user){changed.accept(p);dirty=true;drawCurve();}}public void onStartTrackingTouch(SeekBar v){}public void onStopTrackingTouch(SeekBar v){}});return s;}
@@ -119,8 +122,12 @@ public final class MainActivity extends Activity {
         smallBrightenSwitch=new Switch(this);smallBrightenSwitch.setText(tr("自定义微小变亮确认"));smallBrightenSwitch.setTextSize(14);b.addView(smallBrightenSwitch,new LinearLayout.LayoutParams(-1,dp(48)));smallBrightenSwitch.setOnCheckedChangeListener((v,on)->{smallBrightenOverride=on;if(v.isPressed())dirty=true;});
         smallBrightenLabel=text("",13,INK);b.addView(smallBrightenLabel);smallBrightenSlider=parameter(b,29,9,value->smallBrightenDelay=500+value*500);
         b.addView(text("0.5～15 秒。仅影响系统判定的微小变亮；关闭后沿用系统时间。",12,MUTED));
-        lowLightSwitch=new Switch(this);lowLightSwitch.setText(tr("暗光稳定"));lowLightSwitch.setTextSize(14);b.addView(lowLightSwitch,new LinearLayout.LayoutParams(-1,dp(48)));lowLightSwitch.setOnCheckedChangeListener((v,on)->{lowLightStability=on;if(v.isPressed())dirty=true;});
-        b.addView(text("默认关闭。已确认或候选照度不超过 50 lux 时，主、辅助光感至少持续变亮 3 秒、变暗 4 秒才确认；更长的原有等待保留。手动调节、熄屏、HDR、闲置与驾驶模式不受此项影响。",12,MUTED));
+        lowLightSwitch=new Switch(this);lowLightSwitch.setText(tr("暗光稳定"));lowLightSwitch.setTextSize(14);b.addView(lowLightSwitch,new LinearLayout.LayoutParams(-1,dp(48)));lowLightSwitch.setOnCheckedChangeListener((v,on)->{lowLightStability=on;if(v.isPressed())dirty=true;if(lowLimitSlider!=null)for(SeekBar slider:new SeekBar[]{lowLimitSlider,lowBrightSlider,lowDarkSlider})slider.setEnabled(on&&runtime!=null&&runtime.optBoolean("low_light_supported"));});
+        b.addView(text("默认关闭。在设定照度以内增加主、辅助光感的变化确认时间。手动调节、熄屏、HDR、闲置与驾驶模式继续沿用系统。",12,MUTED));
+        lowLimitLabel=text("",13,INK);b.addView(lowLimitLabel);lowLimitSlider=parameter(b,19,9,value->lowLightLimit=5+value*5);
+        lowBrightLabel=text("",13,INK);b.addView(lowBrightLabel);lowBrightSlider=parameter(b,6,4,value->lowLightBrighten=1000+value*500);
+        lowDarkLabel=text("",13,INK);b.addView(lowDarkLabel);lowDarkSlider=parameter(b,6,6,value->lowLightDarken=1000+value*500);
+        b.addView(text("适用照度 5～100 lux；变亮、变暗最短确认各为 1～4 秒。保留系统更长等待；辅助光感采样窗口仅 5 秒，因此确认时间最高 4 秒。",12,MUTED));
         b.addView(text("采样窗口不足时沿用原有等待，避免一直等不到确认。",12,MUTED));
         b=card(pages[1]);b.addView(text("界面",18,INK));refreshLabel=text("",13,INK);b.addView(refreshLabel);refreshSlider=parameter(b,4,refreshSeconds-1,value->{refreshSeconds=value+1;getPreferences(0).edit().putInt("refresh_seconds",refreshSeconds).apply();});
         b.addView(text("只影响状态显示，不改变亮度调节频率。",12,MUTED));
@@ -128,10 +135,13 @@ public final class MainActivity extends Activity {
     void makeLogs(){
         LinearLayout b=card(pages[2]);b.setPadding(dp(16),dp(12),dp(16),dp(12));b.addView(text("运行与兼容",17,INK));compatibility=text("正在等待系统状态…",13,MUTED);compatibility.setMaxLines(4);compatibility.setEllipsize(android.text.TextUtils.TruncateAt.END);b.addView(compatibility);
         b=card(pages[2]);LinearLayout.LayoutParams panel=(LinearLayout.LayoutParams)b.getLayoutParams();panel.height=0;panel.weight=1;panel.bottomMargin=0;b.setLayoutParams(panel);b.setPadding(dp(14),dp(12),dp(14),dp(12));
-        LinearLayout r=row(b);r.addView(text("最近运行记录",17,INK),new LinearLayout.LayoutParams(0,-2,1));Button refresh=action("刷新",()->run("inspect",null));refresh.setTextSize(12);r.addView(refresh,new LinearLayout.LayoutParams(dp(64),dp(32)));
+        LinearLayout r=row(b);r.addView(text("最近运行记录",15,INK),new LinearLayout.LayoutParams(0,-2,1));Button refresh=action("刷新",()->run("inspect",null));refresh.setTextSize(12);Switch follow=new Switch(this);follow.setText(tr("自动滚动"));follow.setTextSize(11);follow.setShowText(false);follow.setChecked(autoScroll);follow.setPadding(dp(4),0,dp(8),0);r.addView(follow,new LinearLayout.LayoutParams(-2,dp(36)));
+        follow.setOnCheckedChangeListener((v,on)->{autoScroll=on;getPreferences(0).edit().putBoolean("log_auto_scroll",on).apply();if(on)scrollLogs();});r.addView(refresh,new LinearLayout.LayoutParams(dp(52),dp(32)));
         TextView hint=text("当前系统进程 · 最近 160 条",11,MUTED);b.addView(hint);
         logText=text("尚无记录",12,INK);logText.setTypeface(Typeface.MONOSPACE);logText.setTextIsSelectable(true);logText.setPadding(dp(10),dp(8),dp(10),dp(8));
         logScroller=new ScrollView(this);logScroller.setBackground(background(0xfff2f4f8,12));logScroller.setClipToOutline(true);logScroller.addView(logText);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,0,1);lp.topMargin=dp(8);lp.bottomMargin=dp(8);b.addView(logScroller,lp);
+        logText.addOnLayoutChangeListener((v,l,t,right,bottom,ol,ot,or,ob)->{if(autoScroll&&bottom-t!=ob-ot)scrollLogs();});
+        logScroller.addOnLayoutChangeListener((v,l,t,right,bottom,ol,ot,or,ob)->{if(autoScroll&&bottom-t!=ob-ot)scrollLogs();});
         r=row(b);compact("亮度分支",this::branches,r);compact("详细读数",this::details,r);compact("导出分析包",()->run("export",null),r);
         b.addView(text("分析包保存到手机存储根目录",11,MUTED));note.setMaxLines(2);note.setEllipsize(android.text.TextUtils.TruncateAt.END);b.addView(note);
     }
@@ -143,10 +153,20 @@ public final class MainActivity extends Activity {
         r=row(b);compact("官网",()->open("https://lc.rongshangs.top"),r);compact("GitHub",()->open(UpdateChecker.REPO),r);compact("开源协议",()->open("https://www.gnu.org/licenses/gpl-3.0.html"),r);
         LinearLayout group=column();group.setPadding(dp(14),dp(12),dp(14),dp(12));group.setBackground(ripple(0xffeef3ff,14));group.setClipToOutline(true);group.setClickable(true);group.setOnClickListener(v->copyGroupNumber());lp=new LinearLayout.LayoutParams(-1,-2);lp.topMargin=dp(12);b.addView(group,lp);
         group.addView(text("QQ 交流群",12,MUTED));r=row(group);r.setBaselineAligned(false);TextView number=text("314981836",22,BLUE);number.setPadding(0,0,0,0);r.addView(number,new LinearLayout.LayoutParams(0,-2,1));Button copy=action("复制群号",this::copyGroupNumber);copy.setTextSize(12);copy.setPadding(dp(8),0,dp(8),0);r.addView(copy,new LinearLayout.LayoutParams(dp(88),dp(34)));group.addView(text("暗号：1691",12,MUTED));
-        b=card(pages[3]);b.addView(text("打赏",18,INK));b.addView(text("完全开源免费。欢迎捐赠 2.3 元支持开发。备注「昵称：想说的一句话」，总计不超过 30 个字符，下次更新加入感谢名单。",13,MUTED));r=row(b);compact("微信",()->donate("微信","donate-wechat.jpg"),r);compact("支付宝",()->donate("支付宝","donate-alipay.jpg"),r);
-        b=card(pages[3]);b.addView(text("感谢名单",18,INK));for(String line:new String[]{"戒戒：喵喵喵？","Starshine：好歹露个脸","H*P：感谢发电"})b.addView(text(line,14,INK));
+        b=card(pages[3]);b.addView(text("打赏",18,INK));b.addView(text("完全开源免费。欢迎捐赠 2.3 元支持开发。备注「昵称：想说的一句话」，总计不超过 30 个字符，将会尽快更新到感谢名单。",13,MUTED));r=row(b);compact("微信",()->donate("微信","donate-wechat.jpg"),r);compact("支付宝",()->donate("支付宝","donate-alipay.jpg"),r);
+        b=card(pages[3]);b.addView(text("感谢名单",18,INK));thanksList=column();b.addView(thanksList);thanksStatus=text("名单来自官网，联网时自动更新",11,MUTED);b.addView(thanksStatus);
+        try{JSONObject data;try{data=ThanksFeed.parse(getPreferences(0).getString("thanks_cache",null));}catch(Exception absent){data=ThanksFeed.parse(ThanksFeed.read(getAssets().open("thanks.json")));}renderThanks(data);}catch(Exception ignored){thanksStatus.setText("暂时无法读取名单");}
         b=card(pages[3]);r=row(b);r.addView(image("avatar.jpg",46,15));TextView author=text("戎Shang",19,INK);author.setPadding(dp(14),0,0,0);r.addView(author);r=row(b);compact("作者博客",()->open("https://rongshangs.top"),r);compact("酷安主页",()->open("https://www.coolapk.com/u/3261403"),r);
     }
+    void renderThanks(JSONObject data)throws JSONException{
+        thanksList.removeAllViews();JSONArray entries=data.getJSONArray("entries");
+        for(int i=0;i<entries.length();i++){JSONObject entry=entries.getJSONObject(i);TextView line=new TextView(this);line.setText(entry.getString("name")+"："+entry.getString("message"));line.setTextSize(14);line.setTextColor(INK);line.setPadding(0,dp(6),0,dp(6));thanksList.addView(line);}
+    }
+    void refreshThanks(){
+        if(thanksBusy||SystemClock.elapsedRealtime()-thanksChecked<60000&&thanksChecked!=0)return;thanksBusy=true;thanksChecked=SystemClock.elapsedRealtime();
+        network.execute(()->{try{JSONObject data=ThanksFeed.check();ui.post(()->{if(destroyed)return;thanksBusy=false;try{renderThanks(data);getPreferences(0).edit().putString("thanks_cache",data.toString()).apply();thanksStatus.setText("已同步官网感谢名单");}catch(Exception ignored){thanksStatus.setText("名单来自官网，联网时自动更新");}});}catch(Exception failure){ui.post(()->{if(destroyed)return;thanksBusy=false;thanksStatus.setText("暂未连接官网，显示已保存的名单");});}});
+    }
+    void scrollLogs(){if(logScroller!=null&&autoScroll)logScroller.post(()->{if(autoScroll&&!destroyed)logScroller.scrollTo(0,logText.getHeight());});}
     void copyGroupNumber(){android.content.ClipboardManager cm=(android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE);cm.setPrimaryClip(ClipData.newPlainText(tr("QQ 交流群"),"314981836"));show("已复制群号");}
     void rememberLegacy(JSONObject answer){JSONArray modules=answer.optJSONArray("legacy_modules");if(modules==null||modules.length()==0){pendingLegacy=null;legacyNotice="";return;}if(!modules.toString().equals(legacyNotice))pendingLegacy=modules;}
     void offerLegacyModules(){
@@ -164,7 +184,7 @@ public final class MainActivity extends Activity {
     void select(int value){int previous=page;page=Math.max(0,Math.min(3,value));header.setVisibility(page==3?View.GONE:View.VISIBLE);note.setVisibility(View.GONE);
         for(int i=0;i<4;i++){content.getChildAt(i).setVisibility(i==page?View.VISIBLE:View.GONE);if(nav[i]!=null){navNames[i].setTextColor(i==page?BLUE:MUTED);navIcons[i].selected=i==page;navIcons[i].invalidate();nav[i].setSelected(i==page);}}
         // Refresh the saved settings on every visit, without creating navigation history.
-        if(page==1&&previous!=1)dirty=false;if(page==3&&previous!=3&&visible)checkUpdate(false);if(visible){if(busy)rereadPending=true;else run("inspect",null);}
+        if(page==1&&previous!=1)dirty=false;if(page==3&&previous!=3&&visible){checkUpdate(false);refreshThanks();}if(page==2)scrollLogs();if(visible){if(busy)rereadPending=true;else run("inspect",null);}
     }
     void show(String message){if(!destroyed){note.setText(message);note.setVisibility(message==null||message.isEmpty()?View.GONE:View.VISIBLE);if(message!=null&&!message.isEmpty()&&page!=2)Toast.makeText(this,tr(message),Toast.LENGTH_SHORT).show();}}
     void permissionPrompt(String key,String title,String message){
@@ -185,13 +205,16 @@ public final class MainActivity extends Activity {
         coolingSlider.setProgress(Math.round((thermalCooling-1)*2));coolingLabel.setText("冷却幅度："+format(thermalCooling)+"℃");responseSwitch.setChecked(responseOverride);brightenSlider.setProgress((int)(brightenDelay-500)/500);darkenSlider.setProgress((int)(darkenDelay-1000)/500);brightenLabel.setText("变亮确认："+format(brightenDelay/1000d)+" 秒");darkenLabel.setText("变暗确认："+format(darkenDelay/1000d)+" 秒");refreshSlider.setProgress(refreshSeconds-1);refreshLabel.setText("状态刷新间隔："+refreshSeconds+" 秒");
         smallBrightenSwitch.setChecked(smallBrightenOverride);smallBrightenSlider.setProgress((int)(smallBrightenDelay-500)/500);smallBrightenLabel.setText("微小变亮确认："+format(smallBrightenDelay/1000d)+" 秒");
         lowLightSwitch.setChecked(lowLightStability);
+        lowLimitSlider.setProgress(Math.round((lowLightLimit-5)/5));lowLimitLabel.setText("暗光适用照度："+format(lowLightLimit)+" lux");
+        lowBrightSlider.setProgress((int)(lowLightBrighten-1000)/500);lowBrightLabel.setText("暗光最短变亮确认："+format(lowLightBrighten/1000d)+" 秒");
+        lowDarkSlider.setProgress((int)(lowLightDarken-1000)/500);lowDarkLabel.setText("暗光最短变暗确认："+format(lowLightDarken/1000d)+" 秒");
         try{if(factoryLux!=null)new CurvePlan(factoryLux,factoryNit,minimum,maximum,factors);curveHint.setText("拖动或点击节点 · 高照度端固定"+(dirty?" · 尚未保存":""));}catch(Exception error){curveHint.setText(error.getMessage());}
     }
     void submit(){
         if(factoryLux==null)return;
         try{new CurvePlan(factoryLux,factoryNit,minimum,maximum,factors);ThermalPolicy.validate(thermalCeiling);
             JSONObject options=new JSONObject().put("factors",CurvePlan.encode(factors)).put("thermal_relax",thermalRelax).put("thermal_ceiling",thermalCeiling).put("memory_strength",memoryEnabled?memoryStrength:0).put("memory_window",memoryWindow).put("memory_lux_range",memoryLuxRange).put("thermal_cooling",thermalCooling).put("response_override",responseOverride).put("brighten_delay",brightenDelay).put("darken_delay",darkenDelay).put("small_brighten_override",smallBrightenOverride).put("small_brighten_delay",smallBrightenDelay);
-            options.put("low_light_stability",lowLightStability);
+            options.put("low_light_stability",lowLightStability).put("low_light_limit",lowLightLimit).put("low_light_brighten",lowLightBrighten).put("low_light_darken",lowLightDarken);
             run("apply",Base64.getEncoder().encodeToString(options.toString().getBytes(StandardCharsets.UTF_8)));
         }catch(Exception error){show(error.getMessage());}
     }
@@ -245,7 +268,7 @@ public final class MainActivity extends Activity {
         ScrollView scroll=new ScrollView(this);scroll.addView(body);scroll.setLayoutParams(new LinearLayout.LayoutParams(-1,Math.min(dp(430),getResources().getDisplayMetrics().heightPixels-dp(240))));AlertDialog d=dialog("亮度分支",scroll);d.show();dialogButton(d,"关闭",null,true);
     }
     static String pretty(JSONObject object){try{return object.toString(2);}catch(Exception ignored){return object.toString();}}
-    void donate(String name,String file){try{ImageView v=image(file,240,12);v.setScaleType(ImageView.ScaleType.FIT_CENTER);LinearLayout box=column();box.setGravity(Gravity.CENTER_HORIZONTAL);box.addView(v);AlertDialog d=dialog(tr(name)+" · "+tr("打赏"),box);d.show();dialogButton(d,"关闭",null,false);}catch(Exception error){show(error.toString());}}
+    void donate(String name,String file){try{ImageView v=image(file,240,12);v.setScaleType(ImageView.ScaleType.FIT_CENTER);LinearLayout box=column();box.setGravity(Gravity.CENTER_HORIZONTAL);box.addView(v);TextView reminder=text("记得备注[昵称：想说的话]噢",13,MUTED);reminder.setGravity(Gravity.CENTER);box.addView(reminder);AlertDialog d=dialog(tr(name)+" · "+tr("打赏"),box);d.show();dialogButton(d,"关闭",null,false);}catch(Exception error){show(error.toString());}}
     void editPoint(int point){
         if(factoryLux==null)return;if(point==3){show("最高照度节点固定为系统上限");return;}
         try{float[] range=CurveEditor.bounds(point,factoryNit,minimum,maximum,factors);LinearLayout body=column();body.addView(text(format(factoryLux[point])+" lux · 节点强度",13,MUTED));
@@ -269,7 +292,7 @@ public final class MainActivity extends Activity {
         bridge=new ProcessBuilder("su","-c",command).redirectErrorStream(true).start();bridgeReader=new BufferedReader(new InputStreamReader(bridge.getInputStream(),StandardCharsets.UTF_8));bridgeWriter=new BufferedWriter(new OutputStreamWriter(bridge.getOutputStream(),StandardCharsets.UTF_8));
     }
     JSONObject request(String command,String payload)throws Exception{
-        connectBridge();final java.lang.Process current=bridge;Thread timeout=new Thread(()->{try{Thread.sleep(90000);current.destroyForcibly();}catch(InterruptedException ignored){}});timeout.setDaemon(true);timeout.start();
+        connectBridge();final java.lang.Process current=bridge;Thread timeout=new Thread(()->{try{Thread.sleep(command.equals("export")?300000:90000);current.destroyForcibly();}catch(InterruptedException ignored){}});timeout.setDaemon(true);timeout.start();
         try{
             bridgeWriter.write(new JSONObject().put("command",command).put("payload",payload==null?JSONObject.NULL:payload).toString());bridgeWriter.newLine();bridgeWriter.flush();
             String line;StringBuilder errors=new StringBuilder();while((line=bridgeReader.readLine())!=null){
@@ -314,7 +337,7 @@ public final class MainActivity extends Activity {
             runtime=answer.getJSONObject("runtime");if(!runtime.has("factory_lux")){factoryLux=factoryNit=null;badge.setText("不兼容");compatibility.setText(runtime.optString("message"));show("");apply.setEnabled(false);thermalSwitch.setEnabled(false);memorySwitch.setEnabled(false);permissionPrompt("abi","系统接口尚未兼容",runtime.optString("message"));return;}
             factoryLux=RootControl.numbers(runtime.getJSONArray("factory_lux"));factoryNit=RootControl.numbers(runtime.getJSONArray("factory_logical_nit"));minimum=(float)runtime.getDouble("min_logical_nit");maximum=(float)runtime.getDouble("max_logical_nit");
             JSONObject config=answer.optJSONObject("config");if(!dirty&&config!=null&&config.optBoolean("enabled")){factors=CurvePlan.factors(config.getString("factors"));thermalRelax=config.optBoolean("thermal_relax");thermalCeiling=(float)config.optDouble("thermal_ceiling",43);float memory=(float)config.optDouble("memory_strength",1);memoryEnabled=memory>0;if(memoryEnabled)memoryStrength=memory;memoryWindow=config.optLong("memory_window",1500);memoryLuxRange=(float)config.optDouble("memory_lux_range",.3);thermalCooling=(float)config.optDouble("thermal_cooling",1);responseOverride=config.optBoolean("response_override");brightenDelay=config.optLong("brighten_delay",1500);darkenDelay=config.optLong("darken_delay",5000);smallBrightenOverride=config.optBoolean("small_brighten_override");smallBrightenDelay=config.optLong("small_brighten_delay",5000);}
-            if(!dirty)lowLightStability=config!=null&&config.optBoolean("enabled")&&config.optBoolean("low_light_stability");
+            if(!dirty){lowLightStability=config!=null&&config.optBoolean("enabled")&&config.optBoolean("low_light_stability");lowLightLimit=config==null?50:(float)config.optDouble("low_light_limit",50);lowLightBrighten=config==null?3000:config.optLong("low_light_brighten",3000);lowLightDarken=config==null?4000:config.optLong("low_light_darken",4000);}
             JSONObject currentFrame=runtime.optJSONObject("last_pipeline");branchOverview.setText("曲线："+route(currentFrame)+" · 输出："+strategy()+"\nHDR："+observed(runtime,"hdr_active")+" · 点击查看亮度分支");
             String phase=runtime.optString("phase");boolean active=phase.equals("active"),auto=runtime.optBoolean("auto_mode");badge.setText(active?"运行中":phase.equals("error")?"接入异常":"官方基准");
             stateTitle.setText(active?(auto?"自动亮度已接入":"系统处于手动亮度"):phase.equals("error")?"已交回系统控制":"使用系统基础曲线");
@@ -327,16 +350,16 @@ public final class MainActivity extends Activity {
             memoryStatus.setText("手动记忆节点："+remembered+" 个");
             compatibility.setText("✓ Root 与系统框架已连接\n"+(phase.equals("error")?"○ 接入异常，请查看详细读数":active?"✓ 自定义曲线已应用":"○ 当前使用系统基础曲线")+"\n"+(runtime.optBoolean("thermal_supported")?"✓ 温控接口兼容":"○ 温控接口暂未兼容"));
             JSONArray logs=runtime.optJSONArray("logs");StringBuilder lines=new StringBuilder();if(logs!=null)for(int i=0;i<logs.length();i++)lines.append(logs.getString(i)).append('\n');String next=lines.length()==0?"尚无运行记录":lines.toString();
-            if(!tr(next).contentEquals(logText.getText())){boolean follow=logText.getHeight()-logScroller.getHeight()-logScroller.getScrollY()<dp(32);logText.setText(next);if(follow)logScroller.post(()->logScroller.fullScroll(View.FOCUS_DOWN));}
+            if(!tr(next).contentEquals(logText.getText())){int position=logScroller.getScrollY();logText.setText(next);if(autoScroll)scrollLogs();else logScroller.post(()->logScroller.scrollTo(0,position));}
             // After an OTA, an unsupported option that was enabled must still be switchable off.
             smallBrightenSwitch.setEnabled(runtime.optBoolean("small_response_supported")||smallBrightenOverride);smallBrightenSlider.setEnabled(runtime.optBoolean("small_response_supported"));
-            lowLightSwitch.setEnabled(runtime.optBoolean("low_light_supported")||lowLightStability);
+            lowLightSwitch.setEnabled(runtime.optBoolean("low_light_supported")||lowLightStability);for(SeekBar slider:new SeekBar[]{lowLimitSlider,lowBrightSlider,lowDarkSlider})slider.setEnabled(runtime.optBoolean("low_light_supported")&&lowLightStability);
             thermalSwitch.setEnabled(runtime.optBoolean("thermal_supported")||thermalRelax);responseSwitch.setEnabled(runtime.optBoolean("response_supported")||responseOverride);brightenSlider.setEnabled(runtime.optBoolean("response_supported"));darkenSlider.setEnabled(runtime.optBoolean("response_supported"));memorySwitch.setEnabled(true);apply.setEnabled(true);permissionNotice="";permissionBlocked=false;drawCurve();
             if(!firmwarePrompted&&config!=null&&config.optBoolean("enabled")&&!config.optString("fingerprint").equals(Build.FINGERPRINT)){firmwarePrompted=true;AlertDialog d=dialog("系统已更新",text("当前已恢复系统曲线。请核对兼容状态，再重新保存并应用。",14,MUTED));d.show();dialogButton(d,"知道了",null,true);}if(!busy&&!dirty)show("");
         }catch(Exception error){runtime=null;factoryLux=factoryNit=null;apply.setEnabled(false);stateGraph.invalidate();pipeline.invalidate();show("状态格式不兼容："+error);}
     }
     static String severity(int level){String[] names={"正常","轻微","中等","严重","危急","紧急","关机"};return level>=0&&level<names.length?names[level]:"未知";}
-    @Override public void onResume(){super.onResume();visible=true;permissionNotice="";permissionBlocked=false;run("inspect",null);ui.removeCallbacks(tick);ui.postDelayed(tick,refreshSeconds*1000);checkUpdate(false);offerLegacyModules();offerUpdate();}
+    @Override public void onResume(){super.onResume();visible=true;permissionNotice="";permissionBlocked=false;run("inspect",null);ui.removeCallbacks(tick);ui.postDelayed(tick,refreshSeconds*1000);checkUpdate(false);if(page==3)refreshThanks();offerLegacyModules();offerUpdate();}
     @Override public void onPause(){visible=false;ui.removeCallbacks(tick);getPreferences(0).edit().putString("draft",CurvePlan.encode(factors)).apply();if(!busy)worker.execute(this::closeBridge);super.onPause();}
     @Override public void onSaveInstanceState(Bundle saved){saved.putInt("page",page);super.onSaveInstanceState(saved);}
     @Override public void onDestroy(){destroyed=true;if(!busy)closeBridge();worker.shutdown();network.shutdownNow();super.onDestroy();}
@@ -353,9 +376,10 @@ public final class MainActivity extends Activity {
     final class PipelineBoard extends ViewGroup {
         final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);final RectF[] boxes=new RectF[6];
         PipelineBoard(){super(MainActivity.this);setWillNotDraw(false);for(int i=0;i<6;i++)boxes[i]=new RectF();stateGraph=new CurveView(false);addView(stateGraph);addView(branchOverview);setContentDescription(tr("主光感和辅助光感，经融合与场景判断产生有效照度"));}
-        void layoutBoxes(){float w=getWidth(),h=getHeight(),gap=dp(12),half=(w-gap)/2;boxes[0].set(0,0,half,h*.12f);boxes[1].set(half+gap,0,w,h*.12f);boxes[2].set(0,h*.16f,w,h*.37f);boxes[3].set(0,h*.43f,w,h*.70f);boxes[4].set(0,h*.74f,w,h*.845f);boxes[5].set(0,h*.885f,w,h);}
-        @Override protected void onMeasure(int ws,int hs){int w=MeasureSpec.getSize(ws),h=MeasureSpec.getSize(hs);setMeasuredDimension(w,h);stateGraph.measure(MeasureSpec.makeMeasureSpec(Math.max(0,w-dp(20)),MeasureSpec.EXACTLY),MeasureSpec.makeMeasureSpec(Math.max(0,(int)(h*.27f)-dp(20)),MeasureSpec.EXACTLY));branchOverview.measure(MeasureSpec.makeMeasureSpec(Math.max(0,w-dp(24)),MeasureSpec.EXACTLY),MeasureSpec.makeMeasureSpec(Math.max(0,(int)(h*.21f*.46f)-dp(8)),MeasureSpec.EXACTLY));}
-        @Override protected void onLayout(boolean changed,int l,int t,int r,int b){layoutBoxes();RectF graph=boxes[3];stateGraph.layout(dp(10),(int)graph.top+dp(10),getWidth()-dp(10),(int)graph.bottom-dp(10));RectF fused=boxes[2];branchOverview.layout(dp(12),(int)(fused.top+fused.height()*.54f),getWidth()-dp(12),(int)fused.bottom-dp(8));}
+        void layoutBoxes(){float w=getWidth(),h=getHeight(),gap=dp(12),half=(w-gap)/2;boxes[0].set(0,0,half,h*.12f);boxes[1].set(half+gap,0,w,h*.12f);boxes[2].set(0,h*.16f,w,h*.30f);boxes[3].set(0,h*.36f,w,h*.70f);boxes[4].set(0,h*.74f,w,h*.845f);boxes[5].set(0,h*.885f,w,h);}
+        int branchHeight(int h){return Math.min(dp(46),Math.max(dp(30),(int)(h*.085f)));}
+        @Override protected void onMeasure(int ws,int hs){int w=MeasureSpec.getSize(ws),h=MeasureSpec.getSize(hs);setMeasuredDimension(w,h);int bh=branchHeight(h);stateGraph.measure(MeasureSpec.makeMeasureSpec(Math.max(0,w-dp(20)),MeasureSpec.EXACTLY),MeasureSpec.makeMeasureSpec(Math.max(0,(int)(h*.34f)-dp(18)-bh),MeasureSpec.EXACTLY));branchOverview.measure(MeasureSpec.makeMeasureSpec(Math.max(0,w-dp(24)),MeasureSpec.EXACTLY),MeasureSpec.makeMeasureSpec(bh,MeasureSpec.EXACTLY));}
+        @Override protected void onLayout(boolean changed,int l,int t,int r,int b){layoutBoxes();RectF graph=boxes[3];int bottom=(int)graph.bottom-dp(6),top=bottom-branchHeight(getHeight());stateGraph.layout(dp(10),(int)graph.top+dp(8),getWidth()-dp(10),top-dp(4));branchOverview.layout(dp(12),top,getWidth()-dp(12),bottom);}
         void prepareLabel(String value,int size,int color,float width){paint.setColor(color);paint.setStyle(Paint.Style.FILL);float scale=Math.min(1,Math.max(.65f,getHeight()/(float)dp(440)));paint.setTextSize(dp(Math.max(9,size*scale)));while(paint.measureText(value)>width&&paint.getTextSize()>dp(9))paint.setTextSize(paint.getTextSize()-1);}
         void label(Canvas c,String value,float x,float y,int size,int color,float width){value=tr(value);prepareLabel(value,size,color,width);c.drawText(value,x-paint.measureText(value)/2,y,paint);}
         void labelStart(Canvas c,String value,float x,float y,int size,int color,float width){value=tr(value);prepareLabel(value,size,color,width);c.drawText(value,x,y,paint);}
@@ -370,7 +394,7 @@ public final class MainActivity extends Activity {
             for(int i=2;i<5;i++)connection(c,middle,boxes[i].bottom,boxes[i+1].top);paint.setPathEffect(null);paint.setStyle(Paint.Style.FILL);
             for(int i=0;i<6;i++){paint.setColor(i==1?0xffeef0f4:i==2?0xffedf3ff:Color.WHITE);c.drawRoundRect(boxes[i],dp(17),dp(17),paint);}
             for(int i=0;i<2;i++){RectF box=boxes[i];label(c,i==0?"主光感":"辅助光感",box.centerX(),box.top+box.height()*.35f,12,MUTED,box.width()-dp(14));label(c,reading(i==0?"main_fast_lux":"assist_fast_lux"," lux"),box.centerX(),box.top+box.height()*.77f,22,i==0?BLUE:INK,box.width()-dp(14));}
-            RectF fused=boxes[2];label(c,"融合滤波与场景判定",middle,fused.top+fused.height()*.19f,13,MUTED,w-dp(20));label(c,reading(runtime!=null&&runtime.has("official_effective_lux")?"official_effective_lux":"last_lux"," lux"),middle,fused.top+fused.height()*.44f,24,BLUE,w-dp(20));
+            RectF fused=boxes[2];label(c,"融合滤波与场景判定",middle,fused.top+fused.height()*.35f,13,MUTED,w-dp(20));label(c,reading(runtime!=null&&runtime.has("official_effective_lux")?"official_effective_lux":"last_lux"," lux"),middle,fused.top+fused.height()*.78f,24,BLUE,w-dp(20));
             float thresholdY=(fused.bottom+boxes[3].top)/2+dp(3),thresholdGap=dp(6);labelEnd(c,runtime!=null&&runtime.has("darkening_lux_threshold")?"变暗 < "+format(runtime.optDouble("darkening_lux_threshold"))+" lux":"变暗 —",middle-thresholdGap,thresholdY,10,MUTED,w/2-dp(12));labelStart(c,runtime!=null&&runtime.has("brightening_lux_threshold")?"变亮 > "+format(runtime.optDouble("brightening_lux_threshold"))+" lux":"变亮 —",middle+thresholdGap,thresholdY,10,MUTED,w/2-dp(12));
             RectF thermal=boxes[4];labelStart(c,"温控",dp(16),thermal.top+thermal.height()*.60f,14,INK,dp(50));paint.setColor(0xffe5eaf2);paint.setStrokeWidth(dp(1));c.drawLine(dp(72),thermal.top+dp(12),dp(72),thermal.bottom-dp(12),paint);
             String control=runtime==null?"暂无读数":runtime.optBoolean("thermal_relax")&&runtime.optBoolean("thermal_permitted")?"减少温控降亮":"系统温控生效";labelStart(c,control,dp(88),thermal.top+thermal.height()*.40f,13,INK,w-dp(100));labelStart(c,"电池 "+reading("battery_temperature","℃")+" · "+(runtime==null?"未知":severity(runtime.optInt("thermal_severity",-1))),dp(88),thermal.top+thermal.height()*.78f,11,MUTED,w-dp(100));

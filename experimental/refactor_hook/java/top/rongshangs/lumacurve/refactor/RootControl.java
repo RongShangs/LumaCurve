@@ -125,6 +125,7 @@ public final class RootControl implements AutoCloseable {
         if(response&&!state.optBoolean("response_supported"))throw new IOException("此系统的确认时间接口暂未兼容");
         if(small&&!state.optBoolean("small_response_supported"))throw new IOException("此系统的微小变亮接口暂未兼容");
         boolean lowLight=options.optBoolean("low_light_stability",false);
+        float lowLimit=(float)options.optDouble("low_light_limit",50);long lowBright=options.optLong("low_light_brighten",3000),lowDark=options.optLong("low_light_darken",4000);LowLightPolicy.validate(lowLimit,lowBright,lowDark);
         if(lowLight&&!state.optBoolean("low_light_supported"))throw new IOException("暗光稳定接口尚未完整兼容");
         if(thermal&&!state.optBoolean("thermal_supported"))throw new IOException("此固件温控亮度接口尚未兼容，不能启用该选项");
         float[] f=CurvePlan.factors(factors);
@@ -138,7 +139,7 @@ public final class RootControl implements AutoCloseable {
             .put("fingerprint",Build.FINGERPRINT).put("user_serial",0).put("factors",CurvePlan.encode(f)).put("thermal_relax",thermal).put("thermal_ceiling",ceiling).put("memory_strength",memory);
         config.put("memory_window",memoryMs).put("memory_lux_range",memoryRange).put("thermal_cooling",cooling).put("response_override",response).put("brighten_delay",bright).put("darken_delay",dark);
         config.put("small_brighten_override",small).put("small_brighten_delay",smallMs);
-        config.put("low_light_stability",lowLight);
+        config.put("low_light_stability",lowLight).put("low_light_limit",lowLimit).put("low_light_brighten",lowBright).put("low_light_darken",lowDark);
         try {
             prepare();
             progress("提交小米基础曲线并等待系统确认…");
@@ -163,26 +164,28 @@ public final class RootControl implements AutoCloseable {
         return new JSONObject().put("ok",true).put("message",connected?"已恢复官方基础曲线，并恢复由本应用暂停的旧模块":"关闭请求已保存；请重启后再点停用，确认恢复并解除旧模块暂停");
     }
     String export()throws Exception {
-        File file=new File("/sdcard/LumaCurve-analysis-"+new SimpleDateFormat("yyyyMMdd-HHmmss",Locale.ROOT).format(new Date())+"-"+UUID.randomUUID().toString().substring(0,6)+".zip");
-        try(ZipOutputStream zip=new ZipOutputStream(new FileOutputStream(file))) {
-            progress("1/4 收集曲线、运行状态与本次系统进程日志…");
-            JSONObject state=inspect();write(zip,"state.json",state.toString(2));
-            JSONObject runtime=state.optJSONObject("runtime");JSONArray logs=runtime==null?null:runtime.optJSONArray("logs");StringBuilder text=new StringBuilder();
-            if(logs!=null)for(int i=0;i<logs.length();i++)text.append(logs.getString(i)).append('\n');write(zip,"logs.txt",text.toString());
-            if(runtime!=null){
-                JSONArray pipeline=runtime.optJSONArray("pipeline_trace"),output=runtime.optJSONArray("output_trace");
-                write(zip,"pipeline-trace.json",pipeline==null?"[]":pipeline.toString(2));write(zip,"output-trace.json",output==null?"[]":output.toString(2));
-                write(zip,"trace-readme.txt","Pipeline records group stages from ONE updateAutoBrightness call. Values are framework brightness coordinates (0..1), not nit or percent. Missing fields mean unobserved, not disabled.\nOutput records are separate later calls, not automatically attributed to a calculation. Use uptime_ms within this boot, or unix_ms for wall time. Reason modifiers may describe multiple policies. Sensor readings are OEM filtered readings, not raw samples.\nBounded history: latest 24 calculations and 16 output calls; no continuous recording or extra sensor subscriptions.\n");
+        String name="LumaCurve-analysis-"+new SimpleDateFormat("yyyyMMdd-HHmmss",Locale.ROOT).format(new Date())+"-"+UUID.randomUUID().toString().substring(0,6)+".zip";
+        File file=new File("/sdcard",name),partial=new File("/sdcard",name+".partial");
+        try {
+            try(ZipOutputStream zip=new ZipOutputStream(new FileOutputStream(partial))) {
+                zip.setLevel(Deflater.BEST_SPEED);
+                progress("1/8 收集曲线、运行状态与本次系统进程日志…");
+                JSONObject state=inspect();write(zip,"state.json",state.toString(2));
+                JSONObject runtime=state.optJSONObject("runtime");JSONArray logs=runtime==null?null:runtime.optJSONArray("logs");StringBuilder text=new StringBuilder();
+                if(logs!=null)for(int i=0;i<logs.length();i++)text.append(logs.getString(i)).append('\n');write(zip,"logs.txt",text.toString());
+                if(runtime!=null){
+                    JSONArray pipeline=runtime.optJSONArray("pipeline_trace"),output=runtime.optJSONArray("output_trace");
+                    write(zip,"pipeline-trace.json",pipeline==null?"[]":pipeline.toString(2));write(zip,"output-trace.json",output==null?"[]":output.toString(2));
+                    write(zip,"trace-readme.txt","Pipeline records group stages from ONE updateAutoBrightness call. Values are framework brightness coordinates (0..1), not nit or percent. Missing fields mean unobserved, not disabled.\nOutput records are separate later calls, not automatically attributed to a calculation. Use uptime_ms within this boot, or unix_ms for wall time. Sensor readings are OEM filtered readings, not raw samples.\nBounded history: latest 24 calculations and 16 output calls.\n");
+                }
+                write(zip,"config.json",String.valueOf(settings.get(CONFIG)));write(zip,"stored-hook-status.json",String.valueOf(settings.get(STATUS)));write(zip,"build.txt",BUILD+"\n"+Build.FINGERPRINT+"\n");
+                new DiagnosticCollector(zip).collect();
+                progress("8/8 完成压缩并校验分析包…");
             }
-            write(zip,"config.json",String.valueOf(settings.get(CONFIG)));
-            progress("2/4 收集系统显示链路…");
-            try{write(zip,"display.txt",process("dumpsys","display"));}catch(Exception error){write(zip,"display-error.txt",error.toString());}
-            progress("3/4 收集系统温控与固件信息…");
-            try{write(zip,"thermal.txt",process("dumpsys","thermalservice"));}catch(Exception error){write(zip,"thermal-error.txt",error.toString());}
-            try{write(zip,"battery.txt",process("dumpsys","battery"));}catch(Exception error){write(zip,"battery-error.txt",error.toString());}
-            write(zip,"build.txt",BUILD+"\n"+Build.FINGERPRINT+"\n");
-            progress("4/4 完成分析包…");
-        }catch(Exception failure){file.delete();throw failure;}return file.toString();
+            // Do not advertise a partial archive after cancellation, disk full or a write error.
+            try(ZipFile check=new ZipFile(partial)){byte[] buffer=new byte[65536];Enumeration<? extends ZipEntry> entries=check.entries();while(entries.hasMoreElements()){ZipEntry entry=entries.nextElement();CRC32 crc=new CRC32();long size=0;try(InputStream in=check.getInputStream(entry)){int count;while((count=in.read(buffer))!=-1){crc.update(buffer,0,count);size+=count;}}if(crc.getValue()!=entry.getCrc()||size!=entry.getSize())throw new IOException("分析包校验失败："+entry.getName());}}
+            Files.move(partial.toPath(),file.toPath());return file.toString();
+        }catch(Exception failure){partial.delete();throw failure;}
     }
     static void write(ZipOutputStream zip,String name,String data)throws IOException{zip.putNextEntry(new ZipEntry(name));zip.write(data.getBytes(StandardCharsets.UTF_8));zip.closeEntry();}
     static float[] numbers(JSONArray array)throws JSONException {float[] out=new float[array.length()];for(int i=0;i<out.length;i++)out[i]=(float)array.getDouble(i);return out;}

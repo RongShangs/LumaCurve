@@ -4,7 +4,7 @@ import hashlib,json,zipfile,xml.etree.ElementTree as ET
 ROOT=Path(__file__).resolve().parents[1];site=ROOT.parent/'web'
 manifest=ET.parse(ROOT/'experimental/refactor_hook/AndroidManifest.xml').getroot()
 version=manifest.attrib['{http://schemas.android.com/apk/res/android}versionName']
-required=['index.html','assets/site.js','assets/site.css','assets/donate-wechat.jpg','assets/donate-alipay.jpg',
+required=['index.html','thanks.json','thanks.js','assets/site.js','assets/site.css','assets/donate-wechat.jpg','assets/donate-alipay.jpg',
           f'downloads/HyperLux-{version}.apk',f'downloads/LumaCurve-{version}-source.zip',f'downloads/LumaCurve-{version}.zip',
           'downloads/SHA256SUMS.txt','update.json','update.js']
 assert all((site/name).is_file() for name in required),'Run tools/sync_website.py first'
