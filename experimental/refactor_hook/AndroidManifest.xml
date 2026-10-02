@@ -1,4 +1,4 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="top.rongshangs.lumacurve" android:versionCode="20000" android:versionName="2.0.0">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="top.rongshangs.lumacurve" android:versionCode="20001" android:versionName="2.0.1">
     <uses-sdk android:minSdkVersion="34" android:targetSdkVersion="34"/>
     <uses-permission android:name="android.permission.INTERNET"/>
     <application android:label="HyperLux" android:theme="@style/AppTheme" android:icon="@drawable/icon" android:roundIcon="@drawable/icon" android:allowBackup="false" android:supportsRtl="true">

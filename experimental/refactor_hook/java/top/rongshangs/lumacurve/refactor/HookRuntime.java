@@ -11,7 +11,7 @@ import java.util.*;
 import java.text.SimpleDateFormat;
 
 final class HookRuntime {
-    static final String BUILD="release-2.0.0-r2",CONFIG="lumacurve_refactor_config_v1",STATUS="lumacurve_refactor_status_v1",REFRESH="lumacurve_refactor_refresh_v1";
+    static final String BUILD=AppBuild.BUILD,CONFIG="lumacurve_refactor_config_v1",STATUS="lumacurve_refactor_status_v1",REFRESH="lumacurve_refactor_refresh_v1";
     final Object owner; final RefactorAdapter kernel; final Handler handler; final Context context;
     final String fingerprint; final ContentObserver observer,refresh;
     final ThermalPolicy thermalGate=new ThermalPolicy();
@@ -28,12 +28,19 @@ final class HookRuntime {
     float memoryStrength=1;long memoryEvents,lastMemoryLog;String lastReset="";
     boolean responseEnabled;long brightenDelay=1500,darkenDelay=5000,responseAdjustments,memoryWindow=1500;float memoryLuxRange=.3f,thermalCooling=1;
     boolean smallResponseEnabled;long smallBrightenDelay=5000,smallResponseAdjustments;
+    boolean lowLightEnabled;long lowLightMainAdjustments,lowLightAssistAdjustments;
+    final PipelineHistory pipelineHistory=new PipelineHistory();PipelineHistory.Frame traceFrame;
+    final ArrayDeque<JSONObject> outputHistory=new ArrayDeque<>();
+    final Map<String,JSONObject> lastOutput=new HashMap<>();
+    java.lang.reflect.Method hdrProbe;
+    java.lang.reflect.Method strategyProbe;Object strategyController;
     HookRuntime(Object owner,Object ref,Handler handler)throws Exception {
         this.owner=owner;this.handler=handler;context=(Context)HookEntry.get(owner,"mContext");fingerprint=Build.FINGERPRINT;
         Class<?> util=Class.forName("com.android.server.display.RefactorBrightnessUtil",true,ref.getClass().getClassLoader());
         if(HookEntry.field(util,"MIN_NIT").getType()!=float.class||HookEntry.field(util,"MAX_NIT").getType()!=float.class)throw new IllegalStateException("逻辑亮度边界类型已变化");
         float min=((Number)HookEntry.field(util,"MIN_NIT").get(null)).floatValue(),max=((Number)HookEntry.field(util,"MAX_NIT").get(null)).floatValue();
         kernel=new RefactorAdapter(ref,min,max);
+        try{hdrProbe=owner.getClass().getDeclaredMethod("isHdrScene");if(hdrProbe.getReturnType()!=boolean.class)hdrProbe=null;else hdrProbe.setAccessible(true);}catch(Throwable optional){}
         observer=new ContentObserver(handler){public void onChange(boolean self){reload();}};
         refresh=new ContentObserver(handler){public void onChange(boolean self){viewUntil=SystemClock.elapsedRealtime()+5000;publish();}};
         power=(PowerManager)context.getSystemService(Context.POWER_SERVICE);
@@ -96,6 +103,7 @@ final class HookRuntime {
     }
     void reload(){
         if(closed||changing)return;changing=true;
+        lowLightEnabled=false;
         try{
             String text=Settings.Global.getString(context.getContentResolver(),CONFIG);
             if(text==null||text.equals("null")){
@@ -122,6 +130,8 @@ final class HookRuntime {
                     memoryWindow=memoryMs;memoryLuxRange=memoryRange;memoryPolicy.configure(memoryMs,memoryRange);thermalCooling=cooling;thermalGate.configure(cooling);
                     brightenDelay=bright;darkenDelay=dark;responseEnabled=config.optBoolean("response_override",false);
                     smallBrightenDelay=small;smallResponseEnabled=config.optBoolean("small_brighten_override",false);
+                    lowLightEnabled=config.optBoolean("low_light_stability",false);
+                    if(lowLightEnabled&&!LowLightTuning.supported(this))throw new IllegalArgumentException("暗光稳定接口尚未完整兼容");
                     phase="active";message="自定义曲线已接入，官方光感和过渡动画继续运行";
                     log(curveChanged?"曲线已应用，重新建立基础锚点":"设置已更新，保留当前手动锚点");
                 }else{
@@ -134,6 +144,7 @@ final class HookRuntime {
             }
             consumed=0;lastLux=lastNit=Float.NaN;thermalAllowed=relaxThermal();publish();requestRecalculation();
         }catch(Throwable error){
+            lowLightEnabled=false;
             thermalEnabled=false;responseEnabled=false;smallResponseEnabled=false;memoryStrength=1;try{kernel.configure(null);}catch(Throwable rollback){XposedBridge.log("LumaCurve fallback failed: "+rollback);}
             phase="error";message="未启用："+error;log(message);publish();
         }finally{changing=false;}
@@ -146,7 +157,7 @@ final class HookRuntime {
         }catch(Throwable notReady){XposedBridge.log("LumaCurve deferred OEM update: "+notReady);}
     }
     void fault(Throwable error){
-        if(closed||faultPending)return;faultPending=true;thermalEnabled=false;
+        if(closed||faultPending)return;faultPending=true;thermalEnabled=false;lowLightEnabled=false;
         handler.post(()->{if(closed)return;try{kernel.configure(null);}catch(Throwable ignored){}
             phase="error";message="接入异常，已尝试恢复官方："+error;log(message);publish();faultPending=false;});
     }
@@ -173,6 +184,13 @@ final class HookRuntime {
             status.put("memory_window",memoryWindow).put("memory_lux_range",memoryLuxRange).put("thermal_cooling",thermalCooling)
                 .put("response_supported",ResponseTuning.supported(owner)).put("response_override",responseEnabled).put("brighten_delay",brightenDelay).put("darken_delay",darkenDelay).put("response_adjustments",responseAdjustments);
             status.put("small_response_supported",ResponseTuning.smallSupported(owner)).put("small_brighten_override",smallResponseEnabled).put("small_brighten_delay",smallBrightenDelay).put("small_response_adjustments",smallResponseAdjustments);
+            status.put("low_light_supported",LowLightTuning.supported(this)).put("low_light_stability",lowLightEnabled)
+                .put("low_light_limit_lux",LowLightPolicy.LIMIT_LUX).put("low_light_brighten_ms",LowLightPolicy.BRIGHTEN_MS).put("low_light_darken_ms",LowLightPolicy.DARKEN_MS)
+                .put("low_light_main_adjustments",lowLightMainAdjustments).put("low_light_assist_adjustments",lowLightAssistAdjustments);
+            JSONArray trace=new JSONArray();for(PipelineHistory.Frame f:pipelineHistory.snapshot())trace.put(traceJson(f));
+            status.put("pipeline_trace",trace).put("output_trace",new JSONArray(outputHistory));
+            PipelineHistory.Frame recent=pipelineHistory.last();if(recent!=null)status.put("last_pipeline",traceJson(recent));
+            Boolean hdr=hdrActive();if(hdr!=null)status.put("hdr_active",hdr);
             int count=kernel.integer("mAnchorCount");
             status.put("current_anchors_lux",array(Arrays.copyOf((float[])kernel.get("mAnchorLux"),count)))
                 .put("current_anchors_nit",array(Arrays.copyOf((float[])kernel.get("mAnchorNit"),count)));
@@ -195,6 +213,14 @@ final class HookRuntime {
         }catch(Throwable error){XposedBridge.log("LumaCurve status: "+error);}
     }
     void collectOfficial(JSONObject status){
+        try{Object dpc=HookEntry.get(owner,"mDisplayPowerController");String strategy=outputStrategy(dpc);if(strategy!=null)status.put("output_strategy",strategy);
+            status.put("output_reason",String.valueOf(HookEntry.get(dpc,"mBrightnessReason")));
+        }catch(Throwable optional){}
+        try{Object hbm=HookEntry.get(owner,"mHbmController");if(hbm!=null){
+            int mode=((Number)hbm.getClass().getMethod("getHighBrightnessMode").invoke(hbm)).intValue();status.put("hbm_mode",mode);
+            Class<?> info=Class.forName("android.hardware.display.BrightnessInfo",false,owner.getClass().getClassLoader());
+            int sunlight=info.getField("HIGH_BRIGHTNESS_MODE_SUNLIGHT").getInt(null);status.put("sunlight_active",mode==sunlight);
+        }}catch(Throwable optional){}
         try{
             Object impl=HookEntry.get(owner,"mAutomaticBrightnessControllerImpl"),abc=HookEntry.get(impl,"mAutomaticBrightnessController");
             readNumber(status,"official_effective_lux",abc,"mAmbientLux");readNumber(status,"official_observed_lux",abc,"mLastObservedLux");
@@ -204,12 +230,93 @@ final class HookRuntime {
                 status.put("assist_valid",HookEntry.get(dual,"mAssistAmbientLuxValid"));
                 if((Boolean)HookEntry.get(dual,"mAssistAmbientLuxValid"))readNumber(status,"assist_fast_lux",dual,"mAssistFastAmbientLux");
                 status.put("sensor_policy_flag",HookEntry.get(dual,"mUseLightSensorFlag"));
+                String reference=sensorName(((Number)HookEntry.get(dual,"mUseLightSensorFlag")).intValue());if(reference!=null)status.put("sensor_reference_name",reference);
             }
             status.put("proximity_near",HookEntry.get(impl,"mProximityPositive"));
         }catch(Throwable optional){}
         readNumber(status,"official_thermal_cap",owner,"mThermalMaxBrightness");
     }
     static void readNumber(JSONObject json,String key,Object object,String field){try{float n=((Number)HookEntry.get(object,field)).floatValue();if(Float.isFinite(n)&&n>=0)json.put(key,n);}catch(Throwable optional){}}
+    Boolean hdrActive(){try{return hdrProbe==null?null:(Boolean)hdrProbe.invoke(owner);}catch(Throwable absent){return null;}}
+    float mainCandidate(Object abc,Object impl){
+        try{Object dual=HookEntry.get(impl,"mDualSensorPolicy");if(dual!=null)return optionalNumber(dual,"mMainFastAmbientLux");}catch(Throwable absent){}
+        return optionalNumber(abc,"mFastAmbientLux");
+    }
+    String sensorName(int flag){try{Class<?> stub=Class.forName("com.android.server.display.AutomaticBrightnessControllerStub",false,owner.getClass().getClassLoader());
+        int main=HookEntry.field(stub,"USE_MAIN_LIGHT_SENSOR").getInt(null),assist=HookEntry.field(stub,"USE_ASSIST_LIGHT_SENSOR").getInt(null);
+        return flag==main?"main":flag==assist?"assist":"other";
+    }catch(Throwable absent){return null;}}
+    boolean lowLightApplies(Object abc,Object impl,float candidateLux){
+        if(!lowLightEnabled||closed||!phase.equals("active")||!appliesToUser())return false;
+        try{Boolean hdr=hdrActive();if(hdr==null)return false;
+            if(!Boolean.TRUE.equals(optionalBoolean(abc,"mAmbientLuxValid")))return false;
+            Object dpc=HookEntry.get(owner,"mDisplayPowerController"),display=dpc.getClass().getMethod("getDisplayPowerState").invoke(dpc);
+            int screen=((Number)display.getClass().getMethod("getScreenState").invoke(display)).intValue();
+            java.lang.reflect.Method idle=abc.getClass().getDeclaredMethod("isInIdleMode");idle.setAccessible(true);
+            return LowLightPolicy.applies(true,(Boolean)kernel.get("mUseAutoBrightness"),screen==2,
+                (Boolean)idle.invoke(abc),(Boolean)impl.getClass().getMethod("getDrivingStatus").invoke(impl),hdr,
+                ((Number)HookEntry.get(abc,"mAmbientLux")).floatValue(),candidateLux);
+        }catch(Throwable absent){return false;}
+    }
+    static float optionalNumber(Object o,String field){try{return ((Number)HookEntry.get(o,field)).floatValue();}catch(Throwable absent){return Float.NaN;}}
+    static Boolean optionalBoolean(Object o,String field){try{return (Boolean)HookEntry.get(o,field);}catch(Throwable absent){return null;}}
+    PipelineHistory.Frame beginTrace(Object abc){
+        PipelineHistory.Frame f=pipelineHistory.begin(SystemClock.uptimeMillis(),System.currentTimeMillis());f.lux=optionalNumber(abc,"mAmbientLux");
+        f.nightWake=optionalBoolean(abc,"mIsNightWakeMode");
+        try{Object model=HookEntry.get(abc,"mShortTermModel");Boolean valid=optionalBoolean(model,"mIsValid");float anchor=optionalNumber(model,"mAnchor");
+            if(valid!=null&&Float.isFinite(anchor))f.shortTermMemory=valid&&anchor>=0;
+        }catch(Throwable absent){}
+        try{Object impl=HookEntry.get(owner,"mAutomaticBrightnessControllerImpl"),dual=HookEntry.get(impl,"mDualSensorPolicy");
+            f.main=optionalNumber(dual,"mMainFastAmbientLux");if(Boolean.TRUE.equals(optionalBoolean(dual,"mAssistAmbientLuxValid")))f.assist=optionalNumber(dual,"mAssistFastAmbientLux");
+            f.sensor=((Number)HookEntry.get(dual,"mUseLightSensorFlag")).intValue();
+            f.sensorName=sensorName(f.sensor);
+        }catch(Throwable absent){}return f;
+    }
+    void finishTrace(PipelineHistory.Frame f,Object abc,boolean failed){
+        if(f.route.equals("unobserved")&&!failed)return;
+        f.failed=failed;f.finalTarget=optionalNumber(abc,"mScreenAutoBrightness");PipelineHistory.Frame previous=pipelineHistory.last();
+        pipelineHistory.finish(f);
+        if(previous!=null&&Float.isFinite(f.lux)&&Float.isFinite(previous.lux)&&Math.abs(f.lux-previous.lux)>Math.max(3,Math.max(f.lux,previous.lux)*.5f))
+            log("照度跳变："+String.format(Locale.ROOT,"%.1f → %.1f lux",previous.lux,f.lux)+" · "+f.route);
+        if(previous!=null&&!previous.route.equals(f.route))log("曲线路径切换："+previous.route+" → "+f.route);
+        if(previous!=null&&previous.sensor>=0&&f.sensor>=0&&previous.sensor!=f.sensor)log("光感参考切换："+previous.sensor+" → "+f.sensor);
+        if(previous!=null&&Float.isFinite(f.sceneIn)&&Float.isFinite(f.sceneOut)&&Float.isFinite(previous.sceneIn)&&Float.isFinite(previous.sceneOut)&&PipelineHistory.Frame.changed(f.sceneIn,f.sceneOut)!=PipelineHistory.Frame.changed(previous.sceneIn,previous.sceneOut))log("场景修正："+(PipelineHistory.Frame.changed(f.sceneIn,f.sceneOut)?"开始改写目标":"停止改写目标"));
+        if(previous!=null&&Float.isFinite(f.overrideIn)&&Float.isFinite(f.overrideOut)&&Float.isFinite(previous.overrideIn)&&Float.isFinite(previous.overrideOut)&&PipelineHistory.Frame.changed(f.overrideIn,f.overrideOut)!=PipelineHistory.Frame.changed(previous.overrideIn,previous.overrideOut))log("手动保持修正："+(PipelineHistory.Frame.changed(f.overrideIn,f.overrideOut)?"开始改写目标":"停止改写目标"));
+        queuePublish();
+    }
+    static void traceNumber(JSONObject j,String key,float n)throws JSONException{if(Float.isFinite(n)&&n>=0)j.put(key,n);}
+    static JSONObject traceJson(PipelineHistory.Frame f)throws JSONException{
+        JSONObject j=new JSONObject().put("sequence",f.sequence).put("uptime_ms",f.uptime).put("unix_ms",f.unixMs).put("route",f.route).put("failed",f.failed);
+        traceNumber(j,"lux",f.lux);traceNumber(j,"main_lux",f.main);traceNumber(j,"assist_lux",f.assist);if(f.sensor>=0)j.put("sensor_reference",f.sensor);
+        if(f.sensorName!=null)j.put("sensor_reference_name",f.sensorName);
+        traceNumber(j,"mapped_brightness",f.mapped);traceNumber(j,"curve_brightness",f.curve);traceNumber(j,"scene_before",f.sceneIn);traceNumber(j,"scene_after",f.sceneOut);
+        traceNumber(j,"override_before",f.overrideIn);traceNumber(j,"override_after",f.overrideOut);traceNumber(j,"auto_target",f.finalTarget);
+        if(f.nightWake!=null)j.put("night_wake",f.nightWake);if(f.shortTermMemory!=null)j.put("short_term_memory",f.shortTermMemory);
+        if(Float.isFinite(f.sceneIn)&&Float.isFinite(f.sceneOut))j.put("scene_changed",PipelineHistory.Frame.changed(f.sceneIn,f.sceneOut));
+        if(Float.isFinite(f.overrideIn)&&Float.isFinite(f.overrideOut))j.put("override_changed",PipelineHistory.Frame.changed(f.overrideIn,f.overrideOut));return j;
+    }
+    void outputTrace(String method,float before,float after,String reason){
+        try{Boolean hdr=hdrActive();String strategy=outputStrategy(HookEntry.get(owner,"mDisplayPowerController"));
+            String limitedReason=reason.substring(0,Math.min(160,reason.length()));
+            JSONObject sameStage=lastOutput.get(method);
+            if(sameStage!=null&&Float.compare(before,(float)sameStage.optDouble("before",Double.NaN))==0&&Float.compare(after,(float)sameStage.optDouble("after",Double.NaN))==0&&
+                    limitedReason.equals(sameStage.optString("reason"))&&Objects.equals(hdr,sameStage.has("hdr")?sameStage.optBoolean("hdr"):null)&&Objects.equals(strategy,sameStage.optString("strategy",null)))return;
+            // Unchanged per-frame calls do not allocate a record or schedule state publication.
+            JSONObject j=new JSONObject().put("uptime_ms",SystemClock.uptimeMillis()).put("unix_ms",System.currentTimeMillis()).put("stage",method).put("reason",limitedReason);
+            traceNumber(j,"before",before);traceNumber(j,"after",after);if(hdr!=null)j.put("hdr",hdr);if(strategy!=null)j.put("strategy",strategy);
+            lastOutput.put(method,j);JSONObject previous=outputHistory.peekLast();
+            if(previous!=null&&hdr!=null&&previous.has("hdr")&&hdr!=previous.optBoolean("hdr"))log(hdr?"HDR 场景进入，输出可能增强":"HDR 场景退出，输出恢复常规策略");
+            if(previous!=null&&strategy!=null&&previous.has("strategy")&&!strategy.equals(previous.optString("strategy")))log("输出路径切换："+previous.optString("strategy")+" → "+strategy);
+            // A separate event, not a claim that the latest calculation caused this output.
+            if(outputHistory.size()>=16)outputHistory.removeFirst();outputHistory.addLast(j);queuePublish();
+        }catch(Throwable ignored){}
+    }
+    String outputStrategy(Object dpc){try{
+        if(strategyController!=dpc){strategyController=dpc;strategyProbe=null;
+            try{strategyProbe=dpc.getClass().getDeclaredMethod("getLastSelectedStrategy");strategyProbe.setAccessible(true);}catch(Throwable absent){}
+        }
+        if(strategyProbe==null)return null;Object strategy=strategyProbe.invoke(dpc);
+        return strategy==null?null:strategy.getClass().getSimpleName();}catch(Throwable unavailable){return null;}}
     static JSONArray array(float[] numbers)throws JSONException{JSONArray out=new JSONArray();for(float n:numbers)out.put((double)n);return out;}
     static String processStart()throws IOException{try(BufferedReader reader=new BufferedReader(new FileReader("/proc/self/stat"))){String text=reader.readLine();return text.substring(text.lastIndexOf(')')+2).split(" +")[19];}}
     static void reportAttachFailure(Object owner,Throwable error){

@@ -15,7 +15,7 @@ import java.util.zip.*;
 
 /** A short-lived root command, not a brightness output service. */
 public final class RootControl implements AutoCloseable {
-    static final String CONFIG="lumacurve_refactor_config_v1",STATUS="lumacurve_refactor_status_v1",REFRESH="lumacurve_refactor_refresh_v1",BUILD="release-2.0.0-r2";
+    static final String CONFIG="lumacurve_refactor_config_v1",STATUS="lumacurve_refactor_status_v1",REFRESH="lumacurve_refactor_refresh_v1",BUILD=AppBuild.BUILD;
     static final File DATA=new File("/data/adb/luma_curve_refactor_test"),PAUSE_OWNED=new File(DATA,"old-pause-owned");
     static final String OLD="/data/adb/modules/luma_curve/luma_curvectl.sh";
     final RootSettings settings;
@@ -124,6 +124,8 @@ public final class RootControl implements AutoCloseable {
         boolean small=options.optBoolean("small_brighten_override",false);long smallMs=options.optLong("small_brighten_delay",5000);DelayPolicy.validateSmall(smallMs);
         if(response&&!state.optBoolean("response_supported"))throw new IOException("此系统的确认时间接口暂未兼容");
         if(small&&!state.optBoolean("small_response_supported"))throw new IOException("此系统的微小变亮接口暂未兼容");
+        boolean lowLight=options.optBoolean("low_light_stability",false);
+        if(lowLight&&!state.optBoolean("low_light_supported"))throw new IOException("暗光稳定接口尚未完整兼容");
         if(thermal&&!state.optBoolean("thermal_supported"))throw new IOException("此固件温控亮度接口尚未兼容，不能启用该选项");
         float[] f=CurvePlan.factors(factors);
         if(f[3]!=1f)throw new IOException("高照度端暂保持官方上限，请保持第四个参数为 100%");
@@ -136,6 +138,7 @@ public final class RootControl implements AutoCloseable {
             .put("fingerprint",Build.FINGERPRINT).put("user_serial",0).put("factors",CurvePlan.encode(f)).put("thermal_relax",thermal).put("thermal_ceiling",ceiling).put("memory_strength",memory);
         config.put("memory_window",memoryMs).put("memory_lux_range",memoryRange).put("thermal_cooling",cooling).put("response_override",response).put("brighten_delay",bright).put("darken_delay",dark);
         config.put("small_brighten_override",small).put("small_brighten_delay",smallMs);
+        config.put("low_light_stability",lowLight);
         try {
             prepare();
             progress("提交小米基础曲线并等待系统确认…");
@@ -166,6 +169,11 @@ public final class RootControl implements AutoCloseable {
             JSONObject state=inspect();write(zip,"state.json",state.toString(2));
             JSONObject runtime=state.optJSONObject("runtime");JSONArray logs=runtime==null?null:runtime.optJSONArray("logs");StringBuilder text=new StringBuilder();
             if(logs!=null)for(int i=0;i<logs.length();i++)text.append(logs.getString(i)).append('\n');write(zip,"logs.txt",text.toString());
+            if(runtime!=null){
+                JSONArray pipeline=runtime.optJSONArray("pipeline_trace"),output=runtime.optJSONArray("output_trace");
+                write(zip,"pipeline-trace.json",pipeline==null?"[]":pipeline.toString(2));write(zip,"output-trace.json",output==null?"[]":output.toString(2));
+                write(zip,"trace-readme.txt","Pipeline records group stages from ONE updateAutoBrightness call. Values are framework brightness coordinates (0..1), not nit or percent. Missing fields mean unobserved, not disabled.\nOutput records are separate later calls, not automatically attributed to a calculation. Use uptime_ms within this boot, or unix_ms for wall time. Reason modifiers may describe multiple policies. Sensor readings are OEM filtered readings, not raw samples.\nBounded history: latest 24 calculations and 16 output calls; no continuous recording or extra sensor subscriptions.\n");
+            }
             write(zip,"config.json",String.valueOf(settings.get(CONFIG)));
             progress("2/4 收集系统显示链路…");
             try{write(zip,"display.txt",process("dumpsys","display"));}catch(Exception error){write(zip,"display-error.txt",error.toString());}

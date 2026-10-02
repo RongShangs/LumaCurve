@@ -160,6 +160,46 @@ public final class RefactorTest {
             if(!temp.toAbsolutePath().normalize().startsWith(fixtures))throw new AssertionError("invalid fixture path");
             try(java.util.stream.Stream<java.nio.file.Path> paths=java.nio.file.Files.walk(temp)){for(java.nio.file.Path file:(Iterable<java.nio.file.Path>)paths.sorted(Comparator.reverseOrder())::iterator){if(!file.toAbsolutePath().normalize().startsWith(temp))throw new AssertionError("fixture escape");java.nio.file.Files.delete(file);}}
         }
-        System.out.println("Refactor curve/adapter/thermal/memory/response/update/modules: "+cases+" cases PASS; OEM calls modeled, device not verified");
+        // Confirming a real change must finish from the original evidence timestamp,
+        // rather than moving the deadline forward at every sample.
+        check(LowLightPolicy.applies(true,true,true,false,false,false,1.14f,100));
+        check(LowLightPolicy.applies(true,true,true,false,false,false,100,1.14f));
+        check(!LowLightPolicy.applies(true,true,true,false,false,false,100,101));
+        check(LowLightPolicy.applies(true,true,true,false,false,false,50,Float.NaN));
+        check(!LowLightPolicy.applies(true,true,true,false,false,false,Float.NaN,1));
+        check(!LowLightPolicy.applies(true,true,true,false,false,false,-1,1));
+        check(!LowLightPolicy.applies(true,true,true,false,false,false,100,-1));
+        for(int mode=0;mode<6;mode++)check(!LowLightPolicy.applies(mode!=0,mode!=1,mode!=2,mode==3,mode==4,mode==5,1,2));
+        check(LowLightPolicy.chosen(1000,true,false)==3000);
+        check(LowLightPolicy.chosen(1000,false,false)==4000);
+        check(LowLightPolicy.chosen(8000,false,false)==8000);
+        check(LowLightPolicy.chosen(1000,false,true)==4000);
+        check(LowLightPolicy.chosen(5000,true,true)==5000); // Never shorten the OEM small-change delay.
+        check(LowLightPolicy.withinWindow(4000,1000,10000,0)==4000);
+        check(LowLightPolicy.withinWindow(4000,1000,5000,2000)==1000);
+        check(LowLightPolicy.withinWindow(4000,1000,5000,5000)==1000);
+        check(LowLightPolicy.withinWindow(8000,8000,5000,0)==8000); // Preserve an already-existing policy, don't lengthen it.
+        check(LowLightPolicy.withinWindow(4000,1000,0,0)==1000);
+        bad(()->LowLightPolicy.chosen(-1,false,true));bad(()->LowLightPolicy.chosen(60001,false,true));
+        long onset=20000,baseDelay=1000,original=onset+baseDelay;
+        for(long now=20000;now<=24000;now+=250){
+            long corrected=DelayPolicy.deadline(original,now,baseDelay,LowLightPolicy.chosen(baseDelay,false,true));
+            check(corrected==24000); // Reaches now exactly after 4 s, before 5 s assist pruning.
+        }
+        check(DelayPolicy.deadline(23000,23000,1000,4000)==26000); // New evidence starts later after an interruption.
+        check(DelayPolicy.deadline(22000,20000,1000,4000)==25000); // Preserves an OEM additional 1 s delay.
+        check(DelayPolicy.deadline(21000,25000,1000,3000)==25000); // Already-established change can proceed.
+        PipelineHistory history=new PipelineHistory();
+        PipelineHistory.Frame first=history.begin(1,1000);first.route="refactor";first.curve=.1f;first.sceneIn=.1f;first.sceneOut=.2f;history.finish(first);
+        PipelineHistory.Frame next=history.begin(2,2000);next.route="mapping";history.finish(next);
+        check(next.sequence==2&&history.last()==next);check(Float.isNaN(next.sceneOut)&&next.shortTermMemory==null&&next.nightWake==null);
+        check(first.sceneOut==.2f&&PipelineHistory.Frame.changed(first.sceneIn,first.sceneOut));
+        check(!PipelineHistory.Frame.changed(Float.NaN,0)&&!PipelineHistory.Frame.changed(.1f,.1f));
+        for(int i=0;i<100;i++)history.finish(history.begin(i+3,3000+i));
+        check(history.snapshot().size()==24&&history.last().sequence==102&&history.snapshot().get(0).sequence==79);
+        history.snapshot().clear();check(history.snapshot().size()==24);history.finish(null);check(history.last().sequence==102);
+        check(UiText.translate("暗光稳定",true).equals("Low-light stability"));
+        check(UiText.translate("当前路径未取得可绘制曲线",true).equals("No drawable curve observed for this path"));
+        System.out.println("Refactor curve/adapter/thermal/memory/response/update/modules/stability/trace: "+cases+" cases PASS; OEM calls modeled, device not verified");
     }
 }

@@ -53,3 +53,20 @@ impl=(ROOT/'build/device-reports/framework02/disassembly/com.android.server.disp
 assert 'METHOD getDrivingStatus ()Z' in impl
 assert 'FIELD mAutomaticBrightnessController Lcom/android/server/display/AutomaticBrightnessController;' in impl
 print('Refactor firmware: target ABI, actual consumer, OEM drag/coordinate/constraint and debounce chain PASS; static analysis only')
+
+# The optional stability hook covers the distinct assist buffer, not only ABC.
+ring=Path('D:/IOS/reverse-engineering/device-collections/dark-cycle-20261001-010613/official-sensor-disassembly/com.android.server.display.AmbientLightRingBuffer.txt').read_text(encoding='utf-8')
+for signature in ['nextAmbientLightBrighteningTransition (J F)J','nextAmbientLightBrighteningTransition (J F F F)J','nextAmbientLightDarkeningTransition (J F)J']:
+    body=ring.split('METHOD '+signature)[1].split('\nMETHOD ')[0]
+    assert '->getTime(I)J' in body and 'add-long' in body
+for name in ['mBrighteningLightDebounceConfig','mDarkeningLightDebounceConfig','mSmallBrighteningLightDebounceConfig']:
+    assert 'FIELD '+name+' J' in ring
+assert '->nextAmbientLightBrighteningTransition(J F F F)J' in dual and '->nextAmbientLightDarkeningTransition(J F)J' in dual
+assert 'const-wide/16 v1, 5000' in dual and '->prune(J)V' in dual  # Guard's 4 s stays within retention.
+assert 'FIELD mAmbientLuxValid Z' in abc and 'FIELD mFastAmbientLux F' in abc
+assert 'METHOD isHdrScene ()Z' in owner
+for signature in ['getCustomBrightnessForRefactorPolicy (F F Z)F','getOverrideLimitBrightness (F Z F)F']:
+    assert 'METHOD '+signature in impl
+dpc=(ROOT/'build/device-reports/framework02/disassembly/com.android.server.display.DisplayPowerController.txt').read_text(encoding='utf-8')
+assert 'METHOD getLastSelectedStrategy ()Lcom/android/server/display/brightness/strategy/DisplayBrightnessStrategy;' in dpc
+print('Stability/trace firmware: main and assist evidence deadlines, 5 s retention, HDR gate and read-only pipeline probes PASS; static analysis only')

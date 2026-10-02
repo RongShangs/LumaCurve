@@ -19,7 +19,12 @@ for name in files:
     shutil.copy2(source,download/name)
     checks.append(hashlib.sha256(source.read_bytes()).hexdigest()+'  '+name+'\n')
 (download/'SHA256SUMS.txt').write_text(''.join(checks),encoding='utf-8',newline='\n')
-notes='HyperLux 2.0.0：Root + LSPosed APP，系统曲线编辑与手动记忆、双参考场景控制、可选温控与变化确认时间。四页双语界面、旧模块与权限检测、分析包导出和自动更新。关于页按简介/交流群、打赏、感谢名单、作者排列。'
+release_notes=ROOT/'docs/releases'/f'{version}.md'
+notes=release_notes.read_text(encoding='utf-8').strip()
+index=(site/'index.html').read_text(encoding='utf-8')
+assert f'id="latest-version">{version}</span>' in index,'Update the website release heading before syncing'
+assert all(f'downloads/{name}' in index for name in files),'Website download links must match this release'
+assert f'{version} / {code}' in index,'Website version code mismatch'
 metadata={'name':'HyperLux','version':version,'versionCode':code,'distribution':'apk','requires':['Root','LSPosed','HyperOS 4'],
           'apkUrl':f'https://lc.rongshangs.top/downloads/{files[0]}','sourceUrl':f'https://lc.rongshangs.top/downloads/{files[1]}',
           'bundleUrl':f'https://lc.rongshangs.top/downloads/{files[2]}','releaseUrl':f'https://github.com/RongShangs/LumaCurve/releases/tag/v{version}',

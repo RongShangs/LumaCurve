@@ -22,7 +22,7 @@ public final class HookEntry implements IXposedHookLoadPackage {
         if(android.os.Process.myUid()!=1000 || !(p.packageName.equals("android")||p.packageName.equals("system")) ||
                 !(p.processName.equals("android")||p.processName.equals("system")||p.processName.equals("system_server")))return;
         if(!os().startsWith("OS4"))return;
-        XposedBridge.log("LumaCurve release-2.0.0-r2: system_server entry, package="+p.packageName+", process="+p.processName);
+        XposedBridge.log("HyperLux "+AppBuild.BUILD+": system_server entry, package="+p.packageName+", process="+p.processName);
         if(discover(p.classLoader))return;
         // Some ROMs create a separate MIUI services loader later. Remove this startup
         // discovery hook as soon as the owner class is found; never poll brightness.
@@ -55,6 +55,8 @@ public final class HookEntry implements IXposedHookLoadPackage {
             try {
                 installThermal(owner);
                 ResponseTuning.install(owner.getClassLoader());
+                LowLightTuning.install(owner.getClassLoader());
+                PipelineHooks.install(owner);
                 Method memory=ref.getDeclaredMethod("updateLogicalCurve",float.class,float.class);
                 if(memory.getReturnType()!=void.class)throw new IllegalStateException("manual memory ABI");
                 added.add(XposedBridge.hookMethod(memory,new XC_MethodHook(){
@@ -89,7 +91,7 @@ public final class HookEntry implements IXposedHookLoadPackage {
                 installed.add(owner);
             }catch(Throwable error){for(XC_MethodHook.Unhook u:added)u.unhook();throw error;}
             for(XC_MethodHook.Unhook u:discovery)u.unhook();discovery.clear();
-            XposedBridge.log("LumaCurve release-2.0.0-r2: verified hooks installed");return true;
+            XposedBridge.log("HyperLux "+AppBuild.BUILD+": verified hooks installed");return true;
         }catch(ClassNotFoundException absent){return false;}
         catch(Throwable error){XposedBridge.log("LumaCurve incompatible Refactor interface: "+error);return false;}
         finally{discovering=false;}
