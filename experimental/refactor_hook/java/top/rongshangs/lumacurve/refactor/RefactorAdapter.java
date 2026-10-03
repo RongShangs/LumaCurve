@@ -10,6 +10,7 @@ public final class RefactorAdapter extends CurveBackend {
     private final Method reset;
     private volatile CurvePlan active;
     private float[] activeFactors;
+    private float activeFloor;
     private static final String[] ARRAYS={"mAnchorLux","mAnchorNit","mAnchorOrder","mAnchorIsUserDrag",
         "mGoodAnchorLux","mGoodAnchorNit","mGoodAnchorOrder","mGoodAnchorIsUserDrag"};
     private static final String[] BASE={"mDefNit0","mDefNit30","mDefNitMidHigh"};
@@ -46,7 +47,7 @@ public final class RefactorAdapter extends CurveBackend {
     public int integer(String name)throws Exception{return ((Number)get(name)).intValue();}
     public CurvePlan plan(){return active;}
     public String name(){return "refactor";}
-    public void clearMemory()throws Exception{configure(activeFactors);}
+    public void clearMemory()throws Exception{configure(activeFactors,activeFloor);}
     public float currentAt(float lux)throws Exception{
         float[] x=(float[])get("mAnchorLux"),y=(float[])get("mAnchorNit");int count=integer("mAnchorCount");
         if(count<2||count>x.length)throw new IllegalStateException("系统锚点数量异常");
@@ -56,8 +57,11 @@ public final class RefactorAdapter extends CurveBackend {
     }
     // Must run on DisplayPowerControllerImpl's handler. Roll back all changed fields on failure.
     public void configure(float[] factors) throws Exception {
+        configure(factors,0);
+    }
+    public void configure(float[] factors,float floor) throws Exception {
         if(factors!=null && (factors.length!=4 || factors[3]!=1f))throw new IllegalArgumentException("本应用高照度端保持官方上限");
-        CurvePlan next=factors==null?null:new CurvePlan(factoryLux,factoryNit,min,max,factors);
+        CurvePlan next=factors==null?null:new CurvePlan(factoryLux,factoryNit,min,max,factors,floor);
         Map<String,Object> before=new HashMap<>();
         for(String name:ARRAYS){Object a=get(name);Object copy=Array.newInstance(a.getClass().getComponentType(),Array.getLength(a));System.arraycopy(a,0,copy,0,Array.getLength(a));before.put(name,copy);}
         for(String name:SCALARS)before.put(name,get(name));
@@ -70,6 +74,7 @@ public final class RefactorAdapter extends CurveBackend {
             for(int i=0;i<3;i++)set(BASE[i],desired[i]);
             reset.invoke(target);afterReset();
             activeFactors=factors==null?null:factors.clone();
+            activeFloor=factors==null?0:floor;
         }
         catch(Throwable failure) {
             active=previous;

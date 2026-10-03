@@ -73,7 +73,7 @@ public final class HookEntry implements IXposedHookLoadPackage {
                 installThermal(owner);
                 ResponseTuning.install(owner.getClassLoader());AdvancedTuning.install(owner.getClassLoader());
                 LowLightTuning.install(owner.getClassLoader());
-                PipelineHooks.install(owner);
+                PipelineHooks.install(owner);OutdoorTuning.install(owner);
                 try {
                 Class<?> ref=Class.forName(REFACTOR,false,owner.getClassLoader());
                 Method output=ref.getDeclaredMethod("getCurrentNit",float.class,float.class,boolean.class);

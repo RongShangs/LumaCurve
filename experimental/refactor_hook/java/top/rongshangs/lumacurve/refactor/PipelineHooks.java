@@ -56,7 +56,7 @@ final class PipelineHooks {
                 if(stage.equals("mapped")){f.mapped=(Float)p.args[input];f.curve=out;f.route="mapping";}
                 if(stage.equals("refactor")&&Float.isFinite(out)&&out>=0){f.curve=out;f.route="refactor";}
                 if(stage.equals("scene")){f.sceneIn=(Float)p.args[input];f.sceneOut=out;}
-                if(stage.equals("override")){f.overrideIn=(Float)p.args[input];f.overrideOut=out;}
+                if(stage.equals("override")){f.overrideIn=(Float)p.args[input];Object original=p.getObjectExtra("hyperlux.outdoor.original");f.overrideOut=original instanceof Float?(Float)original:out;if(original instanceof Float){f.outdoorIn=(Float)original;f.outdoorOut=out;}}
             }});
         }catch(Throwable absent){XposedBridge.log("HyperLux trace stage unavailable: "+name);}
     }

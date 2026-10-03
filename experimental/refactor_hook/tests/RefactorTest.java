@@ -14,7 +14,17 @@ public final class RefactorTest {
         boolean[] mAnchorIsUserDrag=new boolean[7],mGoodAnchorIsUserDrag=new boolean[7];
         void resetDefaultSpline(){
             for(float[] a:new float[][]{mAnchorLux,mAnchorNit,mGoodAnchorLux,mGoodAnchorNit})Arrays.fill(a,0);
-            float[] x={0,30,600,5000},y={mDefNit0,mDefNit30,mDefNitMidHigh,1060};
+            check(SensorState.resolve(false,false,false).equals("manual"));
+        check(!SensorState.usable(false,true,true)); // Old cached lux cannot become live in manual mode.
+        check(SensorState.resolve(true,false,true).equals("paused"));
+        check(SensorState.resolve(true,true,false).equals("warming"));
+        check(!SensorState.usable(true,true,false)); // Zero initialization is not zero ambient light.
+        check(SensorState.resolve(null,true,true).equals("unknown"));
+        check(SensorState.resolve(true,null,null).equals("unknown"));
+        check(SensorState.usable(true,true,true));
+        check(SensorState.usable(true,null,true)); // Some firmware lacks an optional sampling flag.
+        check(UiText.translate("有未保存的设置",true).equals("Unsaved settings"));
+        float[] x={0,30,600,5000},y={mDefNit0,mDefNit30,mDefNitMidHigh,1060};
             System.arraycopy(x,0,mAnchorLux,0,4);System.arraycopy(x,0,mGoodAnchorLux,0,4);
             System.arraycopy(y,0,mAnchorNit,0,4);System.arraycopy(y,0,mGoodAnchorNit,0,4);
             mAnchorCount=mGoodAnchorCount=4;mUserLux=mUserLogicalNit=-1;
@@ -40,6 +50,13 @@ public final class RefactorTest {
         bad(()->new CurvePlan(new float[]{0,30,30,5000},new float[]{2,135,220,1060},.2f,1060,one));
         bad(()->new CurvePlan(new float[]{0,30,600,5000},new float[]{2,135,220,1060},.2f,1060,new float[]{1,2,.1f,1}));
         CurvePlan clipped=new CurvePlan(new float[]{0,30,600,5000},new float[]{2,135,220,1060},2,1060,new float[]{.1f,1,1,2});check(clipped.at(0)==2 && clipped.at(5000)==1060);
+        float[] zeroLux={0,30,600,5000},zeroNit={0,20,100,1000};
+        CurvePlan raised=new CurvePlan(zeroLux,zeroNit,0,1000,one,10);check(raised.at(0)==10);check(raised.at(15)==15);check(raised.at(30)==20);check(raised.at(5000)==1000);
+        check(new CurvePlan(zeroLux,zeroNit,0,1000,one).at(0)==0);check(zeroNit[0]==0);
+        bad(()->new CurvePlan(zeroLux,zeroNit,0,1000,one,21));bad(()->new CurvePlan(zeroLux,zeroNit,0,1000,one,Float.NaN));bad(()->new CurvePlan(zeroLux,zeroNit,0,1000,one,-1));
+        check(CurvePlan.floor(null)==0);check(CurvePlan.floor(10)==10);bad(()->CurvePlan.floor("10"));bad(()->CurvePlan.floor(Float.POSITIVE_INFINITY));
+        check(Arrays.equals(CurveEditor.floorBounds(zeroNit,0,1000,one),new float[]{0,20}));check(CurveEditor.preset(one,zeroNit,0,1000)[0]==1);
+        float[] zeroDraft=one.clone();zeroDraft[1]=CurveEditor.clamp(1,.1f,zeroNit,0,1000,one,10);check(zeroDraft[1]>=.5f);check(new CurvePlan(zeroLux,zeroNit,0,1000,zeroDraft,10).at(30)>=10);
         OEM o=new OEM();o.resetDefaultSpline();RefactorAdapter a=new RefactorAdapter(o,.2f,1060);
         a.configure(new float[]{.7f,.8f,.95f,1});check(Math.abs(o.mAnchorNit[1]-108)<.001);check(o.mGoodAnchorNit[1]==o.mAnchorNit[1]);check(o.mDefNit30==108);
         check(Math.abs(o.defaultAtLux(70)-a.plan().at(70))<.001);
@@ -54,6 +71,7 @@ public final class RefactorTest {
         o.mAnchorNit[1]=177;o.mUserLux=30;o.mUserLogicalNit=177;o.mAnchorIsUserDrag[1]=true;o.fail=true;
         try{a.configure(new float[]{.7f,.8f,.95f,1});throw new AssertionError();}catch(IllegalStateException expected){check(o.mAnchorNit[1]==177 && o.mUserLux==30 && o.mAnchorIsUserDrag[1] && o.mDefNit30==135);check(a.plan().at(30)==135);}
         o.fail=false;OEM rear=new OEM();rear.mDisplayId=1;
+        a.configure(one,50);check(o.mDefNit0==50&&o.mAnchorNit[0]==50);a.clearMemory();check(o.mDefNit0==50&&a.plan().at(0)==50);o.fail=true;try{a.configure(one,100);throw new AssertionError();}catch(IllegalStateException expected){check(o.mDefNit0==50&&a.plan().at(0)==50);}o.fail=false;a.configure(null);check(o.mDefNit0==2&&a.plan()==null);a.configure(one);o.mAnchorNit[1]=177;
         try{new RefactorAdapter(rear,.2f,1060);throw new AssertionError();}catch(IllegalArgumentException expected){cases++;}
         ThermalPolicy gate=new ThermalPolicy();
         check(!gate.evaluate(false,true,0,35,43));check(!gate.evaluate(true,false,0,35,43));

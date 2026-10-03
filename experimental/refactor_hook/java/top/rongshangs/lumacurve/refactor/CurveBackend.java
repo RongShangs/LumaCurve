@@ -10,6 +10,7 @@ public abstract class CurveBackend {
     public int integer(String name)throws Exception{return ((Number)get(name)).intValue();}
     public abstract CurvePlan plan();
     public abstract void configure(float[] factors)throws Exception;
+    public void configure(float[] factors,float floor)throws Exception{if(floor!=0)throw new IllegalArgumentException("此曲线路径不支持亮度下限");configure(factors);}
     public abstract void clearMemory()throws Exception;
     public abstract float currentAt(float lux)throws Exception;
     public float memoryAt(float lux)throws Exception{return currentAt(lux);}

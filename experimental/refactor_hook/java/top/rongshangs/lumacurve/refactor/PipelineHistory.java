@@ -10,7 +10,7 @@ public final class PipelineHistory {
         String route="unobserved";
         float lux=Float.NaN,main=Float.NaN,assist=Float.NaN,mapped=Float.NaN,
             curve=Float.NaN,sceneIn=Float.NaN,sceneOut=Float.NaN,
-            overrideIn=Float.NaN,overrideOut=Float.NaN,finalTarget=Float.NaN;
+            overrideIn=Float.NaN,overrideOut=Float.NaN,outdoorIn=Float.NaN,outdoorOut=Float.NaN,finalTarget=Float.NaN;
         Boolean nightWake,shortTermMemory;
         int sensor=-1;
         String sensorName;

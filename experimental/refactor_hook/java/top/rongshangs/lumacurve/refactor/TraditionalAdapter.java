@@ -72,19 +72,22 @@ public final class TraditionalAdapter extends CurveBackend {
         float[] result=new float[points.size()];int i=0;for(float v:points)result[i++]=v;return result;
     }
     public float[] currentNit()throws Exception{float[] x=currentLux(),n=new float[x.length];for(int i=0;i<x.length;i++)n[i]=currentAt(x[i]);return n;}
-    Object configuration(float[] factors)throws Exception {
-        return configConstructor.newInstance(original.lux(),original.reshape(min,max,factors),
+    Object configuration(float[] factors,float floor)throws Exception {
+        return configConstructor.newInstance(original.lux(),original.reshape(min,max,factors,floor),
             new HashMap<>((Map<?,?>)read(baseline,"mCorrectionsByPackageName")),new HashMap<>((Map<?,?>)read(baseline,"mCorrectionsByCategory")),
             read(baseline,"mDescription"),read(baseline,"mShouldCollectColorSamples"),read(baseline,"mShortTermModelTimeout"),
             read(baseline,"mShortTermModelLowerLuxMultiplier"),read(baseline,"mShortTermModelUpperLuxMultiplier"));
     }
     public void configure(float[] factors)throws Exception {
-        CurvePlan next=factors==null?null:new CurvePlan(factoryLux,factoryNit,min,max,factors);
+        configure(factors,0);
+    }
+    public void configure(float[] factors,float floor)throws Exception {
+        CurvePlan next=factors==null?null:new CurvePlan(factoryLux,factoryNit,min,max,factors,floor);
         Object current=read(mapper,"mConfig");
         if(factors==null&&active==null)return;
         // An OEM/cloud/user replacement must not be overwritten by our recovery.
         if(current!=baseline&&current!=applied){active=null;applied=null;if(factors==null)return;throw new IllegalStateException("系统基准曲线已改变，请重启应用后重新读取");}
-        Object desired=next==null?baseline:configuration(factors);
+        Object desired=next==null?baseline:configuration(factors,floor);
         Map<Field,Object> before=snapshot(mapper),modelBefore=snapshot(read(abc,"mShortTermModel"));
         Object model=read(abc,"mShortTermModel");CurvePlan old=active;Object oldApplied=applied;
         updating=true;

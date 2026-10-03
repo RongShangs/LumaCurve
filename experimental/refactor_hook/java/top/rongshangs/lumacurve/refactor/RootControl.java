@@ -128,6 +128,7 @@ public final class RootControl implements AutoCloseable {
         JSONObject options=decoded.startsWith("{")?new JSONObject(decoded):new JSONObject().put("factors",decoded);
         String factors=options.getString("factors");
         AdvancedOptions advanced=AdvancedOptions.parse(options);advanced.verify(state);
+        OutdoorOptions outdoor=OutdoorOptions.parse(options);outdoor.verify(state);
         boolean thermal=options.optBoolean("thermal_relax",false);float ceiling=(float)options.optDouble("thermal_ceiling",43);ThermalPolicy.validate(ceiling);
         float memory=(float)options.optDouble("memory_strength",1);MemoryPolicy.validate(memory);
         long memoryMs=options.optLong("memory_window",1500);float memoryRange=(float)options.optDouble("memory_lux_range",.3);MemoryPolicy.validateGrouping(memoryMs,memoryRange);
@@ -141,9 +142,10 @@ public final class RootControl implements AutoCloseable {
         if(lowLight&&!state.optBoolean("low_light_supported"))throw new IOException("暗光稳定接口尚未完整兼容");
         if(thermal&&!state.optBoolean("thermal_supported"))throw new IOException("此固件温控亮度接口尚未兼容，不能启用该选项");
         float[] f=CurvePlan.factors(factors);
+        float floor=CurvePlan.floor(options.has("curve_floor_nit")?options.opt("curve_floor_nit"):null);
         if(f[3]!=1f)throw new IOException("高照度端暂保持官方上限，请保持第四个参数为 100%");
         new CurvePlan(numbers(state.getJSONArray("factory_lux")),numbers(state.getJSONArray("factory_logical_nit")),
-            (float)state.getDouble("min_logical_nit"),(float)state.getDouble("max_logical_nit"),f);
+            (float)state.getDouble("min_logical_nit"),(float)state.getDouble("max_logical_nit"),f,floor);
         String previous=settings.get(CONFIG);
         boolean wasActive=state.optString("phase").equals("active");
         String revision=UUID.randomUUID().toString();
@@ -153,7 +155,7 @@ public final class RootControl implements AutoCloseable {
         config.put("memory_window",memoryMs).put("memory_lux_range",memoryRange).put("thermal_cooling",cooling).put("response_override",response).put("brighten_delay",bright).put("darken_delay",dark);
         config.put("small_brighten_override",small).put("small_brighten_delay",smallMs);
         config.put("low_light_stability",lowLight).put("low_light_limit",lowLimit).put("low_light_brighten",lowBright).put("low_light_darken",lowDark);
-        advanced.put(config);
+        advanced.put(config);outdoor.put(config);config.put("curve_floor_nit",floor);
         try {
             prepare();
             progress("提交小米基础曲线并等待系统确认…");
@@ -189,6 +191,7 @@ public final class RootControl implements AutoCloseable {
                 if(logs!=null)for(int i=0;i<logs.length();i++)text.append(logs.getString(i)).append('\n');write(zip,"logs.txt",text.toString());
                 if(runtime!=null){
                     JSONArray pipeline=runtime.optJSONArray("pipeline_trace"),output=runtime.optJSONArray("output_trace");
+                    JSONObject outdoorState=runtime.optJSONObject("outdoor");write(zip,"outdoor-state.json",outdoorState==null?"{}":outdoorState.toString(2));write(zip,"outdoor-limit-trace.json",outdoorState==null?"[]":outdoorState.optJSONArray("limit_trace")==null?"[]":outdoorState.getJSONArray("limit_trace").toString(2));
                     write(zip,"pipeline-trace.json",pipeline==null?"[]":pipeline.toString(2));write(zip,"output-trace.json",output==null?"[]":output.toString(2));
                     write(zip,"trace-readme.txt","Pipeline records group stages from ONE updateAutoBrightness call. Values are framework brightness coordinates (0..1), not nit or percent. Missing fields mean unobserved, not disabled.\nOutput records are separate later calls, not automatically attributed to a calculation. Use uptime_ms within this boot, or unix_ms for wall time. Sensor readings are OEM filtered readings, not raw samples.\nBounded history: latest 24 calculations and 16 output calls.\n");
                 }
@@ -223,6 +226,7 @@ public final class RootControl implements AutoCloseable {
     }
     JSONObject execute(String command,String payload)throws Exception{
         if(command.equals("inspect"))return inspect();
+        if(command.equals("export-config")&&payload!=null){byte[] raw=Base64.getDecoder().decode(payload);if(raw.length>ConfigurationFile.LIMIT)throw new IOException("配置文件过大");JSONObject document=new JSONObject(new String(raw,StandardCharsets.UTF_8));if(!ConfigurationFile.FORMAT.equals(document.optString("format"))||document.getInt("schema")!=2||!document.has("options"))throw new IOException("不是兼容的 HyperLux 配置文件");byte[] bytes=document.toString(2).getBytes(StandardCharsets.UTF_8);if(bytes.length>ConfigurationFile.LIMIT)throw new IOException("配置文件过大");File file=new File("/sdcard","HyperLux-config-"+new SimpleDateFormat("yyyyMMdd-HHmmss",Locale.ROOT).format(new Date())+"-"+UUID.randomUUID().toString().substring(0,8)+".json");Files.createFile(file.toPath());try(FileOutputStream output=new FileOutputStream(file)){output.write(bytes);output.getFD().sync();}catch(Exception failure){file.delete();throw failure;}return new JSONObject().put("ok",true).put("path",file.getAbsolutePath());}
         if(command.equals("legacy-preferences"))return legacyPreferences();
         if(command.equals("export"))return new JSONObject().put("ok",true).put("path",export());
         try(FileChannel lock=FileChannel.open(new File(DATA,"control.lock").toPath(),StandardOpenOption.CREATE,StandardOpenOption.WRITE);FileLock held=lock.tryLock()){
@@ -249,7 +253,7 @@ public final class RootControl implements AutoCloseable {
                     try(BufferedReader input=new BufferedReader(new InputStreamReader(System.in,StandardCharsets.UTF_8))){
                         String line;while((line=input.readLine())!=null){
                             try{
-                                if(line.length()>4096)throw new IOException("请求过长");JSONObject request=new JSONObject(line);
+                                if(line.length()>65536)throw new IOException("请求过长");JSONObject request=new JSONObject(line);if(!"export-config".equals(request.optString("command"))&&line.length()>4096)throw new IOException("请求过长");
                                 System.out.println("LUMA_RESULT="+ctl.execute(request.getString("command"),request.optString("payload",null)));
                             }catch(Throwable error){System.out.println("LUMA_RESULT="+new JSONObject().put("ok",false).put("message",error.toString()));}
                             System.out.flush();
