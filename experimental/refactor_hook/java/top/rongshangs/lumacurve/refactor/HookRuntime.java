@@ -43,11 +43,11 @@ final class HookRuntime {
         if(HookEntry.field(util,"MIN_NIT").getType()!=float.class||HookEntry.field(util,"MAX_NIT").getType()!=float.class)throw new IllegalStateException("逻辑亮度边界类型已变化");
         float min=((Number)HookEntry.field(util,"MIN_NIT").get(null)).floatValue(),max=((Number)HookEntry.field(util,"MAX_NIT").get(null)).floatValue();
         kernel=new RefactorAdapter(ref,min,max);
-        }else {Object impl=HookEntry.get(owner,"mAutomaticBrightnessControllerImpl");Object abc=HookEntry.get(impl,"mAutomaticBrightnessController");kernel=new TraditionalAdapter(owner,ref,abc,()->HookEntry.currentUserSerial);}
+        }else {Object impl=HookEntry.get(owner,"mAutomaticBrightnessControllerImpl");Object abc=HookEntry.get(impl,"mAutomaticBrightnessController");kernel=new TraditionalAdapter(owner,ref,abc,()->HookEntry.currentUser.serial());}
         baselineIdentity=CurveIdentity.of(kernel.name(),kernel.fullLux(),kernel.fullNit(),kernel.min,kernel.max);
         try{hdrProbe=owner.getClass().getDeclaredMethod("isHdrScene");if(hdrProbe.getReturnType()!=boolean.class)hdrProbe=null;else hdrProbe.setAccessible(true);}catch(Throwable optional){}
         observer=new ContentObserver(handler){public void onChange(boolean self){reload();}};
-        refresh=new ContentObserver(handler){public void onChange(boolean self){viewUntil=SystemClock.elapsedRealtime()+5000;publish();}};
+        refresh=new ContentObserver(handler){public void onChange(boolean self){viewUntil=SystemClock.elapsedRealtime()+5000;refreshUserIdentity();if(kernel.plan()!=null&&!appliesToUser())userChanged();else publish();}};
         power=(PowerManager)context.getSystemService(Context.POWER_SERVICE);
         thermalListener=level->{thermalSeverity=level;environmentChanged();};
         batteryListener=new BroadcastReceiver(){public void onReceive(Context c,Intent intent){
@@ -62,6 +62,7 @@ final class HookRuntime {
     }
     void start(){
         try{
+            refreshUserIdentity();
             context.getContentResolver().registerContentObserver(Settings.Global.getUriFor(CONFIG),false,observer);
             context.getContentResolver().registerContentObserver(Settings.Global.getUriFor(REFRESH),false,refresh);
             if(power!=null){thermalSeverity=power.getCurrentThermalStatus();power.addThermalStatusListener(command->handler.post(command),thermalListener);thermalRegistered=true;}
@@ -111,6 +112,7 @@ final class HookRuntime {
         if(closed||changing)return;changing=true;
         lowLightEnabled=false;
         try{
+            refreshUserIdentity();
             String text=Settings.Global.getString(context.getContentResolver(),CONFIG);
             if(text==null||text.equals("null")){
                 if(kernel.plan()!=null)kernel.configure(null);disableOverrides();memoryStrength=1;phase="attached";revision="";message="已连接 · 官方曲线";
@@ -192,7 +194,8 @@ final class HookRuntime {
         if(!normalTuningAllowed(abc,impl)||(lastManualAdjustment>=0&&SystemClock.uptimeMillis()-lastManualAdjustment<=memoryWindow))return false;
         try{return "AutomaticBrightnessStrategy".equals(outputStrategy(HookEntry.get(owner,"mDisplayPowerController")));}catch(Throwable missing){return false;}
     }
-    boolean appliesToUser(){try{return boundUser==kernel.integer("mUserSerial");}catch(Throwable error){return false;}}
+    void refreshUserIdentity(){if(kernel instanceof TraditionalAdapter)HookEntry.refreshCurrentUser(context);}
+    boolean appliesToUser(){try{return ForegroundUser.matches(boundUser,kernel.integer("mUserSerial"));}catch(Throwable error){return false;}}
     void userChanged(){disableOverrides();try{kernel.configure(null);phase="error";message="用户已切换，恢复官方策略";log(message);publish();}catch(Throwable error){fault(error);}}
     void sample(float lux,float nit){
         if(closed||!Float.isFinite(lux)||!Float.isFinite(nit)||lux<0||nit<0)return;
@@ -217,6 +220,7 @@ final class HookRuntime {
             if(lastMainBrighten>=0)status.put("last_main_brighten_ms",lastMainBrighten);if(lastMainDarken>=0)status.put("last_main_darken_ms",lastMainDarken);if(lastMainSmall>=0)status.put("last_main_small_ms",lastMainSmall);status.put("last_main_extra_ms",lastMainExtra);
             status.put("curve_backend",kernel.name()).put("baseline_id",baselineId()).put("curve_coordinate",kernel.name().equals("refactor")?"logical_nit":"physical_nit")
                 .put("factory_full_lux",array(kernel.fullLux())).put("factory_full_nit",array(kernel.fullNit()));
+            if(kernel instanceof TraditionalAdapter)status.put("user_identity_source",HookEntry.currentUser.source()).put("user_identity_ready",kernel.integer("mUserSerial")>=0);
             status.put("memory_strength",memoryStrength).put("memory_events",memoryEvents);
             Object good=kernel.get("mIsHaveGoodCurve");if(good!=null)status.put("good_curve_available",good);
             status.put("memory_window",memoryWindow).put("memory_lux_range",memoryLuxRange).put("thermal_cooling",thermalCooling)

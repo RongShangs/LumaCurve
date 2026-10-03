@@ -42,6 +42,7 @@ print(tested.stdout,end='');host_cases=int(re.search(r'(\d+) cases PASS',tested.
 diagnostic_cases=checked_test(ROOT/'tests/refactor_diagnostics.py',r'(\d+) host cases PASS')
 advanced_cases=checked_test(ROOT/'tests/refactor_advanced_hooks.py',r'(\d+) cases PASS')
 traditional_cases=checked_test(ROOT/'tests/refactor_traditional.py',r'(\d+) cases PASS')
+user_identity_cases=checked_test(ROOT/'tests/refactor_user_identity.py',r'(\d+) cases PASS')
 if not args.skip_device_fixtures:run(['python',ROOT/'tests/refactor_hook_firmware.py'])
 else:print('OEM firmware checks skipped explicitly; runtime compatibility validation remains enabled')
 advanced_firmware_cases=0
@@ -65,7 +66,7 @@ run(['java','-jar',BT/'lib/apksigner.jar','verify','--verbose',APK])
 run([BT/'zipalign.exe','-c','4',APK])
 # Root recovery does not load any Xposed classes, and works if the app is uninstalled.
 HELPER=DIST/'luma-refactor-helper.jar'
-names={'RootControl.class','RootSettings.class','CurvePlan.class','CurveIdentity.class','TraditionalCurve.class','ThermalPolicy.class','MemoryPolicy.class','DelayPolicy.class','LegacyModules.class','AppBuild.class','LowLightPolicy.class','DiagnosticCollector.class','AdvancedOptions.class','AdvancedPolicy.class'}
+names={'RootControl.class','RootSettings.class','ForegroundUser.class','CurvePlan.class','CurveIdentity.class','TraditionalCurve.class','ThermalPolicy.class','MemoryPolicy.class','DelayPolicy.class','LegacyModules.class','AppBuild.class','LowLightPolicy.class','DiagnosticCollector.class','AdvancedOptions.class','AdvancedPolicy.class'}
 run(['java','-cp',BT/'lib/d8.jar','com.android.tools.r8.D8','--min-api','34','--lib',ANDROID,'--output',HELPER,*[p for p in inputs if p.name in names or p.name.startswith('DiagnosticCollector$')]])
 run(['C:/msys64/usr/bin/bash.exe','-n',SRC/'restore_refactor_hook_android.sh'])
 meta={'build':BUILD,'version':ARTIFACT_VERSION,'version_code':VERSION_CODE,'test_build':IS_TEST,'app_name':'HyperLux','architecture':'oem_active_curve_backend_hook',
@@ -76,6 +77,7 @@ meta={'build':BUILD,'version':ARTIFACT_VERSION,'version_code':VERSION_CODE,'test
       'pipeline_readonly_trace':True,'pipeline_calculation_capacity':24,'output_trace_capacity':16,'low_light_stability_optional':True,'low_light_stability_default':False,
       'advanced_optional_parameters':14,'advanced_default_enabled':False,'advanced_hook_model_verified':True,'advanced_firmware_collections':2 if not args.skip_device_fixtures else 0,
       'diagnostic_cases':diagnostic_cases,'advanced_hook_model_cases':advanced_cases,'advanced_firmware_checks':advanced_firmware_cases,
+      'user_identity_cases':user_identity_cases,
       'curve_backends':['refactor','physical_mapping'],'baseline':'current_device_local_curve','traditional_hook_model_cases':traditional_cases,'traditional_firmware_checks':traditional_firmware_cases,
       'module_long_term_learning':False,'oem_anchor_memory_adjustable':True,'thermal_display_relaxation':True,'source_sha256':{p.relative_to(SRC).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in (SRC/'java').rglob('*.java')},
       'apk_sha256':hashlib.sha256(APK.read_bytes()).hexdigest()}
@@ -92,7 +94,7 @@ with zipfile.ZipFile(source,'w',zipfile.ZIP_DEFLATED) as z:
     for p in sorted(SRC.rglob('*')):
         if p.is_file():z.write(p,p.relative_to(ROOT))
     z.write(ROOT/'LICENSE','LICENSE');z.write(ROOT/'README.md','README.md');z.write(ROOT/'CHANGELOG.md','CHANGELOG.md');z.write(Path(__file__),'tools/build_refactor_hook_test.py');z.write(ROOT/'tests/refactor_hook_firmware.py','tests/refactor_hook_firmware.py');z.write(ROOT/'tests/refactor_diagnostics.py','tests/refactor_diagnostics.py')
-    for name in ['refactor_advanced_hooks.py','refactor_advanced_firmware.py','refactor_traditional.py','refactor_traditional_firmware.py']:z.write(ROOT/'tests'/name,'tests/'+name)
+    for name in ['refactor_advanced_hooks.py','refactor_advanced_firmware.py','refactor_traditional.py','refactor_traditional_firmware.py','refactor_user_identity.py']:z.write(ROOT/'tests'/name,'tests/'+name)
     for p in sorted((ROOT/'docs/releases').glob('*.md')):z.write(p,p.relative_to(ROOT))
     z.write(ROOT/'docs/release-policy.md','docs/release-policy.md')
     for name in ['sync_website.py','package_website.py']:z.write(ROOT/'tools'/name,'tools/'+name)

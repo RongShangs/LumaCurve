@@ -52,13 +52,17 @@ public final class RootControl implements AutoCloseable {
             return status;
         }catch(Exception unavailable){return null;}
     }
-    JSONObject inspect()throws Exception {
+    JSONObject refreshedLive()throws Exception {
         JSONObject state=live();
         if(state!=null){
             long before=state.optLong("elapsed_ms");
             settings.put(REFRESH,UUID.randomUUID().toString());
             for(int i=0;i<10;i++){JSONObject newer=live();if(newer!=null&&newer.optLong("elapsed_ms")>before){state=newer;break;}Thread.sleep(30);}
         }
+        return state;
+    }
+    JSONObject inspect()throws Exception {
+        JSONObject state=refreshedLive();
         String raw=settings.get(CONFIG);
         JSONObject out=new JSONObject().put("ok",true).put("connected",state!=null).put("fingerprint",Build.FINGERPRINT);
         JSONObject injection=validated("lumacurve_refactor_injection_v1");out.put("lsp_loaded",state!=null||injection!=null);
@@ -114,9 +118,11 @@ public final class RootControl implements AutoCloseable {
         PAUSE_OWNED.delete();
     }
     JSONObject apply(String encoded)throws Exception {
-        JSONObject state=live();if(state==null)throw new IOException("尚未连接 Hook：请在 LSPosed 启用本模块，勾选系统框架并重启");
+        JSONObject state=refreshedLive();if(state==null)throw new IOException("尚未连接 Hook：请在 LSPosed 启用本模块，勾选系统框架并重启");
         int user=((Number)Class.forName("android.app.ActivityManager").getMethod("getCurrentUser").invoke(null)).intValue();
-        if(user!=0||state.getInt("user_serial")!=0)throw new IOException("本应用暂只支持主用户");
+        int serial=state.optInt("user_serial",-1);
+        if(user!=0||serial>0)throw new IOException("本应用暂只支持主用户，请切回主用户后重试");
+        if(!ForegroundUser.canApply(user,serial))throw new IOException("系统亮度的用户身份尚未就绪，请稍后再点保存并应用");
         if(encoded.length()>8192)throw new IOException("参数过长");
         String decoded=new String(Base64.getDecoder().decode(encoded),StandardCharsets.UTF_8);
         JSONObject options=decoded.startsWith("{")?new JSONObject(decoded):new JSONObject().put("factors",decoded);

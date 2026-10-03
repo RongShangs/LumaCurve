@@ -15,7 +15,21 @@ public final class HookEntry implements IXposedHookLoadPackage {
     static final class AttachFailure{final int attempts;final long retryAt;AttachFailure(int count){attempts=count;retryAt=SystemClock.uptimeMillis()+count*1000L;}}
     static final List<XC_MethodHook.Unhook> discovery=new ArrayList<>();
     static boolean discovering;
-    static volatile int currentUserSerial=-1;
+    static final ForegroundUser currentUser=new ForegroundUser();
+    static void refreshCurrentUser(android.content.Context context){
+        long identity=Binder.clearCallingIdentity();
+        try{currentUser.refresh(()->{
+            try{
+                int id=((Number)Class.forName("android.app.ActivityManager").getMethod("getCurrentUser").invoke(null)).intValue();
+                if(id<0)return -1;
+                // The display callback carries a serial, not a user ID. They can differ.
+                UserManager users=(UserManager)context.getSystemService(android.content.Context.USER_SERVICE);
+                UserHandle handle=(UserHandle)UserHandle.class.getMethod("of",int.class).invoke(null,id);
+                long serial=users.getSerialNumberForUser(handle);
+                return serial>=0&&serial<=Integer.MAX_VALUE?(int)serial:-1;
+            }catch(Exception unavailable){return -1;}
+        });}finally{Binder.restoreCallingIdentity(identity);}
+    }
     static HookRuntime ownerState(Object owner){synchronized(states){for(HookRuntime s:states.values())if(s.owner==owner&&!s.closed)return s;}return null;}
     static void reattach(Object owner,Object mapper){HookRuntime old=states.get(mapper);if(old==null||old.owner!=owner)return;states.remove(mapper);old.close();failedOwners.remove(owner);attach(owner);}
     static final Set<Class<?>> thermalSupported=new HashSet<>();
@@ -31,7 +45,6 @@ public final class HookEntry implements IXposedHookLoadPackage {
                 !(p.processName.equals("android")||p.processName.equals("system")||p.processName.equals("system_server")))return;
         if(!os().startsWith("OS4"))return;
         InjectionStatus.write(null,"injected","LSPosed 已加载，正在识别设备曲线");
-        try{currentUserSerial=((Number)Class.forName("android.app.ActivityManager").getMethod("getCurrentUser").invoke(null)).intValue()==0?0:-1;}catch(Throwable unknown){}
         XposedBridge.log("HyperLux "+AppBuild.BUILD+": system_server entry, package="+p.packageName+", process="+p.processName);
         if(discover(p.classLoader))return;
         // Some ROMs create a separate MIUI services loader later. Remove this startup
@@ -97,7 +110,10 @@ public final class HookEntry implements IXposedHookLoadPackage {
                 // updateAutoBrightness occurs after the ABC has been assigned by its constructor.
                 added.addAll(XposedBridge.hookAllMethods(owner,"updateAutoBrightness",new XC_MethodHook(){protected void beforeHookedMethod(MethodHookParam p){attach(p.thisObject);}}));
                 added.addAll(XposedBridge.hookAllMethods(owner,"getRefactorBrightness",new XC_MethodHook(){protected void beforeHookedMethod(MethodHookParam p){attach(p.thisObject);HookRuntime s=ownerState(p.thisObject);if(s!=null&&s.kernel.plan()!=null&&!s.appliesToUser())s.userChanged();}}));
-                added.addAll(XposedBridge.hookAllMethods(owner,"handleOnSwitchUser",new XC_MethodHook(){protected void beforeHookedMethod(MethodHookParam p){HookRuntime s=ownerState(p.thisObject);if(s!=null&&s.kernel.plan()!=null)s.userChanged();currentUserSerial=((Number)p.args[0]).intValue();}}));
+                added.addAll(XposedBridge.hookAllMethods(owner,"handleOnSwitchUser",new XC_MethodHook(){
+                    protected void beforeHookedMethod(MethodHookParam p){HookRuntime s=ownerState(p.thisObject);if(s!=null&&s.kernel.plan()!=null)s.userChanged();currentUser.switched(((Number)p.args[0]).intValue());}
+                    protected void afterHookedMethod(MethodHookParam p){HookRuntime s=ownerState(p.thisObject);if(s!=null)s.queuePublish();}
+                }));
                 InjectionStatus.write(null,"hooks_ready","系统接口已连接，等待读取设备曲线");
                 installed.add(owner);
             }catch(Throwable error){for(XC_MethodHook.Unhook u:added)u.unhook();throw error;}

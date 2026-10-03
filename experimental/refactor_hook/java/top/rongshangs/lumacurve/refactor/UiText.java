@@ -262,6 +262,8 @@ public final class UiText {
         WORDS.put("相邻节点限制了可调范围","Neighboring points limit this range");
         WORDS.put("已交回官方温控亮度策略","System thermal control restored");
         WORDS.put("本应用暂只支持主用户","Only the main user is supported");
+        WORDS.put("本应用暂只支持主用户，请切回主用户后重试","Only the main user is supported. Switch back to the main user and retry.");
+        WORDS.put("系统亮度的用户身份尚未就绪，请稍后再点保存并应用","The display user identity is not ready. Wait a moment and save again.");
         WORDS.put("需要 Root 权限","Root permission required");
         WORDS.put("连接系统后再保存预设","Connect to the system before saving a preset");
         WORDS.put("需要 Root 授权","Root permission required");
