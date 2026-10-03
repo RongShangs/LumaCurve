@@ -54,7 +54,7 @@ final class PipelineHooks {
                 if(p.hasThrowable())return;HookRuntime s=state(p.thisObject,role);if(s==null||s.traceFrame==null)return;
                 PipelineHistory.Frame f=s.traceFrame;float out=(Float)p.getResult();
                 if(stage.equals("mapped")){f.mapped=(Float)p.args[input];f.curve=out;f.route="mapping";}
-                if(stage.equals("refactor")){f.curve=out;f.route="refactor";}
+                if(stage.equals("refactor")&&Float.isFinite(out)&&out>=0){f.curve=out;f.route="refactor";}
                 if(stage.equals("scene")){f.sceneIn=(Float)p.args[input];f.sceneOut=out;}
                 if(stage.equals("override")){f.overrideIn=(Float)p.args[input];f.overrideOut=out;}
             }});

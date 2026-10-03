@@ -2,7 +2,7 @@ package top.rongshangs.lumacurve.refactor;
 
 import java.util.Arrays;
 
-/** OEM logical-nit coordinates, not physical nits or raw panel codes. */
+/** Editing coordinates: OEM logical nit for Refactor, physical nit for mapping. */
 public final class CurvePlan {
     private final float[] lux, nit;
     public CurvePlan(float[] factoryLux, float[] factoryNit, float min, float max, float[] factors) {

@@ -39,8 +39,11 @@ public final class RootControl implements AutoCloseable {
         return text.substring(text.lastIndexOf(')')+2).split(" +")[19];
     }
     JSONObject live() {
+        return validated(STATUS);
+    }
+    JSONObject validated(String key) {
         try {
-            String text=settings.get(STATUS);if(text==null)return null;
+            String text=settings.get(key);if(text==null)return null;
             JSONObject status=new JSONObject(text);if(!BUILD.equals(status.getString("build")))return null;
             int pid=status.getInt("pid");
             String cmd=new String(Files.readAllBytes(Paths.get("/proc/"+pid+"/cmdline")),StandardCharsets.UTF_8);
@@ -58,6 +61,8 @@ public final class RootControl implements AutoCloseable {
         }
         String raw=settings.get(CONFIG);
         JSONObject out=new JSONObject().put("ok",true).put("connected",state!=null).put("fingerprint",Build.FINGERPRINT);
+        JSONObject injection=validated("lumacurve_refactor_injection_v1");out.put("lsp_loaded",state!=null||injection!=null);
+        if(injection!=null){out.put("injection",injection);if(state==null)out.put("hook_issue",injection.optString("stage")).put("hook_message",injection.optString("message"));}
         JSONArray legacy=new JSONArray();for(String[] module:LegacyModules.scan(new File("/data/adb/modules"),new File("/data/adb/modules_update")))legacy.put(new JSONObject().put("id",module[0]).put("name",module[1]).put("state",module[2]));out.put("legacy_modules",legacy);
         if(state==null){
             try{JSONObject cached=new JSONObject(settings.get(STATUS));int pid=cached.getInt("pid");
@@ -138,6 +143,7 @@ public final class RootControl implements AutoCloseable {
         String revision=UUID.randomUUID().toString();
         JSONObject config=new JSONObject().put("schema",1).put("enabled",true).put("revision",revision)
             .put("fingerprint",Build.FINGERPRINT).put("user_serial",0).put("factors",CurvePlan.encode(f)).put("thermal_relax",thermal).put("thermal_ceiling",ceiling).put("memory_strength",memory);
+        config.put("curve_backend",state.getString("curve_backend")).put("baseline_id",state.getString("baseline_id"));
         config.put("memory_window",memoryMs).put("memory_lux_range",memoryRange).put("thermal_cooling",cooling).put("response_override",response).put("brighten_delay",bright).put("darken_delay",dark);
         config.put("small_brighten_override",small).put("small_brighten_delay",smallMs);
         config.put("low_light_stability",lowLight).put("low_light_limit",lowLimit).put("low_light_brighten",lowBright).put("low_light_darken",lowDark);
@@ -180,7 +186,7 @@ public final class RootControl implements AutoCloseable {
                     write(zip,"pipeline-trace.json",pipeline==null?"[]":pipeline.toString(2));write(zip,"output-trace.json",output==null?"[]":output.toString(2));
                     write(zip,"trace-readme.txt","Pipeline records group stages from ONE updateAutoBrightness call. Values are framework brightness coordinates (0..1), not nit or percent. Missing fields mean unobserved, not disabled.\nOutput records are separate later calls, not automatically attributed to a calculation. Use uptime_ms within this boot, or unix_ms for wall time. Sensor readings are OEM filtered readings, not raw samples.\nBounded history: latest 24 calculations and 16 output calls.\n");
                 }
-                write(zip,"config.json",String.valueOf(settings.get(CONFIG)));write(zip,"stored-hook-status.json",String.valueOf(settings.get(STATUS)));write(zip,"build.txt",BUILD+"\n"+Build.FINGERPRINT+"\n");
+                write(zip,"config.json",String.valueOf(settings.get(CONFIG)));write(zip,"stored-hook-status.json",String.valueOf(settings.get(STATUS)));write(zip,"injection.json",String.valueOf(settings.get("lumacurve_refactor_injection_v1")));write(zip,"build.txt",BUILD+"\n"+Build.FINGERPRINT+"\n");
                 new DiagnosticCollector(zip,settings::getSystem).collect();
                 progress("8/8 完成压缩并校验分析包…");
             }

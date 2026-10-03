@@ -22,8 +22,8 @@ public final class MainActivity extends Activity {
     FrameLayout content;LinearLayout root,header,pages[]=new LinearLayout[4];
     TextView badge,note,stateTitle,luxReading,nitReading,flow,thermalState,userState,compatibility,logText,curveHint,memoryText,memoryStatus;
     LinearLayout nav[]=new LinearLayout[4]; NavIcon navIcons[]=new NavIcon[4];TextView navNames[]=new TextView[4];Button apply,stop;Switch thermalSwitch;SeekBar ceilingSlider;TextView ceilingText;
-    float factors[]={.7f,.8f,.95f,1},factoryLux[],factoryNit[],minimum,maximum,thermalCeiling=43,memoryStrength=1;boolean thermalRelax,memoryEnabled=true,busy,visible,dirty,destroyed;
-    Switch memorySwitch;SeekBar memorySlider;PipelineBoard pipeline;boolean english,rereadPending,legacyChecked;String permissionNotice="";boolean permissionDialogVisible,permissionBlocked;ScrollView logScroller;
+    float factors[]={1,1,1,1},factoryLux[],factoryNit[],minimum,maximum,thermalCeiling=43,memoryStrength=1;boolean thermalRelax,memoryEnabled=true,busy,visible,dirty,destroyed;
+    Switch memorySwitch;SeekBar memorySlider;PipelineBoard pipeline;boolean english,rereadPending,legacyChecked;String permissionNotice="",loadedBaseline="";boolean permissionDialogVisible,permissionBlocked;ScrollView logScroller;
     JSONObject runtime,lastAnswer;CurveView stateGraph,settingsGraph;int page;
     long memoryWindow=1500,brightenDelay=1500,darkenDelay=5000;float memoryLuxRange=.3f,thermalCooling=1;int refreshSeconds=2;boolean responseOverride,smallBrightenOverride,updateChecked,updateBusy,firmwarePrompted,legacyDialogVisible;long smallBrightenDelay=5000;JSONArray pendingLegacy;String legacyNotice="";
     Switch responseSwitch,smallBrightenSwitch,lowLightSwitch;boolean lowLightStability;TextView branchOverview;SeekBar smallBrightenSlider;TextView smallBrightenLabel;SeekBar memoryWindowSlider,memoryRangeSlider,coolingSlider,brightenSlider,darkenSlider,refreshSlider;
@@ -70,7 +70,7 @@ public final class MainActivity extends Activity {
     Button compact(String name,Runnable task,LinearLayout parent){Button b=action(name,task);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(44),1);lp.setMargins(dp(3),dp(6),dp(3),dp(4));parent.addView(b,lp);return b;}
     @Override public void onCreate(Bundle saved){
         super.onCreate(saved);autoScroll=getPreferences(0).getBoolean("log_auto_scroll",true);refreshSeconds=getPreferences(0).getInt("refresh_seconds",2);english=!getResources().getConfiguration().getLocales().get(0).getLanguage().equals("zh");getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING);
-        try{factors=CurvePlan.factors(getPreferences(0).getString("draft",".7,.8,.95,1"));}catch(Exception ignored){}
+        try{factors=CurvePlan.factors(getPreferences(0).getString("draft","1,1,1,1"));}catch(Exception ignored){}
         root=column();root.setBackgroundColor(BG);setContentView(root);
         header=row(root);header.setPadding(dp(18),0,dp(18),0);header.setLayoutParams(new LinearLayout.LayoutParams(-1,dp(64)));
         ImageView icon=image(null,38,12);header.addView(icon);
@@ -102,7 +102,7 @@ public final class MainActivity extends Activity {
     void makeCurveSettings(){
         LinearLayout b=card(pages[1]);b.addView(text("照度与亮度曲线",18,INK));b.addView(text("拖动节点调整亮度，点击节点输入数值。",13,MUTED));
         settingsGraph=new CurveView(true);b.addView(settingsGraph,new LinearLayout.LayoutParams(-1,dp(235)));curveHint=text("连接后显示节点范围",12,MUTED);b.addView(curveHint);
-        b.addView(text("节点受系统上下限和相邻节点约束，亮度随照度不递减；最高照度端保持系统上限。",12,MUTED));
+        b.addView(text("默认基准取自本设备的系统曲线。编辑保留原曲线形状与完整节点；亮度须随照度不递减，高照度末端保持原始值。",12,MUTED));
         LinearLayout presets=row(b);compact("柔和",()->preset(new float[]{.7f,.8f,.95f,1}),presets);compact("系统默认",()->preset(new float[]{1,1,1,1}),presets);compact("稍亮",()->preset(new float[]{1.2f,1.15f,1.05f,1}),presets);
         presets=row(b);compact("保存为预设",this::savePreset,presets);compact("我的预设",this::pickPreset,presets);
     }
@@ -195,7 +195,7 @@ public final class MainActivity extends Activity {
     }
 
     void makeAbout(){
-        LinearLayout b=card(pages[3]);b.setPadding(dp(22),dp(22),dp(22),dp(18));LinearLayout r=row(b);r.addView(image(null,68,20));LinearLayout title=column();LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-2,1);lp.leftMargin=dp(18);r.addView(title,lp);title.addView(text("HyperLux",26,INK));title.addView(text(AppBuild.VERSION+" · "+tr(AppBuild.TEST?"参数研究测试版":"正式版"),14,BLUE));
+        LinearLayout b=card(pages[3]);b.setPadding(dp(22),dp(22),dp(22),dp(18));LinearLayout r=row(b);r.addView(image(null,68,20));LinearLayout title=column();LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-2,1);lp.leftMargin=dp(18);r.addView(title,lp);title.addView(text("HyperLux",26,INK));title.addView(text(AppBuild.ARTIFACT_VERSION+" · "+tr(AppBuild.TEST?"曲线适配测试版":"正式版"),14,BLUE));
         TextView intro=text("适配 HyperOS 4 的自动亮度工具。\n\n以系统双侧感光与场景判定为基础，提供可编辑曲线、预设与手动偏好记忆。保留系统平滑过渡，也可按需调整温控和变化确认时间。",15,INK);intro.setLineSpacing(dp(5),1);intro.setPadding(0,dp(20),0,dp(16));b.addView(intro);
         b.addView(text("HyperOS 4 · Root · LSPosed",12,MUTED));updateLabel=text("自动检查应用更新",12,BLUE);updateLabel.setPadding(dp(12),dp(10),dp(12),dp(10));updateLabel.setBackground(background(0xffeef3ff,12));lp=new LinearLayout.LayoutParams(-1,-2);lp.topMargin=dp(10);lp.bottomMargin=dp(6);b.addView(updateLabel,lp);
         r=row(b);compact("官网",()->open("https://lc.rongshangs.top"),r);compact("GitHub",()->open(UpdateChecker.REPO),r);compact("开源协议",()->open("https://www.gnu.org/licenses/gpl-3.0.html"),r);
@@ -304,6 +304,7 @@ public final class MainActivity extends Activity {
         String reference=runtime==null?"":runtime.optString("sensor_reference_name");
         branchRow(body,"当前光感参考",reference.equals("main")?"主光感":reference.equals("assist")?"辅助光感":reference.equals("other")?"其他系统策略":"未取得","系统会根据双侧读数与场景切换参考，不意味着两个独立亮度引擎在抢控制权。");
         branchRow(body,"输出路径",strategy(),"自动、临时、应用指定与系统回退是不同输出策略；回退不代表用户关闭了自动亮度。");
+        if(runtime!=null)branchRow(body,"接入后端",runtime.optString("curve_backend").equals("physical_mapping")?"传统系统曲线":"Refactor 曲线","根据系统正在使用的控制器读取设备本地曲线，保留传感器处理和亮度动画。");
         branchRow(body,"曲线路径",route(frame),"显示最近一次实际执行的映射路径，不把支持某接口当作正在使用它。");
         branchRow(body,"场景修正",change(frame,"scene_changed"),"比较同一次计算中，场景处理前后的亮度目标。");
         branchRow(body,"手动保持修正",change(frame,"override_changed"),"显示系统手动保持策略是否改写目标；手动曲线节点仍可另行影响曲线。");
@@ -321,7 +322,7 @@ public final class MainActivity extends Activity {
     static String pretty(JSONObject object){try{return object.toString(2);}catch(Exception ignored){return object.toString();}}
     void donate(String name,String file){try{ImageView v=image(file,240,12);v.setScaleType(ImageView.ScaleType.FIT_CENTER);LinearLayout box=column();box.setGravity(Gravity.CENTER_HORIZONTAL);box.addView(v);TextView reminder=text("记得备注[昵称：想说的话]噢",13,MUTED);reminder.setGravity(Gravity.CENTER);box.addView(reminder);AlertDialog d=dialog(tr(name)+" · "+tr("打赏"),box);d.show();dialogButton(d,"关闭",null,false);}catch(Exception error){show(error.toString());}}
     void editPoint(int point){
-        if(factoryLux==null)return;if(point==3){show("最高照度节点固定为系统上限");return;}
+        if(factoryLux==null)return;if(point==3){show("最高照度节点保持设备原始值");return;}
         try{float[] range=CurveEditor.bounds(point,factoryNit,minimum,maximum,factors);LinearLayout body=column();body.addView(text(format(factoryLux[point])+" lux · 节点强度",13,MUTED));
             body.addView(text("可调范围："+format(range[0]*100)+"% ～ "+format(range[1]*100)+"%",13,BLUE));body.addView(text("100% 为系统基础值。范围由系统亮度上下限及相邻节点决定。",12,MUTED));
             EditText number=input("输入百分比");number.setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);number.setText(format(factors[point]*100));body.addView(number);
@@ -384,10 +385,15 @@ public final class MainActivity extends Activity {
         lastAnswer=answer;rememberLegacy(answer);
         try{
             if(!answer.optBoolean("connected")){runtime=null;drawAdvanced();factoryLux=factoryNit=null;branchOverview.setText("亮度分支：等待读取 · 点击查看");lowLightSwitch.setEnabled(false);badge.setText("未连接");stateTitle.setText("尚未连接系统曲线");luxReading.setText("— nit");nitReading.setText("— nit");compatibility.setText("✓ Root 授权已通过\n○ 系统框架连接未建立\n请核对 LSPosed 作用域和是否重启");apply.setEnabled(false);thermalSwitch.setEnabled(false);memorySwitch.setEnabled(false);stateGraph.invalidate();pipeline.invalidate();
+                if(answer.optBoolean("lsp_loaded")){badge.setText("已加载");compatibility.setText("✓ Root 授权已通过\n✓ LSPosed 已加载\n○ 设备曲线尚未连接");if(!answer.optString("hook_issue").equals("curve_incompatible")){permissionBlocked=false;permissionNotice="";show(answer.optString("hook_message"));return;}permissionPrompt("abi","设备曲线尚未连接",answer.optString("hook_message","等待读取设备本地曲线；如持续未连接，请导出分析包。"));return;}
                 permissionPrompt("lsp","LSPosed 尚未接入",answer.optString("hook_issue").equals("restart_required")?"Root 已获授权，但系统仍在运行旧版 Hook。请重启手机以加载新版本。":"Root 已授权。请在 LSPosed 启用 HyperLux，勾选系统框架，然后重启手机。\n从旧测试版迁移时，请先关闭旧版的 LSPosed 开关。");return;}
             runtime=answer.getJSONObject("runtime");if(!runtime.has("factory_lux")){factoryLux=factoryNit=null;badge.setText("不兼容");compatibility.setText(runtime.optString("message"));show("");apply.setEnabled(false);thermalSwitch.setEnabled(false);memorySwitch.setEnabled(false);permissionPrompt("abi","系统接口尚未兼容",runtime.optString("message"));return;}
             factoryLux=RootControl.numbers(runtime.getJSONArray("factory_lux"));factoryNit=RootControl.numbers(runtime.getJSONArray("factory_logical_nit"));minimum=(float)runtime.getDouble("min_logical_nit");maximum=(float)runtime.getDouble("max_logical_nit");
-            JSONObject config=answer.optJSONObject("config");if(!dirty&&config!=null&&config.optBoolean("enabled")){factors=CurvePlan.factors(config.getString("factors"));thermalRelax=config.optBoolean("thermal_relax");thermalCeiling=(float)config.optDouble("thermal_ceiling",43);float memory=(float)config.optDouble("memory_strength",1);memoryEnabled=memory>0;if(memoryEnabled)memoryStrength=memory;memoryWindow=config.optLong("memory_window",1500);memoryLuxRange=(float)config.optDouble("memory_lux_range",.3);thermalCooling=(float)config.optDouble("thermal_cooling",1);responseOverride=config.optBoolean("response_override");brightenDelay=config.optLong("brighten_delay",1500);darkenDelay=config.optLong("darken_delay",5000);smallBrightenOverride=config.optBoolean("small_brighten_override");smallBrightenDelay=config.optLong("small_brighten_delay",5000);}
+            String baseline=runtime.optString("baseline_id");
+            if(!baseline.equals(loadedBaseline)){loadedBaseline=baseline;dirty=false;factors=new float[]{1,1,1,1};if(baseline.equals(getPreferences(0).getString("draft_baseline","")))try{factors=CurvePlan.factors(getPreferences(0).getString("draft","1,1,1,1"));}catch(Exception ignored){}}
+            JSONObject config=answer.optJSONObject("config");
+            if(config!=null&&(!Build.FINGERPRINT.equals(config.optString("fingerprint"))||!runtime.optString("curve_backend").equals(config.optString("curve_backend",runtime.optString("curve_backend").equals("refactor")?"refactor":""))||(config.has("baseline_id")&&!baseline.equals(config.optString("baseline_id")))))config=null;
+            if(!dirty&&config!=null&&config.optBoolean("enabled")){factors=CurvePlan.factors(config.getString("factors"));thermalRelax=config.optBoolean("thermal_relax");thermalCeiling=(float)config.optDouble("thermal_ceiling",43);float memory=(float)config.optDouble("memory_strength",1);memoryEnabled=memory>0;if(memoryEnabled)memoryStrength=memory;memoryWindow=config.optLong("memory_window",1500);memoryLuxRange=(float)config.optDouble("memory_lux_range",.3);thermalCooling=(float)config.optDouble("thermal_cooling",1);responseOverride=config.optBoolean("response_override");brightenDelay=config.optLong("brighten_delay",1500);darkenDelay=config.optLong("darken_delay",5000);smallBrightenOverride=config.optBoolean("small_brighten_override");smallBrightenDelay=config.optLong("small_brighten_delay",5000);}
             if(!dirty)advanced=config!=null&&config.optBoolean("enabled")?AdvancedOptions.parse(config):new AdvancedOptions();
             if(!dirty){lowLightStability=config!=null&&config.optBoolean("enabled")&&config.optBoolean("low_light_stability");lowLightLimit=config==null?50:(float)config.optDouble("low_light_limit",50);lowLightBrighten=config==null?3000:config.optLong("low_light_brighten",3000);lowLightDarken=config==null?4000:config.optLong("low_light_darken",4000);}
             JSONObject currentFrame=runtime.optJSONObject("last_pipeline");branchOverview.setText("曲线："+route(currentFrame)+" · 输出："+strategy()+"\nHDR："+observed(runtime,"hdr_active")+" · 点击查看亮度分支");
@@ -399,8 +405,8 @@ public final class MainActivity extends Activity {
             thermalState.setText("温控："+thermal+"\n电池 "+(runtime.has("battery_temperature")?format(runtime.optDouble("battery_temperature"))+"℃":"无读数")+"；系统热状态 "+severity(runtime.optInt("thermal_severity",-1)));
             double anchor=runtime.optDouble("user_anchor_lux",-1);userState.setText("手动偏好："+(anchor>=0?"系统锚点位于 "+format(anchor)+" lux":"当前没有手动锚点"));
             JSONArray flags=runtime.optJSONArray("manual_anchor_flags");int remembered=0;if(flags!=null)for(int i=0;i<flags.length();i++)if(flags.optBoolean(i))remembered++;
-            memoryStatus.setText("手动记忆节点："+remembered+" 个");
-            compatibility.setText("✓ Root 与系统框架已连接\n"+(phase.equals("error")?"○ 接入异常，请查看详细读数":active?"✓ 自定义曲线已应用":"○ 当前使用系统基础曲线")+"\n"+(runtime.optBoolean("thermal_supported")?"✓ 温控接口兼容":"○ 温控接口暂未兼容"));
+            memoryStatus.setText("手动记忆节点："+(runtime.optString("curve_backend").equals("physical_mapping")?(anchor>=0?1:0):remembered)+" 个");
+            compatibility.setText("✓ Root 与系统框架已连接\n"+(runtime.optString("curve_backend").equals("physical_mapping")?"✓ 传统系统曲线 · 设备本地基准":"✓ Refactor 曲线 · 设备本地基准")+"\n"+(phase.equals("error")?"○ 接入异常，请查看详细读数":active?"✓ 自定义曲线已应用":"○ 当前使用系统基础曲线")+"\n"+(runtime.optBoolean("thermal_supported")?"✓ 温控接口兼容":"○ 温控接口暂未兼容"));
             JSONArray logs=runtime.optJSONArray("logs");StringBuilder lines=new StringBuilder();if(logs!=null)for(int i=0;i<logs.length();i++)lines.append(logs.getString(i)).append('\n');String next=lines.length()==0?"尚无运行记录":lines.toString();
             if(!tr(next).contentEquals(logText.getText())){int position=logScroller.getScrollY();logText.setText(next);if(autoScroll)scrollLogs();else logScroller.post(()->logScroller.scrollTo(0,position));}
             // After an OTA, an unsupported option that was enabled must still be switchable off.
@@ -421,7 +427,7 @@ public final class MainActivity extends Activity {
     }
     static String severity(int level){String[] names={"正常","轻微","中等","严重","危急","紧急","关机"};return level>=0&&level<names.length?names[level]:"未知";}
     @Override public void onResume(){super.onResume();visible=true;permissionNotice="";permissionBlocked=false;run("inspect",null);ui.removeCallbacks(tick);ui.postDelayed(tick,refreshSeconds*1000);checkUpdate(false);if(page==3)refreshThanks();offerLegacyModules();offerUpdate();}
-    @Override public void onPause(){visible=false;ui.removeCallbacks(tick);getPreferences(0).edit().putString("draft",CurvePlan.encode(factors)).apply();if(!busy)worker.execute(this::closeBridge);super.onPause();}
+    @Override public void onPause(){visible=false;ui.removeCallbacks(tick);getPreferences(0).edit().putString("draft",CurvePlan.encode(factors)).putString("draft_baseline",loadedBaseline).apply();if(!busy)worker.execute(this::closeBridge);super.onPause();}
     @Override public void onSaveInstanceState(Bundle saved){saved.putInt("page",page);super.onSaveInstanceState(saved);}
     @Override public void onDestroy(){destroyed=true;if(!busy)closeBridge();worker.shutdown();network.shutdownNow();super.onDestroy();}
     static JSONArray array(float[] values)throws JSONException{JSONArray result=new JSONArray();for(float n:values)result.put(n);return result;}
@@ -472,7 +478,7 @@ public final class MainActivity extends Activity {
         @Override protected void onDraw(Canvas canvas){
             super.onDraw(canvas);paint.setStyle(Paint.Style.FILL);paint.setTextSize(dp(12));paint.setColor(MUTED);
             if(factoryLux==null){canvas.drawText(tr("连接后读取曲线"),dp(10),dp(65),paint);return;}
-            if(!draft&&(runtime==null||!"refactor".equals(runtime.optJSONObject("last_pipeline")==null?"":runtime.optJSONObject("last_pipeline").optString("route")))){canvas.drawText(tr("当前路径未取得可绘制曲线"),dp(10),dp(65),paint);return;}
+            if(!draft&&(runtime==null||!("refactor".equals(runtime.optJSONObject("last_pipeline")==null?"":runtime.optJSONObject("last_pipeline").optString("route"))||("physical_mapping".equals(runtime.optString("curve_backend"))&&runtime.optBoolean("physical_mapping_active")&&"mapping".equals(runtime.optJSONObject("last_pipeline")==null?"":runtime.optJSONObject("last_pipeline").optString("route")))))){canvas.drawText(tr("当前路径未取得可绘制曲线"),dp(10),dp(65),paint);return;}
             float left=left(),top=top(),width=width(),height=height();if(width<=0||height<=0)return;
             paint.setStrokeWidth(dp(1));paint.setTextSize(dp(10));for(int i=0;i<3;i++){float yy=top+height*i/2;paint.setColor(0xffe7ebf2);canvas.drawLine(left,yy,left+width,yy,paint);paint.setColor(MUTED);canvas.drawText((100-i*50)+"%",0,yy+dp(4),paint);}
             CurvePlan base=new CurvePlan(factoryLux,factoryNit,minimum,maximum,new float[]{1,1,1,1});float[] target=base.nits();
@@ -480,8 +486,10 @@ public final class MainActivity extends Activity {
             else if(runtime!=null&&runtime.has("active_logical_nit"))try{target=RootControl.numbers(runtime.getJSONArray("active_logical_nit"));}catch(Exception ignored){}
             float[] nativeLux=null,nativeNit=null;if(!draft&&runtime!=null)try{nativeLux=RootControl.numbers(runtime.getJSONArray("current_anchors_lux"));nativeNit=RootControl.numbers(runtime.getJSONArray("current_anchors_nit"));if(nativeLux.length!=nativeNit.length||nativeLux.length<2){nativeLux=nativeNit=null;}}catch(Exception ignored){}
             if(nativeLux!=null&&Arrays.equals(nativeLux,factoryLux)&&Arrays.equals(nativeNit,target))nativeLux=nativeNit=null;
+            float[] denseLux=null,denseBase=null,denseTarget=null;
+            if(draft&&runtime!=null&&runtime.optString("curve_backend").equals("physical_mapping"))try{TraditionalCurve dense=new TraditionalCurve(RootControl.numbers(runtime.getJSONArray("factory_full_lux")),RootControl.numbers(runtime.getJSONArray("factory_full_nit")));denseLux=dense.lux();denseBase=dense.nit();denseTarget=dense.reshape(minimum,maximum,factors);}catch(Exception error){return;}
             for(int curve=0;curve<(draft?2:1);curve++){float[] values=draft?(curve==0?base.nits():target):(nativeLux==null?target:nativeNit);Path path=new Path();
-                for(int i=0;i<=128;i++){float lux=(float)Math.expm1(Math.log1p(factoryLux[3])*i/128),xx=left+width*i/128,yy=y(!draft&&nativeLux!=null?interpolate(lux,nativeLux,values):interpolate(lux,values));if(i==0)path.moveTo(xx,yy);else path.lineTo(xx,yy);}
+                for(int i=0;i<=128;i++){float lux=(float)Math.expm1(Math.log1p(factoryLux[3])*i/128),xx=left+width*i/128,yy=y(draft&&denseLux!=null?interpolate(lux,denseLux,curve==0?denseBase:denseTarget):!draft&&nativeLux!=null?interpolate(lux,nativeLux,values):interpolate(lux,values));if(i==0)path.moveTo(xx,yy);else path.lineTo(xx,yy);}
                 paint.setColor(draft&&curve==0?0xffbbc5d2:BLUE);paint.setStrokeWidth(dp(draft&&curve==0?2:3));paint.setStyle(Paint.Style.STROKE);canvas.drawPath(path,paint);paint.setStyle(Paint.Style.FILL);
             }
             for(int i=0;i<4;i++){float xx=x(factoryLux[i]);paint.setTextSize(dp(10));paint.setColor(MUTED);String label=String.format(Locale.ROOT,"%.0f",factoryLux[i]);canvas.drawText(label,xx-paint.measureText(label)/2,top+height+dp(20),paint);

@@ -4,19 +4,18 @@ import java.lang.reflect.*;
 import java.util.*;
 
 /** Only replaces base anchors. All OEM conversion, user-drag and output methods run. */
-public final class RefactorAdapter {
+public final class RefactorAdapter extends CurveBackend {
     private final Object target;
     private final Map<String,Field> fields=new HashMap<>();
     private final Method reset;
-    public final float[] factoryLux, factoryNit;
-    public final float min, max;
     private volatile CurvePlan active;
+    private float[] activeFactors;
     private static final String[] ARRAYS={"mAnchorLux","mAnchorNit","mAnchorOrder","mAnchorIsUserDrag",
         "mGoodAnchorLux","mGoodAnchorNit","mGoodAnchorOrder","mGoodAnchorIsUserDrag"};
     private static final String[] BASE={"mDefNit0","mDefNit30","mDefNitMidHigh"};
     private static final String[] SCALARS={"mAnchorCount","mGoodAnchorCount","mOrderCounter","mUserLux","mUserLogicalNit","mIsHaveGoodCurve","mDefNit0","mDefNit30","mDefNitMidHigh"};
     public RefactorAdapter(Object target, float min, float max) throws Exception {
-        this.target=target; this.min=min; this.max=max;
+        super(min,max);this.target=target;
         if(integer("mDisplayId")!=0) throw new IllegalArgumentException("仅接入内置主屏");
         for(String name:new String[]{"mLuxSeg0","mLuxSeg1","mLuxMax","mDefNit0","mDefNit30","mDefNitMidHigh","mUserLux","mUserLogicalNit"})
             if(field(name).getType()!=float.class)throw new IllegalArgumentException("曲线字段类型已变化："+name);
@@ -34,6 +33,7 @@ public final class RefactorAdapter {
         }
         for(String name:SCALARS) field(name);
         reset=target.getClass().getDeclaredMethod("resetDefaultSpline");
+        if(target.getClass().getDeclaredMethod("defaultAtLux",float.class).getReturnType()!=float.class)throw new IllegalArgumentException("默认曲线接口不兼容");
         if(reset.getReturnType()!=void.class) throw new IllegalArgumentException("重置接口不兼容");
         reset.setAccessible(true);
     }
@@ -45,6 +45,8 @@ public final class RefactorAdapter {
     public float number(String name)throws Exception{return ((Number)get(name)).floatValue();}
     public int integer(String name)throws Exception{return ((Number)get(name)).intValue();}
     public CurvePlan plan(){return active;}
+    public String name(){return "refactor";}
+    public void clearMemory()throws Exception{configure(activeFactors);}
     public float currentAt(float lux)throws Exception{
         float[] x=(float[])get("mAnchorLux"),y=(float[])get("mAnchorNit");int count=integer("mAnchorCount");
         if(count<2||count>x.length)throw new IllegalStateException("系统锚点数量异常");
@@ -67,6 +69,7 @@ public final class RefactorAdapter {
             // This works even if private interpolation helpers were inlined by ART.
             for(int i=0;i<3;i++)set(BASE[i],desired[i]);
             reset.invoke(target);afterReset();
+            activeFactors=factors==null?null:factors.clone();
         }
         catch(Throwable failure) {
             active=previous;

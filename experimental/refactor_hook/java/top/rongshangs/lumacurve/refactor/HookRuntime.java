@@ -12,8 +12,8 @@ import java.text.SimpleDateFormat;
 
 final class HookRuntime {
     static final String BUILD=AppBuild.BUILD,CONFIG="lumacurve_refactor_config_v1",STATUS="lumacurve_refactor_status_v1",REFRESH="lumacurve_refactor_refresh_v1";
-    final Object owner; final RefactorAdapter kernel; final Handler handler; final Context context;
-    final String fingerprint; final ContentObserver observer,refresh;
+    final Object owner; final CurveBackend kernel; final Handler handler; final Context context;
+    final String fingerprint,baselineIdentity; final ContentObserver observer,refresh;
     final ThermalPolicy thermalGate=new ThermalPolicy();
     final MemoryPolicy memoryPolicy=new MemoryPolicy();
     final ArrayDeque<String> logs=new ArrayDeque<>();
@@ -38,10 +38,13 @@ final class HookRuntime {
     java.lang.reflect.Method strategyProbe;Object strategyController;
     HookRuntime(Object owner,Object ref,Handler handler)throws Exception {
         this.owner=owner;this.handler=handler;context=(Context)HookEntry.get(owner,"mContext");fingerprint=Build.FINGERPRINT;
+        if(ref.getClass().getName().equals(HookEntry.REFACTOR)){
         Class<?> util=Class.forName("com.android.server.display.RefactorBrightnessUtil",true,ref.getClass().getClassLoader());
         if(HookEntry.field(util,"MIN_NIT").getType()!=float.class||HookEntry.field(util,"MAX_NIT").getType()!=float.class)throw new IllegalStateException("逻辑亮度边界类型已变化");
         float min=((Number)HookEntry.field(util,"MIN_NIT").get(null)).floatValue(),max=((Number)HookEntry.field(util,"MAX_NIT").get(null)).floatValue();
         kernel=new RefactorAdapter(ref,min,max);
+        }else {Object impl=HookEntry.get(owner,"mAutomaticBrightnessControllerImpl");Object abc=HookEntry.get(impl,"mAutomaticBrightnessController");kernel=new TraditionalAdapter(owner,ref,abc,()->HookEntry.currentUserSerial);}
+        baselineIdentity=CurveIdentity.of(kernel.name(),kernel.fullLux(),kernel.fullNit(),kernel.min,kernel.max);
         try{hdrProbe=owner.getClass().getDeclaredMethod("isHdrScene");if(hdrProbe.getReturnType()!=boolean.class)hdrProbe=null;else hdrProbe.setAccessible(true);}catch(Throwable optional){}
         observer=new ContentObserver(handler){public void onChange(boolean self){reload();}};
         refresh=new ContentObserver(handler){public void onChange(boolean self){viewUntil=SystemClock.elapsedRealtime()+5000;publish();}};
@@ -64,7 +67,8 @@ final class HookRuntime {
             if(power!=null){thermalSeverity=power.getCurrentThermalStatus();power.addThermalStatusListener(command->handler.post(command),thermalListener);thermalRegistered=true;}
             Intent initial=context.registerReceiver(batteryListener,new IntentFilter(Intent.ACTION_BATTERY_CHANGED),null,handler,Context.RECEIVER_EXPORTED);receiverRegistered=true;
             if(initial!=null)batteryListener.onReceive(context,initial);
-            log("系统曲线已连接；主屏接口核对通过");reload();
+            InjectionStatus.write(context,"attached","已读取设备本地曲线："+kernel.name());
+            log("系统曲线已连接："+kernel.name()+"；使用此设备本地基准");reload();
         }catch(Throwable error){fault(error);}
     }
     void close(){
@@ -117,6 +121,8 @@ final class HookRuntime {
                 if(config.getBoolean("enabled")){
                     if(!fingerprint.equals(config.getString("fingerprint")))throw new IllegalArgumentException("系统已更新，请重新应用曲线");
                     if(config.getInt("user_serial")!=kernel.integer("mUserSerial"))throw new IllegalArgumentException("当前用户与曲线配置不一致");
+                    if(!config.optString("curve_backend",kernel.name().equals("refactor")?"refactor":"").equals(kernel.name())||
+                        (config.has("baseline_id")&&!config.getString("baseline_id").equals(baselineId())))throw new IllegalArgumentException("设备曲线路径或基准已变化，请重新应用");
                     float ceiling=(float)config.optDouble("thermal_ceiling",43);ThermalPolicy.validate(ceiling);
                     boolean thermal=config.optBoolean("thermal_relax",false);
                     float strength=(float)config.optDouble("memory_strength",1);MemoryPolicy.validate(strength);
@@ -148,7 +154,7 @@ final class HookRuntime {
                 }
                 String reset=config.optString("reset_anchors","");
                 if(!reset.isEmpty()&&!reset.equals(lastReset)){
-                    kernel.configure(kernel.plan()==null?null:CurvePlan.factors(config.getString("factors")));lastReset=reset;memoryPolicy.reset();log("已清除本次系统曲线的手动锚点，保留基础曲线");
+                    kernel.clearMemory();lastReset=reset;memoryPolicy.reset();log("已清除本次系统曲线的手动锚点，保留基础曲线");
                 }
             }
             consumed=0;lastLux=lastNit=Float.NaN;AdvancedTuning.refreshThresholds(this);thermalAllowed=relaxThermal();publish();requestRecalculation();
@@ -209,7 +215,10 @@ final class HookRuntime {
                 .put("threshold_adjustments",thresholdAdjustments).put("assist_adjustments",assistAdjustments).put("animation_adjustments",animationAdjustments).put("sunlight_adjustments",sunlightAdjustments).put("touch_adjustments",touchAdjustments).put("delay_window_clamps",delayWindowClamps);
             if(lastAnimationSeconds>0)status.put("last_animation_seconds",lastAnimationSeconds);
             if(lastMainBrighten>=0)status.put("last_main_brighten_ms",lastMainBrighten);if(lastMainDarken>=0)status.put("last_main_darken_ms",lastMainDarken);if(lastMainSmall>=0)status.put("last_main_small_ms",lastMainSmall);status.put("last_main_extra_ms",lastMainExtra);
-            status.put("memory_strength",memoryStrength).put("memory_events",memoryEvents).put("good_curve_available",kernel.get("mIsHaveGoodCurve"));
+            status.put("curve_backend",kernel.name()).put("baseline_id",baselineId()).put("curve_coordinate",kernel.name().equals("refactor")?"logical_nit":"physical_nit")
+                .put("factory_full_lux",array(kernel.fullLux())).put("factory_full_nit",array(kernel.fullNit()));
+            status.put("memory_strength",memoryStrength).put("memory_events",memoryEvents);
+            Object good=kernel.get("mIsHaveGoodCurve");if(good!=null)status.put("good_curve_available",good);
             status.put("memory_window",memoryWindow).put("memory_lux_range",memoryLuxRange).put("thermal_cooling",thermalCooling)
                 .put("response_supported",ResponseTuning.supported(owner)).put("response_override",responseEnabled).put("brighten_delay",brightenDelay).put("darken_delay",darkenDelay).put("response_adjustments",responseAdjustments);
             status.put("small_response_supported",ResponseTuning.smallSupported(owner)).put("small_brighten_override",smallResponseEnabled).put("small_brighten_delay",smallBrightenDelay).put("small_response_adjustments",smallResponseAdjustments);
@@ -220,10 +229,9 @@ final class HookRuntime {
             status.put("pipeline_trace",trace).put("output_trace",new JSONArray(outputHistory));
             PipelineHistory.Frame recent=pipelineHistory.last();if(recent!=null)status.put("last_pipeline",traceJson(recent));
             Boolean hdr=hdrActive();if(hdr!=null)status.put("hdr_active",hdr);
-            int count=kernel.integer("mAnchorCount");
-            status.put("current_anchors_lux",array(Arrays.copyOf((float[])kernel.get("mAnchorLux"),count)))
-                .put("current_anchors_nit",array(Arrays.copyOf((float[])kernel.get("mAnchorNit"),count)));
-            JSONArray flags=new JSONArray();boolean[] user=(boolean[])kernel.get("mAnchorIsUserDrag");for(int i=0;i<count;i++)flags.put(user[i]);status.put("manual_anchor_flags",flags);
+            status.put("current_anchors_lux",array(kernel.currentLux())).put("current_anchors_nit",array(kernel.currentNit()));
+            if(kernel.name().equals("refactor")){int count=kernel.integer("mAnchorCount");JSONArray flags=new JSONArray();boolean[] user=(boolean[])kernel.get("mAnchorIsUserDrag");for(int i=0;i<count;i++)flags.put(user[i]);status.put("manual_anchor_flags",flags);}
+            else status.put("physical_mapping_active",HookEntry.get(((TraditionalAdapter)kernel).abc,"mCurrentBrightnessMapper")==((TraditionalAdapter)kernel).mapper);
             collectOfficial(status);
             if(Float.isFinite(batteryTemperature))status.put("battery_temperature",batteryTemperature);
             if(Float.isFinite(lastOfficialCap))status.put("thermal_last_cap",lastOfficialCap);
@@ -367,6 +375,7 @@ final class HookRuntime {
         if(strategyProbe==null)return null;Object strategy=strategyProbe.invoke(dpc);
         return strategy==null?null:strategy.getClass().getSimpleName();}catch(Throwable unavailable){return null;}}
     static JSONArray array(float[] numbers)throws JSONException{JSONArray out=new JSONArray();for(float n:numbers)out.put((double)n);return out;}
+    String baselineId(){return baselineIdentity;}
     static String processStart()throws IOException{try(BufferedReader reader=new BufferedReader(new FileReader("/proc/self/stat"))){String text=reader.readLine();return text.substring(text.lastIndexOf(')')+2).split(" +")[19];}}
     static void reportAttachFailure(Object owner,Throwable error){
         try{Context context=(Context)HookEntry.get(owner,"mContext");JSONObject status=new JSONObject().put("build",BUILD).put("phase","error").put("message","此固件曲线接口尚未兼容，保留官方行为："+error)

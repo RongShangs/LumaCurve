@@ -15,11 +15,14 @@ public final class HookEntry implements IXposedHookLoadPackage {
     static final class AttachFailure{final int attempts;final long retryAt;AttachFailure(int count){attempts=count;retryAt=SystemClock.uptimeMillis()+count*1000L;}}
     static final List<XC_MethodHook.Unhook> discovery=new ArrayList<>();
     static boolean discovering;
+    static volatile int currentUserSerial=-1;
+    static HookRuntime ownerState(Object owner){synchronized(states){for(HookRuntime s:states.values())if(s.owner==owner&&!s.closed)return s;}return null;}
+    static void reattach(Object owner,Object mapper){HookRuntime old=states.get(mapper);if(old==null||old.owner!=owner)return;states.remove(mapper);old.close();failedOwners.remove(owner);attach(owner);}
     static final Set<Class<?>> thermalSupported=new HashSet<>();
     static final java.util.concurrent.ConcurrentMap<Class<?>,java.util.concurrent.ConcurrentMap<String,Field>> fieldCache=new java.util.concurrent.ConcurrentHashMap<>();
     static Field field(Class<?> cls,String name)throws Exception{
         java.util.concurrent.ConcurrentMap<String,Field> fields=fieldCache.computeIfAbsent(cls,k->new java.util.concurrent.ConcurrentHashMap<>());
-        Field f=fields.get(name);if(f!=null)return f;f=cls.getDeclaredField(name);f.setAccessible(true);Field existing=fields.putIfAbsent(name,f);return existing==null?f:existing;
+        Field f=fields.get(name);if(f!=null)return f;f=TraditionalAdapter.find(cls,name);Field existing=fields.putIfAbsent(name,f);return existing==null?f:existing;
     }
     static Object get(Object obj,String name)throws Exception{return field(obj.getClass(),name).get(obj);}
     static String os()throws Exception{return (String)Class.forName("android.os.SystemProperties").getMethod("get",String.class).invoke(null,"ro.mi.os.version.name");}
@@ -27,6 +30,8 @@ public final class HookEntry implements IXposedHookLoadPackage {
         if(android.os.Process.myUid()!=1000 || !(p.packageName.equals("android")||p.packageName.equals("system")) ||
                 !(p.processName.equals("android")||p.processName.equals("system")||p.processName.equals("system_server")))return;
         if(!os().startsWith("OS4"))return;
+        InjectionStatus.write(null,"injected","LSPosed 已加载，正在识别设备曲线");
+        try{currentUserSerial=((Number)Class.forName("android.app.ActivityManager").getMethod("getCurrentUser").invoke(null)).intValue()==0?0:-1;}catch(Throwable unknown){}
         XposedBridge.log("HyperLux "+AppBuild.BUILD+": system_server entry, package="+p.packageName+", process="+p.processName);
         if(discover(p.classLoader))return;
         // Some ROMs create a separate MIUI services loader later. Remove this startup
@@ -39,6 +44,8 @@ public final class HookEntry implements IXposedHookLoadPackage {
         discovery.addAll(XposedBridge.hookAllMethods(ClassLoader.class,"loadClass",watch));
         new Handler(Looper.getMainLooper()).postDelayed(()->{
             synchronized(HookEntry.class){for(XC_MethodHook.Unhook u:discovery)u.unhook();discovery.clear();}
+            if(installed.isEmpty())InjectionStatus.write(null,"curve_incompatible","LSPosed 已加载，但尚未找到兼容的系统显示接口");
+            else if(InjectionStatus.lastStage.isEmpty())InjectionStatus.write(null,"hooks_ready","LSPosed 已加载，等待读取设备曲线");
         },45000);
     }
     static synchronized boolean discover(ClassLoader loader){
@@ -47,21 +54,17 @@ public final class HookEntry implements IXposedHookLoadPackage {
         try {
             Class<?> owner=Class.forName(OWNER,false,loader);
             if(installed.contains(owner))return true;
-            Class<?> ref=Class.forName(REFACTOR,false,owner.getClassLoader());
-            Method defaults=ref.getDeclaredMethod("defaultAtLux",float.class);
-            Method reset=ref.getDeclaredMethod("resetDefaultSpline");
-            Method output=ref.getDeclaredMethod("getCurrentNit",float.class,float.class,boolean.class);
-            Method actual=owner.getDeclaredMethod("getRefactorBrightness",float.class,float.class,boolean.class,boolean.class);
-            if(defaults.getReturnType()!=float.class||reset.getReturnType()!=void.class||output.getReturnType()!=float.class||actual.getReturnType()!=float.class)
-                throw new IllegalStateException("Refactor signature changed");
-            for(String name:new String[]{"mContext","mHandler","mRefactorNitController","mDisplayId"})field(owner,name);
-            for(String name:new String[]{"mDisplayId","mUserSerial","mDefaultLogicalCurve"})field(ref,name);
+            for(String name:new String[]{"mContext","mHandler","mDisplayId"})field(owner,name);
             List<XC_MethodHook.Unhook> added=new ArrayList<>();
             try {
                 installThermal(owner);
                 ResponseTuning.install(owner.getClassLoader());AdvancedTuning.install(owner.getClassLoader());
                 LowLightTuning.install(owner.getClassLoader());
                 PipelineHooks.install(owner);
+                try {
+                Class<?> ref=Class.forName(REFACTOR,false,owner.getClassLoader());
+                Method output=ref.getDeclaredMethod("getCurrentNit",float.class,float.class,boolean.class);
+                if(output.getReturnType()!=float.class)throw new IllegalStateException("Refactor output ABI");
                 Method memory=ref.getDeclaredMethod("updateLogicalCurve",float.class,float.class);
                 if(memory.getReturnType()!=void.class)throw new IllegalStateException("manual memory ABI");
                 added.add(XposedBridge.hookMethod(memory,new XC_MethodHook(){
@@ -87,13 +90,15 @@ public final class HookEntry implements IXposedHookLoadPackage {
                     if(Float.isNaN((Float)param.args[1]) && !((Boolean)param.args[2]))
                         state.sample((Float)param.args[0],(Float)param.getResult());
                 }}));
-                added.add(XposedBridge.hookMethod(actual,new XC_MethodHook(){protected void beforeHookedMethod(MethodHookParam param){
-                    attach(param.thisObject);
-                    try {HookRuntime state=states.get(get(param.thisObject,"mRefactorNitController"));
-                        if(state!=null && state.kernel.plan()!=null && !state.appliesToUser())state.userChanged();
-                    }catch(Throwable error){XposedBridge.log(error);}
-                }}));
-                added.addAll(XposedBridge.hookAllMethods(owner,"init",new XC_MethodHook(){protected void afterHookedMethod(MethodHookParam param){if(!param.hasThrowable())attach(param.thisObject);}}));
+                }catch(Throwable optional){XposedBridge.log("HyperLux Refactor hooks unavailable; will inspect physical mapper: "+optional);}
+                XC_MethodHook attachHook=new XC_MethodHook(){protected void afterHookedMethod(MethodHookParam p){if(!p.hasThrowable())attach(p.thisObject);}};
+                added.addAll(XposedBridge.hookAllMethods(owner,"init",attachHook));
+                added.addAll(XposedBridge.hookAllMethods(owner,"setUpAutoBrightness",attachHook));
+                // updateAutoBrightness occurs after the ABC has been assigned by its constructor.
+                added.addAll(XposedBridge.hookAllMethods(owner,"updateAutoBrightness",new XC_MethodHook(){protected void beforeHookedMethod(MethodHookParam p){attach(p.thisObject);}}));
+                added.addAll(XposedBridge.hookAllMethods(owner,"getRefactorBrightness",new XC_MethodHook(){protected void beforeHookedMethod(MethodHookParam p){attach(p.thisObject);HookRuntime s=ownerState(p.thisObject);if(s!=null&&s.kernel.plan()!=null&&!s.appliesToUser())s.userChanged();}}));
+                added.addAll(XposedBridge.hookAllMethods(owner,"handleOnSwitchUser",new XC_MethodHook(){protected void beforeHookedMethod(MethodHookParam p){HookRuntime s=ownerState(p.thisObject);if(s!=null&&s.kernel.plan()!=null)s.userChanged();currentUserSerial=((Number)p.args[0]).intValue();}}));
+                InjectionStatus.write(null,"hooks_ready","系统接口已连接，等待读取设备曲线");
                 installed.add(owner);
             }catch(Throwable error){for(XC_MethodHook.Unhook u:added)u.unhook();throw error;}
             for(XC_MethodHook.Unhook u:discovery)u.unhook();discovery.clear();
@@ -114,7 +119,7 @@ public final class HookEntry implements IXposedHookLoadPackage {
             XC_MethodHook hook=new XC_MethodHook(){
                 protected void beforeHookedMethod(MethodHookParam p){
                     try{
-                        HookRuntime state=states.get(get(p.thisObject,"mRefactorNitController"));
+                        HookRuntime state=ownerState(p.thisObject);
                         if(state==null||state.closed||Looper.myLooper()!=state.handler.getLooper()||!state.relaxThermal())return;
                         float cap=((Number)get(p.thisObject,"mThermalMaxBrightness")).floatValue();
                         if(!Float.isFinite(cap)||cap<0||cap>1)return;
@@ -137,16 +142,24 @@ public final class HookEntry implements IXposedHookLoadPackage {
         try {
             AttachFailure failure=failedOwners.get(owner);if(failure!=null&&(failure.attempts>=3||SystemClock.uptimeMillis()<failure.retryAt))return;
             if(((Number)get(owner,"mDisplayId")).intValue()!=0)return;
-            Object ref=get(owner,"mRefactorNitController");if(ref==null||states.containsKey(ref))return;
+            Object ref=null;try{ref=get(owner,"mRefactorNitController");}catch(NoSuchFieldException absent){}
+            Object mapper=null,abc=null;Boolean usesRefactor=null;
+            try{mapper=get(owner,"mBrightnessMapper");Object impl=get(owner,"mAutomaticBrightnessControllerImpl");if(impl!=null)abc=get(impl,"mAutomaticBrightnessController");if(abc!=null)usesRefactor=(Boolean)get(abc,"mUseRefactorBrightnessPolicy");}catch(NoSuchFieldException absent){}
+            String selected=BackendSelection.choose(usesRefactor,ref!=null,mapper!=null&&abc!=null);
+            if(selected.equals("waiting")){InjectionStatus.write((android.content.Context)get(owner,"mContext"),"waiting_curve","LSPosed 已加载，设备曲线尚未就绪");return;}
+            if(selected.equals("physical_mapping"))ref=mapper;
+            if(states.containsKey(ref))return;
             Handler handler=(Handler)get(owner,"mHandler");if(handler==null)return;
             if(Looper.myLooper()!=handler.getLooper()){handler.post(()->attach(owner));return;}
-            // A replacement controller owns the primary display. Release the old observer.
-            synchronized(states){for(HookRuntime old:states.values())old.close();states.clear();}
+            // Validate the replacement before releasing an existing observer.
             HookRuntime state=new HookRuntime(owner,ref,handler);
+            if(state.kernel instanceof TraditionalAdapter)TraditionalHooks.install(ref.getClass());
+            synchronized(states){for(HookRuntime old:states.values())old.close();states.clear();}
             failedOwners.remove(owner);
             states.put(ref,state);state.start();
         }catch(Throwable error){AttachFailure before=failedOwners.get(owner),failure=new AttachFailure(before==null?1:before.attempts+1);failedOwners.put(owner,failure);
             XposedBridge.log("HyperLux attach attempt "+failure.attempts+" failed, OEM left in control: "+error);
+            try{InjectionStatus.write((android.content.Context)get(owner,"mContext"),"curve_incompatible","LSPosed 已加载，但当前设备曲线接口未兼容："+error);}catch(Throwable ignored){}
             if(failure.attempts<3){try{Handler handler=(Handler)get(owner,"mHandler");if(handler!=null)handler.postDelayed(()->attach(owner),failure.attempts*1000L);}catch(Throwable absent){}}
             else HookRuntime.reportAttachFailure(owner,error);
         }

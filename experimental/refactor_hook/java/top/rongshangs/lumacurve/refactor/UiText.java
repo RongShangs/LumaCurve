@@ -6,6 +6,18 @@ public final class UiText {
     private static final LinkedHashMap<String,String> WORDS=new LinkedHashMap<>();
     private static final List<Map.Entry<String,String>> PHRASES;
     static {
+        WORDS.put("曲线适配测试版","Curve compatibility test");
+        WORDS.put("默认基准取自本设备的系统曲线。编辑保留原曲线形状与完整节点；亮度须随照度不递减，高照度末端保持原始值。","The baseline comes from this device. Edits preserve its shape and nodes; brightness must not decrease with light, and the final point stays unchanged.");
+        WORDS.put("最高照度节点保持设备原始值","The final point keeps this device\'s original value");
+        WORDS.put("传统系统曲线 · 设备本地基准","Physical mapping · this device's baseline");
+        WORDS.put("Refactor 曲线 · 设备本地基准","Refactor · this device's baseline");
+        WORDS.put("接入后端","Curve backend");
+        WORDS.put("传统系统曲线","Physical mapping curve");
+        WORDS.put("设备曲线尚未连接","Device curve not connected");
+        WORDS.put("设备曲线尚未就绪","Device curve not ready");
+        WORDS.put("LSPosed 已加载","LSPosed loaded");
+        WORDS.put("等待读取设备本地曲线；如持续未连接，请导出分析包。","Waiting for this device's baseline. If it remains unavailable, export an analysis package.");
+        WORDS.put("根据系统正在使用的控制器读取设备本地曲线，保留传感器处理和亮度动画。","Reads the device baseline from the active system controller, preserving sensor processing and brightness animation.");
         WORDS.put("触摸遮挡保护","Touch-cover protection");
         WORDS.put("触摸释放等待","Wait after touch release");
         WORDS.put(" · 触摸保护 "," · touch protection ");
