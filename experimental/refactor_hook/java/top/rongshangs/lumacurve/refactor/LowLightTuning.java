@@ -23,14 +23,18 @@ final class LowLightTuning {
                 hooks.add(XposedBridge.hookMethod(m,new XC_MethodHook(){protected void afterHookedMethod(MethodHookParam p){
                     if(p.hasThrowable())return;
                     synchronized(HookEntry.states){for(HookRuntime s:HookEntry.states.values()){
-                        if(s.closed||!s.lowLightEnabled||Looper.myLooper()!=s.handler.getLooper())continue;
+                        if(s.closed||(!s.lowLightEnabled&&!s.advanced.enabled[1])||Looper.myLooper()!=s.handler.getLooper())continue;
                         try{Object impl=HookEntry.get(s.owner,"mAutomaticBrightnessControllerImpl"),dual=HookEntry.get(impl,"mDualSensorPolicy");
                             if(HookEntry.get(dual,"mAssistLightSensorRingBuffer")!=p.thisObject)continue;
-                            Object abc=HookEntry.get(impl,"mAutomaticBrightnessController");if(!s.lowLightApplies(abc,impl,HookRuntime.optionalNumber(dual,"mAssistFastAmbientLux")))return;
+                            Object abc=HookEntry.get(impl,"mAutomaticBrightnessController");
+                            boolean guard=s.lowLightApplies(abc,impl,HookRuntime.optionalNumber(dual,"mAssistFastAmbientLux"));
+                            boolean custom=s.advanced.enabled[1]&&s.normalTuningAllowed(abc,impl);if(!guard&&!custom)return;
                             boolean small=bright&&p.args.length==4&&(Float)p.args[1]<(Float)p.args[2];
                             long base=((Number)HookEntry.get(p.thisObject,small?"mSmallBrighteningLightDebounceConfig":bright?"mBrighteningLightDebounceConfig":"mDarkeningLightDebounceConfig")).longValue();
-                            long chosen=LowLightPolicy.chosen(base,bright,true,s.lowLightBrighten,s.lowLightDarken);if(chosen==base)return;
-                            p.setResult(DelayPolicy.deadline((Long)p.getResult(),(Long)p.args[0],base,chosen));s.lowLightAssistAdjustments++;return;
+                            long chosen=custom?(long)s.advanced.values[small?8:bright?6:7]:base;
+                            if(guard)chosen=LowLightPolicy.chosen(Math.max(base,chosen),bright,true,s.lowLightBrighten,s.lowLightDarken);
+                            if(chosen==base)return;
+                            p.setResult(DelayPolicy.deadline((Long)p.getResult(),(Long)p.args[0],base,chosen));if(guard)s.lowLightAssistAdjustments++;if(custom)s.assistAdjustments++;return;
                         }catch(Throwable incompatible){return;}
                     }}
                 }}));

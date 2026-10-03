@@ -11,11 +11,16 @@ public final class HookEntry implements IXposedHookLoadPackage {
     static final String REFACTOR="com.android.server.display.RefactorNitController";
     static final Map<Object,HookRuntime> states=Collections.synchronizedMap(new IdentityHashMap<>());
     static final Set<Class<?>> installed=new HashSet<>();
-    static final Map<Object,Boolean> failedOwners=Collections.synchronizedMap(new WeakHashMap<>());
+    static final Map<Object,AttachFailure> failedOwners=Collections.synchronizedMap(new WeakHashMap<>());
+    static final class AttachFailure{final int attempts;final long retryAt;AttachFailure(int count){attempts=count;retryAt=SystemClock.uptimeMillis()+count*1000L;}}
     static final List<XC_MethodHook.Unhook> discovery=new ArrayList<>();
     static boolean discovering;
     static final Set<Class<?>> thermalSupported=new HashSet<>();
-    static Field field(Class<?> cls,String name)throws Exception{Field f=cls.getDeclaredField(name);f.setAccessible(true);return f;}
+    static final java.util.concurrent.ConcurrentMap<Class<?>,java.util.concurrent.ConcurrentMap<String,Field>> fieldCache=new java.util.concurrent.ConcurrentHashMap<>();
+    static Field field(Class<?> cls,String name)throws Exception{
+        java.util.concurrent.ConcurrentMap<String,Field> fields=fieldCache.computeIfAbsent(cls,k->new java.util.concurrent.ConcurrentHashMap<>());
+        Field f=fields.get(name);if(f!=null)return f;f=cls.getDeclaredField(name);f.setAccessible(true);Field existing=fields.putIfAbsent(name,f);return existing==null?f:existing;
+    }
     static Object get(Object obj,String name)throws Exception{return field(obj.getClass(),name).get(obj);}
     static String os()throws Exception{return (String)Class.forName("android.os.SystemProperties").getMethod("get",String.class).invoke(null,"ro.mi.os.version.name");}
     public void handleLoadPackage(XC_LoadPackage.LoadPackageParam p)throws Throwable {
@@ -54,7 +59,7 @@ public final class HookEntry implements IXposedHookLoadPackage {
             List<XC_MethodHook.Unhook> added=new ArrayList<>();
             try {
                 installThermal(owner);
-                ResponseTuning.install(owner.getClassLoader());
+                ResponseTuning.install(owner.getClassLoader());AdvancedTuning.install(owner.getClassLoader());
                 LowLightTuning.install(owner.getClassLoader());
                 PipelineHooks.install(owner);
                 Method memory=ref.getDeclaredMethod("updateLogicalCurve",float.class,float.class);
@@ -65,6 +70,7 @@ public final class HookEntry implements IXposedHookLoadPackage {
                         if(state==null||state.closed||!state.phase.equals("active")||!state.appliesToUser()||Looper.myLooper()!=state.handler.getLooper())return;
                         try{
                             if(!((Boolean)state.kernel.get("mUseAutoBrightness")))return;
+                            state.lastManualAdjustment=SystemClock.uptimeMillis();
                             float lux=(Float)p.args[0],desired=(Float)p.args[1];
                             if(state.memoryStrength==0){p.setResult(null);state.memoryEvent(lux,desired,Float.NaN);return;}
                             float applied=desired;
@@ -129,7 +135,7 @@ public final class HookEntry implements IXposedHookLoadPackage {
     }
     static void attach(Object owner){
         try {
-            if(failedOwners.containsKey(owner))return;
+            AttachFailure failure=failedOwners.get(owner);if(failure!=null&&(failure.attempts>=3||SystemClock.uptimeMillis()<failure.retryAt))return;
             if(((Number)get(owner,"mDisplayId")).intValue()!=0)return;
             Object ref=get(owner,"mRefactorNitController");if(ref==null||states.containsKey(ref))return;
             Handler handler=(Handler)get(owner,"mHandler");if(handler==null)return;
@@ -137,7 +143,12 @@ public final class HookEntry implements IXposedHookLoadPackage {
             // A replacement controller owns the primary display. Release the old observer.
             synchronized(states){for(HookRuntime old:states.values())old.close();states.clear();}
             HookRuntime state=new HookRuntime(owner,ref,handler);
+            failedOwners.remove(owner);
             states.put(ref,state);state.start();
-        }catch(Throwable error){failedOwners.put(owner,true);XposedBridge.log("LumaCurve attach failed, OEM left in control: "+error);HookRuntime.reportAttachFailure(owner,error);}
+        }catch(Throwable error){AttachFailure before=failedOwners.get(owner),failure=new AttachFailure(before==null?1:before.attempts+1);failedOwners.put(owner,failure);
+            XposedBridge.log("HyperLux attach attempt "+failure.attempts+" failed, OEM left in control: "+error);
+            if(failure.attempts<3){try{Handler handler=(Handler)get(owner,"mHandler");if(handler!=null)handler.postDelayed(()->attach(owner),failure.attempts*1000L);}catch(Throwable absent){}}
+            else HookRuntime.reportAttachFailure(owner,error);
+        }
     }
 }

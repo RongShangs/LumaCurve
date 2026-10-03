@@ -30,6 +30,6 @@ public final class LowLightPolicy {
     public static long withinWindow(long wanted,long existing,long horizon,long additional){
         // Do not increase a wait beyond the retained evidence, including OEM step-mode time.
         if(horizon<=250||additional<0||additional>=horizon)return existing;
-        return wanted<=horizon-additional-250?wanted:existing;
+        return Math.max(existing,Math.min(wanted,horizon-additional-250));
     }
 }

@@ -32,6 +32,9 @@ public final class MainActivity extends Activity {
     LinearLayout thanksList;TextView thanksStatus;boolean thanksBusy,autoScroll=true;long thanksChecked;
     float lowLightLimit=50;long lowLightBrighten=3000,lowLightDarken=4000;
     SeekBar lowLimitSlider,lowBrightSlider,lowDarkSlider;TextView lowLimitLabel,lowBrightLabel,lowDarkLabel;
+    AdvancedOptions advanced=new AdvancedOptions();
+    final Switch[] advancedSwitches=new Switch[AdvancedOptions.GROUPS.length];final SeekBar[] advancedSliders=new SeekBar[AdvancedOptions.KEYS.length];final TextView[] advancedLabels=new TextView[AdvancedOptions.KEYS.length];
+    TextView advancedStatus;
     java.lang.Process bridge;BufferedReader bridgeReader;BufferedWriter bridgeWriter;
     final Runnable tick=()->{if(visible){if(!busy&&!permissionBlocked&&(page==0||page==2))run("inspect",null);ui.postDelayed(this.tick,page==0?refreshSeconds*1000:5000);}};
     int dp(float value){return Math.round(value*getResources().getDisplayMetrics().density);}
@@ -88,15 +91,23 @@ public final class MainActivity extends Activity {
         pipeline=new PipelineBoard();pages[0].addView(pipeline,new LinearLayout.LayoutParams(-1,0,1));
     }
     SeekBar parameter(LinearLayout parent,int maximum,int initial,java.util.function.IntConsumer changed){SeekBar s=new SeekBar(this);s.setMax(maximum);s.setProgress(initial);parent.addView(s,new LinearLayout.LayoutParams(-1,dp(38)));s.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){public void onProgressChanged(SeekBar v,int p,boolean user){if(user){changed.accept(p);dirty=true;drawCurve();}}public void onStartTrackingTouch(SeekBar v){}public void onStopTrackingTouch(SeekBar v){}});return s;}
+    void settingsSection(String title){TextView label=text(title,13,BLUE);label.setPadding(dp(4),dp(8),dp(4),dp(10));pages[1].addView(label);}
     void makeSettings(){
         LinearLayout b=card(pages[1]);b.addView(text("引擎控制",18,INK));LinearLayout r=row(b);apply=compact("保存并应用",this::submit,r);stop=compact("停用并恢复",()->run("stop",null),r);
-
-        b=card(pages[1]);b.addView(text("照度与亮度曲线",18,INK));b.addView(text("拖动节点调整亮度，点击节点输入数值。",13,MUTED));
+        settingsSection("亮度与偏好");makeCurveSettings();makeMemorySettings();
+        settingsSection("环境变化与过渡");makeAdvancedSettings(0);makeMainResponseSettings();makeAdvancedSettings(1);makeLowLightSettings();makeAdvancedSettings(2);
+        settingsSection("场景与保护");makeAdvancedSettings(4);makeAdvancedSettings(3);makeThermalSettings();
+        settingsSection("运行状态与界面");makeAdvancedStatus();makeRefreshSettings();
+    }
+    void makeCurveSettings(){
+        LinearLayout b=card(pages[1]);b.addView(text("照度与亮度曲线",18,INK));b.addView(text("拖动节点调整亮度，点击节点输入数值。",13,MUTED));
         settingsGraph=new CurveView(true);b.addView(settingsGraph,new LinearLayout.LayoutParams(-1,dp(235)));curveHint=text("连接后显示节点范围",12,MUTED);b.addView(curveHint);
         b.addView(text("节点受系统上下限和相邻节点约束，亮度随照度不递减；最高照度端保持系统上限。",12,MUTED));
         LinearLayout presets=row(b);compact("柔和",()->preset(new float[]{.7f,.8f,.95f,1}),presets);compact("系统默认",()->preset(new float[]{1,1,1,1}),presets);compact("稍亮",()->preset(new float[]{1.2f,1.15f,1.05f,1}),presets);
         presets=row(b);compact("保存为预设",this::savePreset,presets);compact("我的预设",this::pickPreset,presets);
-        b=card(pages[1]);b.addView(text("手动偏好记忆",18,INK));memorySwitch=new Switch(this);memorySwitch.setText(tr("记住我的手动调整"));memorySwitch.setTextSize(14);memorySwitch.setShowText(false);b.addView(memorySwitch,new LinearLayout.LayoutParams(-1,dp(48)));
+    }
+    void makeMemorySettings(){
+        LinearLayout b=card(pages[1]);b.addView(text("手动偏好记忆",18,INK));memorySwitch=new Switch(this);memorySwitch.setText(tr("记住我的手动调整"));memorySwitch.setTextSize(14);memorySwitch.setShowText(false);b.addView(memorySwitch,new LinearLayout.LayoutParams(-1,dp(48)));
         memorySwitch.setOnCheckedChangeListener((v,on)->{memoryEnabled=on;if(v.isPressed())dirty=true;});
         b.addView(text("手动亮度立即生效，也会影响附近照度的曲线。强度越低，每次记住的调整越少。",12,MUTED));
         memoryText=text("记忆强度 100%",13,INK);b.addView(memoryText);memorySlider=new SeekBar(this);memorySlider.setMax(99);memorySlider.setProgress(99);b.addView(memorySlider,new LinearLayout.LayoutParams(-1,dp(40)));
@@ -107,30 +118,67 @@ public final class MainActivity extends Activity {
         memoryStatus=text("等待读取手动锚点",12,MUTED);b.addView(memoryStatus);
         button("清除当前手动记忆",()->messageDialog("清除手动记忆？","保留基础曲线和最近滑块位置，仅清除当前曲线的手动锚点。","清除",()->run("reset-memory",null)),b);
         b.addView(text("关闭后不再记入新调整，已有记忆保留。记忆可能被系统重置，不保证跨重启保留。",12,MUTED));
-        b=card(pages[1]);b.addView(text("温控",18,INK));thermalSwitch=new Switch(this);thermalSwitch.setText(tr("减少温控降亮"));thermalSwitch.setTextSize(14);thermalSwitch.setShowText(false);b.addView(thermalSwitch,new LinearLayout.LayoutParams(-1,dp(48)));
+    }
+    void makeThermalSettings(){
+        LinearLayout b=card(pages[1]);b.addView(text("温控",18,INK));thermalSwitch=new Switch(this);thermalSwitch.setText(tr("减少温控降亮"));thermalSwitch.setTextSize(14);thermalSwitch.setShowText(false);b.addView(thermalSwitch,new LinearLayout.LayoutParams(-1,dp(48)));
         thermalSwitch.setOnCheckedChangeListener((v,on)->{thermalRelax=on;if(v.isPressed())dirty=true;});
         b.addView(text("默认关闭。开启后可减少显示层的温控限亮；严重过热或达到电池温度阈值时恢复系统策略。",12,MUTED));
         ceilingText=text("电池温度阈值：43℃（建议）",13,INK);b.addView(ceilingText);ceilingSlider=new SeekBar(this);ceilingSlider.setMax(7);ceilingSlider.setProgress(5);b.addView(ceilingSlider,new LinearLayout.LayoutParams(-1,dp(40)));
         ceilingSlider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){public void onProgressChanged(SeekBar s,int p,boolean from){if(from){thermalCeiling=p+38;dirty=true;drawCurve();}}public void onStartTrackingTouch(SeekBar s){}public void onStopTrackingTouch(SeekBar s){}});
         coolingLabel=text("",13,INK);b.addView(coolingLabel);coolingSlider=parameter(b,4,0,value->thermalCooling=1+value*.5f);
         b.addView(text("可设 38～45℃。达到阈值交回系统，冷却到设定幅度后再允许减少降亮。",12,MUTED));
-        b=card(pages[1]);b.addView(text("场景响应",18,INK));responseSwitch=new Switch(this);responseSwitch.setText(tr("自定义变化确认时间"));responseSwitch.setTextSize(14);b.addView(responseSwitch,new LinearLayout.LayoutParams(-1,dp(48)));responseSwitch.setOnCheckedChangeListener((v,on)->{responseOverride=on;if(v.isPressed())dirty=true;});
+    }
+    void makeMainResponseSettings(){
+        LinearLayout b=card(pages[1]);b.addView(text("主光感确认",18,INK));responseSwitch=new Switch(this);responseSwitch.setText(tr("自定义变化确认时间"));responseSwitch.setTextSize(14);b.addView(responseSwitch,new LinearLayout.LayoutParams(-1,dp(48)));responseSwitch.setOnCheckedChangeListener((v,on)->{responseOverride=on;if(v.isPressed())dirty=true;});
         b.addView(text("默认沿用系统。光线持续越过变化阈值后再调节，等待越长越不易受短暂遮挡影响。",12,MUTED));
         brightenLabel=text("",13,INK);b.addView(brightenLabel);brightenSlider=parameter(b,19,2,value->brightenDelay=500+value*500);
         darkenLabel=text("",13,INK);b.addView(darkenLabel);darkenSlider=parameter(b,28,8,value->darkenDelay=1000+value*500);
-        b.addView(text("变亮 0.5～10 秒，变暗 1～15 秒。闲置与驾驶模式继续沿用系统策略。",12,MUTED));
+        b.addView(text("变亮 0.5～10 秒，变暗 1～15 秒；实际等待受本机采样窗口限制。熄屏、HDR、闲置与驾驶沿用系统策略。",12,MUTED));
         smallBrightenSwitch=new Switch(this);smallBrightenSwitch.setText(tr("自定义微小变亮确认"));smallBrightenSwitch.setTextSize(14);b.addView(smallBrightenSwitch,new LinearLayout.LayoutParams(-1,dp(48)));smallBrightenSwitch.setOnCheckedChangeListener((v,on)->{smallBrightenOverride=on;if(v.isPressed())dirty=true;});
         smallBrightenLabel=text("",13,INK);b.addView(smallBrightenLabel);smallBrightenSlider=parameter(b,29,9,value->smallBrightenDelay=500+value*500);
         b.addView(text("0.5～15 秒。仅影响系统判定的微小变亮；关闭后沿用系统时间。",12,MUTED));
+    }
+    void makeLowLightSettings(){
+        LinearLayout b=card(pages[1]);b.addView(text("暗光稳定",18,INK));
         lowLightSwitch=new Switch(this);lowLightSwitch.setText(tr("暗光稳定"));lowLightSwitch.setTextSize(14);b.addView(lowLightSwitch,new LinearLayout.LayoutParams(-1,dp(48)));lowLightSwitch.setOnCheckedChangeListener((v,on)->{lowLightStability=on;if(v.isPressed())dirty=true;if(lowLimitSlider!=null)for(SeekBar slider:new SeekBar[]{lowLimitSlider,lowBrightSlider,lowDarkSlider})slider.setEnabled(on&&runtime!=null&&runtime.optBoolean("low_light_supported"));});
         b.addView(text("默认关闭。在设定照度以内增加主、辅助光感的变化确认时间。手动调节、熄屏、HDR、闲置与驾驶模式继续沿用系统。",12,MUTED));
         lowLimitLabel=text("",13,INK);b.addView(lowLimitLabel);lowLimitSlider=parameter(b,19,9,value->lowLightLimit=5+value*5);
         lowBrightLabel=text("",13,INK);b.addView(lowBrightLabel);lowBrightSlider=parameter(b,6,4,value->lowLightBrighten=1000+value*500);
         lowDarkLabel=text("",13,INK);b.addView(lowDarkLabel);lowDarkSlider=parameter(b,6,6,value->lowLightDarken=1000+value*500);
         b.addView(text("适用照度 5～100 lux；变亮、变暗最短确认各为 1～4 秒。保留系统更长等待；辅助光感采样窗口仅 5 秒，因此确认时间最高 4 秒。",12,MUTED));
-        b.addView(text("采样窗口不足时沿用原有等待，避免一直等不到确认。",12,MUTED));
-        b=card(pages[1]);b.addView(text("界面",18,INK));refreshLabel=text("",13,INK);b.addView(refreshLabel);refreshSlider=parameter(b,4,refreshSeconds-1,value->{refreshSeconds=value+1;getPreferences(0).edit().putInt("refresh_seconds",refreshSeconds).apply();});
+        b.addView(text("新增等待受采样窗口限制；主光感最近实际确认时间显示在下方，系统更长等待仍保留。",12,MUTED));
+    }
+    void makeRefreshSettings(){
+        LinearLayout b=card(pages[1]);b.addView(text("界面",18,INK));refreshLabel=text("",13,INK);b.addView(refreshLabel);refreshSlider=parameter(b,4,refreshSeconds-1,value->{refreshSeconds=value+1;getPreferences(0).edit().putInt("refresh_seconds",refreshSeconds).apply();});
         b.addView(text("只影响状态显示，不改变亮度调节频率。",12,MUTED));
+    }
+    void makeAdvancedSettings(int g){
+        String[] titles={"变化阈值","辅助光感确认","过渡动画","手动模式阳光屏","触摸遮挡保护"};
+        String[] explanations={
+            "默认沿用系统。倍率越大，需要更明显的照度变化才调节；最低照度差可过滤暗处的小波动。只在选定照度以内生效，高亮度、HDR 与驾驶场景保留系统阈值。",
+            "辅助光感独立确认，避免背面遮挡影响持续过久。三种等待各为 0.5～4 秒，受系统 5 秒历史窗口约束；暗光稳定开启时取更长等待。",
+            "保留系统感知亮度过渡，只调整时长。倍率越大越慢；变亮、变暗分别设置。仅自动亮度正常场景生效，已有过渡不重启。",
+            "这里只调整系统手动模式阳光屏的进入、退出确认，不是自动亮度 HBM 的冷却时间。仍需要系统开启阳光屏并满足照度与亮度条件，不强制开启增强。",
+            "系统检测到手指仍在遮挡区域时始终保留保护。这里只调整手指移开后的等待，可设 0～5 秒；0 秒仅取消移开后的附加等待，不关闭遮挡检测。"};
+        int[] starts={0,6,9,11,13},ends={6,9,11,13,14};
+        final int group=g;LinearLayout b=card(pages[1]);b.addView(text(titles[g],18,INK));
+            Switch toggle=new Switch(this);toggle.setText(tr("自定义"));toggle.setTextSize(14);toggle.setShowText(false);b.addView(toggle,new LinearLayout.LayoutParams(-1,dp(44)));advancedSwitches[g]=toggle;
+            b.addView(text(explanations[g],12,MUTED));LinearLayout details=column();details.setVisibility(View.GONE);
+            Button expand=action("展开参数",()->{});b.addView(expand,new LinearLayout.LayoutParams(-1,dp(42)));expand.setOnClickListener(v->{boolean open=details.getVisibility()!=View.VISIBLE;details.setVisibility(open?View.VISIBLE:View.GONE);expand.setText(tr(open?"收起参数":"展开参数"));});b.addView(details);
+            for(int i=starts[g];i<ends[g];i++){final int key=i;advancedLabels[i]=text("",13,INK);details.addView(advancedLabels[i]);advancedSliders[i]=parameter(details,(int)Math.round((AdvancedOptions.MAX[i]-AdvancedOptions.MIN[i])/AdvancedOptions.STEP[i]),(int)Math.round((AdvancedOptions.DEFAULT[i]-AdvancedOptions.MIN[i])/AdvancedOptions.STEP[i]),value->advanced.values[key]=AdvancedOptions.MIN[key]+value*AdvancedOptions.STEP[key]);}
+            toggle.setOnCheckedChangeListener((v,on)->{advanced.enabled[group]=on;if(v.isPressed())dirty=true;drawAdvanced();});
+    }
+    void makeAdvancedStatus(){
+        LinearLayout b=card(pages[1]);b.addView(text("参数生效状态",18,INK));advancedStatus=text("等待读取高级参数兼容状态",12,MUTED);b.addView(advancedStatus);
+    }
+    void drawAdvanced(){
+        String[] labels={"变亮阈值倍率","变暗阈值倍率","微小变亮阈值倍率","最小变亮照度差","最小变暗照度差","自定义阈值照度上限","辅助变亮确认","辅助变暗确认","辅助微小变亮确认","变亮时长倍率","变暗时长倍率","阳光屏进入确认","阳光屏退出确认","触摸释放等待"};
+        int[] groups={0,0,0,0,0,0,1,1,1,2,2,3,3,4};
+        for(int g=0;g<AdvancedOptions.GROUPS.length;g++)if(advancedSwitches[g]!=null){boolean supported=runtime!=null&&runtime.optBoolean(AdvancedOptions.GROUPS[g]+"_supported");if(advancedSwitches[g].isChecked()!=advanced.enabled[g])advancedSwitches[g].setChecked(advanced.enabled[g]);advancedSwitches[g].setEnabled(supported||advanced.enabled[g]);advancedSwitches[g].setText(tr(supported?"自定义":"此系统接口暂未兼容"));}
+        for(int i=0;i<AdvancedOptions.KEYS.length;i++)if(advancedSliders[i]!=null){advancedSliders[i].setProgress((int)Math.round((advanced.values[i]-AdvancedOptions.MIN[i])/AdvancedOptions.STEP[i]));boolean timing=i>=6&&i<=12&&i!=9&&i!=10;advancedLabels[i].setText(labels[i]+"："+format(timing?advanced.values[i]/1000:advanced.values[i])+(timing||i==13?" 秒":i==3||i==4||i==5?" lux":"×"));advancedSliders[i].setEnabled(advanced.enabled[groups[i]]&&runtime!=null&&runtime.optBoolean(AdvancedOptions.GROUPS[groups[i]]+"_supported"));}
+        if(advancedStatus!=null)advancedStatus.setText(runtime==null?"等待读取高级参数兼容状态":"实际改写次数：阈值 "+runtime.optLong("threshold_adjustments")+" · 辅助确认 "+runtime.optLong("assist_adjustments")+" · 动画 "+runtime.optLong("animation_adjustments")+" · 阳光屏 "+runtime.optLong("sunlight_adjustments")+" · 触摸保护 "+runtime.optLong("touch_adjustments")+"\n确认时间受采样窗口限制："+runtime.optLong("delay_window_clamps")+" 次");
+        if(advancedStatus!=null&&runtime!=null){JSONObject scenes=runtime.optJSONObject("system_scene");if(scenes!=null&&scenes.has("main_history_ms"))advancedStatus.append("\n"+tr("主光感历史窗口")+": "+format(scenes.optDouble("main_history_ms")/1000)+tr(" 秒"));
+            if(runtime.has("last_main_brighten_ms")||runtime.has("last_main_darken_ms"))advancedStatus.append("\n"+tr("最近主光感基础确认：亮 ")+(runtime.has("last_main_brighten_ms")?format(runtime.optDouble("last_main_brighten_ms")/1000):"—")+tr(" 秒")+tr(" · 暗 ")+(runtime.has("last_main_darken_ms")?format(runtime.optDouble("last_main_darken_ms")/1000):"—")+tr(" 秒"));}
     }
     void makeLogs(){
         LinearLayout b=card(pages[2]);b.setPadding(dp(16),dp(12),dp(16),dp(12));b.addView(text("运行与兼容",17,INK));compatibility=text("正在等待系统状态…",13,MUTED);compatibility.setMaxLines(4);compatibility.setEllipsize(android.text.TextUtils.TruncateAt.END);b.addView(compatibility);
@@ -147,7 +195,7 @@ public final class MainActivity extends Activity {
     }
 
     void makeAbout(){
-        LinearLayout b=card(pages[3]);b.setPadding(dp(22),dp(22),dp(22),dp(18));LinearLayout r=row(b);r.addView(image(null,68,20));LinearLayout title=column();LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-2,1);lp.leftMargin=dp(18);r.addView(title,lp);title.addView(text("HyperLux",26,INK));title.addView(text(AppBuild.VERSION+" · "+tr(AppBuild.TEST?"稳定性测试版":"正式版"),14,BLUE));
+        LinearLayout b=card(pages[3]);b.setPadding(dp(22),dp(22),dp(22),dp(18));LinearLayout r=row(b);r.addView(image(null,68,20));LinearLayout title=column();LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-2,1);lp.leftMargin=dp(18);r.addView(title,lp);title.addView(text("HyperLux",26,INK));title.addView(text(AppBuild.VERSION+" · "+tr(AppBuild.TEST?"参数研究测试版":"正式版"),14,BLUE));
         TextView intro=text("适配 HyperOS 4 的自动亮度工具。\n\n以系统双侧感光与场景判定为基础，提供可编辑曲线、预设与手动偏好记忆。保留系统平滑过渡，也可按需调整温控和变化确认时间。",15,INK);intro.setLineSpacing(dp(5),1);intro.setPadding(0,dp(20),0,dp(16));b.addView(intro);
         b.addView(text("HyperOS 4 · Root · LSPosed",12,MUTED));updateLabel=text("自动检查应用更新",12,BLUE);updateLabel.setPadding(dp(12),dp(10),dp(12),dp(10));updateLabel.setBackground(background(0xffeef3ff,12));lp=new LinearLayout.LayoutParams(-1,-2);lp.topMargin=dp(10);lp.bottomMargin=dp(6);b.addView(updateLabel,lp);
         r=row(b);compact("官网",()->open("https://lc.rongshangs.top"),r);compact("GitHub",()->open(UpdateChecker.REPO),r);compact("开源协议",()->open("https://www.gnu.org/licenses/gpl-3.0.html"),r);
@@ -199,6 +247,7 @@ public final class MainActivity extends Activity {
         }catch(Exception error){show(error.getMessage());}
     }
     void drawCurve(){
+        drawAdvanced();
         thermalSwitch.setChecked(thermalRelax);ceilingSlider.setProgress(Math.round(thermalCeiling)-38);ceilingText.setText("电池温度阈值："+Math.round(thermalCeiling)+"℃"+(Math.round(thermalCeiling)==43?"（建议）":""));stateGraph.invalidate();settingsGraph.invalidate();
         memorySwitch.setChecked(memoryEnabled);memorySlider.setProgress(Math.round(memoryStrength*100)-1);memoryText.setText("记忆强度 "+Math.round(memoryStrength*100)+"%"+(memoryStrength==1?" · 系统速度":" · 缓慢记忆"));pipeline.invalidate();
         memoryWindowSlider.setProgress((int)(memoryWindow-500)/500);memoryWindowLabel.setText("连续调节间隔："+format(memoryWindow/1000d)+" 秒");memoryRangeSlider.setProgress(Math.round((memoryLuxRange-.1f)/.05f));memoryRangeLabel.setText("记忆照度范围：±"+Math.round(memoryLuxRange*100)+"%");
@@ -214,6 +263,7 @@ public final class MainActivity extends Activity {
         if(factoryLux==null)return;
         try{new CurvePlan(factoryLux,factoryNit,minimum,maximum,factors);ThermalPolicy.validate(thermalCeiling);
             JSONObject options=new JSONObject().put("factors",CurvePlan.encode(factors)).put("thermal_relax",thermalRelax).put("thermal_ceiling",thermalCeiling).put("memory_strength",memoryEnabled?memoryStrength:0).put("memory_window",memoryWindow).put("memory_lux_range",memoryLuxRange).put("thermal_cooling",thermalCooling).put("response_override",responseOverride).put("brighten_delay",brightenDelay).put("darken_delay",darkenDelay).put("small_brighten_override",smallBrightenOverride).put("small_brighten_delay",smallBrightenDelay);
+            advanced.put(options);
             options.put("low_light_stability",lowLightStability).put("low_light_limit",lowLightLimit).put("low_light_brighten",lowLightBrighten).put("low_light_darken",lowLightDarken);
             run("apply",Base64.getEncoder().encodeToString(options.toString().getBytes(StandardCharsets.UTF_8)));
         }catch(Exception error){show(error.getMessage());}
@@ -262,6 +312,7 @@ public final class MainActivity extends Activity {
         branchRow(body,"HDR",observed(runtime,"hdr_active"),"视频等 HDR 内容可改变输出亮度，与照度曲线变化分开记录。");
         branchRow(body,"阳光增强",observed(runtime,"sunlight_active"),"系统高亮控制器的当前状态；仍由系统判断何时触发。");
         branchRow(body,"暗光稳定",observed(runtime,"low_light_stability"),"仅增加照度变化的确认时间，保留原有传感器数值与系统过渡动画。");
+        if(runtime!=null){branchRow(body,"变化阈值与辅助确认",advancedStatus==null?"":advancedStatus.getText().toString(),"高级选项默认关闭；次数为本次系统进程累计，不代表当前每一帧都在调整。");JSONObject scenes=runtime.optJSONObject("system_scene");if(scenes!=null)branchRow(body,"系统场景与增强条件",sceneSummary(scenes),"只读显示。未出现的字段表示未取得，并非关闭；系统仍负责口袋、反射、驾驶、HDR 和高亮度保护。");}
         if(runtime!=null)body.addView(text("实际延长确认：主光感 "+runtime.optLong("low_light_main_adjustments")+" · 辅助光感 "+runtime.optLong("low_light_assist_adjustments"),12,MUTED));
         if(frame!=null){long age=Math.max(0,SystemClock.uptimeMillis()-frame.optLong("uptime_ms"));body.addView(text("最近曲线计算："+format(age/1000d)+" 秒前 · #"+frame.optLong("sequence"),12,MUTED));}
         body.addView(text("未取得表示该阶段尚未被观察到。曲线计算与后续输出分开记录，导出分析包可查看切换详情。",12,MUTED));
@@ -332,11 +383,12 @@ public final class MainActivity extends Activity {
     void render(JSONObject answer){
         lastAnswer=answer;rememberLegacy(answer);
         try{
-            if(!answer.optBoolean("connected")){runtime=null;factoryLux=factoryNit=null;branchOverview.setText("亮度分支：等待读取 · 点击查看");lowLightSwitch.setEnabled(false);badge.setText("未连接");stateTitle.setText("尚未连接系统曲线");luxReading.setText("— nit");nitReading.setText("— nit");compatibility.setText("✓ Root 授权已通过\n○ 系统框架连接未建立\n请核对 LSPosed 作用域和是否重启");apply.setEnabled(false);thermalSwitch.setEnabled(false);memorySwitch.setEnabled(false);stateGraph.invalidate();pipeline.invalidate();
+            if(!answer.optBoolean("connected")){runtime=null;drawAdvanced();factoryLux=factoryNit=null;branchOverview.setText("亮度分支：等待读取 · 点击查看");lowLightSwitch.setEnabled(false);badge.setText("未连接");stateTitle.setText("尚未连接系统曲线");luxReading.setText("— nit");nitReading.setText("— nit");compatibility.setText("✓ Root 授权已通过\n○ 系统框架连接未建立\n请核对 LSPosed 作用域和是否重启");apply.setEnabled(false);thermalSwitch.setEnabled(false);memorySwitch.setEnabled(false);stateGraph.invalidate();pipeline.invalidate();
                 permissionPrompt("lsp","LSPosed 尚未接入",answer.optString("hook_issue").equals("restart_required")?"Root 已获授权，但系统仍在运行旧版 Hook。请重启手机以加载新版本。":"Root 已授权。请在 LSPosed 启用 HyperLux，勾选系统框架，然后重启手机。\n从旧测试版迁移时，请先关闭旧版的 LSPosed 开关。");return;}
             runtime=answer.getJSONObject("runtime");if(!runtime.has("factory_lux")){factoryLux=factoryNit=null;badge.setText("不兼容");compatibility.setText(runtime.optString("message"));show("");apply.setEnabled(false);thermalSwitch.setEnabled(false);memorySwitch.setEnabled(false);permissionPrompt("abi","系统接口尚未兼容",runtime.optString("message"));return;}
             factoryLux=RootControl.numbers(runtime.getJSONArray("factory_lux"));factoryNit=RootControl.numbers(runtime.getJSONArray("factory_logical_nit"));minimum=(float)runtime.getDouble("min_logical_nit");maximum=(float)runtime.getDouble("max_logical_nit");
             JSONObject config=answer.optJSONObject("config");if(!dirty&&config!=null&&config.optBoolean("enabled")){factors=CurvePlan.factors(config.getString("factors"));thermalRelax=config.optBoolean("thermal_relax");thermalCeiling=(float)config.optDouble("thermal_ceiling",43);float memory=(float)config.optDouble("memory_strength",1);memoryEnabled=memory>0;if(memoryEnabled)memoryStrength=memory;memoryWindow=config.optLong("memory_window",1500);memoryLuxRange=(float)config.optDouble("memory_lux_range",.3);thermalCooling=(float)config.optDouble("thermal_cooling",1);responseOverride=config.optBoolean("response_override");brightenDelay=config.optLong("brighten_delay",1500);darkenDelay=config.optLong("darken_delay",5000);smallBrightenOverride=config.optBoolean("small_brighten_override");smallBrightenDelay=config.optLong("small_brighten_delay",5000);}
+            if(!dirty)advanced=config!=null&&config.optBoolean("enabled")?AdvancedOptions.parse(config):new AdvancedOptions();
             if(!dirty){lowLightStability=config!=null&&config.optBoolean("enabled")&&config.optBoolean("low_light_stability");lowLightLimit=config==null?50:(float)config.optDouble("low_light_limit",50);lowLightBrighten=config==null?3000:config.optLong("low_light_brighten",3000);lowLightDarken=config==null?4000:config.optLong("low_light_darken",4000);}
             JSONObject currentFrame=runtime.optJSONObject("last_pipeline");branchOverview.setText("曲线："+route(currentFrame)+" · 输出："+strategy()+"\nHDR："+observed(runtime,"hdr_active")+" · 点击查看亮度分支");
             String phase=runtime.optString("phase");boolean active=phase.equals("active"),auto=runtime.optBoolean("auto_mode");badge.setText(active?"运行中":phase.equals("error")?"接入异常":"官方基准");
@@ -354,9 +406,18 @@ public final class MainActivity extends Activity {
             // After an OTA, an unsupported option that was enabled must still be switchable off.
             smallBrightenSwitch.setEnabled(runtime.optBoolean("small_response_supported")||smallBrightenOverride);smallBrightenSlider.setEnabled(runtime.optBoolean("small_response_supported"));
             lowLightSwitch.setEnabled(runtime.optBoolean("low_light_supported")||lowLightStability);for(SeekBar slider:new SeekBar[]{lowLimitSlider,lowBrightSlider,lowDarkSlider})slider.setEnabled(runtime.optBoolean("low_light_supported")&&lowLightStability);
+            if(answer.optLong("state_age_ms")>15000)compatibility.append("\n"+tr("系统状态未及时刷新"));
             thermalSwitch.setEnabled(runtime.optBoolean("thermal_supported")||thermalRelax);responseSwitch.setEnabled(runtime.optBoolean("response_supported")||responseOverride);brightenSlider.setEnabled(runtime.optBoolean("response_supported"));darkenSlider.setEnabled(runtime.optBoolean("response_supported"));memorySwitch.setEnabled(true);apply.setEnabled(true);permissionNotice="";permissionBlocked=false;drawCurve();
             if(!firmwarePrompted&&config!=null&&config.optBoolean("enabled")&&!config.optString("fingerprint").equals(Build.FINGERPRINT)){firmwarePrompted=true;AlertDialog d=dialog("系统已更新",text("当前已恢复系统曲线。请核对兼容状态，再重新保存并应用。",14,MUTED));d.show();dialogButton(d,"知道了",null,true);}if(!busy&&!dirty)show("");
         }catch(Exception error){runtime=null;factoryLux=factoryNit=null;apply.setEnabled(false);stateGraph.invalidate();pipeline.invalidate();show("状态格式不兼容："+error);}
+    }
+    String sceneSummary(JSONObject scenes){
+        StringBuilder out=new StringBuilder();
+        String[][] flags={{"touch_protection_active","触摸遮挡保护"},{"proximity_near","距离遮挡"},{"night_wake","夜间唤醒"},{"night_driving","夜间驾驶"},{"reflective","反射判定"},{"step_mode","运动延迟"},{"assist_reset_pending","辅助重置等待"},{"manual_sunlight_active","手动阳光屏"},{"manual_sunlight_sensor","阳光屏传感器"},{"hbm_controller_enabled","HBM 控制器"},{"hbm_time_available","HBM 时间条件"},{"hbm_ambient_allowed","HBM 照度条件"},{"hbm_low_power_block","HBM 省电限制"},{"hdr_layer_present","HDR 图层"},{"dolby_enabled","杜比显示"}};
+        for(String[] f:flags)if(scenes.has(f[0]))out.append(tr(f[1])).append(": ").append(tr(scenes.optBoolean(f[0])?"已触发":"未触发")).append('\n');
+        String[][] numbers={{"main_history_ms","主光感历史窗口","ms"},{"step_extra_ms","运动附加等待","ms"},{"hbm_minimum_lux","HBM 最低照度","lux"},{"hbm_time_window_ms","HBM 时间窗口","ms"},{"hbm_time_max_ms","HBM 时间预算","ms"}};
+        for(String[] f:numbers)if(scenes.has(f[0]))out.append(tr(f[1])).append(": ").append(format(scenes.optDouble(f[0]))).append(' ').append(f[2]).append('\n');
+        return out.length()==0?tr("未取得"):out.toString().trim();
     }
     static String severity(int level){String[] names={"正常","轻微","中等","严重","危急","紧急","关机"};return level>=0&&level<names.length?names[level]:"未知";}
     @Override public void onResume(){super.onResume();visible=true;permissionNotice="";permissionBlocked=false;run("inspect",null);ui.removeCallbacks(tick);ui.postDelayed(tick,refreshSeconds*1000);checkUpdate(false);if(page==3)refreshThanks();offerLegacyModules();offerUpdate();}
@@ -378,8 +439,8 @@ public final class MainActivity extends Activity {
         PipelineBoard(){super(MainActivity.this);setWillNotDraw(false);for(int i=0;i<6;i++)boxes[i]=new RectF();stateGraph=new CurveView(false);addView(stateGraph);addView(branchOverview);setContentDescription(tr("主光感和辅助光感，经融合与场景判断产生有效照度"));}
         void layoutBoxes(){float w=getWidth(),h=getHeight(),gap=dp(12),half=(w-gap)/2;boxes[0].set(0,0,half,h*.12f);boxes[1].set(half+gap,0,w,h*.12f);boxes[2].set(0,h*.16f,w,h*.30f);boxes[3].set(0,h*.36f,w,h*.70f);boxes[4].set(0,h*.74f,w,h*.845f);boxes[5].set(0,h*.885f,w,h);}
         int branchHeight(int h){return Math.min(dp(46),Math.max(dp(30),(int)(h*.085f)));}
-        @Override protected void onMeasure(int ws,int hs){int w=MeasureSpec.getSize(ws),h=MeasureSpec.getSize(hs);setMeasuredDimension(w,h);int bh=branchHeight(h);stateGraph.measure(MeasureSpec.makeMeasureSpec(Math.max(0,w-dp(20)),MeasureSpec.EXACTLY),MeasureSpec.makeMeasureSpec(Math.max(0,(int)(h*.34f)-dp(18)-bh),MeasureSpec.EXACTLY));branchOverview.measure(MeasureSpec.makeMeasureSpec(Math.max(0,w-dp(24)),MeasureSpec.EXACTLY),MeasureSpec.makeMeasureSpec(bh,MeasureSpec.EXACTLY));}
-        @Override protected void onLayout(boolean changed,int l,int t,int r,int b){layoutBoxes();RectF graph=boxes[3];int bottom=(int)graph.bottom-dp(6),top=bottom-branchHeight(getHeight());stateGraph.layout(dp(10),(int)graph.top+dp(8),getWidth()-dp(10),top-dp(4));branchOverview.layout(dp(12),top,getWidth()-dp(12),bottom);}
+        @Override protected void onMeasure(int ws,int hs){int w=MeasureSpec.getSize(ws),h=MeasureSpec.getSize(hs);setMeasuredDimension(w,h);int bh=branchHeight(h),chartCardHeight=(int)(h*.70f)-(int)(h*.36f);stateGraph.measure(MeasureSpec.makeMeasureSpec(Math.max(0,w-dp(20)),MeasureSpec.EXACTLY),MeasureSpec.makeMeasureSpec(Math.max(0,chartCardHeight-dp(24)-bh),MeasureSpec.EXACTLY));branchOverview.measure(MeasureSpec.makeMeasureSpec(Math.max(0,w-dp(24)),MeasureSpec.EXACTLY),MeasureSpec.makeMeasureSpec(bh,MeasureSpec.EXACTLY));}
+        @Override protected void onLayout(boolean changed,int l,int t,int r,int b){layoutBoxes();RectF graph=boxes[3];int bottom=(int)graph.bottom-dp(12),top=bottom-branchHeight(getHeight());stateGraph.layout(dp(10),(int)graph.top+dp(8),getWidth()-dp(10),top-dp(4));branchOverview.layout(dp(12),top,getWidth()-dp(12),bottom);}
         void prepareLabel(String value,int size,int color,float width){paint.setColor(color);paint.setStyle(Paint.Style.FILL);float scale=Math.min(1,Math.max(.65f,getHeight()/(float)dp(440)));paint.setTextSize(dp(Math.max(9,size*scale)));while(paint.measureText(value)>width&&paint.getTextSize()>dp(9))paint.setTextSize(paint.getTextSize()-1);}
         void label(Canvas c,String value,float x,float y,int size,int color,float width){value=tr(value);prepareLabel(value,size,color,width);c.drawText(value,x-paint.measureText(value)/2,y,paint);}
         void labelStart(Canvas c,String value,float x,float y,int size,int color,float width){value=tr(value);prepareLabel(value,size,color,width);c.drawText(value,x,y,paint);}

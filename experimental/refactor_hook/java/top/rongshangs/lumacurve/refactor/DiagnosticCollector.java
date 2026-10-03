@@ -11,16 +11,45 @@ import org.json.*;
 
 /** On-demand, bounded read-only diagnostics. No sensor registration or brightness writes. */
 final class DiagnosticCollector {
+    interface SettingsReader {String get(String name)throws Exception;}
     final ZipOutputStream zip;final JSONArray manifest=new JSONArray();long copied;int files;
+    final SettingsReader settingsReader;
+    final long deadline;
     static final long FILE_LIMIT=64L*1024*1024,TOTAL_LIMIT=256L*1024*1024;
-    DiagnosticCollector(ZipOutputStream zip){this.zip=zip;}
+    DiagnosticCollector(ZipOutputStream zip){this(zip,null,180000);}
+    DiagnosticCollector(ZipOutputStream zip,SettingsReader reader){this(zip,reader,180000);}
+    DiagnosticCollector(ZipOutputStream zip,long budgetMillis){this(zip,null,budgetMillis);}
+    DiagnosticCollector(ZipOutputStream zip,SettingsReader reader,long budgetMillis){this.zip=zip;settingsReader=reader;deadline=System.nanoTime()+TimeUnit.MILLISECONDS.toNanos(Math.max(1,Math.min(180000,budgetMillis)));}
+    long remainingMillis(){return Math.max(0,TimeUnit.NANOSECONDS.toMillis(deadline-System.nanoTime()));}
     void note(String path,String status,String detail)throws JSONException{manifest.put(new JSONObject().put("path",path).put("status",status).put("detail",detail));}
+    void collectSettings()throws Exception {
+        JSONObject entries=new JSONObject();
+        long collectedAt=System.currentTimeMillis();
+        for(String key:new String[]{"screen_brightness_mode","screen_brightness","screen_auto_brightness_adj"}){
+            String status="ok",value=null,error=null;
+            if(remainingMillis()<=0){status="skipped_budget";error="total collection time budget exhausted";}
+            else if(settingsReader==null){status="unavailable";error="Settings provider reader unavailable";}
+            else try{value=settingsReader.get(key);if(value==null)status="missing";}
+            catch(Exception failure){status="error";error=failure.toString();}
+            JSONObject entry=new JSONObject().put("status",status).put("value",value==null?JSONObject.NULL:value);
+            if(error!=null)entry.put("error",error);
+            entries.put(key,entry);
+            String path="settings/"+key+".txt";
+            // Preserve zero and the provider's exact value; absence/errors are never fake numeric defaults.
+            RootControl.write(zip,path,status.equals("ok")?value+"\n":"["+status+"] "+(error==null?"Setting not present for user 0":error)+"\n");
+            note(path,status,"source=SettingsProvider; namespace=system; user=0"+(error==null?"":"; "+error));
+        }
+        RootControl.write(zip,"settings/system.json",new JSONObject().put("source","SettingsProvider").put("namespace","system")
+            .put("user",0).put("collected_unix_ms",collectedAt).put("entries",entries).toString(2));
+        note("settings/system.json","ok","per-setting statuses included; primary user 0; sequential read-only snapshot");
+    }
     void command(String name,int seconds,String...args)throws Exception{
+        long remaining=remainingMillis();if(remaining<=0){note(name,"skipped_budget","total collection time budget exhausted");return;}
         File temp=File.createTempFile("diagnostic-",".txt",RootControl.DATA);Process process=null;
         byte[] output=null;
         try{
             process=new ProcessBuilder(args).redirectErrorStream(true).redirectOutput(temp).start();
-            boolean done=process.waitFor(seconds,TimeUnit.SECONDS);
+            boolean done=process.waitFor(Math.min(seconds*1000L,remaining),TimeUnit.MILLISECONDS);
             if(!done){process.destroyForcibly();process.waitFor(2,TimeUnit.SECONDS);}
             // Include partial output and mark timeout/nonzero, rather than aborting the archive.
             long size=temp.length();int cap=2*1024*1024;byte[] data=new byte[(int)Math.min(size,cap)];
@@ -33,13 +62,14 @@ final class DiagnosticCollector {
         if(output!=null)RootControl.write(zip,name,new String(output,StandardCharsets.UTF_8));
     }
     void copy(File source,String destination)throws Exception{
+        if(remainingMillis()<=0){note(destination,"skipped_budget","total collection time budget exhausted");return;}
         if(!source.isFile()||!source.canRead()){note(destination,"unavailable",source.toString());return;}
         long size=source.length();if(size>FILE_LIMIT||copied+size>TOTAL_LIMIT||files>=256){note(destination,"skipped_limit",source+"; bytes="+size);return;}
         InputStream input;try{input=new FileInputStream(source);}catch(IOException unavailable){note(destination,"unavailable",unavailable.toString());return;}
         MessageDigest digest=MessageDigest.getInstance("SHA-256");long count=0;String error=null;
         zip.putNextEntry(new ZipEntry(destination));
         try(InputStream in=input){byte[] buffer=new byte[65536];int n;
-            while(true){try{n=in.read(buffer);}catch(IOException unreadable){error=unreadable.toString();break;}if(n==-1)break;
+            while(true){if(remainingMillis()<=0){error="total collection time budget exhausted";break;}try{n=in.read(buffer);}catch(IOException unreadable){error=unreadable.toString();break;}if(n==-1)break;
                 if(count+n>FILE_LIMIT||copied+n>TOTAL_LIMIT){error="file grew beyond collection limit";break;}
                 zip.write(buffer,0,n);digest.update(buffer,0,n);count+=n;copied+=n;
             }
@@ -49,6 +79,7 @@ final class DiagnosticCollector {
             .put("bytes",count).put("sha256",hash.toString()).put("detail",error==null?"hash of archived bytes":error));
     }
     void tree(File directory,String destination,int depth)throws Exception{
+        if(remainingMillis()<=0){note(destination,"skipped_budget","total collection time budget exhausted");return;}
         if(depth>5||!directory.isDirectory()){note(destination,"unavailable",directory.toString());return;}
         File[] children=directory.listFiles();if(children==null){note(destination,"unavailable",directory.toString());return;}Arrays.sort(children);
         String canonical=directory.getCanonicalPath()+File.separator;
@@ -76,7 +107,7 @@ final class DiagnosticCollector {
         String[] props={"ro.product.model","ro.product.device","ro.product.board","ro.product.cpu.abi","ro.build.fingerprint","ro.build.version.sdk","ro.build.version.release","ro.build.version.incremental","ro.mi.os.version.name","ro.mi.os.version.incremental"};
         for(String prop:props)command("properties/"+prop+".txt",2,"getprop",prop);
         command("environment.txt",5,"sh","-c","date; id; getenforce; cat /proc/uptime /proc/sys/kernel/random/boot_id; printf '\\nBOOTCLASSPATH=%s\\nSYSTEMSERVERCLASSPATH=%s\\n' \"$BOOTCLASSPATH\" \"$SYSTEMSERVERCLASSPATH\"");
-        for(String key:new String[]{"screen_brightness_mode","screen_brightness","screen_auto_brightness_adj"})command("settings/"+key+".txt",3,"settings","get","system",key);
+        collectSettings();
         for(String resource:new String[]{"config_screenBrightnessNits","config_screenBrightnessBacklight","config_screenBrightnessBacklightFloat","config_autoBrightnessLevels","config_autoBrightnessDisplayValuesNits"})command("resources/"+resource+".txt",3,"cmd","overlay","lookup","android","android:array/"+resource);
         command("backlight.txt",5,"sh","-c","for n in /sys/class/backlight/*; do [ -d \"$n\" ] || continue; echo \"BACKLIGHT $n\"; readlink -f \"$n\"; ls -l \"$n/brightness\"; for f in brightness actual_brightness max_brightness bl_power type; do [ -r \"$n/$f\" ] && { echo \"$f\"; cat \"$n/$f\"; }; done; done; for n in /sys/class/drm/*; do [ -d \"$n\" ] || continue; echo \"DRM $n\"; for f in status enabled dpms; do [ -r \"$n/$f\" ] && { echo \"$f\"; cat \"$n/$f\"; }; done; done; exit 0");
         RootControl.progress("5/8 收集显示配置文件…");
@@ -94,6 +125,6 @@ final class DiagnosticCollector {
         if(new File("/data/local/tmp/luma_curve.log").isFile())command("legacy/recent-log.txt",3,"tail","-n","250","/data/local/tmp/luma_curve.log");
         command("display-second.txt",12,"dumpsys","display");
         RootControl.write(zip,"collection-manifest.json",new JSONObject().put("format",1).put("app_build",AppBuild.BUILD).put("copied_bytes",copied).put("file_limit_bytes",FILE_LIMIT).put("total_file_limit_bytes",TOTAL_LIMIT).put("entries",manifest).toString(2));
-        RootControl.write(zip,"analysis-readme.txt","Read-only, on-demand collection; no brightness writes or sensor registrations. Snapshots are sequential, not simultaneous.\nstate.json/config.json/logs.txt are app/Hook snapshots. pipeline-trace.json and output-trace.json are bounded histories.\ncollection-manifest.json records command errors, timeouts, truncation, unavailable files and SHA-256 hashes of copied files. Partial entries are not complete firmware.\nFirmware and display resources are for private diagnostic analysis, not redistribution in public source, APKs or the website.\n");
+        RootControl.write(zip,"analysis-readme.txt","Read-only, on-demand collection; no brightness writes or sensor registrations. Snapshots are sequential, not simultaneous.\nstate.json/config.json/logs.txt are app/Hook snapshots. pipeline-trace.json and output-trace.json are bounded histories.\nsettings/system.json and settings/*.txt read the three brightness System settings directly through SettingsProvider for primary user 0. Values are exact strings; missing/error/skipped_budget are distinct from zero. No settings shell command or numeric fallback.\ncollection-manifest.json records command errors, timeouts, truncation, unavailable files and SHA-256 hashes of copied files. Partial entries are not complete firmware.\nFirmware and display resources are for private diagnostic analysis, not redistribution in public source, APKs or the website.\n");
     }
 }

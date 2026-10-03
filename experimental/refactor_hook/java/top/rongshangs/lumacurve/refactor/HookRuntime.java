@@ -25,10 +25,12 @@ final class HookRuntime {
     float lastLux=Float.NaN,lastNit=Float.NaN,batteryTemperature=Float.NaN,thermalCeiling=43,lastOfficialCap=Float.NaN;
     int thermalSeverity=-1,boundUser=-1;
     boolean closed,changing,faultPending,thermalEnabled,receiverRegistered,thermalRegistered,publishQueued;
-    float memoryStrength=1;long memoryEvents,lastMemoryLog;String lastReset="";
+    float memoryStrength=1;long memoryEvents,lastMemoryLog,lastManualAdjustment=-1;String lastReset="";
     boolean responseEnabled;long brightenDelay=1500,darkenDelay=5000,responseAdjustments,memoryWindow=1500;float memoryLuxRange=.3f,thermalCooling=1;
     boolean smallResponseEnabled;long smallBrightenDelay=5000,smallResponseAdjustments;
     float lowLightLimit=50;long lowLightBrighten=3000,lowLightDarken=4000;boolean lowLightEnabled;long lowLightMainAdjustments,lowLightAssistAdjustments;
+    AdvancedOptions advanced=new AdvancedOptions();long thresholdAdjustments,assistAdjustments,animationAdjustments,sunlightAdjustments,touchAdjustments,delayWindowClamps;double lastAnimationSeconds;
+    long lastMainBrighten=-1,lastMainDarken=-1,lastMainSmall=-1,lastMainExtra;boolean probingScenes;
     final PipelineHistory pipelineHistory=new PipelineHistory();PipelineHistory.Frame traceFrame;
     final ArrayDeque<JSONObject> outputHistory=new ArrayDeque<>();
     final Map<String,JSONObject> lastOutput=new HashMap<>();
@@ -70,7 +72,7 @@ final class HookRuntime {
         try{context.getContentResolver().unregisterContentObserver(observer);context.getContentResolver().unregisterContentObserver(refresh);}catch(Throwable ignored){}
         try{if(receiverRegistered)context.unregisterReceiver(batteryListener);}catch(Throwable ignored){}
         try{if(thermalRegistered)power.removeThermalStatusListener(thermalListener);}catch(Throwable ignored){}
-        thermalEnabled=false;try{if(kernel.plan()!=null)kernel.configure(null);}catch(Throwable ignored){}
+        disableOverrides();try{if(kernel.plan()!=null)kernel.configure(null);}catch(Throwable ignored){}
     }
     boolean relaxThermal(){
         return !closed&&phase.equals("active")&&appliesToUser()&&thermalGate.evaluate(thermalEnabled,HookEntry.thermalSupported.contains(owner.getClass()),thermalSeverity,batteryTemperature,thermalCeiling);
@@ -107,9 +109,9 @@ final class HookRuntime {
         try{
             String text=Settings.Global.getString(context.getContentResolver(),CONFIG);
             if(text==null||text.equals("null")){
-                if(kernel.plan()!=null)kernel.configure(null);thermalEnabled=false;responseEnabled=false;smallResponseEnabled=false;memoryStrength=1;phase="attached";revision="";message="已连接 · 官方曲线";
+                if(kernel.plan()!=null)kernel.configure(null);disableOverrides();memoryStrength=1;phase="attached";revision="";message="已连接 · 官方曲线";
             }else{
-                if(text.length()>2048)throw new IllegalArgumentException("配置过长");JSONObject config=new JSONObject(text);
+                if(text.length()>8192)throw new IllegalArgumentException("配置过长");JSONObject config=new JSONObject(text);
                 if(config.getInt("schema")!=1)throw new IllegalArgumentException("配置格式不兼容");
                 revision=config.getString("revision");if(!revision.matches("[A-Za-z0-9_-]{1,80}"))throw new IllegalArgumentException("配置标识无效");
                 if(config.getBoolean("enabled")){
@@ -122,32 +124,38 @@ final class HookRuntime {
                     float cooling=(float)config.optDouble("thermal_cooling",1);ThermalPolicy.validateCooling(cooling);
                     long bright=config.optLong("brighten_delay",1500),dark=config.optLong("darken_delay",5000);DelayPolicy.validate(bright,dark);
                     long small=config.optLong("small_brighten_delay",5000);DelayPolicy.validateSmall(small);
+                    AdvancedOptions proposed=AdvancedOptions.parse(config);JSONObject capabilities=new JSONObject();AdvancedTuning.capabilities((key,value)->capabilities.put(key,value),this);proposed.verify(capabilities);
+                    float lowLimit=(float)config.optDouble("low_light_limit",50);long lowBright=config.optLong("low_light_brighten",3000),lowDark=config.optLong("low_light_darken",4000);LowLightPolicy.validate(lowLimit,lowBright,lowDark);
+                    if(config.optBoolean("response_override",false)&&!ResponseTuning.supported(owner))throw new IllegalArgumentException("确认时间接口暂未兼容");
+                    if(config.optBoolean("small_brighten_override",false)&&!ResponseTuning.smallSupported(owner))throw new IllegalArgumentException("微小变亮接口暂未兼容");
+                    if(config.optBoolean("low_light_stability",false)&&!LowLightTuning.supported(this))throw new IllegalArgumentException("暗光稳定接口尚未完整兼容");
                     if(thermal&&!HookEntry.thermalSupported.contains(owner.getClass()))throw new IllegalArgumentException("此固件的温控亮度接口尚未兼容");
                     float[] factors=CurvePlan.factors(config.getString("factors"));
                     boolean curveChanged=kernel.plan()==null||!Arrays.equals(kernel.plan().nits(),new CurvePlan(kernel.factoryLux,kernel.factoryNit,kernel.min,kernel.max,factors).nits());
                     if(curveChanged)kernel.configure(factors);
+                    AdvancedTuning.restoreAnimation(this);advanced=proposed;
                     boundUser=config.getInt("user_serial");thermalCeiling=ceiling;thermalEnabled=thermal;memoryStrength=strength;
-                    memoryWindow=memoryMs;memoryLuxRange=memoryRange;memoryPolicy.configure(memoryMs,memoryRange);thermalCooling=cooling;thermalGate.configure(cooling);
+                    if(memoryWindow!=memoryMs||memoryLuxRange!=memoryRange)memoryPolicy.configure(memoryMs,memoryRange);memoryWindow=memoryMs;memoryLuxRange=memoryRange;thermalCooling=cooling;thermalGate.configure(cooling);
                     brightenDelay=bright;darkenDelay=dark;responseEnabled=config.optBoolean("response_override",false);
                     smallBrightenDelay=small;smallResponseEnabled=config.optBoolean("small_brighten_override",false);
-                    lowLightLimit=(float)config.optDouble("low_light_limit",50);lowLightBrighten=config.optLong("low_light_brighten",3000);lowLightDarken=config.optLong("low_light_darken",4000);LowLightPolicy.validate(lowLightLimit,lowLightBrighten,lowLightDarken);
+                    lowLightLimit=lowLimit;lowLightBrighten=lowBright;lowLightDarken=lowDark;
                     lowLightEnabled=config.optBoolean("low_light_stability",false);
                     if(lowLightEnabled&&!LowLightTuning.supported(this))throw new IllegalArgumentException("暗光稳定接口尚未完整兼容");
                     phase="active";message="自定义曲线已接入，官方光感和过渡动画继续运行";
                     log(curveChanged?"曲线已应用，重新建立基础锚点":"设置已更新，保留当前手动锚点");
                 }else{
-                    if(kernel.plan()!=null)kernel.configure(null);thermalEnabled=false;responseEnabled=false;smallResponseEnabled=false;memoryStrength=1;phase="attached";message="已恢复官方曲线与温控策略";log(message);
+                    if(kernel.plan()!=null)kernel.configure(null);disableOverrides();memoryStrength=1;phase="attached";message="已恢复官方曲线与温控策略";log(message);
                 }
                 String reset=config.optString("reset_anchors","");
                 if(!reset.isEmpty()&&!reset.equals(lastReset)){
                     kernel.configure(kernel.plan()==null?null:CurvePlan.factors(config.getString("factors")));lastReset=reset;memoryPolicy.reset();log("已清除本次系统曲线的手动锚点，保留基础曲线");
                 }
             }
-            consumed=0;lastLux=lastNit=Float.NaN;thermalAllowed=relaxThermal();publish();requestRecalculation();
+            consumed=0;lastLux=lastNit=Float.NaN;AdvancedTuning.refreshThresholds(this);thermalAllowed=relaxThermal();publish();requestRecalculation();
         }catch(Throwable error){
             lowLightEnabled=false;
-            thermalEnabled=false;responseEnabled=false;smallResponseEnabled=false;memoryStrength=1;try{kernel.configure(null);}catch(Throwable rollback){XposedBridge.log("LumaCurve fallback failed: "+rollback);}
-            phase="error";message="未启用："+error;log(message);publish();
+            disableOverrides();memoryStrength=1;try{kernel.configure(null);}catch(Throwable rollback){XposedBridge.log("LumaCurve fallback failed: "+rollback);}
+            AdvancedTuning.refreshThresholds(this);phase="error";message="未启用："+error;log(message);publish();
         }finally{changing=false;}
     }
     void requestRecalculation(){
@@ -158,12 +166,28 @@ final class HookRuntime {
         }catch(Throwable notReady){XposedBridge.log("LumaCurve deferred OEM update: "+notReady);}
     }
     void fault(Throwable error){
-        if(closed||faultPending)return;faultPending=true;thermalEnabled=false;lowLightEnabled=false;
+        if(closed||faultPending)return;faultPending=true;disableOverrides();
         handler.post(()->{if(closed)return;try{kernel.configure(null);}catch(Throwable ignored){}
             phase="error";message="接入异常，已尝试恢复官方："+error;log(message);publish();faultPending=false;});
     }
+    void disableOverrides(){thermalEnabled=false;responseEnabled=false;smallResponseEnabled=false;lowLightEnabled=false;memoryStrength=1;advanced=new AdvancedOptions();AdvancedTuning.restoreAnimation(this);AdvancedTuning.refreshThresholds(this);}
+    boolean onDisplayThread(){return !closed&&Looper.myLooper()==handler.getLooper();}
+    boolean normalTuningAllowed(Object abc,Object impl){
+        if(closed||!phase.equals("active")||!appliesToUser())return false;
+        try{java.lang.reflect.Method idle=abc.getClass().getDeclaredMethod("isInIdleMode");idle.setAccessible(true);return Boolean.TRUE.equals(optionalBoolean(abc,"mAmbientLuxValid"))&&
+            LowLightPolicy.applies(true,(Boolean)kernel.get("mUseAutoBrightness"),screenOn(),
+                (Boolean)idle.invoke(abc),
+                (Boolean)impl.getClass().getMethod("getDrivingStatus").invoke(impl),!Boolean.FALSE.equals(hdrActive()),
+                optionalNumber(abc,"mAmbientLux"),0,Float.MAX_VALUE);
+        }catch(Throwable unavailable){return false;}
+    }
+    boolean screenOn(){try{Object dpc=HookEntry.get(owner,"mDisplayPowerController"),display=dpc.getClass().getMethod("getDisplayPowerState").invoke(dpc);return ((Number)display.getClass().getMethod("getScreenState").invoke(display)).intValue()==2;}catch(Throwable unavailable){return false;}}
+    boolean animationTuningAllowed(Object abc,Object impl){
+        if(!normalTuningAllowed(abc,impl)||(lastManualAdjustment>=0&&SystemClock.uptimeMillis()-lastManualAdjustment<=memoryWindow))return false;
+        try{return "AutomaticBrightnessStrategy".equals(outputStrategy(HookEntry.get(owner,"mDisplayPowerController")));}catch(Throwable missing){return false;}
+    }
     boolean appliesToUser(){try{return boundUser==kernel.integer("mUserSerial");}catch(Throwable error){return false;}}
-    void userChanged(){thermalEnabled=false;try{kernel.configure(null);phase="error";message="用户已切换，恢复官方策略";log(message);publish();}catch(Throwable error){fault(error);}}
+    void userChanged(){disableOverrides();try{kernel.configure(null);phase="error";message="用户已切换，恢复官方策略";log(message);publish();}catch(Throwable error){fault(error);}}
     void sample(float lux,float nit){
         if(closed||!Float.isFinite(lux)||!Float.isFinite(nit)||lux<0||nit<0)return;
         lastLux=lux;lastNit=nit;if(kernel.plan()!=null)consumed++;
@@ -181,6 +205,10 @@ final class HookRuntime {
                 .put("thermal_supported",HookEntry.thermalSupported.contains(owner.getClass())).put("thermal_relax",thermalEnabled)
                 .put("thermal_permitted",relaxThermal()).put("thermal_ceiling",thermalCeiling).put("thermal_severity",thermalSeverity)
                 .put("thermal_skipped",thermalSkipped).put("logs",new JSONArray(logs));
+            AdvancedTuning.capabilities((key,value)->status.put(key,value),this);JSONObject settings=new JSONObject();advanced.put(settings);status.put("advanced_options",settings)
+                .put("threshold_adjustments",thresholdAdjustments).put("assist_adjustments",assistAdjustments).put("animation_adjustments",animationAdjustments).put("sunlight_adjustments",sunlightAdjustments).put("touch_adjustments",touchAdjustments).put("delay_window_clamps",delayWindowClamps);
+            if(lastAnimationSeconds>0)status.put("last_animation_seconds",lastAnimationSeconds);
+            if(lastMainBrighten>=0)status.put("last_main_brighten_ms",lastMainBrighten);if(lastMainDarken>=0)status.put("last_main_darken_ms",lastMainDarken);if(lastMainSmall>=0)status.put("last_main_small_ms",lastMainSmall);status.put("last_main_extra_ms",lastMainExtra);
             status.put("memory_strength",memoryStrength).put("memory_events",memoryEvents).put("good_curve_available",kernel.get("mIsHaveGoodCurve"));
             status.put("memory_window",memoryWindow).put("memory_lux_range",memoryLuxRange).put("thermal_cooling",thermalCooling)
                 .put("response_supported",ResponseTuning.supported(owner)).put("response_override",responseEnabled).put("brighten_delay",brightenDelay).put("darken_delay",darkenDelay).put("response_adjustments",responseAdjustments);
@@ -236,7 +264,27 @@ final class HookRuntime {
             status.put("proximity_near",HookEntry.get(impl,"mProximityPositive"));
         }catch(Throwable optional){}
         readNumber(status,"official_thermal_cap",owner,"mThermalMaxBrightness");
+        collectScenes(status);
     }
+    void collectScenes(JSONObject status){
+        JSONObject scenes=new JSONObject();
+        try{Object impl=HookEntry.get(owner,"mAutomaticBrightnessControllerImpl"),abc=HookEntry.get(impl,"mAutomaticBrightnessController"),scene=HookEntry.get(impl,"mSceneDetector");
+            for(String[] f:new String[][]{{"driving","mIsDriving"},{"night_driving","mIsNightDrivingMode"},{"reflective","mIsReflectiveScene"},{"step_mode","mIsStepMode"}})readBoolean(scenes,f[0],scene,f[1]);
+            readBoolean(scenes,"proximity_near",impl,"mProximityPositive");readBoolean(scenes,"night_wake",abc,"mIsNightWakeMode");
+            boolean wasProbing=probingScenes;probingScenes=true;
+            try{Object touch=HookEntry.get(impl,"mTouchAreaHelper");java.lang.reflect.Method active=touch.getClass().getDeclaredMethod("isTouchCoverProtectionActive");active.setAccessible(true);scenes.put("touch_protection_active",active.invoke(touch));}catch(Throwable absent){}finally{probingScenes=wasProbing;}
+            readNumber(scenes,"main_history_ms",abc,"mAmbientLightHorizonLong");readNumber(scenes,"step_extra_ms",abc,"mStepModeDarkenDebounceConfig");
+            readNumber(scenes,"small_brightening_lux_threshold",abc,"mAmbientBrighteningSmallThreshold");
+            Object dual=HookEntry.get(impl,"mDualSensorPolicy");readBoolean(scenes,"assist_reset_pending",dual,"mIsPendingResetAssistValue");
+            readNumber(scenes,"assist_brightening_threshold",dual,"mAssistBrighteningThreshold");readNumber(scenes,"assist_darkening_threshold",dual,"mAssistDarkeningThreshold");
+        }catch(Throwable missing){}
+        try{Object sun=HookEntry.get(owner,"mSunlightController");for(String[] f:new String[][]{{"manual_sunlight_enabled","mSunlightSettingsEnable"},{"manual_sunlight_sensor","mSunlightSensorEnabled"},{"manual_sunlight_active","mSunlightModeActive"},{"manual_sunlight_user_disabled","mSunlightModeDisabledByUser"}})readBoolean(scenes,f[0],sun,f[1]);readNumber(scenes,"manual_sunlight_nit_condition",sun,"mThresholdSunlightNit");}catch(Throwable missing){}
+        try{Object hbm=HookEntry.get(owner,"mHbmController"),data=hbm.getClass().getMethod("getHbmData").invoke(hbm);for(String[] f:new String[][]{{"hbm_minimum_lux","minimumLux"},{"hbm_time_window_ms","timeWindowMillis"},{"hbm_time_max_ms","timeMaxMillis"},{"hbm_time_min_ms","timeMinMillis"}})readNumber(scenes,f[0],data,f[1]);
+            for(String[] f:new String[][]{{"hbm_controller_enabled","mHbmControllerIsEnabled"},{"hbm_time_available","mIsTimeAvailable"},{"hbm_ambient_allowed","mIsInAllowedAmbientRange"},{"hbm_low_power_block","mIsBlockedByLowPowerMode"},{"hdr_layer_present","mIsHdrLayerPresent"},{"dolby_enabled","mDolbyEnable"}})readBoolean(scenes,f[0],hbm,f[1]);
+        }catch(Throwable missing){}
+        try{status.put("system_scene",scenes);}catch(JSONException ignored){}
+    }
+    static void readBoolean(JSONObject json,String key,Object object,String field){try{Boolean value=optionalBoolean(object,field);if(value!=null)json.put(key,value);}catch(JSONException ignored){}}
     static void readNumber(JSONObject json,String key,Object object,String field){try{float n=((Number)HookEntry.get(object,field)).floatValue();if(Float.isFinite(n)&&n>=0)json.put(key,n);}catch(Throwable optional){}}
     Boolean hdrActive(){try{return hdrProbe==null?null:(Boolean)hdrProbe.invoke(owner);}catch(Throwable absent){return null;}}
     float mainCandidate(Object abc,Object impl){

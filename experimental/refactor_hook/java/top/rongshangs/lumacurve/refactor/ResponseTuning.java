@@ -35,15 +35,18 @@ final class ResponseTuning {
                             if(driving.getReturnType()!=boolean.class||(Boolean)driving.invoke(impl))return;
                             boolean small=brighten&&p.args.length==2&&(Float)p.args[1]<((Number)HookEntry.get(p.thisObject,"mAmbientBrighteningThreshold")).floatValue();
                             float candidate=p.args.length==2?(Float)p.args[1]:state.mainCandidate(p.thisObject,impl);
-                            boolean guard=state.lowLightApplies(p.thisObject,impl,candidate),custom=small?state.smallResponseEnabled:state.responseEnabled;
+                            boolean guard=state.lowLightApplies(p.thisObject,impl,candidate),custom=(small?state.smallResponseEnabled:state.responseEnabled)&&state.normalTuningAllowed(p.thisObject,impl);
                             if(!guard&&!custom)return;
                             long base=((Number)HookEntry.get(p.thisObject,small?"mSmallBrighteningLightDebounceConfig":brighten?"mBrighteningLightDebounceConfig":"mDarkeningLightDebounceConfig")).longValue();
                             long chosen=custom?(small?state.smallBrightenDelay:brighten?state.brightenDelay:state.darkenDelay):base;
+                            long horizon=((Number)HookEntry.get(p.thisObject,"mAmbientLightHorizonLong")).longValue();
+                            long additional=brighten?0:((Number)HookEntry.get(p.thisObject,"mStepModeDarkenDebounceConfig")).longValue();
+                            if(custom){long safe=AdvancedPolicy.retainedDelay(chosen,base,horizon,additional);if(safe!=chosen)state.delayWindowClamps++;chosen=safe;}
                             if(guard){long existing=Math.max(base,chosen);
-                                long horizon=((Number)HookEntry.get(p.thisObject,"mAmbientLightHorizonLong")).longValue();
-                                long additional=brighten?0:((Number)HookEntry.get(p.thisObject,"mStepModeDarkenDebounceConfig")).longValue();
-                                chosen=LowLightPolicy.withinWindow(LowLightPolicy.chosen(existing,brighten,false,state.lowLightBrighten,state.lowLightDarken),existing,horizon,additional);
+                                long wanted=LowLightPolicy.chosen(existing,brighten,false,state.lowLightBrighten,state.lowLightDarken);
+                                chosen=LowLightPolicy.withinWindow(wanted,existing,horizon,additional);if(chosen!=wanted)state.delayWindowClamps++;
                             }
+                            if(small)state.lastMainSmall=chosen;else if(brighten)state.lastMainBrighten=chosen;else {state.lastMainDarken=chosen;state.lastMainExtra=additional;}
                             if(chosen==base)return;
                             p.setResult(DelayPolicy.deadline((Long)p.getResult(),(Long)p.args[0],base,chosen));state.responseAdjustments++;if(small)state.smallResponseAdjustments++;if(guard)state.lowLightMainAdjustments++;return;
                         }catch(Throwable incompatible){return;}
@@ -53,6 +56,6 @@ final class ResponseTuning {
             installed.add(abc);
         }catch(Throwable incompatible){for(XC_MethodHook.Unhook hook:hooks)hook.unhook();XposedBridge.log("LumaCurve response tuning unavailable: "+incompatible);}
     }
-    static boolean supported(Object owner){try{Object impl=HookEntry.get(owner,"mAutomaticBrightnessControllerImpl"),abc=HookEntry.get(impl,"mAutomaticBrightnessController");return abc!=null&&installed.contains(abc.getClass())&&impl.getClass().getMethod("getDrivingStatus").getReturnType()==boolean.class;}catch(Throwable absent){return false;}}
+    static boolean supported(Object owner){try{Object impl=HookEntry.get(owner,"mAutomaticBrightnessControllerImpl"),abc=HookEntry.get(impl,"mAutomaticBrightnessController");return abc!=null&&installed.contains(abc.getClass())&&impl.getClass().getMethod("getDrivingStatus").getReturnType()==boolean.class&&HookEntry.field(abc.getClass(),"mAmbientLightHorizonLong").getType()==int.class&&HookEntry.field(abc.getClass(),"mStepModeDarkenDebounceConfig").getType()==long.class;}catch(Throwable absent){return false;}}
     static boolean smallSupported(Object owner){try{Object impl=HookEntry.get(owner,"mAutomaticBrightnessControllerImpl"),abc=HookEntry.get(impl,"mAutomaticBrightnessController");return supported(owner)&&HookEntry.field(abc.getClass(),"mSmallBrighteningLightDebounceConfig").getType()==long.class;}catch(Throwable absent){return false;}}
 }

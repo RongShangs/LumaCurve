@@ -36,6 +36,11 @@ final class RootSettings implements AutoCloseable {
         return (Bundle)call(provider,"call",new Class<?>[]{AttributionSource.class,String.class,String.class,String.class,Bundle.class},source,"settings",method,name,extras);
     }
     String get(String name)throws Exception {Bundle response=request("GET_global",name,new Bundle());return response==null?null:response.getString("value");}
+    String getSystem(String name)throws Exception {
+        Bundle response=request("GET_system",name,new Bundle());
+        if(response==null)throw new IOException("系统设置接口未返回结果："+name);
+        return response.getString("value");
+    }
     boolean put(String name,String value)throws Exception {
         Bundle extras=new Bundle();extras.putString("value",value);
         request("PUT_global",name,extras);

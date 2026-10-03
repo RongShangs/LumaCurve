@@ -20,6 +20,7 @@ test='''package top.rongshangs.lumacurve.refactor;
 import java.io.*;import java.nio.file.*;import java.util.*;import java.util.zip.*;import org.json.*;
 public final class DiagnosticHostTest {
  static int cases;static void check(boolean b)throws Exception{if(!b)throw new AssertionError();cases++;}
+ static String read(ZipFile zip,String name)throws Exception{try(InputStream in=zip.getInputStream(zip.getEntry(name));ByteArrayOutputStream out=new ByteArrayOutputStream()){byte[] b=new byte[1024];int n;while((n=in.read(b))!=-1)out.write(b,0,n);return new String(out.toByteArray(),"UTF-8").trim();}}
  static void invalid(String text)throws Exception{try{ThanksFeed.parse(text);throw new AssertionError("invalid feed accepted");}catch(Exception expected){cases++;}}
  public static void main(String[] args)throws Exception{
   if(args.length>0&&args[0].equals("sleep")){System.out.println("partial-before-timeout");System.out.flush();Thread.sleep(30000);return;}
@@ -50,6 +51,30 @@ public final class DiagnosticHostTest {
   }
   // Zip write errors propagate instead of being reported as successful diagnostics.
   ZipOutputStream closed=new ZipOutputStream(new ByteArrayOutputStream());closed.close();boolean threw=false;try{new DiagnosticCollector(closed).command("disk-full.txt",5,java,"-version");}catch(IOException expected){threw=true;}check(threw);
+  // Overall budget skips later commands/files without corrupting the archive.
+  try(ZipOutputStream z=new ZipOutputStream(new ByteArrayOutputStream())){DiagnosticCollector budget=new DiagnosticCollector(z,1);Thread.sleep(10);budget.command("budget-command.txt",5,java,"-version");budget.copy(file,"budget-file.txt");check(budget.manifest.length()==2);check(budget.manifest.getJSONObject(0).getString("status").equals("skipped_budget"));check(budget.manifest.getJSONObject(1).getString("status").equals("skipped_budget"));}
+  // Direct-provider export preserves numeric zero and fractional adjustment, without shell parsing.
+  File settingsArchive=new File(dir,"settings.zip");int[] calls={0};
+  try(ZipOutputStream z=new ZipOutputStream(new FileOutputStream(settingsArchive))){
+   DiagnosticCollector direct=new DiagnosticCollector(z,key->{calls[0]++;return key.equals("screen_brightness_mode")?"0":key.equals("screen_brightness")?"179":"0.0008";});direct.collectSettings();
+   check(calls[0]==3);check(direct.manifest.length()==4);check(direct.manifest.getJSONObject(0).getString("status").equals("ok"));
+  }
+  try(ZipFile z=new ZipFile(settingsArchive)){
+   check(read(z,"settings/screen_brightness_mode.txt").equals("0"));check(read(z,"settings/screen_brightness.txt").equals("179"));check(read(z,"settings/screen_auto_brightness_adj.txt").equals("0.0008"));
+   JSONObject snapshot=new JSONObject(read(z,"settings/system.json"));check(snapshot.getString("source").equals("SettingsProvider"));check(snapshot.getString("namespace").equals("system"));check(snapshot.getInt("user")==0);check(snapshot.getLong("collected_unix_ms")>0);
+   check(snapshot.getJSONObject("entries").getJSONObject("screen_brightness_mode").getString("value").equals("0"));
+  }
+  // Missing keys and provider failures must remain distinct, and one failure cannot suppress other reads.
+  try(ZipOutputStream z=new ZipOutputStream(new FileOutputStream(settingsArchive))){
+   DiagnosticCollector direct=new DiagnosticCollector(z,key->{if(key.equals("screen_brightness_mode"))throw new IOException("Failed transaction (2147483646)");return key.equals("screen_brightness")?null:"0";});direct.collectSettings();
+   check(direct.manifest.getJSONObject(0).getString("status").equals("error"));check(direct.manifest.getJSONObject(1).getString("status").equals("missing"));check(direct.manifest.getJSONObject(2).getString("status").equals("ok"));
+  }
+  try(ZipFile z=new ZipFile(settingsArchive)){
+   check(read(z,"settings/screen_brightness_mode.txt").startsWith("[error]"));check(read(z,"settings/screen_brightness.txt").startsWith("[missing]"));check(read(z,"settings/screen_auto_brightness_adj.txt").equals("0"));
+   JSONObject entries=new JSONObject(read(z,"settings/system.json")).getJSONObject("entries");check(entries.getJSONObject("screen_brightness_mode").isNull("value"));check(entries.getJSONObject("screen_brightness").isNull("value"));check(entries.getJSONObject("screen_brightness_mode").getString("error").contains("Failed transaction"));
+  }
+  try(ZipOutputStream z=new ZipOutputStream(new ByteArrayOutputStream())){int[] reads={0};DiagnosticCollector budget=new DiagnosticCollector(z,key->{reads[0]++;return "1";},1);Thread.sleep(10);budget.collectSettings();check(reads[0]==0);check(budget.manifest.getJSONObject(0).getString("status").equals("skipped_budget"));}
+  ZipOutputStream closedSettings=new ZipOutputStream(new ByteArrayOutputStream());closedSettings.close();threw=false;try{new DiagnosticCollector(closedSettings,key->"1").collectSettings();}catch(IOException expected){threw=true;}check(threw);
   for(File f:dir.listFiles())Files.delete(f.toPath());Files.delete(dir.toPath());
   System.out.println("Feed/diagnostics: "+cases+" host cases PASS; Android services not simulated");
  }

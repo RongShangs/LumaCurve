@@ -176,7 +176,7 @@ public final class RefactorTest {
         check(LowLightPolicy.chosen(1000,false,true)==4000);
         check(LowLightPolicy.chosen(5000,true,true)==5000); // Never shorten the OEM small-change delay.
         check(LowLightPolicy.withinWindow(4000,1000,10000,0)==4000);
-        check(LowLightPolicy.withinWindow(4000,1000,5000,2000)==1000);
+        check(LowLightPolicy.withinWindow(4000,1000,5000,2000)==2750); // Use the remaining evidence window instead of discarding the whole extension.
         check(LowLightPolicy.withinWindow(4000,1000,5000,5000)==1000);
         check(LowLightPolicy.withinWindow(8000,8000,5000,0)==8000); // Preserve an already-existing policy, don't lengthen it.
         check(LowLightPolicy.withinWindow(4000,1000,0,0)==1000);
@@ -211,8 +211,33 @@ public final class RefactorTest {
         check(LowLightPolicy.chosen(1000,true,true,2000,3500)==2000);
         check(LowLightPolicy.chosen(1000,false,true,2000,3500)==3500);
         check(LowLightPolicy.chosen(6000,false,true,2000,3500)==6000);
-        check(LowLightPolicy.withinWindow(4000,1000,5000,1000)==1000);
+        check(LowLightPolicy.withinWindow(4000,1000,5000,1000)==3750);
         check(LowLightPolicy.withinWindow(3500,1000,5000,1000)==3500);
-        System.out.println("Refactor curve/adapter/thermal/memory/response/update/modules/stability/trace: "+cases+" cases PASS; OEM calls modeled, device not verified");
+        // Property checks: threshold tuning preserves direction over dark and bright ranges.
+        for(float lux:new float[]{0,.01f,.95f,5,50,200,2000})for(float scale:new float[]{.5f,1,2,3})for(float floor:new float[]{0,.5f,5,10}){
+            float bright=AdvancedPolicy.threshold(lux,lux+Math.max(1,lux*.2f),true,scale,floor);
+            float dark=AdvancedPolicy.threshold(lux,lux*.8f,false,scale,floor);
+            check(Float.isFinite(bright)&&bright>=lux&&bright-lux+.001f>=floor);
+            check(Float.isFinite(dark)&&dark>=0&&dark<=lux);
+        }
+        check(Float.isNaN(AdvancedPolicy.threshold(1,Float.NaN,true,1,0)));
+        check(AdvancedPolicy.threshold(10,5,true,3,10)==5); // Unexpected system branch is untouched.
+        check(AdvancedPolicy.duration(0,3)==0);check(AdvancedPolicy.duration(2,3)==6);
+        check(AdvancedPolicy.duration(50,3)==60);check(Double.isNaN(AdvancedPolicy.duration(Double.NaN,2)));
+        check(AdvancedPolicy.retainedDelay(15000,5000,10000,0)==9750);
+        check(AdvancedPolicy.retainedDelay(15000,5000,10000,3000)==6750);
+        check(AdvancedPolicy.retainedDelay(1000,5000,10000,0)==1000);
+        check(AdvancedPolicy.retainedDelay(15000,5000,200,0)==5000);
+        check(AdvancedPolicy.threshold(.95f,.5f,false,3,5)>0); // Genuine darkness can still cross the strict threshold.
+        check(LowLightPolicy.withinWindow(3000,1000,3000,0)==2750);
+        check(LowLightPolicy.withinWindow(5000,5000,3000,0)==5000); // Do not reduce an existing OEM safety wait.
+        bad(()->AdvancedPolicy.range(Double.NaN,.5,3));bad(()->AdvancedPolicy.range(Double.POSITIVE_INFINITY,.5,3));
+        bad(()->AdvancedPolicy.range(.49,.5,3));bad(()->AdvancedPolicy.range(3.01,.5,3));
+        check(UiText.translate("微小变亮阈值倍率：1×",true).startsWith("Small-brightening threshold multiplier"));
+        // Continuous evidence with pruning: legal delay settles rather than chasing a moving deadline.
+        boolean confirmed=false;long selected=AdvancedPolicy.retainedDelay(15000,5000,10000,0);
+        for(long now=0;now<=20000;now+=250){long oldest=Math.max(0,now-10000);if(oldest+selected<=now){confirmed=true;break;}}
+        check(confirmed);
+        System.out.println("Refactor curve/adapter/thermal/memory/response/update/modules/stability/trace/advanced: "+cases+" cases PASS; OEM calls modeled, device not verified");
     }
 }

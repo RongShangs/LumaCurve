@@ -65,7 +65,7 @@ public final class RootControl implements AutoCloseable {
                     out.put("hook_issue","restart_required");
             }catch(Exception ignored){}
         }
-        if(state!=null)out.put("runtime",state);
+        if(state!=null)out.put("runtime",state).put("state_age_ms",Math.max(0,android.os.SystemClock.elapsedRealtime()-state.optLong("elapsed_ms")));
         if(raw!=null)try{out.put("config",new JSONObject(raw));}catch(JSONException ignored){}
         return out;
     }
@@ -112,10 +112,11 @@ public final class RootControl implements AutoCloseable {
         JSONObject state=live();if(state==null)throw new IOException("尚未连接 Hook：请在 LSPosed 启用本模块，勾选系统框架并重启");
         int user=((Number)Class.forName("android.app.ActivityManager").getMethod("getCurrentUser").invoke(null)).intValue();
         if(user!=0||state.getInt("user_serial")!=0)throw new IOException("本应用暂只支持主用户");
-        if(encoded.length()>1024)throw new IOException("参数过长");
+        if(encoded.length()>8192)throw new IOException("参数过长");
         String decoded=new String(Base64.getDecoder().decode(encoded),StandardCharsets.UTF_8);
         JSONObject options=decoded.startsWith("{")?new JSONObject(decoded):new JSONObject().put("factors",decoded);
         String factors=options.getString("factors");
+        AdvancedOptions advanced=AdvancedOptions.parse(options);advanced.verify(state);
         boolean thermal=options.optBoolean("thermal_relax",false);float ceiling=(float)options.optDouble("thermal_ceiling",43);ThermalPolicy.validate(ceiling);
         float memory=(float)options.optDouble("memory_strength",1);MemoryPolicy.validate(memory);
         long memoryMs=options.optLong("memory_window",1500);float memoryRange=(float)options.optDouble("memory_lux_range",.3);MemoryPolicy.validateGrouping(memoryMs,memoryRange);
@@ -140,6 +141,7 @@ public final class RootControl implements AutoCloseable {
         config.put("memory_window",memoryMs).put("memory_lux_range",memoryRange).put("thermal_cooling",cooling).put("response_override",response).put("brighten_delay",bright).put("darken_delay",dark);
         config.put("small_brighten_override",small).put("small_brighten_delay",smallMs);
         config.put("low_light_stability",lowLight).put("low_light_limit",lowLimit).put("low_light_brighten",lowBright).put("low_light_darken",lowDark);
+        advanced.put(config);
         try {
             prepare();
             progress("提交小米基础曲线并等待系统确认…");
@@ -179,7 +181,7 @@ public final class RootControl implements AutoCloseable {
                     write(zip,"trace-readme.txt","Pipeline records group stages from ONE updateAutoBrightness call. Values are framework brightness coordinates (0..1), not nit or percent. Missing fields mean unobserved, not disabled.\nOutput records are separate later calls, not automatically attributed to a calculation. Use uptime_ms within this boot, or unix_ms for wall time. Sensor readings are OEM filtered readings, not raw samples.\nBounded history: latest 24 calculations and 16 output calls.\n");
                 }
                 write(zip,"config.json",String.valueOf(settings.get(CONFIG)));write(zip,"stored-hook-status.json",String.valueOf(settings.get(STATUS)));write(zip,"build.txt",BUILD+"\n"+Build.FINGERPRINT+"\n");
-                new DiagnosticCollector(zip).collect();
+                new DiagnosticCollector(zip,settings::getSystem).collect();
                 progress("8/8 完成压缩并校验分析包…");
             }
             // Do not advertise a partial archive after cancellation, disk full or a write error.
