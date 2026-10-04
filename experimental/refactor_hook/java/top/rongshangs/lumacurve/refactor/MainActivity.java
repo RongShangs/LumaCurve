@@ -64,6 +64,14 @@ public final class MainActivity extends Activity {
     void dialogButton(AlertDialog d,String label,Runnable task,boolean primary){View decor=d.getWindow().getDecorView();LinearLayout actions=(LinearLayout)decor.findViewWithTag("actions");
         Button b=action(label,()->{d.dismiss();if(task!=null)task.run();});b.setTextColor(primary?Color.WHITE:BLUE);b.setBackground(ripple(primary?BLUE:0xffeef2fa,12));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(46),1);lp.setMargins(dp(4),dp(14),dp(4),0);actions.addView(b,lp);}
     void messageDialog(String title,String message,String yes,Runnable task){AlertDialog d=dialog(title,text(message,14,MUTED));d.show();dialogButton(d,"取消",null,false);dialogButton(d,yes,task,true);}
+    void operationFailure(String command,Throwable error){
+        String detail=error.getMessage();if(detail==null||detail.isEmpty())detail=error.toString();
+        while(detail.startsWith("java.io.IOException: "))detail=detail.substring("java.io.IOException: ".length());
+        if(!command.equals("apply")&&!command.equals("stop")&&!command.equals("reset-memory")){show(detail);return;}
+        show("");ScrollView scroll=new ScrollView(this);scroll.addView(text(detail,14,MUTED));
+        scroll.setLayoutParams(new LinearLayout.LayoutParams(-1,dp(230)));
+        AlertDialog d=dialog("设置未完成",scroll);d.show();dialogButton(d,"知道了",null,false);dialogButton(d,"导出分析包",()->run("export",null),true);
+    }
     LinearLayout column(){LinearLayout b=new LinearLayout(this);b.setOrientation(1);return b;}
     GradientDrawable background(int color,float radius){GradientDrawable b=new GradientDrawable();b.setColor(color);b.setCornerRadius(dp(radius));return b;}
     LinearLayout card(LinearLayout parent){LinearLayout b=column();b.setPadding(dp(18),dp(17),dp(18),dp(17));b.setBackground(background(Color.WHITE,18));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.bottomMargin=dp(12);parent.addView(b,lp);return b;}
@@ -461,7 +469,7 @@ public final class MainActivity extends Activity {
                     if(!command.equals("inspect")){String message=result.optString("message",result.has("path")?"已导出："+result.optString("path"):"操作完成");show(message);
                         if(result.has("path")){boolean configFile=command.equals("export-config");AlertDialog d=dialog(configFile?"配置已导出":"分析包已导出",text(result.optString("path")+"\n\n"+(configFile?"文件位于设备存储根目录。包含当前设置，可在后续版本导入。":"包含设备与显示信息，请按需分享。"),14,MUTED));d.show();dialogButton(d,"知道了",null,true);}}
                 });
-            }catch(Throwable error){closeBridge();ui.post(()->{if(destroyed)return;busy=false;stop.setEnabled(true);if(command.equals("inspect")){runtime=null;factoryLux=factoryNit=null;badge.setText("连接中断");stateTitle.setText("等待连接");thermalSwitch.setEnabled(false);memorySwitch.setEnabled(false);permissionPrompt("root","需要 Root 授权","请在 Root 管理器中允许 HyperLux 获得 Root 权限，再点击重新检测。\nRoot 可用后才会继续检查 LSPosed。");}apply.setEnabled(runtime!=null&&factoryLux!=null);drawDraftState();show(error.toString());if(rereadPending){rereadPending=false;ui.post(()->run("inspect",null));}});}
+            }catch(Throwable error){closeBridge();ui.post(()->{if(destroyed)return;busy=false;stop.setEnabled(true);if(command.equals("inspect")){runtime=null;factoryLux=factoryNit=null;badge.setText("连接中断");stateTitle.setText("等待连接");thermalSwitch.setEnabled(false);memorySwitch.setEnabled(false);permissionPrompt("root","需要 Root 授权","请在 Root 管理器中允许 HyperLux 获得 Root 权限，再点击重新检测。\nRoot 可用后才会继续检查 LSPosed。");}apply.setEnabled(runtime!=null&&factoryLux!=null);drawDraftState();operationFailure(command,error);if(rereadPending){rereadPending=false;ui.post(()->run("inspect",null));}});}
             finally{if(!visible)closeBridge();}
         });
     }

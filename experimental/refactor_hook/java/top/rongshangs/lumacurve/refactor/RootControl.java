@@ -15,7 +15,7 @@ import java.util.zip.*;
 
 /** A short-lived root command, not a brightness output service. */
 public final class RootControl implements AutoCloseable {
-    static final String CONFIG="lumacurve_refactor_config_v1",STATUS="lumacurve_refactor_status_v1",REFRESH="lumacurve_refactor_refresh_v1",BUILD=AppBuild.BUILD;
+    static final String CONFIG="lumacurve_refactor_config_v1",STATUS="lumacurve_refactor_status_v1",REFRESH="lumacurve_refactor_refresh_v1",ACK="lumacurve_refactor_ack_v1",BUILD=AppBuild.BUILD;
     static final File DATA=new File("/data/adb/luma_curve_refactor_test"),PAUSE_OWNED=new File(DATA,"old-pause-owned");
     static final String OLD="/data/adb/modules/luma_curve/luma_curvectl.sh";
     final RootSettings settings;
@@ -39,7 +39,7 @@ public final class RootControl implements AutoCloseable {
         return text.substring(text.lastIndexOf(')')+2).split(" +")[19];
     }
     JSONObject live() {
-        return validated(STATUS);
+        JSONObject state=validated(STATUS);return state==null?null:StatusTransport.restore(state,settings::get);
     }
     JSONObject validated(String key) {
         try {
@@ -80,12 +80,22 @@ public final class RootControl implements AutoCloseable {
     }
     boolean waitFor(String revision,boolean active)throws Exception {
         for(int attempt=0;attempt<60;attempt++) {
-            JSONObject state=live();
+            // A missed/coalesced config notification gets an idempotent reread on
+            // the display thread. Do not resend the configuration or reset anchors.
+            if(attempt%20==0)settings.put(REFRESH,UUID.randomUUID().toString());
+            JSONObject state=validated(ACK);
+            if(state==null||!revision.equals(state.optString("revision")))state=validated(STATUS);
             if(state!=null && revision.equals(state.optString("revision")) && state.optString("phase").equals(active?"active":"attached"))return true;
             if(state!=null && revision.equals(state.optString("revision")) && state.optString("phase").equals("error"))throw new IOException(state.optString("message"));
             Thread.sleep(100);
         }
         return false;
+    }
+    String confirmationDetail(){
+        JSONObject ack=validated(ACK),state=live();
+        if(ack==null&&state==null)return "未取得当前系统进程的有效确认，请核对 LSPosed 并重启。";
+        JSONObject last=ack!=null?ack:state;
+        return "最后确认状态："+last.optString("phase","unknown")+"\n"+last.optString("message","");
     }
     static boolean exists(String path){return new File(path).exists();}
     static void progress(String message){System.out.println("LUMA_PROGRESS="+message);}
@@ -160,14 +170,21 @@ public final class RootControl implements AutoCloseable {
             prepare();
             progress("提交小米基础曲线并等待系统确认…");
             if(!settings.put(CONFIG,config.toString()))throw new IOException("配置提交失败");
-            if(!waitFor(revision,true))throw new IOException("系统尚未确认曲线接入，已撤回本次提交");
+            if(!waitFor(revision,true))throw new IOException("系统未在 6 秒内确认本次配置。\n"+confirmationDetail());
             return new JSONObject().put("ok",true).put("message","已接入小米曲线。系统手动保持仍可能影响当前输出。");
         }catch(Exception failure){
-            if(!wasActive){
-                settings.put(CONFIG,null);
-                try{if(waitFor("",false))resumeOld();}catch(Exception rollback){failure.addSuppressed(rollback);}
-            }else if(previous!=null)settings.put(CONFIG,previous);
-            throw failure;
+            String rollbackMessage="未能确认恢复此前配置，请导出分析包；不要连续点击保存。";
+            try{
+                if(!settings.put(CONFIG,previous))throw new IOException("恢复请求写入失败");
+                String previousRevision=previous==null?"":new JSONObject(previous).optString("revision","");
+                if(waitFor(previousRevision,wasActive)){
+                    rollbackMessage="已恢复此前配置；你在界面中的修改仍保留，尚未保存。";
+                    if(!wasActive)resumeOld();
+                }
+            }catch(Exception rollback){failure.addSuppressed(rollback);}
+            String detail=failure.getMessage()+"\n\n"+rollbackMessage;
+            try{Files.write(new File(DATA,"last-control-error.txt").toPath(),(new Date()+"\n"+detail).getBytes(StandardCharsets.UTF_8));}catch(Exception ignored){}
+            throw new IOException(detail,failure);
         }
     }
     JSONObject stop()throws Exception {
@@ -195,7 +212,7 @@ public final class RootControl implements AutoCloseable {
                     write(zip,"pipeline-trace.json",pipeline==null?"[]":pipeline.toString(2));write(zip,"output-trace.json",output==null?"[]":output.toString(2));
                     write(zip,"trace-readme.txt","Pipeline records group stages from ONE updateAutoBrightness call. Values are framework brightness coordinates (0..1), not nit or percent. Missing fields mean unobserved, not disabled.\nOutput records are separate later calls, not automatically attributed to a calculation. Use uptime_ms within this boot, or unix_ms for wall time. Sensor readings are OEM filtered readings, not raw samples.\nBounded history: latest 24 calculations and 16 output calls.\n");
                 }
-                write(zip,"config.json",String.valueOf(settings.get(CONFIG)));write(zip,"stored-hook-status.json",String.valueOf(settings.get(STATUS)));write(zip,"injection.json",String.valueOf(settings.get("lumacurve_refactor_injection_v1")));write(zip,"build.txt",BUILD+"\n"+Build.FINGERPRINT+"\n");
+                write(zip,"config.json",String.valueOf(settings.get(CONFIG)));write(zip,"stored-hook-status.json",String.valueOf(settings.get(STATUS)));write(zip,"configuration-ack.json",String.valueOf(settings.get(ACK)));File controlError=new File(DATA,"last-control-error.txt");if(controlError.isFile()&&controlError.length()<=16384)write(zip,"last-control-error.txt",new String(Files.readAllBytes(controlError.toPath()),StandardCharsets.UTF_8));write(zip,"injection.json",String.valueOf(settings.get("lumacurve_refactor_injection_v1")));write(zip,"build.txt",BUILD+"\n"+Build.FINGERPRINT+"\n");
                 new DiagnosticCollector(zip,settings::getSystem).collect();
                 progress("8/8 完成压缩并校验分析包…");
             }

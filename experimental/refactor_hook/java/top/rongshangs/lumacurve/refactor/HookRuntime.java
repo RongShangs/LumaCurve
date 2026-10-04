@@ -22,6 +22,7 @@ final class HookRuntime {
     final PowerManager.OnThermalStatusChangedListener thermalListener;
     final BroadcastReceiver batteryListener;
     String revision="",phase="attached",message="已连接小米曲线，当前沿用官方基准";
+    String processedConfig;boolean configProcessed;
     long consumed,lastPublish,thermalSkipped,lastThermalLog,viewUntil;
     float lastLux=Float.NaN,lastNit=Float.NaN,batteryTemperature=Float.NaN,thermalCeiling=43,lastOfficialCap=Float.NaN;
     int thermalSeverity=-1,boundUser=-1;
@@ -48,7 +49,7 @@ final class HookRuntime {
         baselineIdentity=CurveIdentity.of(kernel.name(),kernel.fullLux(),kernel.fullNit(),kernel.min,kernel.max);
         try{hdrProbe=owner.getClass().getDeclaredMethod("isHdrScene");if(hdrProbe.getReturnType()!=boolean.class)hdrProbe=null;else hdrProbe.setAccessible(true);}catch(Throwable optional){}
         observer=new ContentObserver(handler){public void onChange(boolean self){reload();}};
-        refresh=new ContentObserver(handler){public void onChange(boolean self){viewUntil=SystemClock.elapsedRealtime()+5000;refreshUserIdentity();outdoor.tick();if(kernel.plan()!=null&&!appliesToUser())userChanged();else publish();}};
+        refresh=new ContentObserver(handler){public void onChange(boolean self){viewUntil=SystemClock.elapsedRealtime()+5000;refreshUserIdentity();refreshConfiguration();outdoor.tick();if(kernel.plan()!=null&&!appliesToUser())userChanged();else publish();}};
         power=(PowerManager)context.getSystemService(Context.POWER_SERVICE);
         thermalListener=level->{thermalSeverity=level;environmentChanged();};
         batteryListener=new BroadcastReceiver(){public void onReceive(Context c,Intent intent){
@@ -110,12 +111,28 @@ final class HookRuntime {
         long delay=Math.max(0,publishInterval()-(SystemClock.elapsedRealtime()-lastPublish));
         handler.postDelayed(()->{publishQueued=false;if(!closed)publish();},delay);
     }
+    void refreshConfiguration(){
+        if(closed||changing)return;
+        try{String current=Settings.Global.getString(context.getContentResolver(),CONFIG);
+            if(!configProcessed||!Objects.equals(current,processedConfig))reload();
+            else publishAcknowledgement();
+        }catch(Throwable error){XposedBridge.log("HyperLux configuration refresh: "+error);}
+    }
+    void publishAcknowledgement(){
+        if(closed)return;
+        try{JSONObject ack=new JSONObject().put("build",BUILD).put("phase",phase).put("revision",revision).put("message",message)
+            .put("pid",android.os.Process.myPid()).put("process_start",processStart()).put("fingerprint",fingerprint).put("elapsed_ms",SystemClock.elapsedRealtime());
+            if(!Settings.Global.putString(context.getContentResolver(),"lumacurve_refactor_ack_v1",ack.toString()))throw new IOException("确认结果写入失败");
+        }catch(Throwable error){XposedBridge.log("HyperLux configuration acknowledgement: "+error);}
+    }
     void reload(){
         if(closed||changing)return;changing=true;
-        lowLightEnabled=false;
         try{
             refreshUserIdentity();
             String text=Settings.Global.getString(context.getContentResolver(),CONFIG);
+            if(configProcessed&&Objects.equals(text,processedConfig)){publishAcknowledgement();return;}
+            processedConfig=text;configProcessed=true;
+            lowLightEnabled=false;
             if(text==null||text.equals("null")){
                 if(kernel.plan()!=null)kernel.configure(null);disableOverrides();memoryStrength=1;phase="attached";revision="";message="已连接 · 官方曲线";
             }else{
@@ -208,6 +225,8 @@ final class HookRuntime {
     }
     long publishInterval(){return SystemClock.elapsedRealtime()<viewUntil?2000:10000;}
     void publish(){
+        // Configuration confirmation must not depend on optional diagnostic fields.
+        publishAcknowledgement();
         lastPublish=SystemClock.elapsedRealtime();
         try{
             JSONObject status=new JSONObject().put("build",BUILD).put("phase",phase).put("message",message).put("revision",revision)
@@ -254,7 +273,8 @@ final class HookRuntime {
                 status.put("screen_state",display.getClass().getMethod("getScreenState").invoke(display));
             }catch(Throwable unavailable){}
             CurvePlan plan=kernel.plan();if(plan!=null)status.put("active_logical_nit",array(plan.nits()));
-            if(!Settings.Global.putString(context.getContentResolver(),STATUS,status.toString()))throw new IOException("状态写入失败");
+            for(Map.Entry<String,String> part:StatusTransport.encode(status).entrySet())
+                if(!Settings.Global.putString(context.getContentResolver(),part.getKey(),part.getValue()))throw new IOException("状态写入失败："+part.getKey());
         }catch(Throwable error){XposedBridge.log("LumaCurve status: "+error);}
     }
     void collectOfficial(JSONObject status){

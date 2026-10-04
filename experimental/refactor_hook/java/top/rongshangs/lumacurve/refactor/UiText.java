@@ -204,6 +204,12 @@ public final class UiText {
         WORDS.put("收集曲线、运行状态与本次系统进程日志…","Collecting curves, status and session logs…");
         WORDS.put("微小变亮确认时间应在 0.5～15 秒","Small-increase delay must be 0.5–15 s");
         WORDS.put("系统尚未确认曲线接入，已撤回本次提交","The system did not confirm the curve. Changes have been rolled back.");
+        WORDS.put("设置未完成","Settings could not be applied");
+        WORDS.put("系统未在 6 秒内确认本次配置。","The system did not acknowledge these settings within 6 seconds.");
+        WORDS.put("未取得当前系统进程的有效确认，请核对 LSPosed 并重启。","No valid acknowledgement from the current system process. Check LSPosed and restart.");
+        WORDS.put("最后确认状态：","Last acknowledgement: ");
+        WORDS.put("已恢复此前配置；你在界面中的修改仍保留，尚未保存。","Previous settings were restored. Your edits are still available and have not been saved.");
+        WORDS.put("未能确认恢复此前配置，请导出分析包；不要连续点击保存。","Restoration could not be confirmed. Export an analysis package before trying again.");
         WORDS.put("拖动节点调整亮度，点击节点输入数值。","Drag a point to adjust brightness. Tap it to enter a value.");
         WORDS.put("1.0.0 · APP 测试版 03","1.0.0 · App test 03");
         WORDS.put("该预设来自其他固件，请先核对曲线节点","This preset is from another firmware. Check the curve points first.");
