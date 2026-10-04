@@ -142,6 +142,7 @@ public final class RootControl implements AutoCloseable {
         boolean thermal=options.optBoolean("thermal_relax",false);float ceiling=(float)options.optDouble("thermal_ceiling",43);ThermalPolicy.validate(ceiling);
         float memory=(float)options.optDouble("memory_strength",1);MemoryPolicy.validate(memory);
         long memoryMs=options.optLong("memory_window",1500);float memoryRange=(float)options.optDouble("memory_lux_range",.3);MemoryPolicy.validateGrouping(memoryMs,memoryRange);
+        MemoryOptions memoryOptions=MemoryOptions.parse(options).fit(state.optInt("memory_point_capacity",0));memoryOptions.verify(state);
         float cooling=(float)options.optDouble("thermal_cooling",1);ThermalPolicy.validateCooling(cooling);
         boolean response=options.optBoolean("response_override",false);long bright=options.optLong("brighten_delay",1500),dark=options.optLong("darken_delay",5000);DelayPolicy.validate(bright,dark);
         boolean small=options.optBoolean("small_brighten_override",false);long smallMs=options.optLong("small_brighten_delay",5000);DelayPolicy.validateSmall(smallMs);
@@ -150,6 +151,8 @@ public final class RootControl implements AutoCloseable {
         boolean lowLight=options.optBoolean("low_light_stability",false);
         float lowLimit=(float)options.optDouble("low_light_limit",50);long lowBright=options.optLong("low_light_brighten",3000),lowDark=options.optLong("low_light_darken",4000);LowLightPolicy.validate(lowLimit,lowBright,lowDark);
         if(lowLight&&!state.optBoolean("low_light_supported"))throw new IOException("暗光稳定接口尚未完整兼容");
+        LowLightThresholds lowThresholds=LowLightThresholds.parse(options);lowThresholds.verify(lowLight,state.optBoolean("low_light_threshold_supported"));
+        LowLightAssistGate assistGate=new LowLightAssistGate();assistGate.configure(options);if(lowLight&&assistGate.enabled&&!state.optBoolean("low_light_assist_gate_supported"))throw new IOException("辅助光感暗光闸门接口暂未兼容");
         if(thermal&&!state.optBoolean("thermal_supported"))throw new IOException("此固件温控亮度接口尚未兼容，不能启用该选项");
         float[] f=CurvePlan.factors(factors);
         float floor=CurvePlan.floor(options.has("curve_floor_nit")?options.opt("curve_floor_nit"):null);
@@ -163,8 +166,11 @@ public final class RootControl implements AutoCloseable {
             .put("fingerprint",Build.FINGERPRINT).put("user_serial",0).put("factors",CurvePlan.encode(f)).put("thermal_relax",thermal).put("thermal_ceiling",ceiling).put("memory_strength",memory);
         config.put("curve_backend",state.getString("curve_backend")).put("baseline_id",state.getString("baseline_id"));
         config.put("memory_window",memoryMs).put("memory_lux_range",memoryRange).put("thermal_cooling",cooling).put("response_override",response).put("brighten_delay",bright).put("darken_delay",dark);
+        memoryOptions.put(config);
         config.put("small_brighten_override",small).put("small_brighten_delay",smallMs);
         config.put("low_light_stability",lowLight).put("low_light_limit",lowLimit).put("low_light_brighten",lowBright).put("low_light_darken",lowDark);
+        lowThresholds.put(config);
+        assistGate.put(config);
         advanced.put(config);outdoor.put(config);config.put("curve_floor_nit",floor);
         try {
             prepare();
@@ -212,7 +218,7 @@ public final class RootControl implements AutoCloseable {
                     write(zip,"pipeline-trace.json",pipeline==null?"[]":pipeline.toString(2));write(zip,"output-trace.json",output==null?"[]":output.toString(2));
                     write(zip,"trace-readme.txt","Pipeline records group stages from ONE updateAutoBrightness call. Values are framework brightness coordinates (0..1), not nit or percent. Missing fields mean unobserved, not disabled.\nOutput records are separate later calls, not automatically attributed to a calculation. Use uptime_ms within this boot, or unix_ms for wall time. Sensor readings are OEM filtered readings, not raw samples.\nBounded history: latest 24 calculations and 16 output calls.\n");
                 }
-                write(zip,"config.json",String.valueOf(settings.get(CONFIG)));write(zip,"stored-hook-status.json",String.valueOf(settings.get(STATUS)));write(zip,"configuration-ack.json",String.valueOf(settings.get(ACK)));File controlError=new File(DATA,"last-control-error.txt");if(controlError.isFile()&&controlError.length()<=16384)write(zip,"last-control-error.txt",new String(Files.readAllBytes(controlError.toPath()),StandardCharsets.UTF_8));write(zip,"injection.json",String.valueOf(settings.get("lumacurve_refactor_injection_v1")));write(zip,"build.txt",BUILD+"\n"+Build.FINGERPRINT+"\n");
+                write(zip,"config.json",String.valueOf(settings.get(CONFIG)));write(zip,"manual-memory.json",String.valueOf(settings.get(PersistentMemory.KEY)));write(zip,"stored-hook-status.json",String.valueOf(settings.get(STATUS)));write(zip,"configuration-ack.json",String.valueOf(settings.get(ACK)));File controlError=new File(DATA,"last-control-error.txt");if(controlError.isFile()&&controlError.length()<=16384)write(zip,"last-control-error.txt",new String(Files.readAllBytes(controlError.toPath()),StandardCharsets.UTF_8));write(zip,"injection.json",String.valueOf(settings.get("lumacurve_refactor_injection_v1")));write(zip,"build.txt",BUILD+"\n"+Build.FINGERPRINT+"\n");
                 new DiagnosticCollector(zip,settings::getSystem).collect();
                 progress("8/8 完成压缩并校验分析包…");
             }
@@ -255,7 +261,7 @@ public final class RootControl implements AutoCloseable {
                 String raw=settings.get(CONFIG);JSONObject config=raw==null?new JSONObject().put("schema",1).put("enabled",false):new JSONObject(raw);
                 String revision=UUID.randomUUID().toString();config.put("revision",revision).put("reset_anchors",UUID.randomUUID().toString());
                 if(!settings.put(CONFIG,config.toString())||!waitFor(revision,config.optBoolean("enabled")))throw new IOException("系统尚未确认锚点清除，请重新读取状态");
-                return new JSONObject().put("ok",true).put("message","已清除当前手动曲线锚点；系统保存的最近滑块位置保持原样");
+                return new JSONObject().put("ok",true).put("message","已清除当前与已保存的手动记忆；系统保存的最近滑块位置保持原样");
             }
             throw new IOException("未知操作");
         }

@@ -27,8 +27,10 @@ final class ConfigurationFile {
         else if("hyperlux_config_v1".equals(format)){source=file.getJSONObject("options");}
         else if(format.isEmpty()&&file.optInt("schema")==1&&file.has("factors")){source=file;legacy=true;}
         else throw new IllegalArgumentException("不是兼容的 HyperLux 配置文件");
-        JSONObject out=new JSONObject();List<String> notes=new ArrayList<>();
+        JSONObject out=new JSONObject();List<String> notes=new ArrayList<>();MemoryOptions memoryOptions=MemoryOptions.parse(source),fitMemory=memoryOptions.fit(runtime.optInt("memory_point_capacity",0));fitMemory.put(out);disable(out,"memory_reset_override",runtime.optBoolean("memory_reset_supported"),notes);disable(out,"memory_timeout_override",runtime.optBoolean("memory_timeout_supported"),notes);if(memoryOptions.maxPoints!=fitMemory.maxPoints)notes.add("持久化节点上限已按本机能力调整");
         for(String k:FLAGS)out.put(k,flag(source,k));
+        LowLightThresholds lowThresholds=LowLightThresholds.parse(source);lowThresholds.put(out);if(out.getBoolean("low_light_stability"))disable(out,"low_light_threshold",runtime.optBoolean("low_light_threshold_supported"),notes);
+        LowLightAssistGate assistGate=new LowLightAssistGate();assistGate.configure(source);assistGate.put(out);if(out.getBoolean("low_light_stability"))disable(out,"low_light_assist_gate",runtime.optBoolean("low_light_assist_gate_supported"),notes);
         for(int i=0;i<KEYS.length;i++){double n=number(source,KEYS[i],DEFAULT[i],MIN[i],MAX[i],notes);if(i==2||i>=5&&i!=8){if(n!=Math.rint(n))throw new IllegalArgumentException("配置时间必须是整数："+KEYS[i]);}out.put(KEYS[i],n);}
         for(int i=0;i<AdvancedOptions.GROUPS.length;i++)out.put(AdvancedOptions.GROUPS[i],flag(source,AdvancedOptions.GROUPS[i]));
         for(int i=0;i<AdvancedOptions.KEYS.length;i++)out.put(AdvancedOptions.KEYS[i],number(source,AdvancedOptions.KEYS[i],AdvancedOptions.DEFAULT[i],AdvancedOptions.MIN[i],AdvancedOptions.MAX[i],notes));

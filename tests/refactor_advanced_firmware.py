@@ -20,6 +20,8 @@ for variant in ['os41','os28']:
  check('->prune(J)V' in dual and 'const-wide/16 v3, 5000' in method(dual,'updateAssistLightSensorAmbientLux'))
  check('->mSmallBrighteningLightDebounceConfig J' in method(ring,'nextAmbientLightBrighteningTransition','(J F F F)J'))
  check('->mRingTime [J' in method(ring,'prune') and 'aput-wide' in method(ring,'prune'))
+ for name,kind in [('mAssistAmbientLuxValid','Z'),('mAssistLightSensorEnable','Z'),('mIsPendingResetAssistValue','Z'),('mAssistLightSensorEnableTime','J'),('mAssistLightSensorWarmUpTime','I'),('mUseLightSensorFlag','I')]:check('FIELD '+name+' '+kind in dual)
+ for signature in ['size ()I','getTime (I)J','getLux (I)F']:check('METHOD '+signature in ring)
  for field in ['mDuration','mDurationTime','mLogicalStart','mLogicalTarget']:check('FIELD '+field+' D' in animation)
  body=method(animation,'updatePerceptualDuration');check('->mDuration D' in body and '->mDurationTime D' in body and '->mStartDurationTime J' in body)
  body=method(animation,'getCurrentLogical');check('->mDuration D' in body and 'div-double' in body and '->perceptualToLogicalBrt(D)D' in body)

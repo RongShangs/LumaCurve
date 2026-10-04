@@ -17,7 +17,7 @@ VERSION_CODE=int(manifest.get('{http://schemas.android.com/apk/res/android}versi
 OUT=ROOT/'build/refactor-hook'
 SDK=Path('D:/App/SDK'); BT=SDK/'build-tools/37.0.0'; ANDROID=SDK/'platforms/android-37.0/android.jar'
 OUT.mkdir(parents=True,exist_ok=True)
-shutil.copy2(ROOT/'website/thanks.json',SRC/'assets/thanks.json')
+# The web feed is updated independently; preserve the bundled offline fallback.
 # Keep the source archive's local-site fallback in sync before packaging it.
 thanks=json.loads((ROOT/'website/thanks.json').read_text(encoding='utf-8'))
 (ROOT/'website/thanks.js').write_text('window.HyperLuxThanks='+json.dumps(thanks,ensure_ascii=False)+';\n',encoding='utf-8',newline='\n')
@@ -29,7 +29,7 @@ if not DEP.exists():
 assert hashlib.sha256(DEP.read_bytes()).hexdigest()==API_SHA,'compile dependency changed'
 def run(args):subprocess.run([str(a) for a in args],check=True)
 def checked_test(path,pattern):
-    result=subprocess.run(['python',str(path)],check=True,capture_output=True,text=True,encoding='utf-8')
+    result=subprocess.run(['python',str(path)],check=True,capture_output=True,text=True,encoding='utf-8',errors='replace')
     print(result.stdout,end='');matched=re.search(pattern,result.stdout)
     assert matched,'test result count missing'
     return int(matched.group(1))
@@ -40,7 +40,7 @@ if CLASSES.exists():
 CLASSES.mkdir()
 run(['javac','-encoding','UTF-8','--release','8','-cp',str(ANDROID)+';'+str(DEP),'-d',CLASSES,*sorted((SRC/'java').rglob('*.java'))])
 run(['javac','-encoding','UTF-8','--release','8','-cp',CLASSES,'-d',CLASSES,*sorted((SRC/'tests').glob('*.java'))])
-tested=subprocess.run(['java','-cp',str(CLASSES),'top.rongshangs.lumacurve.refactor.RefactorTest'],check=True,capture_output=True,text=True)
+tested=subprocess.run(['java','-cp',str(CLASSES)+';'+str(ROOT/'build/refactor-diagnostics/json-20240303.jar'),'top.rongshangs.lumacurve.refactor.RefactorTest'],check=True,capture_output=True,text=True)
 print(tested.stdout,end='');host_cases=int(re.search(r'(\d+) cases PASS',tested.stdout).group(1))
 diagnostic_cases=checked_test(ROOT/'tests/refactor_diagnostics.py',r'(\d+) host cases PASS')
 advanced_cases=checked_test(ROOT/'tests/refactor_advanced_hooks.py',r'(\d+) cases PASS')
@@ -49,6 +49,10 @@ outdoor_cases=checked_test(ROOT/'tests/refactor_outdoor.py',r'(\d+) cases PASS')
 configuration_cases=checked_test(ROOT/'tests/refactor_configuration.py',r'(\d+) cases PASS')
 user_identity_cases=checked_test(ROOT/'tests/refactor_user_identity.py',r'(\d+) cases PASS')
 status_transport_cases=checked_test(ROOT/'tests/refactor_status_transport.py',r'(\d+) cases PASS')
+memory_cases=checked_test(ROOT/'tests/refactor_persistent_memory.py',r'(\d+) cases PASS')
+memory_lifecycle_cases=checked_test(ROOT/'tests/refactor_memory_lifecycle.py',r'(\d+) cases PASS')
+memory_firmware_cases=0
+if not args.skip_device_fixtures:memory_firmware_cases=checked_test(ROOT/'tests/refactor_memory_firmware.py',r'(\d+) checks PASS')
 if not args.skip_device_fixtures:run(['python',ROOT/'tests/refactor_hook_firmware.py'])
 else:print('OEM firmware checks skipped explicitly; runtime compatibility validation remains enabled')
 advanced_firmware_cases=0
@@ -74,20 +78,20 @@ run(['java','-jar',BT/'lib/apksigner.jar','verify','--verbose',APK])
 run([BT/'zipalign.exe','-c','4',APK])
 # Root recovery does not load any Xposed classes, and works if the app is uninstalled.
 HELPER=DIST/'luma-refactor-helper.jar'
-names={'RootControl.class','RootSettings.class','ForegroundUser.class','CurvePlan.class','CurveIdentity.class','TraditionalCurve.class','ThermalPolicy.class','MemoryPolicy.class','DelayPolicy.class','LegacyModules.class','AppBuild.class','LowLightPolicy.class','DiagnosticCollector.class','AdvancedOptions.class','AdvancedPolicy.class','OutdoorOptions.class','OutdoorPolicy.class','ConfigurationFile.class','ConfigurationFile$Imported.class','StatusTransport.class','StatusTransport$Reader.class'}
+names={'RootControl.class','RootSettings.class','ForegroundUser.class','CurvePlan.class','CurveIdentity.class','TraditionalCurve.class','ThermalPolicy.class','MemoryPolicy.class','MemoryOptions.class','MemoryScene.class','LowLightThresholds.class','LowLightAssistGate.class','PersistentMemory.class','DelayPolicy.class','LegacyModules.class','AppBuild.class','LowLightPolicy.class','DiagnosticCollector.class','AdvancedOptions.class','AdvancedPolicy.class','OutdoorOptions.class','OutdoorPolicy.class','ConfigurationFile.class','ConfigurationFile$Imported.class','StatusTransport.class','StatusTransport$Reader.class'}
 run(['java','-cp',BT/'lib/d8.jar','com.android.tools.r8.D8','--min-api','34','--lib',ANDROID,'--output',HELPER,*[p for p in inputs if p.name in names or p.name.startswith('DiagnosticCollector$')]])
 run(['C:/msys64/usr/bin/bash.exe','-n',SRC/'restore_refactor_hook_android.sh'])
 meta={'build':BUILD,'version':ARTIFACT_VERSION,'version_code':VERSION_CODE,'test_build':IS_TEST,'app_name':'HyperLux','architecture':'oem_active_curve_backend_hook',
-      'device_verified':False,'compile_api':82,'compile_api_sha256':API_SHA,
+      'device_verified':False,'memory_firmware_checks':memory_firmware_cases,'compile_api':82,'compile_api_sha256':API_SHA,
       'sdk_compile':37,'sdk_min':34,'separate_output_daemon':False,
       'firmware_static_checks':not args.skip_device_fixtures,'host_cases':host_cases,
       'package':'top.rongshangs.lumacurve','languages':['zh','en'],'direct_point_editor':True,'system_light_change_delays_optional':True,'apk_update_repo':'RongShangs/LumaCurve',
-      'pipeline_readonly_trace':True,'pipeline_calculation_capacity':24,'output_trace_capacity':16,'low_light_stability_optional':True,'low_light_stability_default':False,
+      'pipeline_readonly_trace':True,'pipeline_calculation_capacity':24,'output_trace_capacity':16,'low_light_stability_optional':True,'low_light_stability_default':False,'low_light_scoped_thresholds':True,'low_light_small_route_protected':True,'low_light_aux_gate_bounded':True,'low_light_aux_gate_default':False,
       'advanced_optional_parameters':14,'advanced_default_enabled':False,'advanced_hook_model_verified':True,'advanced_firmware_collections':2 if not args.skip_device_fixtures else 0,
       'diagnostic_cases':diagnostic_cases,'status_transport_cases':status_transport_cases,'advanced_hook_model_cases':advanced_cases,'advanced_firmware_checks':advanced_firmware_cases,
-      'user_identity_cases':user_identity_cases,'configuration_cases':configuration_cases,'configuration_schema':2,'curve_floor_editable':True,'settings_submenus':6,'settings_independent_screens':True,'settings_parameters_always_visible':True,'sensor_status_explained':True,'unsaved_settings_notice':True,'page_transitions':True,'page_transitions_respect_system':True,'outdoor_cases':outdoor_cases,'outdoor_firmware_checks':outdoor_firmware_cases,'outdoor_firmware_collections':3 if not args.skip_device_fixtures else 0,'outdoor_optional':True,'outdoor_default_enabled':False,'outdoor_uses_oem_animation':True,'outdoor_driver_writes':False,
+      'user_identity_cases':user_identity_cases,'configuration_cases':configuration_cases,'configuration_schema':2,'curve_floor_editable':True,'settings_submenus':7,'settings_independent_screens':True,'settings_parameters_always_visible':False,'settings_details_default_collapsed':True,'settings_category_presets':True,'settings_preset_groups':9,'accessible_draft_switches':True,'sensor_status_explained':True,'unsaved_settings_notice':True,'page_transitions':True,'page_transitions_respect_system':True,'outdoor_cases':outdoor_cases,'outdoor_firmware_checks':outdoor_firmware_cases,'outdoor_firmware_collections':3 if not args.skip_device_fixtures else 0,'outdoor_optional':True,'outdoor_default_enabled':False,'outdoor_uses_oem_animation':True,'outdoor_driver_writes':False,
       'curve_backends':['refactor','physical_mapping'],'baseline':'current_device_local_curve','traditional_hook_model_cases':traditional_cases,'traditional_firmware_checks':traditional_firmware_cases,
-      'module_long_term_learning':False,'oem_anchor_memory_adjustable':True,'thermal_display_relaxation':True,'source_sha256':{p.relative_to(SRC).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in (SRC/'java').rglob('*.java')},
+      'persistent_manual_memory':True,'persistent_memory_default':True,'persistent_memory_cases':memory_cases,'memory_lifecycle_cases':memory_lifecycle_cases,'persistent_memory_record_limit':8192,'persistent_memory_retention_days':[1,90],'persistent_memory_capacity':'backend_native','memory_lifecycle_observed':True,'memory_wake_same_scene_default':True,'memory_native_reset_override_default':False,'dark_mode':'system','editable_base_points':4,'module_long_term_learning':False,'oem_anchor_memory_adjustable':True,'thermal_display_relaxation':True,'source_sha256':{p.relative_to(SRC).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in (SRC/'java').rglob('*.java')},
       'apk_sha256':hashlib.sha256(APK.read_bytes()).hexdigest()}
 (OUT/'verification.json').write_text(json.dumps(meta,ensure_ascii=False,indent=2),encoding='utf-8')
 with zipfile.ZipFile(APK) as z:
@@ -102,7 +106,7 @@ with zipfile.ZipFile(source,'w',zipfile.ZIP_DEFLATED) as z:
     for p in sorted(SRC.rglob('*')):
         if p.is_file():z.write(p,p.relative_to(ROOT))
     z.write(ROOT/'LICENSE','LICENSE');z.write(ROOT/'README.md','README.md');z.write(ROOT/'CHANGELOG.md','CHANGELOG.md');z.write(Path(__file__),'tools/build_refactor_hook_test.py');z.write(ROOT/'tests/refactor_hook_firmware.py','tests/refactor_hook_firmware.py');z.write(ROOT/'tests/refactor_diagnostics.py','tests/refactor_diagnostics.py')
-    for name in ['refactor_advanced_hooks.py','refactor_advanced_firmware.py','refactor_traditional.py','refactor_traditional_firmware.py','refactor_user_identity.py','refactor_outdoor.py','refactor_outdoor_firmware.py','refactor_configuration.py','refactor_status_transport.py']:z.write(ROOT/'tests'/name,'tests/'+name)
+    for name in ['refactor_advanced_hooks.py','refactor_advanced_firmware.py','refactor_traditional.py','refactor_traditional_firmware.py','refactor_user_identity.py','refactor_outdoor.py','refactor_outdoor_firmware.py','refactor_configuration.py','refactor_status_transport.py','refactor_persistent_memory.py','refactor_memory_lifecycle.py','refactor_memory_firmware.py']:z.write(ROOT/'tests'/name,'tests/'+name)
     for p in sorted((ROOT/'docs/releases').glob('*.md')):z.write(p,p.relative_to(ROOT))
     z.write(ROOT/'docs/release-policy.md','docs/release-policy.md')
     for name in ['sync_website.py','package_website.py']:z.write(ROOT/'tools'/name,'tools/'+name)

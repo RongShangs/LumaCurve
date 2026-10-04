@@ -46,7 +46,29 @@ public final class RefactorAdapter extends CurveBackend {
     public float number(String name)throws Exception{return ((Number)get(name)).floatValue();}
     public int integer(String name)throws Exception{return ((Number)get(name)).intValue();}
     public CurvePlan plan(){return active;}
+    Object target(){return target;}
     public String name(){return "refactor";}
+    public boolean persistentMemorySupported(){return true;}
+    public int manualPointCapacity(){try{return Math.min(PersistentMemory.MAX_POINTS,java.lang.reflect.Array.getLength(get("mAnchorLux")));}catch(Exception unavailable){return 0;}}
+    public org.json.JSONArray manualPoints()throws Exception {
+        int count=integer("mAnchorCount");float[] x=(float[])get("mAnchorLux"),y=(float[])get("mAnchorNit");boolean[] flags=(boolean[])get("mAnchorIsUserDrag");int[] order=(int[])get("mAnchorOrder");
+        if(count<0||count>x.length)throw new IllegalStateException("系统锚点数量异常");
+        List<Integer> indices=new ArrayList<>();for(int i=0;i<count;i++)if(flags[i])indices.add(i);
+        Collections.sort(indices,(a,b)->Integer.compare(order[a],order[b]));org.json.JSONArray points=new org.json.JSONArray();
+        for(int i:indices)points.put(new org.json.JSONObject().put("lux",x[i]).put("value",y[i]));return points;
+    }
+    public void restoreManualPoints(org.json.JSONArray points)throws Exception {restore(points,false);}
+    public void replaceManualPoints(org.json.JSONArray points)throws Exception {restore(points,true);}
+    private void restore(org.json.JSONArray points,boolean replace)throws Exception {
+        PersistentMemory.validate(points);
+        for(int i=0;i<points.length();i++){org.json.JSONObject p=points.getJSONObject(i);float x=(float)p.getDouble("lux"),y=(float)p.getDouble("value");if(x>factoryLux[3]||y<min||y>max)throw new IllegalArgumentException("手动记忆超出设备曲线范围");}
+        Map<String,Object> before=new HashMap<>();
+        for(String name:ARRAYS){Object array=get(name),copy=Array.newInstance(array.getClass().getComponentType(),Array.getLength(array));System.arraycopy(array,0,copy,0,Array.getLength(array));before.put(name,copy);}
+        for(String name:SCALARS)before.put(name,get(name));
+        try{if(replace){reset.invoke(target);afterReset();}Method method=target.getClass().getDeclaredMethod("updateLogicalCurve",float.class,float.class);method.setAccessible(true);
+            for(int i=0;i<points.length();i++){org.json.JSONObject p=points.getJSONObject(i);method.invoke(target,(float)p.getDouble("lux"),(float)p.getDouble("value"));}
+        }catch(Throwable error){for(String name:ARRAYS){Object copy=before.get(name);System.arraycopy(copy,0,get(name),0,Array.getLength(copy));}for(String name:SCALARS)set(name,before.get(name));throw new IllegalStateException("手动记忆恢复失败，已回滚",error);}
+    }
     public void clearMemory()throws Exception{configure(activeFactors,activeFloor);}
     public float currentAt(float lux)throws Exception{
         float[] x=(float[])get("mAnchorLux"),y=(float[])get("mAnchorNit");int count=integer("mAnchorCount");

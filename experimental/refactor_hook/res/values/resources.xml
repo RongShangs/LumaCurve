@@ -1,6 +1,6 @@
 <resources>
     <style name="AppTheme" parent="android:style/Theme.Material.Light.NoActionBar">
-        <item name="android:fontFamily">sans</item><item name="android:colorAccent">#3265df</item>
+        <item name="android:fontFamily">sans</item><item name="android:forceDarkAllowed">false</item><item name="android:windowBackground">#fafafa</item><item name="android:colorAccent">#3265df</item>
         <item name="android:windowLightStatusBar">true</item><item name="android:statusBarColor">#fafafa</item>
         <item name="android:navigationBarColor">#fafafa</item><item name="android:windowActionModeOverlay">true</item>
         <item name="android:buttonStyle">@style/FlatButton</item>

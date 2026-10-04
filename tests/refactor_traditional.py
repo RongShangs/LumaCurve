@@ -37,6 +37,7 @@ public class MiuiPhysicalBrightnessMappingStrategy {
  public void clearUserDataPoints(){mShortTermModelUserLux=mShortTermModelUserBrightness=-1;mAutoBrightnessAdjustment=0;compute();}
  public void addUserDataPoint(float lux,float br){XposedBridge.call(this,"addUserDataPoint",new Class<?>[]{float.class,float.class,String.class},lux,br,null);}
  public void addUserDataPoint(float lux,float br,String pkg){dragCalls++;mShortTermModelUserLux=lux;mShortTermModelUserBrightness=br;mBrightnessSpline=new Spline(mConfig.mLux,mConfig.mNits);mBrightnessSpline.userLux=lux;mBrightnessSpline.userNit=convertToNits(br);}
+ public float getUserBrightness(){return mShortTermModelUserBrightness;}
  public float convertToBrightness(float nit){return nit/1000;}public float convertToNits(float br){return br*1000;}
  public float getBrightness(float lux,String pkg,int category){return convertToBrightness(mBrightnessSpline.interpolate(lux));}
  public static class Spline {float[] x,y;float userLux=-1,userNit;Spline(float[] x,float[] y){this.x=x;this.y=y;}public float interpolate(float lux){if(lux==userLux)return userNit;if(lux<=x[0])return y[0];for(int i=1;i<x.length;i++)if(lux<=x[i])return y[i-1]+(y[i]-y[i-1])*(lux-x[i-1])/(x[i]-x[i-1]);return y[y.length-1];}}
@@ -44,7 +45,7 @@ public class MiuiPhysicalBrightnessMappingStrategy {
 'top/rongshangs/lumacurve/refactor/HookEntry.java':'''package top.rongshangs.lumacurve.refactor;import java.util.*;
 class HookEntry {static Map<Object,HookRuntime> states=new IdentityHashMap<>();static int reattached;static Object get(Object o,String n)throws Exception{return TraditionalAdapter.read(o,n);}static void reattach(Object owner,Object mapper){reattached++;}}''',
 'top/rongshangs/lumacurve/refactor/HookRuntime.java':'''package top.rongshangs.lumacurve.refactor;
-class HookRuntime {CurveBackend kernel;Object owner;boolean closed,changing,faultPending,userMatches=true,onThread=true;String phase="active";float memoryStrength=1;long lastManualAdjustment;int events,samples;float remembered,lastNit;MemoryPolicy memoryPolicy=new MemoryPolicy();android.os.Handler handler=new android.os.Handler();
+class HookRuntime {CurveBackend kernel;Object owner;boolean closed,changing,faultPending,userMatches=true,onThread=true;String phase="active";float memoryStrength=1;long lastManualAdjustment;int events,samples;float remembered,lastNit;MemoryPolicy memoryPolicy=new MemoryPolicy();MemoryPersistence persistentMemory=new MemoryPersistence();android.os.Handler handler=new android.os.Handler();
  boolean onDisplayThread(){return onThread&&!closed;}boolean appliesToUser(){return userMatches;}void memoryEvent(float l,float d,float r){events++;remembered=r;}void queuePublish(){}void sample(float l,float n){samples++;lastNit=n;}void fault(Throwable e){faultPending=true;}}
 ''',
 'top/rongshangs/lumacurve/refactor/TraditionalHostTest.java':'''package top.rongshangs.lumacurve.refactor;
@@ -57,6 +58,7 @@ public class TraditionalHostTest {
  public static class Map0 {Object mapper;public Object get(int i){return i==0?mapper:null;}}
  public static class Model {float anchor=30;boolean valid=true;}
  public static class ABC {Map0 mBrightnessMappingStrategyMap=new Map0();Object mCurrentBrightnessMapper;Model mShortTermModel=new Model();int resets;
+   public boolean setScreenBrightnessByUser(float lux,float value){try{TraditionalAdapter.method(mCurrentBrightnessMapper.getClass(),"addUserDataPoint",float.class,float.class).invoke(mCurrentBrightnessMapper,lux,value);mShortTermModel.anchor=lux;mShortTermModel.valid=true;return true;}catch(Exception e){throw new RuntimeException(e);}}
    public void resetShortTermModel(){resets++;try{TraditionalAdapter.method(mCurrentBrightnessMapper.getClass(),"clearUserDataPoints").invoke(mCurrentBrightnessMapper);}catch(Exception e){throw new RuntimeException(e);}mShortTermModel.anchor=-1;mShortTermModel.valid=false;}}
  static BrightnessConfiguration config(float[] x,float[] y){Map<String,Object> pkg=new HashMap<>();pkg.put("video","correction");Map<Integer,Object> cat=new HashMap<>();cat.put(3,"category");return new BrightnessConfiguration(x,y,pkg,cat,"device local",true,300000,.6f,.8f);}
  static Object call(Object o,String method,Class<?>[] types,Object...a){return XposedBridge.call(o,method,types,a);}
@@ -76,6 +78,10 @@ public class TraditionalHostTest {
   TraditionalAdapter a=new TraditionalAdapter(owner,m,abc,()->0);check(a.name().equals("physical_mapping"));check(Arrays.equals(a.fullNit(),y));
   a.configure(one);check(a.plan()!=null&&m.mConfig==nativeConfig&&abc.resets==1);a.configure(f);check(Arrays.equals(m.mConfig.mNits,shape));check(m.mConfig.mCorrectionsByPackageName.equals(nativeConfig.mCorrectionsByPackageName));check(m.mConfig.mCorrectionsByCategory.equals(nativeConfig.mCorrectionsByCategory));check(m.mConfig.mDescription.equals(nativeConfig.mDescription)&&m.mConfig.mShortTermModelTimeout==300000&&m.mConfig.mShouldCollectColorSamples&&m.mConfig.mShortTermModelLowerLuxMultiplier==.6f);
   near(a.currentAt(30),24);near(a.memoryAt(30),.024f);check(a.currentLux().length>=x.length);check(a.currentLux().length==a.currentNit().length);
+  check(a.persistentMemorySupported()&&a.manualPointCapacity()==1);check(a.manualPoints().length()==0);
+  org.json.JSONArray record=new org.json.JSONArray().put(new org.json.JSONObject().put("lux",30).put("value",.15));
+  a.restoreManualPoints(record);near(a.currentAt(30),150);check(abc.mShortTermModel.anchor==30&&abc.mShortTermModel.valid);check(a.manualPoints().getJSONObject(0).getDouble("value")>.149);a.clearMemory();
+  try{a.restoreManualPoints(new org.json.JSONArray().put(new org.json.JSONObject().put("lux",30).put("value",2)));throw new AssertionError();}catch(IllegalArgumentException expected){cases++;}check(a.manualPoints().length()==0);
   m.addUserDataPoint(30,.1f,"video");near(a.currentAt(30),100);check(a.plan().at(30)==24);check(a.number("mUserLux")==30);a.clearMemory();near(a.currentAt(30),24);check(a.plan()!=null);
   m.addUserDataPoint(30,.15f,"video");Object previousConfig=m.mConfig,previousSpline=m.mBrightnessSpline;abc.mShortTermModel.anchor=30;abc.mShortTermModel.valid=true;m.mSplineGroup.put(0,"before");m.fail=true;
   try{a.configure(new float[]{1,1,1,1});throw new AssertionError("failure accepted");}catch(IllegalStateException expected){check(m.mConfig==previousConfig&&m.mBrightnessSpline==previousSpline);near(m.mShortTermModelUserBrightness,.15f);check(m.mSplineGroup.get(0).equals("before"));check(abc.mShortTermModel.anchor==30&&abc.mShortTermModel.valid);check(a.plan().at(30)==24);}m.fail=false;
@@ -87,7 +93,7 @@ public class TraditionalHostTest {
   abc.mBrightnessMappingStrategyMap.mapper=new Object();try{new TraditionalAdapter(owner,m,abc,()->0);throw new AssertionError();}catch(IllegalStateException expected){cases++;}abc.mBrightnessMappingStrategyMap.mapper=m;
   HookRuntime s=new HookRuntime();s.kernel=a;s.owner=owner;HookEntry.states.put(m,s);TraditionalHooks.install(m.getClass());s.changing=true;a.configure(f);s.changing=false;
   s.memoryStrength=.5f;call(m,"addUserDataPoint",DRAG,30f,.2f,"video");near(m.mShortTermModelUserBrightness,.112f);check(s.events==1);android.os.SystemClock.time+=50;call(m,"addUserDataPoint",DRAG,30f,.3f,"video");near(m.mShortTermModelUserBrightness,.162f);check(s.events==2); // One gesture uses its start baseline.
-  s.memoryStrength=0;int calls=m.dragCalls;call(m,"addUserDataPoint",new Class<?>[]{float.class,float.class},30f,.4f);check(m.dragCalls==calls&&Float.isNaN(s.remembered));
+  s.memoryStrength=0;s.persistentMemory.pendingRestore=true;int calls=m.dragCalls;call(m,"addUserDataPoint",new Class<?>[]{float.class,float.class},30f,.4f);check(m.dragCalls==calls&&Float.isNaN(s.remembered));check(!s.persistentMemory.pendingRestore);
   s.memoryStrength=1;s.userMatches=false;call(m,"addUserDataPoint",DRAG,30f,.4f,"video");near(m.mShortTermModelUserBrightness,.4f);s.userMatches=true;
   int events=s.events;abc.mCurrentBrightnessMapper=idle;call(m,"addUserDataPoint",DRAG,30f,.5f,"video");check(s.events==events);abc.mCurrentBrightnessMapper=m;
   s.changing=true;a.clearMemory();s.changing=false;call(m,"getBrightness",new Class<?>[]{float.class,String.class,int.class},30f,"video",0);check(s.samples==1);near(s.lastNit,24);
@@ -119,10 +125,12 @@ fixture=fixture.replace('  System.out.println("Traditional curve/adapter/hooks:'
   System.out.println("Traditional curve/adapter/hooks:''')
 sources['top/rongshangs/lumacurve/refactor/TraditionalHostTest.java']=fixture
 
+sources['top/rongshangs/lumacurve/refactor/MemoryPersistence.java']='''package top.rongshangs.lumacurve.refactor;class MemoryPersistence {boolean replaying,pendingRestore;int captures,resets;void cancelRestore(){pendingRestore=false;}void manualApplied(){captures++;}void afterReset(){resets++;}void maybeRestore(){}}'''
+J=R/'build/refactor-diagnostics/json-20240303.jar'
 files=[]
 for name,value in sources.items():
     p=O/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_text(value,encoding='utf-8');files.append(p)
 C=O/'classes';C.mkdir(exist_ok=True)
-production=['CurvePlan','CurveBackend','TraditionalCurve','TraditionalAdapter','TraditionalHooks','CurveIdentity','BackendSelection','MemoryPolicy']
-subprocess.run(['javac','-encoding','UTF-8','--release','8','-d',str(C),*[str(f) for f in files],*[str(S/(n+'.java')) for n in production]],check=True)
-subprocess.run(['java','-cp',str(C),'top.rongshangs.lumacurve.refactor.TraditionalHostTest'],check=True)
+production=['CurvePlan','CurveBackend','TraditionalCurve','TraditionalAdapter','TraditionalHooks','CurveIdentity','BackendSelection','MemoryPolicy','MemoryOptions','PersistentMemory']
+subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(J),'-d',str(C),*[str(f) for f in files],*[str(S/(n+'.java')) for n in production]],check=True)
+subprocess.run(['java','-cp',str(C)+';'+str(J),'top.rongshangs.lumacurve.refactor.TraditionalHostTest'],check=True)

@@ -15,6 +15,12 @@ public abstract class CurveBackend {
     public abstract float currentAt(float lux)throws Exception;
     public float memoryAt(float lux)throws Exception{return currentAt(lux);}
     public abstract String name();
+    public boolean persistentMemorySupported(){return false;}
+    public int manualPointCapacity(){return 0;}
+    public org.json.JSONArray manualPoints()throws Exception{return new org.json.JSONArray();}
+    public void restoreManualPoints(org.json.JSONArray points)throws Exception{throw new IllegalStateException("此设备的手动记忆恢复接口尚未兼容");}
+    public void replaceManualPoints(org.json.JSONArray points)throws Exception{clearMemory();restoreManualPoints(points);}
+    public float manualDisplayValue(float value)throws Exception{return value;}
     public float[] fullLux(){return factoryLux.clone();}
     public float[] fullNit(){return factoryNit.clone();}
     public float[] currentLux()throws Exception{return java.util.Arrays.copyOf((float[])get("mAnchorLux"),integer("mAnchorCount"));}

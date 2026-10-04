@@ -29,14 +29,14 @@ final class ResponseTuning {
                         try{
                             Object impl=HookEntry.get(state.owner,"mAutomaticBrightnessControllerImpl");
                             if(HookEntry.get(impl,"mAutomaticBrightnessController")!=p.thisObject)continue;
-                            if(!((Boolean)state.kernel.get("mUseAutoBrightness")))return;
-                            if((Boolean)idle.invoke(p.thisObject))return;
+                            if(!((Boolean)state.kernel.get("mUseAutoBrightness"))){state.assistGate.release("inactive");return;}
+                            if((Boolean)idle.invoke(p.thisObject)){state.assistGate.release("inactive");return;}
                             Method driving=impl.getClass().getMethod("getDrivingStatus");
-                            if(driving.getReturnType()!=boolean.class||(Boolean)driving.invoke(impl))return;
+                            if(driving.getReturnType()!=boolean.class||(Boolean)driving.invoke(impl)){state.assistGate.release("inactive");return;}
                             boolean small=brighten&&p.args.length==2&&(Float)p.args[1]<((Number)HookEntry.get(p.thisObject,"mAmbientBrighteningThreshold")).floatValue();
                             float candidate=p.args.length==2?(Float)p.args[1]:state.mainCandidate(p.thisObject,impl);
                             boolean guard=state.lowLightApplies(p.thisObject,impl,candidate),custom=(small?state.smallResponseEnabled:state.responseEnabled)&&state.normalTuningAllowed(p.thisObject,impl);
-                            if(!guard&&!custom)return;
+                            if(!guard&&!custom){state.assistGate.release("inactive");return;}
                             long base=((Number)HookEntry.get(p.thisObject,small?"mSmallBrighteningLightDebounceConfig":brighten?"mBrighteningLightDebounceConfig":"mDarkeningLightDebounceConfig")).longValue();
                             long chosen=custom?(small?state.smallBrightenDelay:brighten?state.brightenDelay:state.darkenDelay):base;
                             long horizon=((Number)HookEntry.get(p.thisObject,"mAmbientLightHorizonLong")).longValue();
@@ -47,8 +47,9 @@ final class ResponseTuning {
                                 chosen=LowLightPolicy.withinWindow(wanted,existing,horizon,additional);if(chosen!=wanted)state.delayWindowClamps++;
                             }
                             if(small)state.lastMainSmall=chosen;else if(brighten)state.lastMainBrighten=chosen;else {state.lastMainDarken=chosen;state.lastMainExtra=additional;}
-                            if(chosen==base)return;
-                            p.setResult(DelayPolicy.deadline((Long)p.getResult(),(Long)p.args[0],base,chosen));state.responseAdjustments++;if(small)state.smallResponseAdjustments++;if(guard)state.lowLightMainAdjustments++;return;
+                            long deadline=chosen==base?(Long)p.getResult():DelayPolicy.deadline((Long)p.getResult(),(Long)p.args[0],base,chosen);
+                            if(brighten&&state.assistGate.enabled)deadline=LowLightAssistEvidence.deadline(state,p.thisObject,impl,(Long)p.args[0],deadline,p.args.length==2?(Float)p.args[1]:HookRuntime.optionalNumber(p.thisObject,"mAmbientBrighteningThreshold"));
+                            if(deadline!=(Long)p.getResult()){p.setResult(deadline);state.responseAdjustments++;if(small)state.smallResponseAdjustments++;if(guard)state.lowLightMainAdjustments++;}return;
                         }catch(Throwable incompatible){return;}
                     }}
                 }}));

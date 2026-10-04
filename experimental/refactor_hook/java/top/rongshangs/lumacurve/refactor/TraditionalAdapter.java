@@ -13,7 +13,7 @@ public final class TraditionalAdapter extends CurveBackend {
     final IntSupplier user;
     final String userLuxField;
     final Method adjustedInterpolation;
-    private CurvePlan active;
+    private CurvePlan active;private Boolean persistenceSupported;
     Object applied;
     boolean updating;
     private static final java.util.concurrent.ConcurrentMap<Class<?>,java.util.concurrent.ConcurrentMap<String,Field>> sharedFields=new java.util.concurrent.ConcurrentHashMap<>();
@@ -50,6 +50,22 @@ public final class TraditionalAdapter extends CurveBackend {
     static Method method(Class<?> type,String name,Class<?>...params)throws Exception{for(Class<?> c=type;c!=null;c=c.getSuperclass())try{Method m=c.getDeclaredMethod(name,params);m.setAccessible(true);return m;}catch(NoSuchMethodException missing){}throw new NoSuchMethodException(name);}
     static float bound(Object mapper,boolean high)throws Exception{float[] n=(float[])read(mapper,"mNits");if(n==null||n.length<2)throw new IllegalArgumentException("设备亮度标定未就绪");for(int i=0;i<n.length;i++)if(!Float.isFinite(n[i])||n[i]<0||(i>0&&n[i]<=n[i-1]))throw new IllegalArgumentException("设备亮度标定无效");return high?n[n.length-1]:n[0];}
     public String name(){return "physical_mapping";}
+    public boolean persistentMemorySupported(){if(persistenceSupported==null)try{persistenceSupported=method(abc.getClass(),"setScreenBrightnessByUser",float.class,float.class).getReturnType()==boolean.class && method(mapper.getClass(),"getUserBrightness").getReturnType()==float.class;}catch(Exception unavailable){persistenceSupported=false;}return persistenceSupported;}
+    public int manualPointCapacity(){return persistentMemorySupported()?1:0;}
+    public org.json.JSONArray manualPoints()throws Exception {
+        org.json.JSONArray points=new org.json.JSONArray();float lux=number("mUserLux");
+        if(Float.isFinite(lux)&&lux>=0){float value=((Number)method(mapper.getClass(),"getUserBrightness").invoke(mapper)).floatValue();if(Float.isFinite(value)&&value>=0&&value<=1)points.put(new org.json.JSONObject().put("lux",lux).put("value",value));}return points;
+    }
+    public float manualDisplayValue(float value)throws Exception{return ((Number)method(mapper.getClass(),"convertToNits",float.class).invoke(mapper,value)).floatValue();}
+    public void restoreManualPoints(org.json.JSONArray points)throws Exception {restore(points,false);}
+    public void replaceManualPoints(org.json.JSONArray points)throws Exception {restore(points,true);}
+    private void restore(org.json.JSONArray points,boolean replace)throws Exception {
+        PersistentMemory.validate(points);if(points.length()>1||read(abc,"mCurrentBrightnessMapper")!=mapper)throw new IllegalArgumentException("当前映射不能恢复此手动记忆");
+        for(int i=0;i<points.length();i++){org.json.JSONObject p=points.getJSONObject(i);if(p.getDouble("lux")>factoryLux[3]||p.getDouble("value")>1)throw new IllegalArgumentException("手动记忆超出设备映射范围");}
+        Map<Field,Object> before=snapshot(mapper);Object model=read(abc,"mShortTermModel");Map<Field,Object> modelBefore=snapshot(model);
+        try{if(replace)clearMemory();for(int i=0;i<points.length();i++){org.json.JSONObject p=points.getJSONObject(i);if(!Boolean.TRUE.equals(method(abc.getClass(),"setScreenBrightnessByUser",float.class,float.class).invoke(abc,(float)p.getDouble("lux"),(float)p.getDouble("value"))))throw new IllegalStateException("系统未采用手动记忆");}}
+        catch(Throwable error){restore(mapper,before);restore(model,modelBefore);throw new IllegalStateException("手动记忆恢复失败，已回滚",error);}
+    }
     public CurvePlan plan(){return active;}
     public float[] fullLux(){return original.lux();}
     public float[] fullNit(){return original.nit();}

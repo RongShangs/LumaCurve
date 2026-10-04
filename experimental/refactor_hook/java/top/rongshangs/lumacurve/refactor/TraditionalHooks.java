@@ -34,19 +34,21 @@ final class TraditionalHooks {
             }));
             added.add(XposedBridge.hookMethod(memory,new XC_MethodHook(){
                 protected void beforeHookedMethod(MethodHookParam p){
-                    HookRuntime s=state(p.thisObject);if(s==null||s.changing||!s.phase.equals("active")||!s.appliesToUser())return;
+                    HookRuntime s=state(p.thisObject);if(s==null||s.changing||s.persistentMemory.replaying||!s.phase.equals("active")||!s.appliesToUser())return;
                     try{TraditionalAdapter a=(TraditionalAdapter)s.kernel;
                         if(!Boolean.TRUE.equals(s.kernel.get("mUseAutoBrightness"))||HookEntry.get(a.abc,"mCurrentBrightnessMapper")!=p.thisObject)return;
                         float lux=(Float)p.args[0],desired=(Float)p.args[1];if(!Float.isFinite(lux)||lux<0||!Float.isFinite(desired)||desired<0||desired>1)return;
                         s.lastManualAdjustment=SystemClock.uptimeMillis();
+                        s.persistentMemory.cancelRestore();
                         if(s.memoryStrength==0){p.setResult(null);s.memoryEvent(lux,desired,Float.NaN);return;}
                         float value=s.memoryStrength<1?s.memoryPolicy.remember(lux,desired,a.memoryAt(lux),s.memoryStrength,SystemClock.elapsedRealtime()):desired;
-                        p.args[1]=value;s.memoryEvent(lux,desired,value);
+                        p.args[1]=value;p.setObjectExtra("hyperlux.manual",Boolean.TRUE);s.memoryEvent(lux,desired,value);
                     }catch(Throwable error){XposedBridge.log("HyperLux traditional memory left OEM: "+error);}
                 }
-                protected void afterHookedMethod(MethodHookParam p){HookRuntime s=state(p.thisObject);if(s!=null&&!p.hasThrowable())s.queuePublish();}
+                protected void afterHookedMethod(MethodHookParam p){HookRuntime s=state(p.thisObject);if(s!=null&&!p.hasThrowable()){if(Boolean.TRUE.equals(p.getObjectExtra("hyperlux.manual")))s.persistentMemory.manualApplied();s.queuePublish();}}
             }));
-            added.add(XposedBridge.hookMethod(output,new XC_MethodHook(){protected void afterHookedMethod(MethodHookParam p){
+            added.add(XposedBridge.hookMethod(TraditionalAdapter.method(type,"clearUserDataPoints"),new XC_MethodHook(){protected void afterHookedMethod(MethodHookParam p){HookRuntime s=state(p.thisObject);if(s!=null&&!s.changing&&!p.hasThrowable())s.persistentMemory.afterReset();}}));
+            added.add(XposedBridge.hookMethod(output,new XC_MethodHook(){protected void beforeHookedMethod(MethodHookParam p){HookRuntime s=state(p.thisObject);if(s!=null)s.persistentMemory.maybeRestore();}protected void afterHookedMethod(MethodHookParam p){
                 if(p.hasThrowable())return;HookRuntime s=state(p.thisObject);if(s==null)return;
                 try{TraditionalAdapter a=(TraditionalAdapter)s.kernel;if(HookEntry.get(a.abc,"mCurrentBrightnessMapper")!=p.thisObject)return;
                     float br=(Float)p.getResult();if(!Float.isFinite(br)||br<0||br>1)return;

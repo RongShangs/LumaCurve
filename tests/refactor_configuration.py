@@ -31,10 +31,41 @@ public class ConfigHostTest{
   bad=clone(file);bad.getJSONObject("options").put("thermal_relax",1);bad(bad,s,c);bad=clone(file);bad.getJSONObject("options").put("memory_window",1000.5);bad(bad,s,c);bad=clone(file);bad.getJSONObject("options").put("curve_floor_nit",21);bad(bad,s,c);
   bad=clone(file);bad.getJSONObject("interface").put("refresh_seconds",1.5);bad(bad,s,c);bad=clone(file);bad.put("oversized",String.join("",Collections.nCopies(32769,"x")));bad(bad,s,c);
   check(c.getDouble("curve_floor_nit")==10&&s.getString("baseline_id").equals("basis"));
+  check(r.options.getBoolean("memory_persist"));check(r.options.getInt("memory_retention_days")==30);check(r.options.getInt("memory_max_points")==0);
+  JSONObject tuned=clone(file);tuned.getJSONObject("options").put("memory_persist",false).put("memory_retention_days",90).put("memory_max_points",7);
+  JSONObject traditional=clone(s).put("memory_point_capacity",1);r=ConfigurationFile.read(tuned.toString(),traditional,c);check(!r.options.getBoolean("memory_persist"));check(r.options.getInt("memory_retention_days")==90);check(r.options.getInt("memory_max_points")==1);check(r.notes.size()==1);
+  for(String key:new String[]{"memory_retention_days","memory_max_points"}){bad=clone(file);bad.getJSONObject("options").put(key,1.5);bad(bad,s,c);bad=clone(file);bad.getJSONObject("options").put(key,"1");bad(bad,s,c);}
+  bad=clone(file);bad.getJSONObject("options").put("memory_persist",1);bad(bad,s,c);
+  JSONObject wake=clone(file);wake.getJSONObject("options").put("memory_restore_unlock",false).put("memory_restore_settle",2500).put("memory_restore_ratio",.8).put("memory_reset_override",true).put("memory_timeout_override",true).put("memory_timeout_minutes",60);
+  r=ConfigurationFile.read(wake.toString(),s,c);check(!r.options.getBoolean("memory_reset_override")&&!r.options.getBoolean("memory_timeout_override"));check(!r.options.getBoolean("memory_restore_unlock"));check(r.options.getInt("memory_restore_settle")==2500);check(Math.abs(r.options.getDouble("memory_restore_ratio")-.8)<.0001);check(r.notes.size()==2);
+  JSONObject caps=clone(s).put("memory_reset_supported",true).put("memory_timeout_supported",true);r=ConfigurationFile.read(wake.toString(),caps,c);check(r.options.getBoolean("memory_reset_override")&&r.options.getBoolean("memory_timeout_override"));check(r.options.getInt("memory_timeout_minutes")==60);check(r.notes.isEmpty());
+  bad=clone(file);bad.getJSONObject("options").put("memory_reset_off_minutes",20).put("memory_reset_force_minutes",10);bad(bad,s,c);
+  bad=clone(file);bad.getJSONObject("options").put("memory_restore_settle",0);bad(bad,s,c);
+  bad=clone(file);bad.getJSONObject("options").put("memory_restore_same_scene","true");bad(bad,s,c);
+  JSONObject olderStable=clone(file);olderStable.getJSONObject("options").put("low_light_stability",true);ConfigurationFile.Imported older=ConfigurationFile.read(olderStable.toString(),s,c);check(older.options.getBoolean("low_light_stability"));check(!older.options.getBoolean("low_light_threshold"));
+  JSONObject stable=clone(file);stable.getJSONObject("options").put("low_light_stability",true).put("low_light_threshold",true).put("low_light_brighten_ratio",1.2).put("low_light_brighten_floor",15);
+  r=ConfigurationFile.read(stable.toString(),s,c);check(!r.options.getBoolean("low_light_threshold"));check(r.notes.size()==1);
+  JSONObject lowCaps=clone(s).put("low_light_threshold_supported",true);r=ConfigurationFile.read(stable.toString(),lowCaps,c);check(r.options.getBoolean("low_light_threshold"));check(r.options.getDouble("low_light_brighten_floor")==15);check(r.options.getDouble("low_light_brighten_ratio")==1.2);check(r.notes.isEmpty());
+  bad=clone(file);bad.getJSONObject("options").put("low_light_darken_ratio",1);bad(bad,s,c);bad=clone(file);bad.getJSONObject("options").put("low_light_threshold",1);bad(bad,s,c);
+  stable.getJSONObject("options").put("low_light_assist_gate",true).put("low_light_assist_wait",8000).put("low_light_assist_tolerance",.3);r=ConfigurationFile.read(stable.toString(),lowCaps,c);check(!r.options.getBoolean("low_light_assist_gate"));check(r.notes.size()==1);lowCaps.put("low_light_assist_gate_supported",true);r=ConfigurationFile.read(stable.toString(),lowCaps,c);check(r.options.getBoolean("low_light_assist_gate"));check(r.options.getLong("low_light_assist_wait")==8000);check(r.notes.isEmpty());
+  // Every quick choice must survive real config validation without touching other groups.
+  JSONObject presetCaps=clone(s).put("low_light_threshold_supported",true).put("low_light_assist_gate_supported",true);
+  JSONObject draft=ConfigurationFile.read(file.toString(),presetCaps,c).options;draft.put("memory_strength",.37).put("memory_max_points",3);
+  for(String group:new String[]{"low","outdoor","response","thermal","threshold_override","assist_override","animation_override","sunlight_override","touch_override"})for(int mode=0;mode<3;mode++){
+   JSONObject patch=SettingsPresets.patch(group,mode,presetCaps),next=SettingsPresets.merge(draft,patch);
+   check(draft.getDouble("memory_strength")==.37&&next.getDouble("memory_strength")==.37);check(next.getInt("memory_max_points")==3);check(next.getDouble("curve_floor_nit")==10);
+   Iterator<String> keys=draft.keys();while(keys.hasNext()){String key=keys.next();if(!patch.has(key))check(JSONObject.valueToString(draft.get(key)).equals(JSONObject.valueToString(next.get(key))));}
+   ConfigurationFile.Imported validated=ConfigurationFile.read(ConfigurationFile.export(next,presetCaps,true,2,true).toString(),presetCaps,c);check(validated.notes.isEmpty());
+   check(SettingsPresets.patch(group,0,new JSONObject()).length()>0);
+   try{SettingsPresets.patch(group,1,new JSONObject());throw new AssertionError("unsupported preset accepted");}catch(IllegalArgumentException expected){cases++;}
+  }
+  JSONObject withoutAux=clone(presetCaps).put("low_light_assist_gate_supported",false);check(!SettingsPresets.patch("low",1,withoutAux).getBoolean("low_light_assist_gate"));
+  check(!SettingsPresets.patch("outdoor",2,presetCaps).getBoolean("outdoor_hbm_tuning"));check(!SettingsPresets.patch("outdoor",2,presetCaps).getBoolean("outdoor_range_unlock"));
+  try{SettingsPresets.patch("unknown",1,presetCaps);throw new AssertionError();}catch(IllegalArgumentException expected){cases++;}
   System.out.println("Configuration migration: "+cases+" cases PASS; cross-version settings and curve identity, Android not tested");
  }
 }''',encoding='utf-8')
 classes=O/'classes';classes.mkdir(exist_ok=True)
-names=['ConfigurationFile','CurvePlan','AdvancedOptions','AdvancedPolicy','OutdoorOptions','ThermalPolicy','MemoryPolicy','DelayPolicy','LowLightPolicy','AppBuild']
+names=['ConfigurationFile','CurvePlan','AdvancedOptions','AdvancedPolicy','OutdoorOptions','ThermalPolicy','MemoryPolicy','MemoryOptions','DelayPolicy','LowLightPolicy','LowLightThresholds','LowLightAssistGate','SettingsPresets','AppBuild']
 subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(J),'-d',str(classes),*[str(S/(n+'.java')) for n in names],str(package/'RootControl.java'),str(package/'ConfigHostTest.java')],check=True)
 subprocess.run(['java','-cp',str(classes)+';'+str(J),'top.rongshangs.lumacurve.refactor.ConfigHostTest'],check=True)

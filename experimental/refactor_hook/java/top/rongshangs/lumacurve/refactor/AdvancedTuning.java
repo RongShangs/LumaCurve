@@ -34,22 +34,30 @@ final class AdvancedTuning {
                 added.add(XposedBridge.hookMethod(method,new XC_MethodHook(){protected void afterHookedMethod(MethodHookParam p){
                     if(p.hasThrowable())return;
                     synchronized(HookEntry.states){for(HookRuntime s:HookEntry.states.values()){
-                        if(thresholdScope.get()!=s||!s.advanced.enabled[0]||!s.onDisplayThread())continue;
+                        if(thresholdScope.get()!=s||(!s.advanced.enabled[0]&&!(s.lowLightEnabled&&s.lowThresholds.enabled))||!s.onDisplayThread())continue;
                         try{Object impl=HookEntry.get(s.owner,"mAutomaticBrightnessControllerImpl");if(HookEntry.get(impl,"mHysteresisLevelsImpl")!=p.thisObject)continue;
                             Object abc=HookEntry.get(impl,"mAutomaticBrightnessController");if(!s.normalTuningAllowed(abc,impl))return;
-                            float lux=(Float)p.args[0];if(!Float.isFinite(lux)||lux<0||lux>s.advanced.values[5])return;
+                            float lux=(Float)p.args[0];if(!Float.isFinite(lux)||lux<0)return;
+                            boolean custom=s.advanced.enabled[0]&&lux<=s.advanced.values[5];
+                            boolean guard=s.lowLightEnabled&&s.lowThresholds.enabled&&lux<=s.lowLightLimit&&s.lowLightApplies(abc,impl,lux);
+                            if(!custom&&!guard)return;
                             Object hbm=HookEntry.get(p.thisObject,"mHbmController");
                             if(hbm!=null){Object data=hbm.getClass().getMethod("getHbmData").invoke(hbm);if(data!=null){float minimum=HookRuntime.optionalNumber(data,"minimumLux");if(!Float.isFinite(minimum)||lux>=minimum)return;}}
                             float original=(Float)p.getResult();
-                            float next=AdvancedPolicy.threshold(lux,original,bright,(float)s.advanced.values[small?2:bright?0:1],small?0:(float)s.advanced.values[bright?3:4]);
+                            float next=applyThreshold(s,lux,original,bright,small,custom,guard);
                             // Keep the small-change threshold at or below the normal threshold.
-                            if(small){Method normal=cls.getDeclaredMethod("getBrighteningThreshold",float.class);next=Math.min(next,((Number)normal.invoke(p.thisObject,lux)).floatValue());}
-                            if(Float.compare(next,original)!=0){p.setResult(next);s.thresholdAdjustments++;}return;
+                            if(small){Method normal=cls.getDeclaredMethod("getBrighteningThreshold",float.class);float nativeNormal=((Number)XposedBridge.invokeOriginalMethod(normal,p.thisObject,new Object[]{lux})).floatValue();next=Math.min(next,applyThreshold(s,lux,nativeNormal,true,false,custom,guard));}
+                            if(Float.compare(next,original)!=0){p.setResult(next);s.thresholdAdjustments++;if(guard)s.lowLightThresholdAdjustments++;}return;
                         }catch(Throwable unavailable){return;}
                     }}
                 }}));
             }thresholds.add(cls);
         }catch(Throwable unavailable){for(XC_MethodHook.Unhook h:added)h.unhook();XposedBridge.log("HyperLux threshold options unavailable: "+unavailable);}
+    }
+    static float applyThreshold(HookRuntime s,float lux,float original,boolean bright,boolean small,boolean custom,boolean guard){
+        float next=custom?AdvancedPolicy.threshold(lux,original,bright,(float)s.advanced.values[small?2:bright?0:1],small?0:(float)s.advanced.values[bright?3:4]):original;
+        // Preserve OEM margins even if another custom setting would make them more sensitive.
+        return guard?s.lowThresholds.threshold(lux,bright?Math.max(original,next):Math.min(original,next),bright):next;
     }
     static void installAnimator(ClassLoader loader){
         try{Class<?> cls=Class.forName("com.android.server.display.RefactorAutoBrightnessAnimator",false,loader);if(animators.contains(cls))return;

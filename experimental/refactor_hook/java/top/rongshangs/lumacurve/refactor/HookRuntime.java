@@ -17,6 +17,8 @@ final class HookRuntime {
     final ThermalPolicy thermalGate=new ThermalPolicy();
     final OutdoorController outdoor=new OutdoorController(this);
     final MemoryPolicy memoryPolicy=new MemoryPolicy();
+    final MemoryPersistence persistentMemory=new MemoryPersistence(this);
+    final MemoryLifecycle memoryLifecycle=new MemoryLifecycle(this);
     final ArrayDeque<String> logs=new ArrayDeque<>();
     final PowerManager power;
     final PowerManager.OnThermalStatusChangedListener thermalListener;
@@ -30,8 +32,9 @@ final class HookRuntime {
     float memoryStrength=1;long memoryEvents,lastMemoryLog,lastManualAdjustment=-1;String lastReset="";
     boolean responseEnabled;long brightenDelay=1500,darkenDelay=5000,responseAdjustments,memoryWindow=1500;float memoryLuxRange=.3f,thermalCooling=1;
     boolean smallResponseEnabled;long smallBrightenDelay=5000,smallResponseAdjustments;
-    float lowLightLimit=50;long lowLightBrighten=3000,lowLightDarken=4000;boolean lowLightEnabled;long lowLightMainAdjustments,lowLightAssistAdjustments;
+    float lowLightLimit=50;long lowLightBrighten=3000,lowLightDarken=4000;boolean lowLightEnabled;long lowLightMainAdjustments,lowLightAssistAdjustments,lowLightThresholdAdjustments;LowLightThresholds lowThresholds=new LowLightThresholds();
     AdvancedOptions advanced=new AdvancedOptions();long thresholdAdjustments,assistAdjustments,animationAdjustments,sunlightAdjustments,touchAdjustments,delayWindowClamps;double lastAnimationSeconds;
+    final LowLightAssistGate assistGate=new LowLightAssistGate();
     long lastMainBrighten=-1,lastMainDarken=-1,lastMainSmall=-1,lastMainExtra;boolean probingScenes;
     final PipelineHistory pipelineHistory=new PipelineHistory();PipelineHistory.Frame traceFrame;
     final ArrayDeque<JSONObject> outputHistory=new ArrayDeque<>();
@@ -53,6 +56,8 @@ final class HookRuntime {
         power=(PowerManager)context.getSystemService(Context.POWER_SERVICE);
         thermalListener=level->{thermalSeverity=level;environmentChanged();};
         batteryListener=new BroadcastReceiver(){public void onReceive(Context c,Intent intent){
+            if(Intent.ACTION_SCREEN_OFF.equals(intent.getAction())){persistentMemory.screenOff();assistGate.reset();return;}
+            if(Intent.ACTION_SCREEN_ON.equals(intent.getAction())){persistentMemory.screenOn();return;}
             batteryTemperature=intent.hasExtra(BatteryManager.EXTRA_TEMPERATURE)?intent.getIntExtra(BatteryManager.EXTRA_TEMPERATURE,-1000)/10f:Float.NaN;
             environmentChanged();
         }};
@@ -64,18 +69,21 @@ final class HookRuntime {
     }
     void start(){
         try{
-            refreshUserIdentity();
+            refreshUserIdentity();memoryLifecycle.attach();
+            lastReset=Settings.Global.getString(context.getContentResolver(),"lumacurve_manual_memory_reset_v1");if(lastReset==null)lastReset="";
             context.getContentResolver().registerContentObserver(Settings.Global.getUriFor(CONFIG),false,observer);
             context.getContentResolver().registerContentObserver(Settings.Global.getUriFor(REFRESH),false,refresh);
             if(power!=null){thermalSeverity=power.getCurrentThermalStatus();power.addThermalStatusListener(command->handler.post(command),thermalListener);thermalRegistered=true;}
-            Intent initial=context.registerReceiver(batteryListener,new IntentFilter(Intent.ACTION_BATTERY_CHANGED),null,handler,Context.RECEIVER_EXPORTED);receiverRegistered=true;
+            IntentFilter batteryAndScreen=new IntentFilter(Intent.ACTION_BATTERY_CHANGED);batteryAndScreen.addAction(Intent.ACTION_SCREEN_OFF);batteryAndScreen.addAction(Intent.ACTION_SCREEN_ON);
+            Intent initial=context.registerReceiver(batteryListener,batteryAndScreen,null,handler,Context.RECEIVER_EXPORTED);receiverRegistered=true;
             if(initial!=null)batteryListener.onReceive(context,initial);
             InjectionStatus.write(context,"attached","已读取设备本地曲线："+kernel.name());
             log("系统曲线已连接："+kernel.name()+"；使用此设备本地基准");reload();
         }catch(Throwable error){fault(error);}
     }
     void close(){
-        closed=true;
+        persistentMemory.close();
+        closed=true;memoryLifecycle.close();
         try{context.getContentResolver().unregisterContentObserver(observer);context.getContentResolver().unregisterContentObserver(refresh);}catch(Throwable ignored){}
         try{if(receiverRegistered)context.unregisterReceiver(batteryListener);}catch(Throwable ignored){}
         try{if(thermalRegistered)power.removeThermalStatusListener(thermalListener);}catch(Throwable ignored){}
@@ -148,6 +156,7 @@ final class HookRuntime {
                     boolean thermal=config.optBoolean("thermal_relax",false);
                     float strength=(float)config.optDouble("memory_strength",1);MemoryPolicy.validate(strength);
                     long memoryMs=config.optLong("memory_window",1500);float memoryRange=(float)config.optDouble("memory_lux_range",.3);MemoryPolicy.validateGrouping(memoryMs,memoryRange);
+                    MemoryOptions memoryOptions=MemoryOptions.parse(config);JSONObject memoryCaps=new JSONObject();memoryLifecycle.put(memoryCaps);memoryOptions.verify(memoryCaps);
                     float cooling=(float)config.optDouble("thermal_cooling",1);ThermalPolicy.validateCooling(cooling);
                     long bright=config.optLong("brighten_delay",1500),dark=config.optLong("darken_delay",5000);DelayPolicy.validate(bright,dark);
                     long small=config.optLong("small_brighten_delay",5000);DelayPolicy.validateSmall(small);
@@ -157,6 +166,8 @@ final class HookRuntime {
                     if(config.optBoolean("response_override",false)&&!ResponseTuning.supported(owner))throw new IllegalArgumentException("确认时间接口暂未兼容");
                     if(config.optBoolean("small_brighten_override",false)&&!ResponseTuning.smallSupported(owner))throw new IllegalArgumentException("微小变亮接口暂未兼容");
                     if(config.optBoolean("low_light_stability",false)&&!LowLightTuning.supported(this))throw new IllegalArgumentException("暗光稳定接口尚未完整兼容");
+                    LowLightThresholds nextLowThresholds=LowLightThresholds.parse(config);nextLowThresholds.verify(config.optBoolean("low_light_stability",false),AdvancedTuning.supported(0,this));
+                    LowLightAssistGate nextAssistGate=new LowLightAssistGate();nextAssistGate.configure(config);if(config.optBoolean("low_light_stability",false)&&nextAssistGate.enabled&&!LowLightAssistEvidence.supported(this))throw new IllegalArgumentException("辅助光感暗光闸门接口暂未兼容");
                     if(thermal&&!HookEntry.thermalSupported.contains(owner.getClass()))throw new IllegalArgumentException("此固件的温控亮度接口尚未兼容");
                     float[] factors=CurvePlan.factors(config.getString("factors"));
                     float floor=CurvePlan.floor(config.has("curve_floor_nit")?config.opt("curve_floor_nit"):null);
@@ -169,15 +180,20 @@ final class HookRuntime {
                     smallBrightenDelay=small;smallResponseEnabled=config.optBoolean("small_brighten_override",false);
                     lowLightLimit=lowLimit;lowLightBrighten=lowBright;lowLightDarken=lowDark;
                     lowLightEnabled=config.optBoolean("low_light_stability",false);
+                    lowThresholds=nextLowThresholds;
+                    assistGate.configure(config);
                     if(lowLightEnabled&&!LowLightTuning.supported(this))throw new IllegalArgumentException("暗光稳定接口尚未完整兼容");
                     phase="active";outdoor.configure(outdoorOptions);message="自定义曲线已接入，官方光感和过渡动画继续运行";
+                    persistentMemory.configure(memoryOptions,curveChanged||!persistentMemory.options.persist&&memoryOptions.persist);
                     log(curveChanged?"曲线已应用，重新建立基础锚点":"设置已更新，保留当前手动锚点");
                 }else{
                     if(kernel.plan()!=null)kernel.configure(null);disableOverrides();memoryStrength=1;phase="attached";message="已恢复官方曲线与温控策略";log(message);
                 }
                 String reset=config.optString("reset_anchors","");
                 if(!reset.isEmpty()&&!reset.equals(lastReset)){
-                    kernel.clearMemory();lastReset=reset;memoryPolicy.reset();log("已清除本次系统曲线的手动锚点，保留基础曲线");
+                    persistentMemory.clear();kernel.clearMemory();memoryPolicy.reset();
+                    if(!Settings.Global.putString(context.getContentResolver(),"lumacurve_manual_memory_reset_v1",reset))throw new IllegalStateException("记忆清除确认写入失败");
+                    lastReset=reset;log("已清除当前与已保存的手动记忆，保留基础曲线");
                 }
             }
             consumed=0;lastLux=lastNit=Float.NaN;AdvancedTuning.refreshThresholds(this);thermalAllowed=relaxThermal();publish();requestRecalculation();
@@ -199,7 +215,7 @@ final class HookRuntime {
         handler.post(()->{if(closed)return;try{kernel.configure(null);}catch(Throwable ignored){}
             phase="error";message="接入异常，已尝试恢复官方："+error;log(message);publish();faultPending=false;});
     }
-    void disableOverrides(){outdoor.stop();thermalEnabled=false;responseEnabled=false;smallResponseEnabled=false;lowLightEnabled=false;memoryStrength=1;advanced=new AdvancedOptions();AdvancedTuning.restoreAnimation(this);AdvancedTuning.refreshThresholds(this);}
+    void disableOverrides(){assistGate.reset();outdoor.stop();thermalEnabled=false;responseEnabled=false;smallResponseEnabled=false;lowLightEnabled=false;memoryStrength=1;advanced=new AdvancedOptions();AdvancedTuning.restoreAnimation(this);AdvancedTuning.refreshThresholds(this);}
     boolean onDisplayThread(){return !closed&&Looper.myLooper()==handler.getLooper();}
     boolean normalTuningAllowed(Object abc,Object impl){
         if(closed||!phase.equals("active")||!appliesToUser())return false;
@@ -244,7 +260,7 @@ final class HookRuntime {
             status.put("curve_backend",kernel.name()).put("baseline_id",baselineId()).put("curve_coordinate",kernel.name().equals("refactor")?"logical_nit":"physical_nit")
                 .put("factory_full_lux",array(kernel.fullLux())).put("factory_full_nit",array(kernel.fullNit()));
             if(kernel instanceof TraditionalAdapter)status.put("user_identity_source",HookEntry.currentUser.source()).put("user_identity_ready",kernel.integer("mUserSerial")>=0);
-            status.put("memory_strength",memoryStrength).put("memory_events",memoryEvents);
+            status.put("memory_strength",memoryStrength).put("memory_events",memoryEvents);persistentMemory.put(status);
             Object good=kernel.get("mIsHaveGoodCurve");if(good!=null)status.put("good_curve_available",good);
             status.put("memory_window",memoryWindow).put("memory_lux_range",memoryLuxRange).put("thermal_cooling",thermalCooling)
                 .put("response_supported",ResponseTuning.supported(owner)).put("response_override",responseEnabled).put("brighten_delay",brightenDelay).put("darken_delay",darkenDelay).put("response_adjustments",responseAdjustments);
@@ -252,6 +268,8 @@ final class HookRuntime {
             status.put("low_light_supported",LowLightTuning.supported(this)).put("low_light_stability",lowLightEnabled)
                 .put("low_light_limit_lux",lowLightLimit).put("low_light_brighten_ms",lowLightBrighten).put("low_light_darken_ms",lowLightDarken)
                 .put("low_light_main_adjustments",lowLightMainAdjustments).put("low_light_assist_adjustments",lowLightAssistAdjustments);
+            lowThresholds.put(status);status.put("low_light_threshold_supported",AdvancedTuning.supported(0,this)).put("low_light_threshold_adjustments",lowLightThresholdAdjustments);
+            assistGate.put(status);status.put("low_light_assist_gate_supported",LowLightAssistEvidence.supported(this)).put("low_light_assist_gate_reason",assistGate.reason).put("low_light_assist_gate_holds",assistGate.holds).put("low_light_assist_gate_releases",assistGate.releases);
             JSONArray trace=new JSONArray();for(PipelineHistory.Frame f:pipelineHistory.snapshot())trace.put(traceJson(f));
             status.put("pipeline_trace",trace).put("output_trace",new JSONArray(outputHistory));
             PipelineHistory.Frame recent=pipelineHistory.last();if(recent!=null)status.put("last_pipeline",traceJson(recent));

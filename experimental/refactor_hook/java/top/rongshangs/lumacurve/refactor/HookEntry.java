@@ -83,22 +83,24 @@ public final class HookEntry implements IXposedHookLoadPackage {
                 added.add(XposedBridge.hookMethod(memory,new XC_MethodHook(){
                     protected void beforeHookedMethod(MethodHookParam p){
                         HookRuntime state=states.get(p.thisObject);
-                        if(state==null||state.closed||!state.phase.equals("active")||!state.appliesToUser()||Looper.myLooper()!=state.handler.getLooper())return;
+                        if(state==null||state.closed||state.changing||state.persistentMemory.replaying||!state.phase.equals("active")||!state.appliesToUser()||Looper.myLooper()!=state.handler.getLooper())return;
                         try{
                             if(!((Boolean)state.kernel.get("mUseAutoBrightness")))return;
                             state.lastManualAdjustment=SystemClock.uptimeMillis();
+                            state.persistentMemory.cancelRestore();
                             float lux=(Float)p.args[0],desired=(Float)p.args[1];
                             if(state.memoryStrength==0){p.setResult(null);state.memoryEvent(lux,desired,Float.NaN);return;}
                             float applied=desired;
                             if(state.memoryStrength<1)applied=state.memoryPolicy.remember(lux,desired,state.kernel.currentAt(lux),state.memoryStrength,SystemClock.elapsedRealtime());
-                            p.args[1]=applied;state.memoryEvent(lux,desired,applied);
+                            p.args[1]=applied;p.setObjectExtra("hyperlux.manual",Boolean.TRUE);state.memoryEvent(lux,desired,applied);
                         }catch(Throwable error){XposedBridge.log("LumaCurve memory left official: "+error);}
                     }
-                    protected void afterHookedMethod(MethodHookParam p){HookRuntime state=states.get(p.thisObject);if(state!=null&&!p.hasThrowable())state.queuePublish();}
+                    protected void afterHookedMethod(MethodHookParam p){HookRuntime state=states.get(p.thisObject);if(state!=null&&!p.hasThrowable()){if(Boolean.TRUE.equals(p.getObjectExtra("hyperlux.manual")))state.persistentMemory.manualApplied();state.queuePublish();}}
                 }));
                 // The adapter changes baseline fields, not private return values.
                 // OEM reset/interpolation code continues to run even when inlined.
-                added.add(XposedBridge.hookMethod(output,new XC_MethodHook(){protected void afterHookedMethod(MethodHookParam param){
+                added.add(XposedBridge.hookMethod(ref.getDeclaredMethod("resetDefaultSpline"),new XC_MethodHook(){protected void afterHookedMethod(MethodHookParam p){HookRuntime state=states.get(p.thisObject);if(state!=null&&state.onDisplayThread()&&!state.changing&&!p.hasThrowable())state.persistentMemory.afterReset();}}));
+                added.add(XposedBridge.hookMethod(output,new XC_MethodHook(){protected void beforeHookedMethod(MethodHookParam param){HookRuntime state=states.get(param.thisObject);if(state!=null&&state.onDisplayThread()&&Float.isNaN((Float)param.args[1])&&!((Boolean)param.args[2]))state.persistentMemory.maybeRestore();}protected void afterHookedMethod(MethodHookParam param){
                     HookRuntime state=states.get(param.thisObject);if(state==null||param.hasThrowable())return;
                     if(Float.isNaN((Float)param.args[1]) && !((Boolean)param.args[2]))
                         state.sample((Float)param.args[0],(Float)param.getResult());
