@@ -65,6 +65,7 @@ public final class RootControl implements AutoCloseable {
         JSONObject state=refreshedLive();
         String raw=settings.get(CONFIG);
         JSONObject out=new JSONObject().put("ok",true).put("connected",state!=null).put("fingerprint",Build.FINGERPRINT);
+        SystemVersion.read().put(out);
         JSONObject injection=validated("lumacurve_refactor_injection_v1");out.put("lsp_loaded",state!=null||injection!=null);
         if(injection!=null){out.put("injection",injection);if(state==null)out.put("hook_issue",injection.optString("stage")).put("hook_message",injection.optString("message"));}
         JSONArray legacy=new JSONArray();for(String[] module:LegacyModules.scan(new File("/data/adb/modules"),new File("/data/adb/modules_update")))legacy.put(new JSONObject().put("id",module[0]).put("name",module[1]).put("state",module[2]));out.put("legacy_modules",legacy);
@@ -137,6 +138,7 @@ public final class RootControl implements AutoCloseable {
         String decoded=new String(Base64.getDecoder().decode(encoded),StandardCharsets.UTF_8);
         JSONObject options=decoded.startsWith("{")?new JSONObject(decoded):new JSONObject().put("factors",decoded);
         String factors=options.getString("factors");
+        BrightnessControlOptions controls=BrightnessControlOptions.parse(options);controls.verify(state);
         AdvancedOptions advanced=AdvancedOptions.parse(options);advanced.verify(state);
         OutdoorOptions outdoor=OutdoorOptions.parse(options);outdoor.verify(state);
         boolean thermal=options.optBoolean("thermal_relax",false);float ceiling=(float)options.optDouble("thermal_ceiling",43);ThermalPolicy.validate(ceiling);
@@ -171,7 +173,7 @@ public final class RootControl implements AutoCloseable {
         config.put("low_light_stability",lowLight).put("low_light_limit",lowLimit).put("low_light_brighten",lowBright).put("low_light_darken",lowDark);
         lowThresholds.put(config);
         assistGate.put(config);
-        advanced.put(config);outdoor.put(config);config.put("curve_floor_nit",floor);
+        advanced.put(config);outdoor.put(config);controls.put(config);config.put("curve_floor_nit",floor);
         try {
             prepare();
             progress("提交小米基础曲线并等待系统确认…");
@@ -194,7 +196,12 @@ public final class RootControl implements AutoCloseable {
         }
     }
     JSONObject stop()throws Exception {
-        boolean connected=live()!=null;
+        NativePanelRoot.stop();boolean connected=live()!=null;
+        if(!connected){String marker=settings.get("hyperlux_brightness_owner_v1");if(marker!=null){JSONObject ownership=new JSONObject(marker);
+            if("dark".equals(ownership.optString("owner"))&&ownership.optInt("user",-1)==0&&ownership.optBoolean("was_auto")&&"0".equals(settings.getSystem("screen_brightness_mode")))
+                if(!settings.putSystem("screen_brightness_mode","1"))throw new IOException("未能恢复暗光锁定前的自动亮度");
+            settings.put("hyperlux_brightness_owner_v1",null);
+        }}
         String revision=UUID.randomUUID().toString();
         JSONObject disabled=new JSONObject().put("schema",1).put("enabled",false).put("revision",revision);
         if(!settings.put(CONFIG,disabled.toString()))throw new IOException("关闭请求保存失败");
@@ -215,10 +222,13 @@ public final class RootControl implements AutoCloseable {
                 if(runtime!=null){
                     JSONArray pipeline=runtime.optJSONArray("pipeline_trace"),output=runtime.optJSONArray("output_trace");
                     JSONObject outdoorState=runtime.optJSONObject("outdoor");write(zip,"outdoor-state.json",outdoorState==null?"{}":outdoorState.toString(2));write(zip,"outdoor-limit-trace.json",outdoorState==null?"[]":outdoorState.optJSONArray("limit_trace")==null?"[]":outdoorState.getJSONArray("limit_trace").toString(2));
+                    try{write(zip,"main-panel-node.json",NativePanelRoot.status().toString(2));}catch(Exception unavailable){write(zip,"main-panel-node.json",new JSONObject().put("error",unavailable.toString()).toString());}write(zip,"brightness-control-state.json",runtime.optJSONObject("brightness_control")==null?"{}":runtime.getJSONObject("brightness_control").toString(2));write(zip,"brightness-control-owner.json",String.valueOf(settings.get("hyperlux_brightness_owner_v1")));write(zip,"brightness-control-ack.json",String.valueOf(settings.get("hyperlux_brightness_ack_v1")));
                     write(zip,"pipeline-trace.json",pipeline==null?"[]":pipeline.toString(2));write(zip,"output-trace.json",output==null?"[]":output.toString(2));
                     write(zip,"trace-readme.txt","Pipeline records group stages from ONE updateAutoBrightness call. Values are framework brightness coordinates (0..1), not nit or percent. Missing fields mean unobserved, not disabled.\nOutput records are separate later calls, not automatically attributed to a calculation. Use uptime_ms within this boot, or unix_ms for wall time. Sensor readings are OEM filtered readings, not raw samples.\nBounded history: latest 24 calculations and 16 output calls.\n");
                 }
-                write(zip,"config.json",String.valueOf(settings.get(CONFIG)));write(zip,"manual-memory.json",String.valueOf(settings.get(PersistentMemory.KEY)));write(zip,"stored-hook-status.json",String.valueOf(settings.get(STATUS)));write(zip,"configuration-ack.json",String.valueOf(settings.get(ACK)));File controlError=new File(DATA,"last-control-error.txt");if(controlError.isFile()&&controlError.length()<=16384)write(zip,"last-control-error.txt",new String(Files.readAllBytes(controlError.toPath()),StandardCharsets.UTF_8));write(zip,"injection.json",String.valueOf(settings.get("lumacurve_refactor_injection_v1")));write(zip,"build.txt",BUILD+"\n"+Build.FINGERPRINT+"\n");
+                write(zip,"config.json",String.valueOf(settings.get(CONFIG)));write(zip,"manual-memory.json",String.valueOf(settings.get(PersistentMemory.KEY)));write(zip,"stored-hook-status.json",String.valueOf(settings.get(STATUS)));write(zip,"configuration-ack.json",String.valueOf(settings.get(ACK)));File controlError=new File(DATA,"last-control-error.txt");if(controlError.isFile()&&controlError.length()<=16384)write(zip,"last-control-error.txt",new String(Files.readAllBytes(controlError.toPath()),StandardCharsets.UTF_8));write(zip,"injection.json",String.valueOf(settings.get("lumacurve_refactor_injection_v1")));for(String f:new String[]{"main-panel-permissions","main-panel.log","last-panel-error.txt"}){optionalFile(zip,f,new File(DATA,f),65536);}
+                for(String f:new String[]{"hyperlux-main-panel-lease","hyperlux-main-panel-health"}){optionalFile(zip,f,new File("/data/system",f),1024);}
+                write(zip,"build.txt",BUILD+"\n"+Build.FINGERPRINT+"\n");
                 new DiagnosticCollector(zip,settings::getSystem).collect();
                 progress("8/8 完成压缩并校验分析包…");
             }
@@ -226,6 +236,12 @@ public final class RootControl implements AutoCloseable {
             try(ZipFile check=new ZipFile(partial)){byte[] buffer=new byte[65536];Enumeration<? extends ZipEntry> entries=check.entries();while(entries.hasMoreElements()){ZipEntry entry=entries.nextElement();CRC32 crc=new CRC32();long size=0;try(InputStream in=check.getInputStream(entry)){int count;while((count=in.read(buffer))!=-1){crc.update(buffer,0,count);size+=count;}}if(crc.getValue()!=entry.getCrc()||size!=entry.getSize())throw new IOException("分析包校验失败："+entry.getName());}}
             Files.move(partial.toPath(),file.toPath());return file.toString();
         }catch(Exception failure){partial.delete();throw failure;}
+    }
+    static void optionalFile(ZipOutputStream zip,String name,File source,long limit)throws IOException{
+        String content;
+        try{if(!source.isFile()||source.length()>limit)return;content=new String(Files.readAllBytes(source.toPath()),StandardCharsets.UTF_8);}
+        catch(IOException disappeared){content="Unavailable during capture: "+disappeared;}
+        write(zip,name,content);
     }
     static void write(ZipOutputStream zip,String name,String data)throws IOException{zip.putNextEntry(new ZipEntry(name));zip.write(data.getBytes(StandardCharsets.UTF_8));zip.closeEntry();}
     static float[] numbers(JSONArray array)throws JSONException {float[] out=new float[array.length()];for(int i=0;i<out.length;i++)out[i]=(float)array.getDouble(i);return out;}
@@ -247,8 +263,62 @@ public final class RootControl implements AutoCloseable {
         }
         return result;
     }
+    JSONObject brightness(String payload)throws Exception {
+        JSONObject state=live();if(state==null)throw new IOException("尚未连接系统亮度接口，请检查 LSPosed 并重启");
+        if(payload.length()>2048)throw new IOException("亮度请求过长");JSONObject request=new JSONObject(new String(Base64.getDecoder().decode(payload),StandardCharsets.UTF_8));
+        String id=UUID.randomUUID().toString();request.put("id",id).put("build",BUILD).put("process_start",state.getString("process_start")).put("elapsed",android.os.SystemClock.elapsedRealtime());
+        if(!settings.put("hyperlux_brightness_request_v1",request.toString()))throw new IOException("亮度请求提交失败");
+        for(int i=0;i<120;i++){String raw=settings.get("hyperlux_brightness_ack_v1");if(raw!=null){JSONObject ack=new JSONObject(raw);if(id.equals(ack.optString("id")))return ack;}Thread.sleep(25);}
+        throw new IOException("系统尚未确认亮度请求，请重新打开面板");
+    }
+    JSONObject rawPanel(String payload)throws Exception{
+        String step="读取主屏状态";
+        try{
+        JSONObject request=new JSONObject(new String(Base64.getDecoder().decode(payload),StandardCharsets.UTF_8));
+        String action=request.getString("action");
+        if(action.equals("status"))return new JSONObject().put("ok",true).put("node",NativePanelRoot.status()).put("runtime",refreshedLive());
+        String token=request.getString("session");if(!token.matches("[A-Za-z0-9_-]{1,80}"))throw new IOException("面板会话无效");
+        if(action.equals("restore")){
+            step="停止守护并释放节点";NativePanelRoot.stop();
+            if(((Number)Class.forName("android.app.ActivityManager").getMethod("getCurrentUser").invoke(null)).intValue()!=0)throw new IOException("请切回主用户");
+            request.put("action","raw_restore");try{brightness(Base64.getEncoder().encodeToString(request.toString().getBytes(StandardCharsets.UTF_8)));}catch(Exception unavailable){}
+            if(!settings.putSystem("screen_brightness_mode","1"))throw new IOException("系统未确认自动亮度模式");
+            return new JSONObject().put("ok",true).put("node",NativePanelRoot.status()).put("runtime",refreshedLive());
+        }
+        int value=request.getInt("value");if(request.getDouble("value")!=value)throw new IOException("请输入整数节点值");
+        JSONObject node=NativePanelRoot.status();if(!node.optBoolean("supported")||value<10||value>node.getInt("maximum"))throw new IOException("主屏节点值超出范围");
+        if(action.equals("begin")){step="启动主屏原生守护";NativePanelRoot.start();}else if(!action.equals("set"))throw new IOException("未知节点操作");
+        request.put("action",action.equals("begin")?"raw_begin":"raw_validate");
+        step=action.equals("begin")?"关闭自动亮度并取得系统许可":"确认当前接管会话";
+        JSONObject ack=brightness(Base64.getEncoder().encodeToString(request.toString().getBytes(StandardCharsets.UTF_8)));
+        if(!ack.optBoolean("ok"))throw new IOException(ack.optString("message","系统未确认接管"));
+        try{
+            if(!"0".equals(settings.getSystem("screen_brightness_mode")))throw new IOException("系统自动亮度仍开启，未写节点");
+            step="传递节点接管许可";
+            if(action.equals("begin")){
+                NativePanelClient.require("ARM "+token+" "+live().getInt("pid"));
+                request.put("action","raw_ready");JSONObject ready=brightness(Base64.getEncoder().encodeToString(request.toString().getBytes(StandardCharsets.UTF_8)));
+                if(!ready.optBoolean("ok"))throw new IOException(ready.optString("message","系统未确认输出隔离"));ack=ready;
+            }
+            step="写入主屏节点并读回";
+            JSONObject result=NativePanelClient.call("SET "+token+" "+value);
+            if(!result.optBoolean("ok"))throw new IOException("主屏节点写入失败："+result.optString("reason")+" errno="+result.optInt("errno"));
+            JSONObject snapshot=live();if(snapshot!=null&&ack.optJSONObject("state")!=null){JSONObject control=ack.getJSONObject("state");snapshot.put("brightness_control",control).put("auto_mode",control.optBoolean("auto"));}
+            return new JSONObject().put("ok",true).put("node",NativePanelRoot.status()).put("runtime",snapshot);
+        }catch(Exception failure){
+            request.put("action","raw_abort");try{brightness(Base64.getEncoder().encodeToString(request.toString().getBytes(StandardCharsets.UTF_8)));}catch(Exception ignored){}
+            try{NativePanelClient.require("STOP "+token);}catch(Exception ignored){}throw failure;
+        }
+        }catch(Exception failure){
+            String detail="主屏操作失败（"+step+"）："+failure.getMessage();
+            try{Files.write(new File(DATA,"last-panel-error.txt").toPath(),(new Date()+"\n"+detail+"\n"+failure).getBytes(StandardCharsets.UTF_8));}catch(Exception ignored){}
+            throw new IOException(detail,failure);
+        }
+    }
     JSONObject execute(String command,String payload)throws Exception{
         if(command.equals("inspect"))return inspect();
+        if(command.equals("raw-panel")&&payload!=null)return rawPanel(payload);
+        if(command.equals("brightness")&&payload!=null)return brightness(payload);
         if(command.equals("export-config")&&payload!=null){byte[] raw=Base64.getDecoder().decode(payload);if(raw.length>ConfigurationFile.LIMIT)throw new IOException("配置文件过大");JSONObject document=new JSONObject(new String(raw,StandardCharsets.UTF_8));if(!ConfigurationFile.FORMAT.equals(document.optString("format"))||document.getInt("schema")!=2||!document.has("options"))throw new IOException("不是兼容的 HyperLux 配置文件");byte[] bytes=document.toString(2).getBytes(StandardCharsets.UTF_8);if(bytes.length>ConfigurationFile.LIMIT)throw new IOException("配置文件过大");File file=new File("/sdcard","HyperLux-config-"+new SimpleDateFormat("yyyyMMdd-HHmmss",Locale.ROOT).format(new Date())+"-"+UUID.randomUUID().toString().substring(0,8)+".json");Files.createFile(file.toPath());try(FileOutputStream output=new FileOutputStream(file)){output.write(bytes);output.getFD().sync();}catch(Exception failure){file.delete();throw failure;}return new JSONObject().put("ok",true).put("path",file.getAbsolutePath());}
         if(command.equals("legacy-preferences"))return legacyPreferences();
         if(command.equals("export"))return new JSONObject().put("ok",true).put("path",export());

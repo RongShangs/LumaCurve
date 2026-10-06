@@ -1,4 +1,4 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="top.rongshangs.lumacurve" android:versionCode="22000" android:versionName="2.2.0">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="top.rongshangs.lumacurve" android:versionCode="23004" android:versionName="2.3.0">
     <uses-sdk android:minSdkVersion="34" android:targetSdkVersion="34"/>
     <uses-permission android:name="android.permission.INTERNET"/>
     <application android:label="HyperLux" android:theme="@style/AppTheme" android:icon="@drawable/icon" android:roundIcon="@drawable/icon" android:allowBackup="false" android:supportsRtl="true">
@@ -6,8 +6,12 @@
         <meta-data android:name="xposeddescription" android:resource="@string/module_description"/>
         <meta-data android:name="xposedminversion" android:value="82"/>
         <meta-data android:name="xposedscope" android:resource="@array/xposed_scope"/>
-        <activity android:name="top.rongshangs.lumacurve.refactor.MainActivity" android:exported="true" android:windowSoftInputMode="adjustNothing">
+        <activity android:name="top.rongshangs.lumacurve.refactor.MainActivity" android:exported="true" android:launchMode="singleTop" android:windowSoftInputMode="adjustNothing">
             <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
         </activity>
+        <activity android:name="top.rongshangs.lumacurve.refactor.BrightnessPanelActivity" android:exported="false" android:theme="@style/BrightnessPopupTheme" android:launchMode="singleTop" android:excludeFromRecents="true" android:taskAffinity=""/>
+        <service android:name="top.rongshangs.lumacurve.refactor.BrightnessTileService" android:label="@string/brightness_tile_label" android:icon="@drawable/brightness_tile" android:exported="true" android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter><action android:name="android.service.quicksettings.action.QS_TILE"/></intent-filter>
+        </service>
     </application>
 </manifest>

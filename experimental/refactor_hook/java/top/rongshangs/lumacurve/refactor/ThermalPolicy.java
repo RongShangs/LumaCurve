@@ -7,8 +7,8 @@ public final class ThermalPolicy {
     public static void validateCooling(float value){if(!Float.isFinite(value)||value<1||value>3)throw new IllegalArgumentException("温控冷却幅度应在 1～3℃");}
     public void configure(float value){validateCooling(value);if(cooling!=value)permitted=false;cooling=value;}
     public static void validate(float ceiling) {
-        if(!Float.isFinite(ceiling)||ceiling<38||ceiling>45)
-            throw new IllegalArgumentException("温控恢复阈值应在 38～45℃");
+        if(!Float.isFinite(ceiling)||ceiling<38||ceiling>50)
+            throw new IllegalArgumentException("温控恢复阈值应在 38～50℃");
     }
     public boolean evaluate(boolean enabled,boolean supported,int severity,float battery,float ceiling) {
         validate(ceiling);

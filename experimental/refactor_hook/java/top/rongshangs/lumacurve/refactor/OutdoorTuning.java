@@ -4,7 +4,7 @@ import java.lang.reflect.*;
 import java.util.*;
 import de.robv.android.xposed.*;
 
-/** Targets enter BEFORE downstream caps and animation. All driver/thermal/power limits remain. */
+/** Targets enter BEFORE downstream caps and animation. Driver/thermal/power limits remain; optional OPR relaxation is scoped to strong auto SDR. */
 final class OutdoorTuning {
     static final Set<Class<?>> owners=new HashSet<>(),ranges=new HashSet<>(),peaks=new HashSet<>(),dynamicRanges=new HashSet<>();
     static HookRuntime state(Object hbm){synchronized(HookEntry.states){for(HookRuntime s:HookEntry.states.values())if(s.onDisplayThread())try{if(HookEntry.get(s.owner,"mHbmController")==hbm)return s;}catch(Throwable ignored){}}return null;}
@@ -37,12 +37,13 @@ final class OutdoorTuning {
             try{Method peak=HbmAccess.method(owner,"getMaxHbmBrightnessForPeak",float.class);XposedBridge.hookMethod(peak,new XC_MethodHook(){protected void afterHookedMethod(MethodHookParam p){if(p.hasThrowable())return;HookRuntime s=HookEntry.ownerState(p.thisObject);if(s==null||!s.onDisplayThread()||!s.outdoor.rangeAllowed())return;
                 try{float before=(Float)p.getResult(),max=s.outdoor.access.max();if(OutdoorPolicy.valid(before)&&OutdoorPolicy.valid(max)&&max>before){p.setResult(max);s.outdoor.stage("outdoor_peak_range",before,max);}}catch(Throwable unknown){}
             }});peaks.add(owner);}catch(Throwable optional){XposedBridge.log("HyperLux outdoor peak range unavailable: "+optional);}
-            // Read-only per-stage causes, including caps a curve cannot bypass.
+            // Read-only per-stage causes; optional OPR relaxation reports its native cap separately.
             for(String name:new String[]{"adjustBrightnessByOpr","adjustBrightnessByThermal","adjustBrightnessByBattery","adjustBrightnessByPowerSaveMode","adjustBrightnessToPeak","adjustBrightnessByBcbc","adjustSdrBrightness"})
                 for(Method m:owner.getDeclaredMethods())if(m.getName().equals(name)&&m.getReturnType()==float.class&&m.getParameterTypes().length>0&&m.getParameterTypes()[0]==float.class){
                     final String stage=name;XposedBridge.hookMethod(m,new XC_MethodHook(){protected void beforeHookedMethod(MethodHookParam p){if(stage.equals("adjustSdrBrightness")){HookRuntime s=HookEntry.ownerState(p.thisObject);if(s!=null)s.outdoor.tick();}}
                         protected void afterHookedMethod(MethodHookParam p){if(p.hasThrowable())return;HookRuntime s=HookEntry.ownerState(p.thisObject);if(s!=null&&s.onDisplayThread())s.outdoor.stage(stage,(Float)p.args[0],(Float)p.getResult());}});
                 }
+            OutdoorOpr.install(owner);
         }catch(Throwable unavailable){for(XC_MethodHook.Unhook h:hooks)h.unhook();XposedBridge.log("HyperLux outdoor interface unavailable: "+unavailable);}
     }
 }

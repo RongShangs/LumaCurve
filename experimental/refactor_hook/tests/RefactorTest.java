@@ -80,7 +80,9 @@ public final class RefactorTest {
         check(!gate.evaluate(true,true,3,40,43));check(!gate.evaluate(true,true,0,42.8f,43));
         check(gate.evaluate(true,true,0,42,43));check(!gate.evaluate(true,true,0,43,43));
         check(!gate.evaluate(true,true,0,42.5f,43));check(gate.evaluate(true,true,0,41.9f,43));
-        bad(()->ThermalPolicy.validate(46));bad(()->ThermalPolicy.validate(37));bad(()->ThermalPolicy.validate(Float.NaN));
+        bad(()->ThermalPolicy.validate(50.1f));bad(()->ThermalPolicy.validate(37));bad(()->ThermalPolicy.validate(Float.NaN));
+        ThermalPolicy.validate(50);check(gate.evaluate(true,true,0,48,50));check(gate.evaluate(true,true,2,49.9f,50));
+        check(!gate.evaluate(true,true,0,50,50));check(!gate.evaluate(true,true,0,49.5f,50));check(gate.evaluate(true,true,0,49,50));check(!gate.evaluate(true,true,3,48,50));
         MemoryPolicy memory=new MemoryPolicy();
         check(memory.remember(30,200,100,.25f,1000)==125);
         // Many callbacks in one drag must not compound into an unintended full-strength update.

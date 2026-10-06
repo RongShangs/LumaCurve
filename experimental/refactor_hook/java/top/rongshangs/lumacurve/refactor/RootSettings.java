@@ -46,6 +46,10 @@ final class RootSettings implements AutoCloseable {
         request("PUT_global",name,extras);
         return Objects.equals(value,get(name));
     }
+    boolean putSystem(String name,String value)throws Exception {
+        Bundle extras=new Bundle();extras.putString("value",value);request("PUT_system",name,extras);
+        return Objects.equals(value,getSystem(name));
+    }
     private void release()throws Exception {call(manager,"removeContentProviderExternalAsUser",new Class<?>[]{String.class,IBinder.class,int.class},"settings",token,0);}
     public void close()throws Exception {release();}
 }

@@ -27,7 +27,7 @@ args.out.mkdir(parents=True, exist_ok=True)
 names = {'HighBrightnessModeController', 'HighBrightnessModeMetadata', 'HbmEvent', 'BrightnessRangeController',
          'DisplayPowerController', 'DisplayPowerControllerImpl', 'AutomaticBrightnessController',
          'AutomaticBrightnessControllerImpl', 'DisplayDeviceConfig', 'HighBrightnessModeData',
-         'BrightnessRangeControllerImpl', 'NormalBrightnessModeController', 'BrightnessThrottler', 'BrightnessClamperController', 'BrightnessThermalClamper', 'BrightnessPowerClamper'}
+         'BrightnessRangeControllerImpl', 'NormalBrightnessModeController', 'BrightnessThrottler', 'BrightnessClamperController', 'BrightnessThermalClamper', 'BrightnessPowerClamper', 'BrightnessReason'}
 for jar in sorted(args.firmware.rglob('*.jar')):
     if jar.name not in {'services.jar', 'miui-services.jar'}:
         continue

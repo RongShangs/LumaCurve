@@ -34,13 +34,16 @@ sources={
  public void resetHbmData(){XposedBridge.invoke(this,"resetHbmData",new Class<?>[]{},new Object[]{},()->null);}public void updateHbmMode(){XposedBridge.invoke(this,"updateHbmMode",new Class<?>[]{},new Object[]{},()->null);}
 }''',
 'com/android/server/display/AutomaticBrightnessControllerImpl.java':'''package com.android.server.display;import de.robv.android.xposed.XposedBridge;public class AutomaticBrightnessControllerImpl {public AutomaticBrightnessController mAutomaticBrightnessController=new AutomaticBrightnessController();public boolean mIsOverrideDragPolicy=false;public float getOverrideLimitBrightness(float b,boolean manual,float lux){return (Float)XposedBridge.invoke(this,"getOverrideLimitBrightness",new Class<?>[]{float.class,boolean.class,float.class},new Object[]{b,manual,lux},()->b);}}''',
-'com/android/server/display/brightness/BrightnessReason.java':'''package com.android.server.display.brightness;public class BrightnessReason {}''',
+'com/android/server/display/brightness/BrightnessReason.java':'''package com.android.server.display.brightness;public class BrightnessReason {int modifiers;public void addModifier(int m){modifiers|=m;}public int getModifier(){return modifiers;}public void setModifier(int m){modifiers=m;}}''',
 'com/android/server/display/DisplayPowerControllerImpl.java':'''package com.android.server.display;import de.robv.android.xposed.XposedBridge;import com.android.server.display.brightness.*;public class DisplayPowerControllerImpl{
- public DisplayPowerController mDisplayPowerController=new DisplayPowerController();public HighBrightnessModeController mHbmController=new HighBrightnessModeController();public AutomaticBrightnessControllerImpl mAutomaticBrightnessControllerImpl=new AutomaticBrightnessControllerImpl();public float thermal=.7f,battery=1,power=1;public int animationCalls;
+ public DisplayPowerController mDisplayPowerController=new DisplayPowerController();public HighBrightnessModeController mHbmController=new HighBrightnessModeController();public AutomaticBrightnessControllerImpl mAutomaticBrightnessControllerImpl=new AutomaticBrightnessControllerImpl();public float thermal=.7f,battery=1,power=1;public int animationCalls;public float opr=1;public boolean mAutoBrightnessEnable=true,hdrScene,privacy,throwPrivacy,throwSdr;
  public float getMaxHbmBrightnessForPeak(){return (Float)XposedBridge.invoke(this,"getMaxHbmBrightnessForPeak",new Class<?>[]{},new Object[]{},()->.85f);}
+ private boolean shouldUsePrivacyOprBrightness(){if(throwPrivacy)throw new IllegalStateException("privacy unavailable");return privacy;}
+ private boolean isHdrScene(){return hdrScene;}
+ public float adjustBrightnessByOpr(float b,BrightnessReason reason){return (Float)XposedBridge.invoke(this,"adjustBrightnessByOpr",new Class<?>[]{float.class,BrightnessReason.class},new Object[]{b,reason},()->{if(b>opr)reason.addModifier(8192);return Math.min(b,opr);});}
  private float adjustBrightnessByThermal(float b,boolean hdr,BrightnessReason reason){return (Float)XposedBridge.invoke(this,"adjustBrightnessByThermal",new Class<?>[]{float.class,boolean.class,BrightnessReason.class},new Object[]{b,hdr,reason},()->Math.min(b,thermal));}
  private float adjustBrightnessByBattery(float b,BrightnessReason reason){return (Float)XposedBridge.invoke(this,"adjustBrightnessByBattery",new Class<?>[]{float.class,BrightnessReason.class},new Object[]{b,reason},()->Math.min(b,battery));}
- public float adjustSdrBrightness(float b,boolean auto,BrightnessReason reason,boolean fast,boolean dim){return (Float)XposedBridge.invoke(this,"adjustSdrBrightness",new Class<?>[]{float.class,boolean.class,BrightnessReason.class,boolean.class,boolean.class},new Object[]{b,auto,reason,fast,dim},()->{float out=Math.min(b,getMaxHbmBrightnessForPeak());out=adjustBrightnessByThermal(out,false,reason);out=adjustBrightnessByBattery(out,reason);animationCalls++;return out;});}
+ public float adjustSdrBrightness(float b,boolean auto,BrightnessReason reason,boolean fast,boolean dim){return (Float)XposedBridge.invoke(this,"adjustSdrBrightness",new Class<?>[]{float.class,boolean.class,BrightnessReason.class,boolean.class,boolean.class},new Object[]{b,auto,reason,fast,dim},()->{float out=adjustBrightnessByOpr(dim?Math.min(b,.4f):b,reason);if(throwSdr)throw new IllegalStateException("SDR failed");out=Math.min(out,getMaxHbmBrightnessForPeak());out=Math.min(out,power);out=adjustBrightnessByThermal(out,false,reason);out=adjustBrightnessByBattery(out,reason);animationCalls++;return out;});}
 }''',
 'top/rongshangs/lumacurve/refactor/OutdoorTest.java':r'''package top.rongshangs.lumacurve.refactor;
 import org.json.*;import com.android.server.display.*;import com.android.server.display.config.*;import com.android.server.display.brightness.*;import android.os.*;
@@ -78,9 +81,53 @@ public class OutdoorTest{static int count;static void check(boolean b){if(!b)thr
   owner.mAutomaticBrightnessControllerImpl.getOverrideLimitBrightness(.3f,true,30000);eq(owner.mAutomaticBrightnessControllerImpl.getOverrideLimitBrightness(.3f,false,30000),.3f);s.handler.advance(SystemClock.now+600000);eq(owner.mAutomaticBrightnessControllerImpl.getOverrideLimitBrightness(.3f,false,30000),.3f);
   s.screen=false;s.outdoor.tick();s.screen=true;s.outdoor.tick();s.handler.advance(SystemClock.now+3000);check(s.outdoor.policy.active);long deadline=s.outdoor.policy.started+180000;s.handler.advance(deadline);check(!s.outdoor.policy.active&&s.outdoor.policy.reason.equals("cooldown"));
   s.outdoor.stop();owner.mHbmController.mHbmControllerIsEnabled=false;owner.mHbmController.mIsAutoBrightnessEnabled=false;check(!h.tunable());activate(s);check(s.outdoor.status().has("controller_managed"));check(!s.outdoor.status().has("hbm_remaining_estimate_ms"));owner.mHbmController.mHbmControllerIsEnabled=true;owner.mHbmController.mIsAutoBrightnessEnabled=true;
+  // A full-strength auto target uses the mapping range, but downstream safety caps still run.
+  s.outdoor.stop();config=enabled();config.flags[2]=true;config.values[5]=1;int recalcBefore=s.recalculations;s.outdoor.configure(config);s.handler.advance(SystemClock.now+3000);check(s.recalculations>recalcBefore);
+  eq(owner.mAutomaticBrightnessControllerImpl.getOverrideLimitBrightness(.3f,false,30000),1);eq(owner.mHbmController.getCurrentBrightnessMax(),1);eq(dynamic.getCurrentBrightnessMax(owner.mHbmController),1);eq(owner.getMaxHbmBrightnessForPeak(),1);
+  eq(owner.adjustSdrBrightness(1,true,new BrightnessReason(),false,false),.7f);owner.mHbmController.mIsTimeAvailable=false;eq(owner.mAutomaticBrightnessControllerImpl.getOverrideLimitBrightness(.3f,false,30000),.6f);owner.mHbmController.mIsTimeAvailable=true;
+  recalcBefore=s.recalculations;s.handler.advance(s.outdoor.policy.started+180000);check(!s.outdoor.policy.active&&s.recalculations>recalcBefore);eq(owner.mHbmController.getCurrentBrightnessMax(),.85f);eq(owner.mAutomaticBrightnessControllerImpl.getOverrideLimitBrightness(.3f,false,30000),.3f);
   s.outdoor.stop();config=enabled();config.flags[1]=true;s.outdoor.configure(config);HighBrightnessModeData external=new HighBrightnessModeData(25000,.5f,600000,120000,30000,false,.5f,null,null,true);owner.mHbmController.mHbmData=external;s.outdoor.stop();check(owner.mHbmController.mHbmData==external);
   h=s.outdoor.binding();owner.mHbmController.mHighBrightnessModeMetadata.events.add(new HbmEvent(1000,2000));long now=SystemClock.now;check(h.remaining(now)==120000);check(owner.mHbmController.mHighBrightnessModeMetadata.events.size()==1);owner.mHbmController.mHighBrightnessModeMetadata.start=now-10000;check(h.remaining(now)==110000);owner.mHbmController.mHighBrightnessModeMetadata.start=now+100;check(h.remaining(now)==-1);
   s.outdoor.stop();config=enabled();config.flags[1]=true;owner.mHbmController.throwing=true;s.outdoor.configure(config);s.handler.advance(SystemClock.now+3000);check(s.outdoor.policy.reason.equals("error"));check(owner.mHbmController.mHbmData==external);check(s.handler.pending.isEmpty());s.outdoor.tick();check(s.outdoor.policy.reason.equals("error"));owner.mHbmController.throwing=false;s.outdoor.configure(enabled());s.handler.advance(SystemClock.now+3000);check(s.outdoor.policy.active);s.outdoor.stop();
+
+  // Reproduce the supplied firmware trace: a full target is reduced to .57015526 by OPR.
+  s.outdoor.stop();owner.opr=.57015526f;owner.thermal=owner.battery=owner.power=1;
+  config=OutdoorOptions.parse(new JSONObject().put("outdoor_enabled",true).put("outdoor_range_unlock",true).put("outdoor_strength",1));
+  check(!config.flags[3]);s.outdoor.configure(config);s.handler.advance(SystemClock.now+3000);
+  BrightnessReason reason=new BrightnessReason();eq(owner.adjustSdrBrightness(1,true,reason,false,false),owner.opr);check(reason.getModifier()==8192);
+  check(s.outdoor.oprSupported());check(s.outdoor.status().optBoolean("opr_supported"));
+  bad(new JSONObject().put("outdoor_enabled",true).put("outdoor_opr_relax",true));
+  bad(new JSONObject().put("outdoor_opr_relax",true));
+  config=OutdoorOptions.parse(new JSONObject().put("outdoor_enabled",true).put("outdoor_range_unlock",true).put("outdoor_opr_relax",true).put("outdoor_strength",1));
+  JSONObject caps=new JSONObject().put("outdoor_supported",true).put("outdoor_range_supported",true);
+  try{config.verify(caps);throw new AssertionError();}catch(IllegalArgumentException expected){count++;}config.verify(caps.put("outdoor_opr_supported",true));
+  s.outdoor.configure(config);s.handler.advance(SystemClock.now+3000);long raises=s.outdoor.oprRaises;
+  reason=new BrightnessReason();reason.addModifier(2);eq(owner.adjustSdrBrightness(1,true,reason,false,false),1);check(reason.getModifier()==2);check(s.outdoor.oprRaises==raises+1);check(OutdoorOpr.current.get()==null);
+  reason=new BrightnessReason();reason.addModifier(8192|2);eq(owner.adjustSdrBrightness(1,true,reason,false,false),1);check(reason.getModifier()==(8192|2));
+  eq(owner.adjustBrightnessByOpr(1,new BrightnessReason()),owner.opr);eq(owner.adjustSdrBrightness(1,false,new BrightnessReason(),false,false),owner.opr);
+  eq(owner.adjustSdrBrightness(.3f,true,new BrightnessReason(),false,false),.3f);eq(owner.adjustSdrBrightness(1,true,new BrightnessReason(),false,true),.4f);
+  owner.thermal=.7f;eq(owner.adjustSdrBrightness(1,true,new BrightnessReason(),false,false),.7f);owner.thermal=1;
+  owner.battery=.65f;eq(owner.adjustSdrBrightness(1,true,new BrightnessReason(),false,false),.65f);owner.battery=1;
+  owner.power=.6f;eq(owner.adjustSdrBrightness(1,true,new BrightnessReason(),false,false),.6f);owner.power=1;
+  owner.privacy=true;eq(owner.adjustSdrBrightness(1,true,new BrightnessReason(),false,false),owner.opr);owner.privacy=false;
+  owner.hdrScene=true;eq(owner.adjustSdrBrightness(1,true,new BrightnessReason(),false,false),owner.opr);owner.hdrScene=false;
+  owner.mAutoBrightnessEnable=false;eq(owner.adjustSdrBrightness(1,true,new BrightnessReason(),false,false),owner.opr);owner.mAutoBrightnessEnable=true;
+  owner.throwPrivacy=true;eq(owner.adjustSdrBrightness(1,true,new BrightnessReason(),false,false),owner.opr);owner.throwPrivacy=false;
+  owner.throwSdr=true;try{owner.adjustSdrBrightness(1,true,new BrightnessReason(),false,false);throw new AssertionError();}catch(RuntimeException expected){count++;}check(OutdoorOpr.current.get()==null);owner.throwSdr=false;
+  owner.opr=Float.NaN;check(Float.isNaN(owner.adjustSdrBrightness(1,true,new BrightnessReason(),false,false)));owner.opr=.57015526f;
+  eq(s.outdoor.opr(Float.NaN,.5f),.5f);eq(s.outdoor.opr(1.5f,.5f),.5f);eq(s.outdoor.opr(.4f,.5f),.5f);
+  owner.mHbmController.mIsTimeAvailable=false;eq(owner.adjustSdrBrightness(1,true,new BrightnessReason(),false,false),owner.opr);owner.mHbmController.mIsTimeAvailable=true;
+  owner.mHbmController.mIsInAllowedAmbientRange=false;eq(owner.adjustSdrBrightness(1,true,new BrightnessReason(),false,false),owner.opr);owner.mHbmController.mIsInAllowedAmbientRange=true;
+  owner.mHbmController.mBrightnessMax=.8f;eq(owner.adjustSdrBrightness(1,true,new BrightnessReason(),false,false),.8f);owner.mHbmController.mBrightnessMax=1;
+  DisplayPowerControllerImpl other=new DisplayPowerControllerImpl();other.opr=.5f;eq(other.adjustSdrBrightness(1,true,new BrightnessReason(),false,false),.5f);
+  OutdoorOpr.Frame outer=new OutdoorOpr.Frame(other,true);OutdoorOpr.current.set(outer);eq(owner.adjustSdrBrightness(1,true,new BrightnessReason(),false,false),1);check(OutdoorOpr.current.get()==outer);OutdoorOpr.current.remove();
+  for(String gate:new String[]{"screen","user","thread","hdr","power","temperature","manual","output","lux"}){
+   if(gate.equals("screen"))s.screen=false;if(gate.equals("user"))s.user=false;if(gate.equals("thread"))s.thread=false;if(gate.equals("hdr"))s.hdr=true;if(gate.equals("power"))s.power.low=true;if(gate.equals("temperature"))s.batteryTemperature=Float.NaN;if(gate.equals("manual"))s.kernel.auto=false;if(gate.equals("output"))s.strategy="TemporaryBrightnessStrategy";if(gate.equals("lux"))owner.mAutomaticBrightnessControllerImpl.mAutomaticBrightnessController.mAmbientLux=500;
+   eq(owner.adjustSdrBrightness(1,true,new BrightnessReason(),false,false),owner.opr);check(OutdoorOpr.current.get()==null);
+   s.screen=s.user=s.thread=true;s.hdr=false;s.power.low=false;s.batteryTemperature=30;s.kernel.auto=true;s.strategy="AutomaticBrightnessStrategy";owner.mAutomaticBrightnessControllerImpl.mAutomaticBrightnessController.mAmbientLux=30000;s.outdoor.stop();s.outdoor.configure(config);s.handler.advance(SystemClock.now+3000);
+  }
+  s.handler.advance(s.outdoor.policy.started+180000);eq(owner.adjustSdrBrightness(1,true,new BrightnessReason(),false,false),owner.opr);check(!s.outdoor.policy.active);
+  s.outdoor.stop();eq(owner.adjustSdrBrightness(1,true,new BrightnessReason(),false,false),owner.opr);check(OutdoorOpr.current.get()==null);
   System.out.println("Outdoor production hooks: "+count+" cases PASS; deterministic OEM model, device not verified");
  }
 }'''
@@ -88,6 +135,6 @@ public class OutdoorTest{static int count;static void check(boolean b){if(!b)thr
 for path,text in sources.items():
     file=OUT/path;file.parent.mkdir(parents=True,exist_ok=True);file.write_text(text,encoding='utf-8')
 classes=OUT/'classes';classes.mkdir(exist_ok=True)
-production=[SRC/(name+'.java') for name in ['OutdoorOptions','OutdoorPolicy','HbmAccess','OutdoorController','OutdoorTuning','ThermalPolicy','AdvancedPolicy']]
+production=[SRC/(name+'.java') for name in ['OutdoorOptions','OutdoorPolicy','HbmAccess','OutdoorController','OutdoorTuning','OutdoorOpr','ThermalPolicy','AdvancedPolicy']]
 subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(JSON),'-d',str(classes),*map(str,production),*[str(OUT/p) for p in sources]],check=True)
 subprocess.run(['java','-cp',str(classes)+';'+str(JSON),'top.rongshangs.lumacurve.refactor.OutdoorTest'],check=True)

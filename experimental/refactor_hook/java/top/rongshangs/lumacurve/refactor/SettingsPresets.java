@@ -4,7 +4,7 @@ import org.json.*;
 /** Category-local draft patches. Presets never submit settings or change another group. */
 final class SettingsPresets {
  static JSONObject patch(String group,int mode,JSONObject caps)throws JSONException {
-  if(mode<0||mode>2)throw new IllegalArgumentException("未知预设");
+  if(mode<0||mode>3||mode==3&&!group.equals("outdoor"))throw new IllegalArgumentException("未知预设");
   JSONObject p=new JSONObject();boolean enabled=mode!=0;
   switch(group){
    case "low":
@@ -14,7 +14,11 @@ final class SettingsPresets {
     new LowLightThresholds(true,mode==1?LowLightThresholds.DEFAULT:new double[]{1,15,.5,3}).put(p);
     p.put("low_light_assist_gate",caps.optBoolean("low_light_assist_gate_supported")).put("low_light_assist_wait",mode==1?6000:8000).put("low_light_assist_tolerance",.2);return p;
    case "outdoor":
-    require(caps,"outdoor_supported",enabled);OutdoorOptions o=new OutdoorOptions();o.flags[0]=enabled;o.values[5]=mode==1?.5:.85;o.put(p);return p;
+    require(caps,"outdoor_supported",enabled);OutdoorOptions o=new OutdoorOptions();o.flags[0]=enabled;o.values[5]=mode==1?.5:mode==3?1:.85;
+    if(mode==3){require(caps,"outdoor_range_supported",true);o.flags[2]=true;o.flags[3]=caps.optBoolean("outdoor_opr_supported");
+     // Only lower the trigger on a verified, timed HBM controller. Keep its original budget.
+     o.flags[1]=caps.optBoolean("outdoor_hbm_supported");if(o.flags[1])o.values[8]=.5;}
+    o.put(p);return p;
    case "response":
     require(caps,"response_supported",enabled);p.put("response_override",enabled).put("small_brighten_override",enabled&&caps.optBoolean("small_response_supported"));
     if(enabled)p.put("brighten_delay",mode==1?1500:3000).put("darken_delay",mode==1?2000:5000).put("small_brighten_delay",mode==1?1500:5000);return p;
