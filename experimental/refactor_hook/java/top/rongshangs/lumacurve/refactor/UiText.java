@@ -479,6 +479,12 @@ public final class UiText {
         WORDS.put("变暗 —","Dim —");
         WORDS.put("变亮 —","Brighten —");
         WORDS.put("复制群号","Copy group ID");
+        WORDS.put("分支交流微信群","Branch WeChat group");
+        WORDS.put("复制微信号","Copy WeChat ID");
+        WORDS.put("备注：添加好友后进群表明来意","Note: state your purpose after adding me");
+        WORDS.put("已复制微信号","WeChat ID copied");
+        WORDS.put("分支作者","Branch author");
+        WORDS.put("负责本分支的界面与功能维护。","Maintains this branch's interface and features.");
         WORDS.put("连接中","Connecting");
         WORDS.put("主光感","Main light sensor");
         WORDS.put("支付宝","Alipay");

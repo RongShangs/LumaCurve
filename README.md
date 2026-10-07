@@ -2,11 +2,20 @@
 
 **适配 HyperOS 4 的自动亮度工具。** 在系统亮度链路内调整曲线与手动偏好记忆，继续使用系统的双侧感光、场景判定和过渡动画；也可按需调整显示层温控与变化确认时间。
 
-**正式版 2.3.1 / 23107** · Root + LSPosed · GPL-3.0 · 完全开源免费
+**正式版 2.4.0 / 24000** · Root + LSPosed · GPL-3.0 · 完全开源免费
 
 [官网](https://lc.rongshangs.top) · [下载安装](https://github.com/RongShangs/LumaCurve/releases/latest) · [作者博客](https://rongshangs.top) · [酷安@戎Shangs](https://www.coolapk.com/u/3261403)
 
-应用名称为 **HyperLux**，安装包为 `HyperLux-2.3.1.apk`。包名 `top.rongshangs.lumacurve`、蓝色曲线图标、官网及 `RongShangs/LumaCurve` 仓库继续沿用；源码与恢复包沿用 `LumaCurve-` 文件名。
+应用名称为 **HyperLux**，安装包为 `HyperLux-2.4.0.apk`。包名 `top.rongshangs.lumacurve`、蓝色曲线图标、官网及仓库继续沿用；源码与恢复包沿用 `LumaCurve-` 文件名。
+
+## 2.4.0 LSP 更新
+
+- 跟随设备系统深浅模式，保留现有页面排版并补充可选的本地背景图片；图片在后台限尺寸解码。
+- 底部导航接入 AndroidLiquidGlassView 的 MIT 许可 AGSL 折射/色散效果，API 33+ 使用硬件 `RenderNode`，旧版本透明降级；Dock 支持左右滑动切换页面并随主题改变色调。
+- 修复预测性返回设置子页面时旧页面闪动的问题。
+- About 页版本显示 2.4，新增分支微信群 `x080814OwO`、备注和分支作者头像。
+
+详见 [2.4.0 更新说明](docs/releases/2.4.0.md)。本版主机回归、原生编译、资源打包和签名检查已通过；尚无本版 HyperOS 4 实机渲染与长期稳定性验证。
 
 ## 2.3.1 更新
 

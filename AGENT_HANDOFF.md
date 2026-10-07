@@ -1,6 +1,13 @@
 # HyperLux 项目交接文档
 
-更新时间：2026-10-07（Asia/Shanghai）。当前交接范围：分支 `v2.3.1-lsp.2` APK 打包与发布。
+更新时间：2026-10-08（Asia/Shanghai）。当前交接范围：分支 `v2.4.0` APK 打包与发布。
+
+## 当前状态：2.4.0 LSP 正式包
+
+- 当前源码身份：`AppBuild.BUILD=release-2.4.0-lsp.1`，`VERSION / ARTIFACT_VERSION=2.4.0`，`TEST=false`；Manifest versionCode=24000。
+- 本轮新增系统主题跟随的背景图片入口、API 33+ AGSL 液态玻璃 Dock、横向滑动切页、预测性返回原子切页，以及 About 页分支信息与用户头像。
+- 构建产物：`dist/HyperLux-2.4.0.apk`、`dist/LumaCurve-2.4.0-source.zip`、`dist/LumaCurve-2.4.0.zip`。主机回归、Java/ARM64 编译、资源打包、签名和原生资产提取已通过；没有连接 HyperOS 4 实机。
+- Liquid Glass 源码取自 [AndroidLiquidGlassView](https://github.com/QmDeve/AndroidLiquidGlassView) 的 MIT 许可实现并做了无 AndroidX 的小型移植；API 33 以下使用透明功能降级。
 
 ## 当前状态：2.3.1 正式包（优先于下方 beta 历史）
 

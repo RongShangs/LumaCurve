@@ -7,6 +7,7 @@ import android.net.Uri;
 import android.graphics.*;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.RippleDrawable;
+import android.graphics.drawable.BitmapDrawable;
 import android.content.res.ColorStateList;
 import android.view.*;
 import android.widget.*;
@@ -35,6 +36,7 @@ public final class MainActivity extends Activity {
     JSONObject pendingUpdate;AlertDialog updateDialog;
     final Set<AlertDialog> openDialogs=new HashSet<>();
     LinearLayout thanksList;TextView thanksStatus;boolean thanksBusy,autoScroll=true;long thanksChecked;
+    TextView backgroundStatus;long backgroundGeneration;
     float lowLightLimit=50;long lowLightBrighten=3000,lowLightDarken=4000;
     SeekBar lowLimitSlider,lowBrightSlider,lowDarkSlider;TextView lowLimitLabel,lowBrightLabel,lowDarkLabel;
     LowLightThresholds lowThresholds=new LowLightThresholds();Switch lowThresholdSwitch;final SeekBar[] lowThresholdSliders=new SeekBar[4];final TextView[] lowThresholdLabels=new TextView[4];
@@ -43,7 +45,7 @@ public final class MainActivity extends Activity {
     AdvancedOptions advanced=new AdvancedOptions();
     final Switch[] advancedSwitches=new Switch[AdvancedOptions.GROUPS.length];final SeekBar[] advancedSliders=new SeekBar[AdvancedOptions.KEYS.length];final TextView[] advancedLabels=new TextView[AdvancedOptions.KEYS.length];
     TextView advancedStatus,unsavedHint;final TextView[] settingHints=new TextView[9];Switch logFollow;
-    LinearLayout settingsHome,settingsTarget,bottomNav;final LinearLayout[] settingGroups=new LinearLayout[9];final LinearLayout[] settingScreens=new LinearLayout[9];final Button[] settingApply=new Button[9];int settingsGroup=-1;float curveFloor;
+    LinearLayout settingsHome,settingsTarget,bottomNav;GlassDockView glassDock;final LinearLayout[] settingGroups=new LinearLayout[9];final LinearLayout[] settingScreens=new LinearLayout[9];final Button[] settingApply=new Button[9];int settingsGroup=-1;float curveFloor;
     View displayedPage;long pageTransition;
     BrightnessControlOptions controls=new BrightnessControlOptions();ManualBrightnessPanel manualPanel;boolean openManualPanel;
     Switch darkLockSwitch,manualPanelSwitch;final SeekBar[] controlSliders=new SeekBar[4];final TextView[] controlLabels=new TextView[4];TextView controlStatus;
@@ -62,8 +64,16 @@ public final class MainActivity extends Activity {
     TextView text(String value,int size,int color){TextView t=new LocalText();t.setText(value);t.setTextSize(size);t.setTextColor(themed(color));t.setPadding(0,dp(4),0,dp(4));return t;}
     RippleDrawable ripple(int color,float radius){return new RippleDrawable(ColorStateList.valueOf(darkTheme?0x3091b3ff:0x203265df),background(color,radius),background(Color.WHITE,radius));}
     ImageView image(String asset,int size,float radius){ImageView v=new ImageView(this);v.setScaleType(ImageView.ScaleType.CENTER_CROP);v.setBackground(background(0xffeef2ff,radius));v.setClipToOutline(true);
-        try{if(asset==null)v.setImageDrawable(getDrawable(getResources().getIdentifier("icon","drawable",getPackageName())));else try(InputStream input=getAssets().open(asset)){v.setImageBitmap(BitmapFactory.decodeStream(input));}}catch(IOException ignored){}
+        try{if(asset==null)v.setImageDrawable(getDrawable(getResources().getIdentifier("icon","drawable",getPackageName())));else v.setImageBitmap(decodeAsset(asset,size));}catch(IOException ignored){}
         v.setLayoutParams(new LinearLayout.LayoutParams(dp(size),dp(size)));return v;}
+    Bitmap decodeAsset(String asset,int size)throws IOException{
+        int target=Math.max(1,dp(size));BitmapFactory.Options bounds=new BitmapFactory.Options();bounds.inJustDecodeBounds=true;
+        try(InputStream input=getAssets().open(asset)){BitmapFactory.decodeStream(input,null,bounds);}
+        BitmapFactory.Options options=new BitmapFactory.Options();int sample=1;
+        while(bounds.outWidth/sample>target*2||bounds.outHeight/sample>target*2)sample<<=1;
+        options.inSampleSize=sample;options.inPreferredConfig=Bitmap.Config.RGB_565;
+        try(InputStream input=getAssets().open(asset)){return BitmapFactory.decodeStream(input,null,options);}
+    }
     AlertDialog dialog(String title,View body){LinearLayout actions=column();actions.setOrientation(LinearLayout.HORIZONTAL);actions.setGravity(Gravity.END);actions.setTag("actions");
         ResponsiveDialog box=new ResponsiveDialog(this,text(title,20,INK),body,actions);boolean landscape=getResources().getConfiguration().orientation==android.content.res.Configuration.ORIENTATION_LANDSCAPE;box.setPadding(dp(22),dp(landscape?12:20),dp(22),dp(landscape?12:18));box.setBackground(background(BG,24));AlertDialog d=new AlertDialog.Builder(this).setView(box).create();
         box.setClipToOutline(true);Window w=d.getWindow();ResponsiveDialog.configure(this,w,dp(landscape?520:440));if(w!=null)w.setDimAmount(.32f);
@@ -103,10 +113,11 @@ public final class MainActivity extends Activity {
         content=new FrameLayout(this);root.addView(content,new LinearLayout.LayoutParams(-1,0,1));
         for(int i=0;i<4;i++){LinearLayout b=column();pages[i]=b;if(i==0||i==2){b.setPadding(dp(16),dp(8),dp(16),dp(6));content.addView(b,new FrameLayout.LayoutParams(-1,-1));}else{ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);b.setPadding(dp(18),dp(10),dp(18),dp(22));scroll.addView(b);content.addView(scroll,new FrameLayout.LayoutParams(-1,-1));scroll.setVisibility(View.GONE);}}
         makeStatus();makeSettings();makeLogs();makeAbout();
-        LinearLayout bottom=row(root);bottomNav=bottom;bottom.setBaselineAligned(false);bottom.setPadding(dp(8),dp(8),dp(8),dp(8));String[] names={"状态","设置","日志","关于"};
+        glassDock=new GlassDockView(this);glassDock.setDarkMode(darkTheme);glassDock.bind(content);root.addView(glassDock,new LinearLayout.LayoutParams(-1,dp(74)));
+        LinearLayout bottom=column();bottomNav=bottom;bottom.setBaselineAligned(false);bottom.setPadding(dp(8),dp(8),dp(8),dp(8));glassDock.addView(bottom,new FrameLayout.LayoutParams(-1,-1));String[] names={"状态","设置","日志","关于"};
         for(int i=0;i<4;i++){final int index=i;LinearLayout tab=column();tab.setBaselineAligned(false);tab.setGravity(Gravity.CENTER);tab.setBackground(ripple(Color.TRANSPARENT,14));tab.setClickable(true);tab.setOnClickListener(v->select(index));
             NavIcon iconView=new NavIcon(i);tab.addView(iconView,new LinearLayout.LayoutParams(dp(25),dp(25)));TextView name=text(names[i],12,MUTED);name.setGravity(Gravity.CENTER);name.setIncludeFontPadding(false);name.setPadding(0,dp(4),0,0);tab.addView(name,new LinearLayout.LayoutParams(-1,dp(22)));bottom.addView(tab,new LinearLayout.LayoutParams(0,dp(58),1));nav[i]=tab;navIcons[i]=iconView;navNames[i]=name;}
-        select(saved==null?0:saved.getInt("page",0));apply.setEnabled(false);
+        glassDock.setSwipeListener(delta->select(page+delta));select(saved==null?0:saved.getInt("page",0));apply.setEnabled(false);loadSavedBackground();
     }
     void makeStatus(){
         stateTitle=text("",16,INK);luxReading=text("",20,BLUE);nitReading=text("",20,INK);flow=text("",12,MUTED);thermalState=text("",12,INK);userState=text("",12,MUTED);
@@ -147,11 +158,15 @@ public final class MainActivity extends Activity {
         settingsTarget=settingGroups[7];makeDarkLockSettings();makeLowLightSettings();
         settingsTarget=settingGroups[8];makeManualPanelSettings();
     }
-    void showSettingsGroup(int group){settingsGroup=group;header.setVisibility(group<0?View.VISIBLE:View.GONE);if(bottomNav!=null)bottomNav.setVisibility(group<0?View.VISIBLE:View.GONE);transitionPage(group<0?content.getChildAt(1):settingScreens[group],group<0?-1:1);drawCurve();}
-    void transitionPage(View target,int direction){
+    void showSettingsGroup(int group){settingsGroup=group;header.setVisibility(group<0?View.VISIBLE:View.GONE);if(glassDock!=null)glassDock.setVisibility(group<0?View.VISIBLE:View.GONE);if(bottomNav!=null)bottomNav.setVisibility(View.VISIBLE);transitionPage(group<0?content.getChildAt(1):settingScreens[group],group<0?-1:1,group<0);drawCurve();}
+    void transitionPage(View target,int direction){transitionPage(target,direction,false);}
+    void transitionPage(View target,int direction,boolean commitBack){
         if(displayedPage==target)return;
         final long generation=++pageTransition;View previous=displayedPage;displayedPage=target;
-        boolean animate=visible&&previous!=null&&android.animation.ValueAnimator.areAnimatorsEnabled();
+        // Back navigation can be committed by the system predictive-back dispatcher while
+        // the current page is already being scrubbed. A second alpha/translation animation
+        // leaves one frame of the old page visible, so commit the destination atomically.
+        boolean animate=!commitBack&&visible&&previous!=null&&android.animation.ValueAnimator.areAnimatorsEnabled();
         for(int i=0;i<content.getChildCount();i++){View child=content.getChildAt(i);child.animate().cancel();child.animate().setListener(null).withEndAction(null);if(child!=target&&(!animate||child!=previous)){child.setVisibility(View.GONE);child.setAlpha(1);child.setTranslationX(0);}}
         target.setVisibility(View.VISIBLE);
         if(!animate){target.setAlpha(1);target.setTranslationX(0);return;}
@@ -336,6 +351,10 @@ public final class MainActivity extends Activity {
     void makeRefreshSettings(){
         LinearLayout b=card(settingsTarget);b.addView(text("界面",18,INK));refreshLabel=text("",13,INK);b.addView(refreshLabel);refreshSlider=parameter(b,4,refreshSeconds-1,value->{refreshSeconds=value+1;getPreferences(0).edit().putInt("refresh_seconds",refreshSeconds).apply();});
         b.addView(text("只影响状态显示，不改变亮度调节频率。",12,MUTED));
+        b.addView(text("背景图片",15,INK));
+        backgroundStatus=text(getPreferences(0).getString("ui_background_uri","").isEmpty()?"未设置背景图片":"已设置背景图片",12,MUTED);b.addView(backgroundStatus);
+        LinearLayout backgroundActions=row(b);compact("选择图片",this::pickBackgroundImage,backgroundActions);compact("清除图片",this::clearBackgroundImage,backgroundActions);
+        b.addView(text("图片仅用于本机界面背景，按系统深浅主题自动降低或提高显示强度；选择后立即保存。",12,MUTED));
     }
     void makeAdvancedSettings(int g){
         String[] titles={"变化阈值","辅助光感确认","过渡动画","手动模式阳光屏","触摸遮挡保护"};
@@ -380,16 +399,19 @@ public final class MainActivity extends Activity {
     }
 
     void makeAbout(){
-        LinearLayout b=card(pages[3]);b.setPadding(dp(22),dp(22),dp(22),dp(18));LinearLayout r=row(b);r.addView(image(null,68,20));LinearLayout title=column();LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-2,1);lp.leftMargin=dp(18);r.addView(title,lp);title.addView(text("HyperLux",26,INK));title.addView(text(AppBuild.ARTIFACT_VERSION+" · "+tr(AppBuild.TEST?"曲线适配测试版":"正式版"),14,BLUE));
+        LinearLayout b=card(pages[3]);b.setPadding(dp(22),dp(22),dp(22),dp(18));LinearLayout r=row(b);r.addView(image(null,68,20));LinearLayout title=column();LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-2,1);lp.leftMargin=dp(18);r.addView(title,lp);title.addView(text("HyperLux",26,INK));String displayVersion=AppBuild.ARTIFACT_VERSION.endsWith(".0")?AppBuild.ARTIFACT_VERSION.substring(0,AppBuild.ARTIFACT_VERSION.length()-2):AppBuild.ARTIFACT_VERSION;title.addView(text(displayVersion+" · "+tr(AppBuild.TEST?"曲线适配测试版":"正式版"),14,BLUE));
         TextView intro=text("适配 HyperOS 4 的自动亮度工具。\n\n沿用系统双侧感光与平滑过渡，支持可编辑曲线、手动记忆保存与暗光稳定。户外高亮、温控和变化确认可按需调整，配置支持导入导出。",15,INK);intro.setLineSpacing(dp(5),1);intro.setPadding(0,dp(20),0,dp(16));b.addView(intro);
         b.addView(text("HyperOS 4 · Root · LSPosed",12,MUTED));updateLabel=text("自动检查应用更新",12,BLUE);updateLabel.setPadding(dp(12),dp(10),dp(12),dp(10));updateLabel.setBackground(background(0xffeef3ff,12));lp=new LinearLayout.LayoutParams(-1,-2);lp.topMargin=dp(10);lp.bottomMargin=dp(6);b.addView(updateLabel,lp);
         r=row(b);compact("官网",()->open("https://lc.rongshangs.top"),r);compact("GitHub",()->open(UpdateChecker.REPO),r);compact("开源协议",()->open("https://www.gnu.org/licenses/gpl-3.0.html"),r);
         LinearLayout group=column();group.setPadding(dp(14),dp(12),dp(14),dp(12));group.setBackground(ripple(0xffeef3ff,14));group.setClipToOutline(true);group.setClickable(true);group.setOnClickListener(v->copyGroupNumber());lp=new LinearLayout.LayoutParams(-1,-2);lp.topMargin=dp(12);b.addView(group,lp);
         group.addView(text("QQ 交流群",12,MUTED));r=row(group);r.setBaselineAligned(false);TextView number=text("314981836",22,BLUE);number.setPadding(0,0,0,0);r.addView(number,new LinearLayout.LayoutParams(0,-2,1));Button copy=action("复制群号",this::copyGroupNumber);copy.setTextSize(12);copy.setPadding(dp(8),0,dp(8),0);r.addView(copy,new LinearLayout.LayoutParams(dp(88),dp(34)));group.addView(text("暗号：1691",12,MUTED));
+        LinearLayout branchGroup=column();branchGroup.setPadding(dp(14),dp(12),dp(14),dp(12));branchGroup.setBackground(ripple(0xffeef3ff,14));branchGroup.setClipToOutline(true);branchGroup.setClickable(true);branchGroup.setOnClickListener(v->copyBranchGroupNumber());lp=new LinearLayout.LayoutParams(-1,-2);lp.topMargin=dp(8);b.addView(branchGroup,lp);
+        branchGroup.addView(text("分支交流微信群",12,MUTED));r=row(branchGroup);r.setBaselineAligned(false);TextView branchNumber=text("x080814OwO",20,BLUE);branchNumber.setPadding(0,0,0,0);r.addView(branchNumber,new LinearLayout.LayoutParams(0,-2,1));Button branchCopy=action("复制微信号",this::copyBranchGroupNumber);branchCopy.setTextSize(12);branchCopy.setPadding(dp(8),0,dp(8),0);r.addView(branchCopy,new LinearLayout.LayoutParams(dp(100),dp(34)));branchGroup.addView(text("备注：添加好友后进群表明来意",12,MUTED));
         b=card(pages[3]);b.addView(text("打赏",18,INK));b.addView(text("完全开源免费。欢迎捐赠 2.3 元支持开发。备注「昵称：想说的一句话」，总计不超过 30 个字符，将会尽快更新到感谢名单。",13,MUTED));r=row(b);compact("微信",()->donate("微信","donate-wechat.jpg"),r);compact("支付宝",()->donate("支付宝","donate-alipay.jpg"),r);
         b=card(pages[3]);b.addView(text("感谢名单",18,INK));thanksList=column();b.addView(thanksList);thanksStatus=text("名单来自官网，联网时自动更新",11,MUTED);b.addView(thanksStatus);
         try{JSONObject data;try{data=ThanksFeed.parse(getPreferences(0).getString("thanks_cache",null));}catch(Exception absent){data=ThanksFeed.parse(ThanksFeed.read(getAssets().open("thanks.json")));}renderThanks(data);}catch(Exception ignored){thanksStatus.setText("暂时无法读取名单");}
         b=card(pages[3]);r=row(b);r.addView(image("avatar.jpg",46,15));TextView author=text("戎Shang",19,INK);author.setPadding(dp(14),0,0,0);r.addView(author);r=row(b);compact("作者博客",()->open("https://rongshangs.top"),r);compact("酷安主页",()->open("https://www.coolapk.com/u/3261403"),r);
+        b=card(pages[3]);r=row(b);r.addView(image("avatar-branch-author.jpg",54,18));LinearLayout branchAuthor=column();branchAuthor.setPadding(dp(14),0,0,0);r.addView(branchAuthor,new LinearLayout.LayoutParams(0,-2,1));branchAuthor.addView(text("凌乱的风&",19,INK));branchAuthor.addView(text("分支作者",12,MUTED));b.addView(text("负责本分支的界面与功能维护。",12,MUTED));
     }
     void renderThanks(JSONObject data)throws JSONException{
         thanksList.removeAllViews();JSONArray entries=data.getJSONArray("entries");
@@ -400,7 +422,44 @@ public final class MainActivity extends Activity {
         network.execute(()->{try{JSONObject data=ThanksFeed.check();ui.post(()->{if(destroyed)return;thanksBusy=false;try{renderThanks(data);getPreferences(0).edit().putString("thanks_cache",data.toString()).apply();thanksStatus.setText("已同步官网感谢名单");}catch(Exception ignored){thanksStatus.setText("名单来自官网，联网时自动更新");}});}catch(Exception failure){ui.post(()->{if(destroyed)return;thanksBusy=false;thanksStatus.setText("暂未连接官网，显示已保存的名单");});}});
     }
     void scrollLogs(){if(logScroller!=null&&autoScroll)logScroller.post(()->{if(autoScroll&&!destroyed)logScroller.scrollTo(0,logText.getHeight());});}
+    void pickBackgroundImage(){
+        try{
+            Intent picker=new Intent(Intent.ACTION_OPEN_DOCUMENT);picker.addCategory(Intent.CATEGORY_OPENABLE);picker.setType("image/*");
+            picker.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);startActivityForResult(picker,502);
+        }catch(ActivityNotFoundException unavailable){show("未找到图片选择器");}
+    }
+    void clearBackgroundImage(){
+        backgroundGeneration++;
+        getPreferences(0).edit().remove("ui_background_uri").apply();
+        if(root!=null)root.setBackgroundColor(BG);
+        if(backgroundStatus!=null)backgroundStatus.setText("未设置背景图片");
+        show("背景图片已清除");
+    }
+    void loadSavedBackground(){
+        String value=getPreferences(0).getString("ui_background_uri","");if(value.isEmpty()||root==null)return;
+        final Uri uri;try{uri=Uri.parse(value);}catch(Exception invalid){return;}
+        final long generation=++backgroundGeneration;
+        worker.execute(()->{
+            Bitmap bitmap=null;
+            try{
+                BitmapFactory.Options bounds=new BitmapFactory.Options();bounds.inJustDecodeBounds=true;
+                try(InputStream input=getContentResolver().openInputStream(uri)){if(input==null)throw new IOException("无法读取背景图片");BitmapFactory.decodeStream(input,null,bounds);}
+                if(bounds.outWidth<=0||bounds.outHeight<=0)throw new IOException("背景图片格式无效");
+                BitmapFactory.Options options=new BitmapFactory.Options();options.inSampleSize=1;int largest=Math.max(bounds.outWidth,bounds.outHeight);while(largest/options.inSampleSize>1600)options.inSampleSize*=2;options.inPreferredConfig=Bitmap.Config.ARGB_8888;
+                try(InputStream input=getContentResolver().openInputStream(uri)){if(input==null)throw new IOException("无法读取背景图片");bitmap=BitmapFactory.decodeStream(input,null,options);}
+                if(bitmap==null)throw new IOException("背景图片格式无效");
+            }catch(Throwable ignored){}
+            final Bitmap loaded=bitmap;
+            ui.post(()->{
+                if(generation!=backgroundGeneration){if(loaded!=null)loaded.recycle();return;}
+                if(destroyed||root==null){if(loaded!=null)loaded.recycle();return;}
+                if(loaded==null){if(backgroundStatus!=null)backgroundStatus.setText("背景图片读取失败");return;}
+                BitmapDrawable drawable=new BitmapDrawable(getResources(),loaded);drawable.setGravity(Gravity.FILL);drawable.setAlpha(darkTheme?105:175);root.setBackground(drawable);if(backgroundStatus!=null)backgroundStatus.setText("已设置背景图片");
+            });
+        });
+    }
     void copyGroupNumber(){android.content.ClipboardManager cm=(android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE);cm.setPrimaryClip(ClipData.newPlainText(tr("QQ 交流群"),"314981836"));show("已复制群号");}
+    void copyBranchGroupNumber(){android.content.ClipboardManager cm=(android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE);cm.setPrimaryClip(ClipData.newPlainText(tr("分支交流微信群"),"x080814OwO"));show("已复制微信号");}
     void rememberLegacy(JSONObject answer){JSONArray modules=answer.optJSONArray("legacy_modules");if(modules==null||modules.length()==0){pendingLegacy=null;legacyNotice="";return;}if(!modules.toString().equals(legacyNotice))pendingLegacy=modules;}
     void offerLegacyModules(){
         if(pendingLegacy==null||!visible||permissionDialogVisible||legacyDialogVisible||updateDialog!=null)return;
@@ -414,7 +473,7 @@ public final class MainActivity extends Activity {
         network.execute(()->{try{JSONObject found=UpdateChecker.check();ui.post(()->{if(destroyed)return;updateBusy=false;if(found.optBoolean("newer")){pendingUpdate=found;updateLabel.setText("发现新版本 "+found.optString("version"));offerUpdate();}else{updateLabel.setText("当前没有新应用版本");if(manual)show("当前没有新应用版本");}});}catch(Exception failure){ui.post(()->{if(destroyed)return;updateBusy=false;updateLabel.setText("暂时无法检查更新");if(manual)show("暂时无法检查更新");});}});
     }
     void offerUpdate(){if(pendingUpdate==null||!visible||permissionDialogVisible||legacyDialogVisible||pendingLegacy!=null||updateDialog!=null)return;JSONObject release=pendingUpdate;pendingUpdate=null;LinearLayout body=column();body.addView(text("版本 "+release.optString("version"),18,BLUE));String notes=release.optString("notes");TextView changes=text(notes.isEmpty()?"查看仓库了解更新内容":notes,13,MUTED);ScrollView scroll=new ScrollView(this);scroll.addView(changes);scroll.setLayoutParams(new LinearLayout.LayoutParams(-1,Math.min(dp(200),dp(70+Math.min(8,notes.length()/40)*16))));body.addView(scroll);AlertDialog d=dialog("有新版本可用",body);updateDialog=d;d.setOnDismissListener(v->{updateDialog=null;offerLegacyModules();});d.show();dialogButton(d,"稍后",null,false);dialogButton(d,"下载更新",()->open(release.optString("url")),true);}
-    void select(int value){int previous=page;page=Math.max(0,Math.min(3,value));settingsGroup=-1;if(bottomNav!=null)bottomNav.setVisibility(View.VISIBLE);header.setVisibility(page==3?View.GONE:View.VISIBLE);note.setVisibility(View.GONE);transitionPage(content.getChildAt(page),Integer.compare(page,previous));
+    void select(int value){int previous=page;page=Math.max(0,Math.min(3,value));settingsGroup=-1;if(glassDock!=null)glassDock.setVisibility(View.VISIBLE);if(bottomNav!=null)bottomNav.setVisibility(View.VISIBLE);header.setVisibility(page==3?View.GONE:View.VISIBLE);note.setVisibility(View.GONE);transitionPage(content.getChildAt(page),Integer.compare(page,previous));
         for(int i=0;i<4;i++){if(nav[i]!=null){navNames[i].setTextColor(i==page?BLUE:MUTED);navIcons[i].selected=i==page;navIcons[i].invalidate();nav[i].setSelected(i==page);}}
         // Refresh every visit; retain unapplied edits until a successful save.
         if(page==3&&previous!=3&&visible){checkUpdate(false);refreshThanks();}if(page==2)scrollLogs();if(visible){if(busy)rereadPending=true;else run("inspect",null);}
@@ -468,7 +527,14 @@ public final class MainActivity extends Activity {
     }
     void exportConfiguration(){if(busy){show("另一项操作还在执行");return;}try{JSONObject file=ConfigurationFile.export(configuration(),runtime,dirty,refreshSeconds,autoScroll);run("export-config",Base64.getEncoder().encodeToString(file.toString().getBytes(StandardCharsets.UTF_8)));}catch(Exception error){show(error.getMessage());}}
     void importConfiguration(){if(factoryLux==null){show("连接后读取曲线");return;}if(busy){show("另一项操作还在执行");return;}try{Intent picker=new Intent(Intent.ACTION_OPEN_DOCUMENT);picker.addCategory(Intent.CATEGORY_OPENABLE);picker.setType("*/*");picker.putExtra(Intent.EXTRA_MIME_TYPES,new String[]{"application/json","text/plain","application/octet-stream"});startActivityForResult(picker,501);}catch(ActivityNotFoundException unavailable){show("未找到文件选择器");}}
-    @Override protected void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);if(request!=501||result!=RESULT_OK||data==null||data.getData()==null)return;Uri uri=data.getData();worker.execute(()->{try(InputStream input=getContentResolver().openInputStream(uri);ByteArrayOutputStream out=new ByteArrayOutputStream()){if(input==null)throw new IOException("无法读取配置文件");byte[] buffer=new byte[4096];int count;while((count=input.read(buffer))!=-1){if(out.size()+count>ConfigurationFile.LIMIT)throw new IOException("配置文件过大");out.write(buffer,0,count);}String content=new String(out.toByteArray(),StandardCharsets.UTF_8);ui.post(()->previewConfiguration(content));}catch(Exception error){ui.post(()->show(error.getMessage()));}});}
+    @Override protected void onActivityResult(int request,int result,Intent data){
+        super.onActivityResult(request,result,data);if(result!=RESULT_OK||data==null||data.getData()==null)return;Uri uri=data.getData();
+        if(request==502){
+            try{getContentResolver().takePersistableUriPermission(uri,Intent.FLAG_GRANT_READ_URI_PERMISSION);}catch(SecurityException ignored){}
+            getPreferences(0).edit().putString("ui_background_uri",uri.toString()).apply();if(backgroundStatus!=null)backgroundStatus.setText("正在读取背景图片…");loadSavedBackground();show("背景图片已设置");return;
+        }
+        if(request!=501)return;worker.execute(()->{try(InputStream input=getContentResolver().openInputStream(uri);ByteArrayOutputStream out=new ByteArrayOutputStream()){if(input==null)throw new IOException("无法读取配置文件");byte[] buffer=new byte[4096];int count;while((count=input.read(buffer))!=-1){if(out.size()+count>ConfigurationFile.LIMIT)throw new IOException("配置文件过大");out.write(buffer,0,count);}String content=new String(out.toByteArray(),StandardCharsets.UTF_8);ui.post(()->previewConfiguration(content));}catch(Exception error){ui.post(()->show(error.getMessage()));}});
+    }
     void previewConfiguration(String text){if(destroyed)return;try{if(runtime==null)throw new IllegalStateException("连接后读取曲线");ConfigurationFile.Imported imported=ConfigurationFile.read(text,runtime,configuration());String message="导入后先检查设置，再点击保存并应用。旧版本缺少的新选项使用默认值。";if(dirty)message+="\n\n导入会替换当前尚未保存的设置。";if(!imported.notes.isEmpty())message+="\n\n"+String.join("\n",imported.notes);ScrollView scroll=new ScrollView(this);scroll.addView(MainActivity.this.text(message,14,MUTED));scroll.setLayoutParams(new LinearLayout.LayoutParams(-1,dp(240)));AlertDialog d=dialog("导入配置",scroll);d.show();dialogButton(d,"取消",null,false);dialogButton(d,"导入",()->{try{ConfigurationFile.Imported checked=ConfigurationFile.read(text,runtime,configuration());loadOptions(checked.options);if(checked.ui.has("refresh_seconds"))refreshSeconds=checked.ui.getInt("refresh_seconds");if(checked.ui.has("log_auto_scroll"))autoScroll=checked.ui.getBoolean("log_auto_scroll");getPreferences(0).edit().putInt("refresh_seconds",refreshSeconds).putBoolean("log_auto_scroll",autoScroll).apply();dirty=true;logFollow.setChecked(autoScroll);drawCurve();show("配置已导入，检查后点击保存并应用");}catch(Exception error){show(error.getMessage());}},true);}catch(Exception error){show(error.getMessage());}}
     void loadOptions(JSONObject config)throws Exception{controls=BrightnessControlOptions.parseStored(config);LowLightAssistGate nextAssistGate=new LowLightAssistGate();nextAssistGate.configure(config);LowLightThresholds nextLowThresholds=LowLightThresholds.parse(config);MemoryOptions nextMemory=MemoryOptions.parse(config);float[] next=CurvePlan.factors(config.getString("factors"));float floor=CurvePlan.floor(config.has("curve_floor_nit")?config.opt("curve_floor_nit"):null);new CurvePlan(factoryLux,factoryNit,minimum,maximum,next,floor);AdvancedOptions a=AdvancedOptions.parse(config);OutdoorOptions o=OutdoorOptions.parse(config);memoryOptions=nextMemory;lowThresholds=nextLowThresholds;assistGateOptions=nextAssistGate;factors=next;curveFloor=floor;advanced=a;outdoorOptions=o;thermalRelax=config.optBoolean("thermal_relax");thermalCeiling=(float)config.optDouble("thermal_ceiling",43);float memory=(float)config.optDouble("memory_strength",1);memoryEnabled=memory>0;if(memoryEnabled)memoryStrength=memory;memoryWindow=config.optLong("memory_window",1500);memoryLuxRange=(float)config.optDouble("memory_lux_range",.3);thermalCooling=(float)config.optDouble("thermal_cooling",1);responseOverride=config.optBoolean("response_override");brightenDelay=config.optLong("brighten_delay",1500);darkenDelay=config.optLong("darken_delay",5000);smallBrightenOverride=config.optBoolean("small_brighten_override");smallBrightenDelay=config.optLong("small_brighten_delay",5000);lowLightStability=config.optBoolean("low_light_stability");lowLightLimit=(float)config.optDouble("low_light_limit",50);lowLightBrighten=config.optLong("low_light_brighten",3000);lowLightDarken=config.optLong("low_light_darken",4000);}
     void submit(){
