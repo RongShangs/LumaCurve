@@ -2,7 +2,7 @@
 
 **适配 HyperOS 4 的自动亮度工具。** 在系统亮度链路内调整曲线与手动偏好记忆，继续使用系统的双侧感光、场景判定和过渡动画；也可按需调整显示层温控与变化确认时间。
 
-**正式版 2.3.1 / 23106** · Root + LSPosed · GPL-3.0 · 完全开源免费
+**正式版 2.3.1 / 23107** · Root + LSPosed · GPL-3.0 · 完全开源免费
 
 [官网](https://lc.rongshangs.top) · [下载安装](https://github.com/RongShangs/LumaCurve/releases/latest) · [作者博客](https://rongshangs.top) · [酷安@戎Shangs](https://www.coolapk.com/u/3261403)
 
@@ -20,7 +20,7 @@
 
 ## `lsp-v2.3.1` 分支说明
 
-该分支基于 HyperLux 2.3.1 提交 `bf839360ba1c6d2b47ae2a7fe3f3c500e7ade1c8`，补充了主屏手动接管的自动亮度恢复、system_server 重启后的状态恢复，以及节点身份校验的事务顺序保护。当前分支发布资产为源码包；本目录中已有的 2.3.1 APK 不包含这些分支修复，也没有本轮重新构建或实机验证结果。
+该分支基于 HyperLux 2.3.1 提交 `bf839360ba1c6d2b47ae2a7fe3f3c500e7ade1c8`，补充了主屏手动接管的自动亮度恢复、system_server 重启后的状态恢复，以及节点身份校验的事务顺序保护。构建版发布于 [v2.3.1-lsp.2](https://github.com/shisjsji/LumaCurve/releases/tag/v2.3.1-lsp.2)，版本代码为 23107。由于本地找不到原签名密钥，此 APK 使用新密钥签名；安装前必须卸载已有同包版本，可能清除该应用的数据。尚无 HyperOS 4 实机验证结果。
 
 ## 2.3.0 更新
 

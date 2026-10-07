@@ -2,6 +2,7 @@
 from pathlib import Path
 import json, os, subprocess, tempfile
 import re
+from native_host import compile_and_run
 
 R=Path(__file__).resolve().parents[1]
 S=R/'experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor'
@@ -96,7 +97,6 @@ int main(void){
 }
 ''',encoding='utf-8')
 exe=O/'node-test.exe'
-subprocess.run(['C:/msys64/mingw64/bin/gcc.exe','-std=c11','-static','-Wall','-Wextra','-Werror','-Wno-misleading-indentation','-I',str(R/'experimental/refactor_hook/native'),str(c),'-o',str(exe)],check=True)
-native_result=subprocess.run([str(exe)],check=True,capture_output=True,text=True)
+native_result=compile_and_run(['C:/msys64/mingw64/bin/gcc.exe','-std=c11','-static','-Wall','-Wextra','-Werror','-Wno-misleading-indentation','-I',str(R/'experimental/refactor_hook/native'),str(c),'-o',str(exe)],exe)
 print(native_result.stdout,end='');native_cases=int(re.search(r'(\d+) cases PASS',native_result.stdout).group(1))
 print('Panel node validation total:',java_cases+native_cases,'cases PASS')

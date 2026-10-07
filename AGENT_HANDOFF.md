@@ -1,17 +1,17 @@
 # HyperLux 项目交接文档
 
-更新时间：2026-10-07（Asia/Shanghai）。当前交接范围：本地 **2.3.1 正式打包**。
+更新时间：2026-10-07（Asia/Shanghai）。当前交接范围：分支 `v2.3.1-lsp.2` APK 打包与发布。
 
 ## 当前状态：2.3.1 正式包（优先于下方 beta 历史）
 
 - 用户已授权按既有需求审阅、修复、正式打包，并随后授权“推送部署”。本轮推进 GitHub main / v2.3.1 / 正式 Release，更新 D:/IOS/web 并生成部署包；用户随后提供私下连接信息并授权直接部署；服务器凭据仅用于本次连接，不写入项目、交付包或发布内容。
-- 当前源码：AppBuild.BUILD=release-2.3.1，VERSION / ARTIFACT_VERSION=2.3.1，TEST=false；Manifest versionCode=23106，高于 beta05。
-- 正式产物路径：dist/HyperLux-2.3.1.apk、dist/LumaCurve-2.3.1-source.zip、dist/LumaCurve-2.3.1.zip。最终 APK SHA-256 及源码 hash 以 build/refactor-hook/verification.json 和合集内 build-info.json 为准；构建日志为 build/release-2.3.1-build.log。
+- 当前源码：AppBuild.BUILD=release-2.3.1-lsp.2，VERSION / ARTIFACT_VERSION=2.3.1，TEST=false；Manifest versionCode=23107。
+- 分支产物路径：dist/HyperLux-2.3.1.apk、dist/LumaCurve-2.3.1-source.zip、dist/LumaCurve-2.3.1.zip。最终 APK SHA-256 及源码 hash 以 build/refactor-hook/verification.json 和合集内 build-info.json 为准；构建日志为 build/release-2.3.1-build.log。
 - 详细审阅和新增修复：docs/review-2.3.1.md；说明：docs/releases/2.3.1.md。修复保存返回覆盖等待期新草稿、暗光锁定转手动失败的自动模式恢复、接管 ACK 丢失的会话回滚、守护健康记录长期有效。
 - 新增 tests/refactor_draft_and_health.py，纳入正式构建；配置迁移 2294、控制器 177、Root 事务 49、草稿与健康方法 23、原生格式 62 项定向检查已通过，完整结果看正式构建日志。
 - 原生身份现在是 raw06-health；socket 仍为 hyperlux.main.panel.raw04。健康记录增加单调时钟第四字段，每 2 秒更新、超过 5 秒不可采信；Java 与 C 同步更新，旧三字段不采信。
 - 继承 beta05 暗光默认：开启锁定，10 lux / 1 min 进入、50 lux / 1 s 退出；旧用户显式设置及早期未配置开关的关闭状态保留。
-- 签名 keystore 未重建，证书应保持 a4c4759841927acf432b887f0c9bfc16fb8e30c0885ae00e8a6175b90731182d。更新后必须重启，详细读数确认 release-2.3.1。
+- 原签名 keystore 不在本机。本次按用户确认生成了新签名；证书与此前 APK 不同，安装前需卸载旧同包 APP，可能清除本机设置和数据。新私钥仅保存在本机忽略目录 `build/refactor-hook/test-signing.p12`，不得提交或发布。更新后必须重启，详细读数确认 `release-2.3.1-lsp.2`。
 - 没有手机连接，本版暗光改善及实际 Hook / 界面仍未实机验证。ueventd 物理源头与稳态对照待办不变，不宣称根治。
 - 网站源与 D:/IOS/web 更新为 2.3.1，部署前已保留线上与部署副本的全部 13 项感谢名单，并合并到仓库网站源；随包离线名单不更新。线上网站是否生效应查询 /update.json，不凭本地同步判断。
 - 本轮基线构建重新生成过 beta05 同名产物，下方 beta05 历史 APK hash 不再代表重建文件；不要据此误报 tampering。正式包独立命名，不覆盖 2.3.0。

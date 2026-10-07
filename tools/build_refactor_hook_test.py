@@ -28,6 +28,10 @@ if not DEP.exists():
     with urllib.request.urlopen(API_URL,timeout=30) as response:DEP.write_bytes(response.read())
 assert hashlib.sha256(DEP.read_bytes()).hexdigest()==API_SHA,'compile dependency changed'
 def run(args):subprocess.run([str(a) for a in args],check=True)
+def wsl_path(path):
+    value=path.resolve().as_posix()
+    if not re.match(r'^[A-Za-z]:/',value):raise ValueError('WSL path must be on a drive mounted under /mnt')
+    return '/mnt/'+value[0].lower()+value[2:]
 def checked_test(path,pattern,*parameters):
     result=subprocess.run(['python',str(path),*[str(p) for p in parameters]],check=True,capture_output=True,text=True,encoding='utf-8',errors='replace')
     print(result.stdout,end='');matched=re.search(pattern,result.stdout)
@@ -94,7 +98,10 @@ native_asset_cases=checked_test(ROOT/'tests/refactor_native_asset.py',r'(\d+) ca
 HELPER=DIST/'luma-refactor-helper.jar'
 names={'PanelNodeDiscovery.class','SystemVersion.class','SystemVersion$Reader.class','SystemVersion$Result.class','NativePanelAsset.class','NativePanelClient.class','NativePanelRoot.class','BrightnessControlOptions.class','RootControl.class','RootSettings.class','ForegroundUser.class','CurvePlan.class','CurveIdentity.class','TraditionalCurve.class','ThermalPolicy.class','MemoryPolicy.class','MemoryOptions.class','MemoryScene.class','LowLightThresholds.class','LowLightAssistGate.class','PersistentMemory.class','DelayPolicy.class','LegacyModules.class','AppBuild.class','LowLightPolicy.class','DiagnosticCollector.class','AdvancedOptions.class','AdvancedPolicy.class','OutdoorOptions.class','OutdoorPolicy.class','ConfigurationFile.class','ConfigurationFile$Imported.class','StatusTransport.class','StatusTransport$Reader.class'}
 run(['java','-cp',BT/'lib/d8.jar','com.android.tools.r8.D8','--min-api','34','--lib',ANDROID,'--output',HELPER,*[p for p in inputs if p.name in names or p.name.startswith('DiagnosticCollector$')]])
-run(['C:/msys64/usr/bin/bash.exe','-n',SRC/'restore_refactor_hook_android.sh'])
+RESTORE_SCRIPT=SRC/'restore_refactor_hook_android.sh'
+MSYS_BASH=Path('C:/msys64/usr/bin/bash.exe')
+if MSYS_BASH.is_file():run([MSYS_BASH,'-n',RESTORE_SCRIPT])
+else:run(['wsl.exe','--exec','bash','-n',wsl_path(RESTORE_SCRIPT)])
 meta={'build':BUILD,'version':ARTIFACT_VERSION,'version_code':VERSION_CODE,'test_build':IS_TEST,'app_name':'HyperLux','architecture':'oem_active_curve_backend_hook','dark_lock_sensor_manager':'automatic_brightness_controller','dark_lock_sensor_matching':'type_and_handle','protected_hbm_threshold_access_fixed':True,'confirmed_night_driving_low_light_guard':True,'oem_night_debounce_budget_preserved':True,'low_light_threshold_value_diagnostics':True,'valid_zero_assist_bounded_confirmation':True,'manual_panel_backend':'raw_main_node','framework_output_bridge':False,'primary_node_auto_discovery':True,'node_discovery_cases':node_discovery_cases,'primary_node_permissions_bound_to_identity':True,'system_version_preflight':True,'system_version_cases':system_version_cases,'thermal_ceiling_range':[38,50],'outdoor_maximum_preset':True,'panel_interaction_cases':panel_interaction_cases,'raw_output_cases':raw_output_cases,'raw_panel_unlock_restore':True,'raw_panel_pauses_during_keyguard_and_aod':True,'raw_panel_relative_gesture':True,'raw_panel_positive_output_isolation':True,
       'device_verified':False,'draft_health_cases':draft_health_cases,'draft_changes_during_save_preserved':True,'native_health_monotonic_heartbeat_ms':2000,'native_health_max_age_ms':5000,'raw_dark_handover_auto_recovery':True,'raw_lost_ack_session_rollback':True,'memory_firmware_checks':memory_firmware_cases,'compile_api':82,'compile_api_sha256':API_SHA,
       'sdk_compile':37,'sdk_min':34,'separate_output_daemon':True,'raw_main_panel_native_guard':True,'native_source_sha256':{p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in (SRC/'native').glob('*') if p.is_file()},'native_guard_sha256':hashlib.sha256(NATIVE.read_bytes()).hexdigest(),
@@ -120,7 +127,7 @@ with zipfile.ZipFile(source,'w',zipfile.ZIP_DEFLATED) as z:
     for p in sorted(SRC.rglob('*')):
         if p.is_file():z.write(p,p.relative_to(ROOT))
     z.write(ROOT/'LICENSE','LICENSE');z.write(ROOT/'README.md','README.md');z.write(ROOT/'CHANGELOG.md','CHANGELOG.md');z.write(Path(__file__),'tools/build_refactor_hook_test.py');z.write(ROOT/'tests/refactor_hook_firmware.py','tests/refactor_hook_firmware.py');z.write(ROOT/'tests/refactor_diagnostics.py','tests/refactor_diagnostics.py')
-    for name in ['refactor_draft_and_health.py','refactor_panel_nodes.py','refactor_curve_comparison.py','refactor_panel_interaction.py','refactor_raw_output.py','refactor_native_transport.py','refactor_native_asset.py','refactor_raw_panel_transaction.py','refactor_native_panel.py','refactor_brightness_control.py','refactor_advanced_hooks.py','refactor_advanced_firmware.py','refactor_traditional.py','refactor_traditional_firmware.py','refactor_user_identity.py','refactor_system_version.py','refactor_outdoor.py','refactor_outdoor_firmware.py','refactor_configuration.py','refactor_status_transport.py','refactor_persistent_memory.py','refactor_memory_lifecycle.py','refactor_memory_firmware.py']:z.write(ROOT/'tests'/name,'tests/'+name)
+    for name in ['refactor_draft_and_health.py','refactor_panel_nodes.py','refactor_curve_comparison.py','refactor_panel_interaction.py','refactor_raw_output.py','refactor_native_transport.py','refactor_native_asset.py','refactor_raw_panel_transaction.py','refactor_native_panel.py','native_host.py','refactor_brightness_control.py','refactor_advanced_hooks.py','refactor_advanced_firmware.py','refactor_traditional.py','refactor_traditional_firmware.py','refactor_user_identity.py','refactor_system_version.py','refactor_outdoor.py','refactor_outdoor_firmware.py','refactor_configuration.py','refactor_status_transport.py','refactor_persistent_memory.py','refactor_memory_lifecycle.py','refactor_memory_firmware.py']:z.write(ROOT/'tests'/name,'tests/'+name)
     for p in sorted((ROOT/'docs/releases').glob('*.md')):z.write(p,p.relative_to(ROOT))
     z.write(ROOT/'docs/release-policy.md','docs/release-policy.md')
     review=ROOT/'docs'/('review-'+VERSION+'.md')

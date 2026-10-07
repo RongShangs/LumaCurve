@@ -1,6 +1,7 @@
 """Compile production native policy on the host; no kernel/SELinux/device claims."""
 from pathlib import Path
 import subprocess
+from native_host import compile_and_run
 R=Path(__file__).resolve().parents[1];O=R/'build/native-panel-tests';O.mkdir(parents=True,exist_ok=True)
 p=O/'test.c'
 p.write_text(r'''
@@ -42,5 +43,5 @@ int main(void){
 }
 ''',encoding='utf-8')
 exe=O/'test.exe'
-subprocess.run(['C:/msys64/mingw64/bin/gcc.exe','-std=c11','-static','-Wall','-Wextra','-Werror','-I',str(R/'experimental/refactor_hook/native'),str(p),'-o',str(exe)],check=True)
-subprocess.run([str(exe)],check=True)
+result=compile_and_run(['C:/msys64/mingw64/bin/gcc.exe','-std=c11','-static','-Wall','-Wextra','-Werror','-I',str(R/'experimental/refactor_hook/native'),str(p),'-o',str(exe)],exe)
+print(result.stdout,end='')
