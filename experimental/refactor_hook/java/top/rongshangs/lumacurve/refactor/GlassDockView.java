@@ -104,7 +104,6 @@ public final class GlassDockView extends ViewGroup {
         setWillNotDraw(false);
         setClipChildren(false);
         setClipToPadding(false);
-        setLayerType(LAYER_TYPE_HARDWARE, null);
         touchSlop = ViewConfiguration.get(context).getScaledTouchSlop();
         float density = getResources().getDisplayMetrics().density;
         cornerRadius = 32f * density;
@@ -116,12 +115,16 @@ public final class GlassDockView extends ViewGroup {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             try {
                 shader = new RuntimeShader(loadShader());
+                setLayerType(LAYER_TYPE_HARDWARE, null);
             } catch (RuntimeException ignored) {
                 // Vendor AGSL implementations can reject optional shader features.
                 // Keep the dock usable and transparent when that happens.
                 shader = null;
                 effectUnavailable = true;
+                setLayerType(LAYER_TYPE_SOFTWARE, null);
             }
+        } else {
+            setLayerType(LAYER_TYPE_SOFTWARE, null);
         }
         updateOutline();
     }
@@ -232,12 +235,13 @@ public final class GlassDockView extends ViewGroup {
         clipPath.reset();
         clipPath.addRoundRect(0, 0, getWidth(), getHeight(), cornerRadius, cornerRadius, Path.Direction.CW);
         canvas.clipPath(clipPath);
+        // Always paint a themed translucent base.  RuntimeShader is an optional
+        // enhancement: shader compilation can fail on vendor implementations or
+        // the view can be software-rendered, and leaving the base conditional
+        // makes the complete dock disappear in those cases.
+        fallbackPaint.setColor(fallbackColor);
+        canvas.drawRect(0, 0, getWidth(), getHeight(), fallbackPaint);
         if (shader != null && !effectUnavailable && canvas.isHardwareAccelerated() && source != null && !disposed) {
-            // The bound source is a sibling content surface and may be transparent
-            // over a user-selected root background. Keep a small translucent base so
-            // the dock stays readable while the shader contributes refraction.
-            fallbackPaint.setColor(fallbackColor);
-            canvas.drawRect(0, 0, getWidth(), getHeight(), fallbackPaint);
             canvas.drawRenderNode(sourceNode);
         }
         super.dispatchDraw(canvas);
