@@ -63,10 +63,10 @@ public final class MainActivity extends Activity {
     }
     TextView text(String value,int size,int color){TextView t=new LocalText();t.setText(value);t.setTextSize(size);t.setTextColor(themed(color));t.setPadding(0,dp(4),0,dp(4));return t;}
     RippleDrawable ripple(int color,float radius){
-        GradientDrawable normal=(color==Color.WHITE||color==0xffeef2fa||color==0xffeef3ff||color==0xffedf3ff||color==0xffedf1f7)?glassSurface(color,radius):background(color,radius);
+        GradientDrawable normal=background(color,radius);
         return new RippleDrawable(ColorStateList.valueOf(darkTheme?0x3091b3ff:0x203265df),normal,background(Color.WHITE,radius));
     }
-    ImageView image(String asset,int size,float radius){ImageView v=new ImageView(this);v.setScaleType(ImageView.ScaleType.CENTER_CROP);v.setBackground(glassSurface(0xffeef2ff,radius));v.setClipToOutline(true);
+    ImageView image(String asset,int size,float radius){ImageView v=new ImageView(this);v.setScaleType(ImageView.ScaleType.CENTER_CROP);v.setBackground(background(0xffeef2ff,radius));v.setClipToOutline(true);
         try{if(asset==null)v.setImageDrawable(getDrawable(getResources().getIdentifier("icon","drawable",getPackageName())));else v.setImageBitmap(decodeAsset(asset,size));}catch(IOException ignored){}
         v.setLayoutParams(new LinearLayout.LayoutParams(dp(size),dp(size)));return v;}
     Bitmap decodeAsset(String asset,int size)throws IOException{
@@ -78,7 +78,7 @@ public final class MainActivity extends Activity {
         try(InputStream input=getAssets().open(asset)){return BitmapFactory.decodeStream(input,null,options);}
     }
     AlertDialog dialog(String title,View body){LinearLayout actions=column();actions.setOrientation(LinearLayout.HORIZONTAL);actions.setGravity(Gravity.END);actions.setTag("actions");
-        ResponsiveDialog box=new ResponsiveDialog(this,text(title,20,INK),body,actions);boolean landscape=getResources().getConfiguration().orientation==android.content.res.Configuration.ORIENTATION_LANDSCAPE;box.setPadding(dp(22),dp(landscape?12:20),dp(22),dp(landscape?12:18));box.setBackground(glassSurface(BG,24));AlertDialog d=new AlertDialog.Builder(this).setView(box).create();
+        ResponsiveDialog box=new ResponsiveDialog(this,text(title,20,INK),body,actions);boolean landscape=getResources().getConfiguration().orientation==android.content.res.Configuration.ORIENTATION_LANDSCAPE;box.setPadding(dp(22),dp(landscape?12:20),dp(22),dp(landscape?12:18));box.setBackground(background(BG,24));AlertDialog d=new AlertDialog.Builder(this).setView(box).create();
         box.setClipToOutline(true);Window w=d.getWindow();ResponsiveDialog.configure(this,w,dp(landscape?520:440));if(w!=null)w.setDimAmount(.32f);
         box.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener(){public void onViewAttachedToWindow(View v){openDialogs.add(d);}public void onViewDetachedFromWindow(View v){openDialogs.remove(d);}});
         // Animate the content itself: application styles are not valid WMS animation resources.
@@ -98,13 +98,22 @@ public final class MainActivity extends Activity {
     /** Creates a horizontal container without attaching it to a parent. */
     LinearLayout row(){LinearLayout b=new LinearLayout(this);b.setOrientation(LinearLayout.HORIZONTAL);b.setGravity(Gravity.CENTER_VERTICAL);return b;}
     GradientDrawable background(int color,float radius){GradientDrawable b=new GradientDrawable();b.setColor(themed(color));b.setCornerRadius(dp(radius));return b;}
-    /** Translucent surface used by cards and secondary controls so a chosen background remains visible. */
-    GradientDrawable glassSurface(int color,float radius){
-        GradientDrawable b=new GradientDrawable();int base=themed(color);int alpha=darkTheme?0xb8:0xd8;
-        b.setColor((base&0x00ffffff)|(alpha<<24));b.setCornerRadius(dp(radius));
-        b.setStroke(dp(1),darkTheme?0x42ffffff:0x58ffffff);return b;
+    /**
+     * Static content card. The liquid-glass effect belongs to the dock only;
+     * cards stay lightweight so scrolling settings and logs never trigger a
+     * per-card RenderEffect pass. The palette still follows the device theme.
+     */
+    LinearLayout card(LinearLayout parent){
+        LinearLayout b=column();
+        b.setBackground(background(darkTheme?0xff1c232e:0xffffffff,18));
+        b.setClipToOutline(true);
+        b.setPadding(dp(18),dp(17),dp(18),dp(17));
+        b.setElevation(dp(1.5f));
+        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);
+        lp.bottomMargin=dp(12);
+        parent.addView(b,lp);
+        return b;
     }
-    LinearLayout card(LinearLayout parent){GlassSurface b=new GlassSurface(this);b.setDarkMode(darkTheme);b.setGlassColor(darkTheme?0xff1b2028:Color.WHITE);b.setCornerRadius(dp(18));b.setPadding(dp(18),dp(17),dp(18),dp(17));b.setElevation(dp(1.5f));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.bottomMargin=dp(12);parent.addView(b,lp);return b;}
     LinearLayout row(LinearLayout parent){LinearLayout r=new LinearLayout(this);r.setGravity(Gravity.CENTER_VERTICAL);parent.addView(r,new LinearLayout.LayoutParams(-1,-2));return r;}
     Button action(String name,Runnable task){Button b=new LocalButton();b.setText(name);b.setTextSize(14);b.setAllCaps(false);b.setTextColor(BLUE);b.setBackground(ripple(0xffeef2fa,12));b.setMinHeight(0);b.setMinimumHeight(0);b.setPadding(dp(10),0,dp(10),0);b.setOnClickListener(v->task.run());return b;}
     Button button(String name,Runnable task,LinearLayout parent){Button b=action(name,task);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,dp(44));lp.topMargin=dp(8);lp.bottomMargin=dp(4);parent.addView(b,lp);return b;}
@@ -116,16 +125,32 @@ public final class MainActivity extends Activity {
         try{factors=CurvePlan.factors(getPreferences(0).getString("draft","1,1,1,1"));}catch(Exception ignored){}
         curveFloor=getPreferences(0).getFloat("draft_floor",0);
         root=column();root.setBackgroundColor(BG);setContentView(root);
-        header=row(root);header.setPadding(dp(18),0,dp(18),0);header.setLayoutParams(new LinearLayout.LayoutParams(-1,dp(64)));header.setBackground(glassSurface(BG,0));
+        header=row(root);header.setPadding(dp(18),0,dp(18),0);header.setLayoutParams(new LinearLayout.LayoutParams(-1,dp(64)));header.setBackground(background(BG,0));
         ImageView icon=image(null,38,12);header.addView(icon);
         LinearLayout brand=column();LinearLayout.LayoutParams brandLp=new LinearLayout.LayoutParams(0,-2,1);brandLp.leftMargin=dp(12);header.addView(brand,brandLp);brand.addView(text("HyperLux",20,INK));
-        badge=text("连接中",12,BLUE);badge.setPadding(dp(10),dp(5),dp(10),dp(5));badge.setBackground(glassSurface(0xffedf3ff,10));header.addView(badge);
+        badge=text("连接中",12,BLUE);badge.setPadding(dp(10),dp(5),dp(10),dp(5));badge.setBackground(background(0xffedf3ff,10));header.addView(badge);
         note=text("",12,MUTED);note.setVisibility(View.GONE);
-        content=new FrameLayout(this);content.setBackgroundColor(Color.TRANSPARENT);root.addView(content,new LinearLayout.LayoutParams(-1,0,1));
+        // Keep the page surface and the dock in one host so the dock floats over
+        // real page pixels. Sampling a sibling below the dock only captures the
+        // root background, which makes the lens look flat on device.
+        FrameLayout contentHost=new FrameLayout(this);contentHost.setClipChildren(false);contentHost.setClipToPadding(false);
+        root.addView(contentHost,new LinearLayout.LayoutParams(-1,0,1));
+        content=new FrameLayout(this);content.setBackgroundColor(Color.TRANSPARENT);content.setClipChildren(false);content.setClipToPadding(false);
+        content.setPadding(0,0,0,dp(82));
+        contentHost.addView(content,new FrameLayout.LayoutParams(-1,-1));
         for(int i=0;i<4;i++){LinearLayout b=column();pages[i]=b;if(i==0||i==2){b.setPadding(dp(16),dp(8),dp(16),dp(6));content.addView(b,new FrameLayout.LayoutParams(-1,-1));}else{ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);b.setPadding(dp(18),dp(10),dp(18),dp(22));scroll.addView(b);content.addView(scroll,new FrameLayout.LayoutParams(-1,-1));scroll.setVisibility(View.GONE);}}
         makeStatus();makeSettings();makeLogs();makeAbout();
         glassDock=new GlassDockView(this);glassDock.setDarkMode(darkTheme);glassDock.bind(content);
-        LinearLayout.LayoutParams dockParams=new LinearLayout.LayoutParams(-1,dp(70));dockParams.leftMargin=dp(18);dockParams.rightMargin=dp(18);dockParams.topMargin=dp(4);dockParams.bottomMargin=dp(10);root.addView(glassDock,dockParams);
+        FrameLayout.LayoutParams dockParams=new FrameLayout.LayoutParams(-1,dp(70),Gravity.BOTTOM);dockParams.leftMargin=dp(18);dockParams.rightMargin=dp(18);dockParams.topMargin=dp(4);dockParams.bottomMargin=dp(12);contentHost.addView(glassDock,dockParams);
+        glassDock.setOnApplyWindowInsetsListener((view,insets)->{
+            int navigationBottom=0;
+            if(Build.VERSION.SDK_INT>=30)navigationBottom=insets.getInsets(WindowInsets.Type.navigationBars()).bottom;
+            FrameLayout.LayoutParams lp=(FrameLayout.LayoutParams)view.getLayoutParams();
+            int bottom=dp(12)+Math.min(navigationBottom,dp(28));
+            if(lp.bottomMargin!=bottom){lp.bottomMargin=bottom;view.setLayoutParams(lp);content.setPadding(0,0,0,dp(82)+Math.min(navigationBottom,dp(28)));}
+            return insets;
+        });
+        glassDock.requestApplyInsets();
         // The dock tabs use horizontal weight (width=0, weight=1).  A vertical
         // container measures those children at zero width, which made the whole
         // navigation bar appear empty even though the dock itself was present.
@@ -158,7 +183,7 @@ public final class MainActivity extends Activity {
             if(i==0||i==3||i==6){TextView section=text(i==0?"亮度与偏好":i==3?"响应与保护":"运行与界面",13,BLUE);section.setPadding(dp(4),dp(12),dp(4),dp(8));settingsHome.addView(section);}
             final int group=i;LinearLayout entry=card(settingsHome);entry.setPadding(dp(16),dp(11),dp(12),dp(11));((LinearLayout.LayoutParams)entry.getLayoutParams()).bottomMargin=dp(8);entry.setBackground(ripple(Color.WHITE,18));entry.setClipToOutline(true);entry.setClickable(true);entry.setOnClickListener(v->showSettingsGroup(group));LinearLayout line=row(entry);line.setBaselineAligned(false);LinearLayout labels=column();line.addView(labels,new LinearLayout.LayoutParams(0,-2,1));TextView name=text(names[i],16,INK);name.setIncludeFontPadding(false);name.setPadding(0,0,0,dp(3));labels.addView(name);TextView description=text(descriptions[i],12,MUTED);description.setIncludeFontPadding(false);description.setPadding(0,0,0,0);labels.addView(description);line.addView(new NavigationArrow(false),new LinearLayout.LayoutParams(dp(28),dp(32)));
             // Each category owns a separate screen and scroll position, outside the settings home.
-            LinearLayout screen=column();screen.setBackground(glassSurface(BG,0));settingScreens[i]=screen;content.addView(screen,new FrameLayout.LayoutParams(-1,-1));screen.setVisibility(View.GONE);
+            LinearLayout screen=column();screen.setBackground(background(BG,0));settingScreens[i]=screen;content.addView(screen,new FrameLayout.LayoutParams(-1,-1));screen.setVisibility(View.GONE);
             LinearLayout bar=row(screen);bar.setPadding(dp(10),dp(6),dp(18),dp(6));bar.setBaselineAligned(false);NavigationArrow back=new NavigationArrow(true);back.setBackground(ripple(Color.TRANSPARENT,24));back.setClipToOutline(true);back.setClickable(true);back.setFocusable(true);back.setContentDescription(tr("返回设置"));back.setOnClickListener(v->showSettingsGroup(-1));bar.addView(back,new LinearLayout.LayoutParams(dp(48),dp(48)));TextView heading=text(names[i],18,INK);LinearLayout.LayoutParams title=new LinearLayout.LayoutParams(0,-2,1);title.leftMargin=dp(6);bar.addView(heading,title);
             ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);screen.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));settingGroups[i]=column();settingGroups[i].setPadding(dp(18),dp(10),dp(18),dp(12));scroll.addView(settingGroups[i]);
             LinearLayout footer=column();footer.setPadding(dp(18),dp(4),dp(18),dp(10));screen.addView(footer);settingHints[i]=text("有未保存的设置",12,0xffbd3434);footer.addView(settingHints[i]);settingHints[i].setVisibility(View.GONE);settingApply[i]=button("保存并应用",this::submit,footer);settingApply[i].setEnabled(false);
@@ -406,7 +431,7 @@ public final class MainActivity extends Activity {
         follow.setOnCheckedChangeListener((v,on)->{autoScroll=on;getPreferences(0).edit().putBoolean("log_auto_scroll",on).apply();if(on)scrollLogs();});r.addView(refresh,new LinearLayout.LayoutParams(dp(52),dp(32)));
         TextView hint=text("当前系统进程 · 最近 160 条",11,MUTED);b.addView(hint);
         logText=text("尚无记录",12,INK);logText.setTypeface(Typeface.MONOSPACE);logText.setTextIsSelectable(true);logText.setPadding(dp(10),dp(8),dp(10),dp(8));
-        logScroller=new ScrollView(this);logScroller.setBackground(glassSurface(0xfff2f4f8,12));logScroller.setClipToOutline(true);logScroller.addView(logText);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,0,1);lp.topMargin=dp(8);lp.bottomMargin=dp(8);b.addView(logScroller,lp);
+        logScroller=new ScrollView(this);logScroller.setBackground(background(0xfff2f4f8,12));logScroller.setClipToOutline(true);logScroller.addView(logText);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,0,1);lp.topMargin=dp(8);lp.bottomMargin=dp(8);b.addView(logScroller,lp);
         logText.addOnLayoutChangeListener((v,l,t,right,bottom,ol,ot,or,ob)->{if(autoScroll&&bottom-t!=ob-ot)scrollLogs();});
         logScroller.addOnLayoutChangeListener((v,l,t,right,bottom,ol,ot,or,ob)->{if(autoScroll&&bottom-t!=ob-ot)scrollLogs();});
         r=row(b);compact("亮度分支",this::branches,r);compact("详细读数",this::details,r);compact("导出分析包",()->run("export",null),r);
@@ -416,7 +441,7 @@ public final class MainActivity extends Activity {
     void makeAbout(){
         LinearLayout b=card(pages[3]);b.setPadding(dp(22),dp(22),dp(22),dp(18));LinearLayout r=row(b);r.addView(image(null,68,20));LinearLayout title=column();LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-2,1);lp.leftMargin=dp(18);r.addView(title,lp);title.addView(text("HyperLux",26,INK));String displayVersion=AppBuild.ARTIFACT_VERSION.endsWith(".0")?AppBuild.ARTIFACT_VERSION.substring(0,AppBuild.ARTIFACT_VERSION.length()-2):AppBuild.ARTIFACT_VERSION;title.addView(text(displayVersion+" · "+tr(AppBuild.TEST?"曲线适配测试版":"正式版"),14,BLUE));
         TextView intro=text("适配 HyperOS 4 的自动亮度工具。\n\n沿用系统双侧感光与平滑过渡，支持可编辑曲线、手动记忆保存与暗光稳定。户外高亮、温控和变化确认可按需调整，配置支持导入导出。",15,INK);intro.setLineSpacing(dp(5),1);intro.setPadding(0,dp(20),0,dp(16));b.addView(intro);
-        b.addView(text("HyperOS 4 · Root · LSPosed",12,MUTED));updateLabel=text("自动检查应用更新",12,BLUE);updateLabel.setPadding(dp(12),dp(10),dp(12),dp(10));updateLabel.setBackground(glassSurface(0xffeef3ff,12));lp=new LinearLayout.LayoutParams(-1,-2);lp.topMargin=dp(10);lp.bottomMargin=dp(6);b.addView(updateLabel,lp);
+        b.addView(text("HyperOS 4 · Root · LSPosed",12,MUTED));updateLabel=text("自动检查应用更新",12,BLUE);updateLabel.setPadding(dp(12),dp(10),dp(12),dp(10));updateLabel.setBackground(background(0xffeef3ff,12));lp=new LinearLayout.LayoutParams(-1,-2);lp.topMargin=dp(10);lp.bottomMargin=dp(6);b.addView(updateLabel,lp);
         r=row(b);compact("官网",()->open("https://lc.rongshangs.top"),r);compact("GitHub",()->open(UpdateChecker.REPO),r);compact("开源协议",()->open("https://www.gnu.org/licenses/gpl-3.0.html"),r);
         LinearLayout group=column();group.setPadding(dp(14),dp(12),dp(14),dp(12));group.setBackground(ripple(0xffeef3ff,14));group.setClipToOutline(true);group.setClickable(true);group.setOnClickListener(v->copyGroupNumber());lp=new LinearLayout.LayoutParams(-1,-2);lp.topMargin=dp(12);b.addView(group,lp);
         group.addView(text("QQ 交流群",12,MUTED));r=row(group);r.setBaselineAligned(false);TextView number=text("314981836",22,BLUE);number.setPadding(0,0,0,0);r.addView(number,new LinearLayout.LayoutParams(0,-2,1));Button copy=action("复制群号",this::copyGroupNumber);copy.setTextSize(12);copy.setPadding(dp(8),0,dp(8),0);r.addView(copy,new LinearLayout.LayoutParams(dp(88),dp(34)));group.addView(text("暗号：1691",12,MUTED));
@@ -496,7 +521,7 @@ public final class MainActivity extends Activity {
     void show(String message){if(!destroyed){note.setText(message);note.setVisibility(message==null||message.isEmpty()?View.GONE:View.VISIBLE);if(message!=null&&!message.isEmpty()&&page!=2)Toast.makeText(this,tr(message),Toast.LENGTH_SHORT).show();}}
     void permissionPrompt(String key,String title,String message){
         permissionBlocked=true;if(!visible||destroyed||permissionDialogVisible||permissionNotice.equals(key))return;
-        permissionNotice=key;permissionDialogVisible=true;LinearLayout body=column();TextView icon=text(key.equals("root")?"ROOT":key.equals("lsp")?"LSPosed":key.equals("os")?"HyperOS 4":"接口检查",14,BLUE);icon.setPadding(dp(12),dp(8),dp(12),dp(8));icon.setBackground(glassSurface(0xffedf3ff,12));body.addView(icon);body.addView(text(message,14,MUTED));
+        permissionNotice=key;permissionDialogVisible=true;LinearLayout body=column();TextView icon=text(key.equals("root")?"ROOT":key.equals("lsp")?"LSPosed":key.equals("os")?"HyperOS 4":"接口检查",14,BLUE);icon.setPadding(dp(12),dp(8),dp(12),dp(8));icon.setBackground(background(0xffedf3ff,12));body.addView(icon);body.addView(text(message,14,MUTED));
         AlertDialog d=dialog(title,body);d.setOnDismissListener(v->{permissionDialogVisible=false;ui.post(()->{offerLegacyModules();offerUpdate();});});d.show();dialogButton(d,"稍后",null,false);dialogButton(d,"重新检测",()->{permissionNotice="";permissionBlocked=false;ui.postDelayed(()->run("inspect",null),150);},true);
     }
     void preset(float[] next){
@@ -559,7 +584,7 @@ public final class MainActivity extends Activity {
         }catch(Exception error){show(error.getMessage());}
     }
     JSONObject presets(){try{return new JSONObject(getPreferences(0).getString("presets","{}"));}catch(Exception error){return new JSONObject();}}
-    EditText input(String hint){EditText v=new EditText(this);v.setSingleLine(true);v.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_DONE|android.view.inputmethod.EditorInfo.IME_FLAG_NO_EXTRACT_UI);v.setTextSize(16);v.setHint(tr(hint));v.setTextColor(INK);v.setHintTextColor(MUTED);v.setPadding(dp(12),dp(10),dp(12),dp(10));v.setBackground(glassSurface(0xffedf1f7,12));return v;}
+    EditText input(String hint){EditText v=new EditText(this);v.setSingleLine(true);v.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_DONE|android.view.inputmethod.EditorInfo.IME_FLAG_NO_EXTRACT_UI);v.setTextSize(16);v.setHint(tr(hint));v.setTextColor(INK);v.setHintTextColor(MUTED);v.setPadding(dp(12),dp(10),dp(12),dp(10));v.setBackground(background(0xffedf1f7,12));return v;}
     void savePreset(){
         if(factoryLux==null){show("连接系统后再保存预设");return;}try{new CurvePlan(factoryLux,factoryNit,minimum,maximum,factors,curveFloor);}catch(Exception error){show(error.getMessage());return;}
         EditText input=input("预设名称，最多 24 字");input.setFilters(new android.text.InputFilter[]{new android.text.InputFilter.LengthFilter(24)});AlertDialog d=dialog("保存曲线预设",input);d.show();dialogButton(d,"取消",null,false);dialogButton(d,"保存",()->{
@@ -588,7 +613,7 @@ public final class MainActivity extends Activity {
         if(s.equals("ScreenOffBrightnessStrategy"))return "熄屏";if(s.equals("DozeBrightnessStrategy"))return "息屏显示";
         if(s.equals("TemporaryBrightnessStrategy"))return "临时亮度";if(s.equals("OverrideBrightnessStrategy"))return "应用指定亮度";return s;
     }
-    void branchRow(LinearLayout parent,String title,String state,String explanation){LinearLayout b=card(parent);b.setBackground(glassSurface(0xffeef3ff,14));b.setPadding(dp(12),dp(10),dp(12),dp(10));b.addView(text(title+" · "+state,14,INK));b.addView(text(explanation,12,MUTED));}
+    void branchRow(LinearLayout parent,String title,String state,String explanation){LinearLayout b=card(parent);b.setBackground(background(0xffeef3ff,14));b.setPadding(dp(12),dp(10),dp(12),dp(10));b.addView(text(title+" · "+state,14,INK));b.addView(text(explanation,12,MUTED));}
     void branches(){
         LinearLayout body=column();if(runtime!=null&&runtime.optJSONObject("outdoor")!=null)branchRow(body,"户外高亮",outdoorDetails(runtime.optJSONObject("outdoor")),"数值是系统亮度坐标的百分比，不是实际 nit。请求目标、可用范围与实际输出分别记录；画面、温控和驱动仍可能限亮。高亮超时由独立事件计时，不依赖光感不断刷新。 ");JSONObject frame=runtime==null?null:runtime.optJSONObject("last_pipeline");
         if(runtime!=null&&runtime.optJSONObject("brightness_control")!=null){JSONObject c=runtime.optJSONObject("brightness_control");branchRow(body,"亮度控制方式",c.optString("owner").equals("dark")?"暗光锁定":(c.optString("owner").equals("panel")||c.optString("owner").equals("raw_panel"))?"主屏手动面板":"系统调节","暗光锁定低频监听主辅光感，环境显著变亮后恢复自动。主屏弹窗直接接管背光节点，关闭弹窗仍保持；锁屏和息屏显示期间释放节点，解锁后恢复原目标；开启自动亮度结束保持。");}

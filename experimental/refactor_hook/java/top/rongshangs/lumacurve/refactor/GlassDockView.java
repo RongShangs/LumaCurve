@@ -21,17 +21,24 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  *
- * Adapted from https://github.com/QmDeve/AndroidLiquidGlassView.
- * This small host-side adapter intentionally has no AndroidX dependency.
+ * The backdrop shader is adapted from https://github.com/QmDeve/AndroidLiquidGlassView.
+ * The 4dp frost/24dp lens tuning and selected-tab capsule follow the visual
+ * treatment in https://github.com/liuran001/WeChat-LiquidGlass (MIT, copyright
+ * liuran001). Its WeChat/QQ Xposed bridge is not part of this app; this class
+ * is a host-side adapter with no AndroidX dependency.
  */
 package top.rongshangs.lumacurve.refactor;
 
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.ColorMatrix;
+import android.graphics.ColorMatrixColorFilter;
+import android.graphics.LinearGradient;
 import android.graphics.Outline;
 import android.graphics.Paint;
 import android.graphics.Path;
+import android.graphics.RectF;
 import android.graphics.RenderEffect;
 import android.graphics.RenderNode;
 import android.graphics.RuntimeShader;
@@ -58,22 +65,38 @@ import java.io.InputStreamReader;
  */
 public final class GlassDockView extends ViewGroup {
     private static final String SHADER_ASSET = "liquidglass_effect.agsl";
+    /** KernelSU/WeChat LiquidGlassPanel tuning: 4dp frost + a 24dp lens rim. */
+    private static final float WECHAT_BLUR_DP = 4f;
+    private static final float WECHAT_REFRACTION_DP = 24f;
+    private static final float WECHAT_SATURATION = 1.5f;
     private final RenderNode sourceNode = new RenderNode("LumaCurveGlassDockSource");
     private final Path clipPath = new Path();
     private final Paint fallbackPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint selectionPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint selectionEdgePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final RectF selectedRect = new RectF();
+    private final RectF fromRect = new RectF();
+    private final RectF toRect = new RectF();
     private final int[] sourceLocation = new int[2];
     private final int[] hostLocation = new int[2];
     private final ViewTreeObserver.OnPreDrawListener preDrawListener =
             new ViewTreeObserver.OnPreDrawListener() {
                 @Override public boolean onPreDraw() {
-                    recordSource();
+                    if (captureDirty) recordSource();
                     return true;
+                }
+            };
+    private final ViewTreeObserver.OnDrawListener sourceDrawListener =
+            new ViewTreeObserver.OnDrawListener() {
+                @Override public void onDraw() {
+                    captureDirty = true;
                 }
             };
 
     private ViewGroup source;
     private RuntimeShader shader;
     private RenderEffect cachedBlur;
+    private RenderEffect saturationEffect;
     private float cornerRadius;
     private float refractionHeight;
     private float refractionOffset;
@@ -87,12 +110,22 @@ public final class GlassDockView extends ViewGroup {
     private float lastBlur = Float.NaN;
     private long lastBlurUpdate;
     private boolean listenerAdded;
+    private boolean drawListenerAdded;
+    private boolean captureDirty = true;
     private boolean disposed;
     private boolean effectUnavailable;
+    private boolean captureUnavailable;
     private float downX, downY;
     private boolean swiping;
     private int touchSlop;
     private SwipeListener swipeListener;
+    private final float density;
+    private int selectedIndex = -1;
+    private int animatedFrom = -1;
+    private int animatedTo = -1;
+    private long selectionAnimationStart;
+    private static final long SELECTION_ANIMATION_MS = 260L;
+    private boolean ancestorsBlocked;
 
     public interface SwipeListener {
         /** Called with -1 for the previous page and +1 for the next page. */
@@ -105,12 +138,15 @@ public final class GlassDockView extends ViewGroup {
         setClipChildren(false);
         setClipToPadding(false);
         touchSlop = ViewConfiguration.get(context).getScaledTouchSlop();
-        float density = getResources().getDisplayMetrics().density;
+        density = getResources().getDisplayMetrics().density;
         cornerRadius = 32f * density;
-        refractionHeight = 20f * density;
-        refractionOffset = -52f * density;
+        refractionHeight = WECHAT_REFRACTION_DP * density;
+        refractionOffset = -WECHAT_REFRACTION_DP * density;
         dispersion = .34f;
-        blurRadius = 8f;
+        blurRadius = WECHAT_BLUR_DP * density;
+        selectionPaint.setStyle(Paint.Style.FILL);
+        selectionEdgePaint.setStyle(Paint.Style.STROKE);
+        selectionEdgePaint.setStrokeWidth(Math.max(0.75f, density));
         setDarkMode(false);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             try {
@@ -134,6 +170,8 @@ public final class GlassDockView extends ViewGroup {
         if (source == content) return;
         removeListener();
         source = content;
+        captureDirty = true;
+        captureUnavailable = false;
         addListener();
         invalidate();
     }
@@ -145,9 +183,12 @@ public final class GlassDockView extends ViewGroup {
     /** Apply the platform night mode without changing child layout. */
     public void setDarkMode(boolean dark) {
         setTintColor(dark ? 0xff111318 : 0xffffffff);
-        tintAlpha = dark ? .28f : .34f;
-        fallbackColor = dark ? 0x45111318 : 0x32ffffff;
+        tintAlpha = dark ? .30f : .34f;
+        fallbackColor = dark ? 0x5a111318 : 0x42ffffff;
+        selectionPaint.setColor(dark ? 0x3dffffff : 0x66ffffff);
+        selectionEdgePaint.setColor(dark ? 0x38ffffff : 0x80ffffff);
         updateEffect();
+        invalidate();
     }
 
     public void setCornerRadius(float px) {
@@ -192,6 +233,7 @@ public final class GlassDockView extends ViewGroup {
     @Override protected void onAttachedToWindow() {
         super.onAttachedToWindow();
         disposed = false;
+        captureUnavailable = false;
         addListener();
     }
 
@@ -210,8 +252,10 @@ public final class GlassDockView extends ViewGroup {
     }
 
     @Override protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        int width = MeasureSpec.getSize(widthMeasureSpec);
-        int height = MeasureSpec.getSize(heightMeasureSpec);
+        int desiredWidth = Math.max(getSuggestedMinimumWidth(), Math.round(280f * density));
+        int desiredHeight = Math.max(getSuggestedMinimumHeight(), Math.round(70f * density));
+        int width = resolveSize(desiredWidth, widthMeasureSpec);
+        int height = resolveSize(desiredHeight, heightMeasureSpec);
         setMeasuredDimension(width, height);
         int childWidth = MeasureSpec.makeMeasureSpec(Math.max(0, width - getPaddingLeft() - getPaddingRight()), MeasureSpec.EXACTLY);
         int childHeight = MeasureSpec.makeMeasureSpec(Math.max(0, height - getPaddingTop() - getPaddingBottom()), MeasureSpec.EXACTLY);
@@ -244,11 +288,89 @@ public final class GlassDockView extends ViewGroup {
         if (shader != null && !effectUnavailable && canvas.isHardwareAccelerated() && source != null && !disposed) {
             canvas.drawRenderNode(sourceNode);
         }
+        drawSelection(canvas);
         super.dispatchDraw(canvas);
         canvas.restoreToCount(save);
     }
 
+    /**
+     * Draw the WeChat/KernelSU-style selected capsule below the real tab
+     * controls. Keeping this as one parent layer means the tab icons and labels
+     * remain native, while the moving material has no per-tab RenderEffect.
+     */
+    private void drawSelection(Canvas canvas) {
+        ViewGroup tabRow = getChildCount() == 0 ? null : asGroup(getChildAt(0));
+        if (tabRow == null || tabRow.getChildCount() == 0) return;
+        int target = findSelectedTab(tabRow);
+        if (target < 0) target = selectedIndex >= 0 ? selectedIndex : 0;
+        if (target != selectedIndex) {
+            if (selectedIndex >= 0) {
+                findTabRect(tabRow, selectedIndex, fromRect);
+            } else {
+                findTabRect(tabRow, target, fromRect);
+            }
+            findTabRect(tabRow, target, toRect);
+            animatedFrom = selectedIndex >= 0 ? selectedIndex : target;
+            animatedTo = target;
+            selectedIndex = target;
+            selectionAnimationStart = android.os.SystemClock.uptimeMillis();
+        } else if (animatedTo < 0) {
+            findTabRect(tabRow, target, toRect);
+            fromRect.set(toRect);
+            animatedFrom = target;
+            animatedTo = target;
+        }
+        if (animatedFrom >= 0 && animatedTo >= 0) {
+            findTabRect(tabRow, animatedFrom, fromRect);
+            findTabRect(tabRow, animatedTo, toRect);
+            long elapsed = android.os.SystemClock.uptimeMillis() - selectionAnimationStart;
+            float progress = Math.max(0f, Math.min(1f, elapsed / (float) SELECTION_ANIMATION_MS));
+            // Decelerate interpolation matches the droplet settling curve
+            // without keeping a ValueAnimator alive after the tab is settled.
+            float eased = 1f - (1f - progress) * (1f - progress);
+            selectedRect.left = fromRect.left + (toRect.left - fromRect.left) * eased;
+            selectedRect.top = fromRect.top + (toRect.top - fromRect.top) * eased;
+            selectedRect.right = fromRect.right + (toRect.right - fromRect.right) * eased;
+            selectedRect.bottom = fromRect.bottom + (toRect.bottom - fromRect.bottom) * eased;
+            if (progress < 1f) postInvalidateOnAnimation();
+        } else {
+            selectedRect.set(toRect);
+        }
+        float inset = Math.max(density * 4f, 1f);
+        selectedRect.inset(inset, inset);
+        float radius = Math.min(selectedRect.height() * .5f, density * 22f);
+        selectionPaint.setShader(new LinearGradient(0f, selectedRect.top, 0f, selectedRect.bottom,
+                selectionPaint.getColor() | 0x18000000, selectionPaint.getColor(), Shader.TileMode.CLAMP));
+        canvas.drawRoundRect(selectedRect, radius, radius, selectionPaint);
+        selectionPaint.setShader(null);
+        float half = selectionEdgePaint.getStrokeWidth() * .5f;
+        canvas.drawRoundRect(selectedRect.left + half, selectedRect.top + half,
+                selectedRect.right - half, selectedRect.bottom - half,
+                Math.max(0f, radius - half), Math.max(0f, radius - half), selectionEdgePaint);
+    }
+
+    private ViewGroup asGroup(View child) {
+        return child instanceof ViewGroup ? (ViewGroup) child : null;
+    }
+
+    private int findSelectedTab(ViewGroup row) {
+        for (int i = 0; i < row.getChildCount(); i++) {
+            View child = row.getChildAt(i);
+            if (child.getVisibility() == View.VISIBLE && child.isSelected()) return i;
+        }
+        return -1;
+    }
+
+    private boolean findTabRect(ViewGroup row, int index, RectF out) {
+        if (index < 0 || index >= row.getChildCount()) return false;
+        View tab = row.getChildAt(index);
+        out.set(row.getLeft() + tab.getLeft(), row.getTop() + tab.getTop(),
+                row.getLeft() + tab.getRight(), row.getTop() + tab.getBottom());
+        return out.width() > 0f && out.height() > 0f;
+    }
+
     @Override public boolean onInterceptTouchEvent(MotionEvent event) {
+        protectAncestors(event);
         switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
                 downX = event.getX();
@@ -272,6 +394,7 @@ public final class GlassDockView extends ViewGroup {
     }
 
     @Override public boolean onTouchEvent(MotionEvent event) {
+        protectAncestors(event);
         if (event.getActionMasked() == MotionEvent.ACTION_UP && swiping) {
             float dx = event.getX() - downX;
             if (swipeListener != null && Math.abs(dx) > touchSlop * 2f) {
@@ -284,10 +407,38 @@ public final class GlassDockView extends ViewGroup {
         return true;
     }
 
+    /** Keep a parent pager from stealing a horizontal dock swipe. */
+    private void protectAncestors(MotionEvent event) {
+        android.view.ViewParent viewParent = getParent();
+        if (viewParent == null) return;
+        int action = event.getActionMasked();
+        if (action == MotionEvent.ACTION_DOWN) {
+            downX = event.getX();
+            downY = event.getY();
+            ancestorsBlocked = true;
+            viewParent.requestDisallowInterceptTouchEvent(true);
+        } else if (action == MotionEvent.ACTION_MOVE && ancestorsBlocked) {
+            float dx = event.getX() - downX;
+            float dy = event.getY() - downY;
+            if (Math.abs(dy) > touchSlop * 2f && Math.abs(dy) > Math.abs(dx)) {
+                ancestorsBlocked = false;
+                viewParent.requestDisallowInterceptTouchEvent(false);
+            }
+        } else if ((action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL)
+                && ancestorsBlocked) {
+            ancestorsBlocked = false;
+            viewParent.requestDisallowInterceptTouchEvent(false);
+        }
+    }
+
     private void addListener() {
         if (source != null && !listenerAdded) {
             source.getViewTreeObserver().addOnPreDrawListener(preDrawListener);
             listenerAdded = true;
+        }
+        if (source != null && !drawListenerAdded) {
+            source.getViewTreeObserver().addOnDrawListener(sourceDrawListener);
+            drawListenerAdded = true;
         }
     }
 
@@ -296,17 +447,40 @@ public final class GlassDockView extends ViewGroup {
             source.getViewTreeObserver().removeOnPreDrawListener(preDrawListener);
             listenerAdded = false;
         }
+        if (source != null && drawListenerAdded) {
+            source.getViewTreeObserver().removeOnDrawListener(sourceDrawListener);
+            drawListenerAdded = false;
+        }
     }
 
     private void recordSource() {
-        if (shader == null || source == null || disposed || source.getWidth() <= 0 || source.getHeight() <= 0) return;
+        if (shader == null || source == null || disposed
+                || source.getWidth() <= 0 || source.getHeight() <= 0) return;
         int w = Math.max(1, getWidth()), h = Math.max(1, getHeight());
-        Canvas recording = sourceNode.beginRecording(w, h);
-        source.getLocationInWindow(sourceLocation);
-        getLocationInWindow(hostLocation);
-        recording.translate(sourceLocation[0] - hostLocation[0], sourceLocation[1] - hostLocation[1]);
-        source.draw(recording);
-        sourceNode.endRecording();
+        Canvas recording = null;
+        try {
+            recording = sourceNode.beginRecording(w, h);
+            source.getLocationInWindow(sourceLocation);
+            getLocationInWindow(hostLocation);
+            recording.translate(sourceLocation[0] - hostLocation[0], sourceLocation[1] - hostLocation[1]);
+            source.draw(recording);
+            captureDirty = false;
+            captureUnavailable = false;
+        } catch (Throwable ignored) {
+            // A few vendor renderers reject recording a ViewGroup while a
+            // transition is being committed. Keep the last good frame and use
+            // the themed base until the next attachment instead of hiding the
+            // whole dock.
+            captureUnavailable = true;
+        } finally {
+            if (recording != null) {
+                try {
+                    sourceNode.endRecording();
+                } catch (Throwable ignored) {
+                    captureUnavailable = true;
+                }
+            }
+        }
     }
 
     private void updateEffect() {
@@ -329,7 +503,14 @@ public final class GlassDockView extends ViewGroup {
                 long now = System.currentTimeMillis();
                 if (cachedBlur == null || Math.abs(blurRadius - lastBlur) > .3f || now - lastBlurUpdate > 120L) {
                     try {
-                        cachedBlur = RenderEffect.createBlurEffect(blurRadius, blurRadius, Shader.TileMode.CLAMP);
+                        if (saturationEffect == null) {
+                            ColorMatrix saturation = new ColorMatrix();
+                            saturation.setSaturation(WECHAT_SATURATION);
+                            saturationEffect = RenderEffect.createColorFilterEffect(
+                                    new ColorMatrixColorFilter(saturation));
+                        }
+                        cachedBlur = RenderEffect.createBlurEffect(blurRadius, blurRadius,
+                                saturationEffect, Shader.TileMode.CLAMP);
                         lastBlur = blurRadius;
                         lastBlurUpdate = now;
                     } catch (RuntimeException ignored) {
