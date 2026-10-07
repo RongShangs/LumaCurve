@@ -94,8 +94,9 @@ final class BrightnessControl implements SensorEventListener {
             if(displayEvents!=null)displayEvents.registerDisplayListener(displayListener,s.handler);
             // Restart recovery only restores an automatic mode that this feature owned.
             String raw=Settings.Global.getString(s.context.getContentResolver(),OWNER);
-            if(raw!=null){JSONObject old=new JSONObject(raw);boolean ours=old.optString("owner").equals("dark")&&old.optInt("user",-1)==0&&old.optBoolean("was_auto")&&old.optString("session").matches("[A-Za-z0-9_-]{1,80}");
-                if(ours&&HookEntry.currentUser.serial()==0&&!auto()){setAuto(true);s.log("已恢复暗光锁定前的自动亮度（系统进程重启）");}
+            if(raw!=null){JSONObject old=new JSONObject(raw);boolean validSession=old.optString("session").matches("[A-Za-z0-9_-]{1,80}");boolean ours=old.optString("owner").equals("dark")&&old.optInt("user",-1)==0&&old.optBoolean("was_auto")&&validSession;
+                boolean rawWasAuto=old.optString("owner").equals("raw_panel")&&old.optInt("user",-1)==0&&old.optBoolean("was_auto")&&validSession;
+                if((ours||rawWasAuto)&&HookEntry.currentUser.serial()==0&&!auto()){setAuto(true);s.log(ours?"已恢复暗光锁定前的自动亮度（系统进程重启）":"已恢复手动接管前的自动亮度（系统进程重启；未恢复节点目标）");}
                 mark(null);
             }
         }catch(Throwable failure){fail(failure);}
@@ -118,8 +119,8 @@ final class BrightnessControl implements SensorEventListener {
     }
     String brightnessValues(){return Settings.System.getString(s.context.getContentResolver(),Settings.System.SCREEN_BRIGHTNESS)+"|"+Settings.System.getString(s.context.getContentResolver(),"screen_brightness_float");}
     void relinquish(String why,boolean restore){
-        String previous=owner;if(previous.equals("raw_panel"))stopRaw();owner="none";session="";held=Float.NaN;policy.reset();reason=why;s.handler.removeCallbacks(snapshot);s.handler.removeCallbacks(timer);s.handler.removeCallbacks(retry);unlisten();
-        try{if(previous.equals("dark")&&restore&&!auto())setAuto(true);mark(null);}catch(Throwable failure){error=failure.toString();}
+        String previous=owner;boolean restoreAuto=restore&&!auto()&&(previous.equals("dark")||previous.equals("raw_panel")&&rawWasAuto);if(previous.equals("raw_panel"))stopRaw();owner="none";session="";held=Float.NaN;policy.reset();reason=why;s.handler.removeCallbacks(snapshot);s.handler.removeCallbacks(timer);s.handler.removeCallbacks(retry);unlisten();
+        try{if(restoreAuto)setAuto(true);mark(null);}catch(Throwable failure){error=failure.toString();}
         if(previous.equals("raw_panel"))s.handler.postDelayed(()->{if(awake())s.requestRecalculation();},400);
         if(!previous.equals("none")){s.log(previous.equals("dark")?"暗光锁定退出："+why:"主屏手动面板已退让："+why);s.queueControlPublish();}
     }

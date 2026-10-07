@@ -4,7 +4,11 @@ import subprocess
 R=Path(__file__).resolve().parents[1];S=R/'experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor'
 O=R/'build/raw-panel-transaction-tests';O.mkdir(parents=True,exist_ok=True)
 J=R/'build/refactor-diagnostics/json-20240303.jar'
+native_root=(S/'NativePanelRoot.java').read_text(encoding='utf-8');start_source=native_root.index('static void start(');end_source=native_root.index(' static IOException startFailure',start_source);start_source=native_root[start_source:end_source]
+assert start_source.index('JSONObject current=')<start_source.index('install();'), 'validate the selected node before stopping an existing guard'
 text=(S/'RootControl.java').read_text(encoding='utf-8');start=text.index('    JSONObject rawPanel(String payload)');end=text.index('    JSONObject execute(',start);method=text[start:end]
+stop_source=text[text.index('    JSONObject stop()'):text.index('    String export()',text.index('    JSONObject stop()'))]
+assert '"raw_panel".equals(ownership.optString("owner"))' in stop_source, 'restore raw-panel automatic mode during disconnected stop'
 files={
 'android/app/ActivityManager.java':'package android.app;public class ActivityManager{public static int getCurrentUser(){return 0;}}',
 'top/rongshangs/lumacurve/refactor/RootControl.java':r'''package top.rongshangs.lumacurve.refactor;

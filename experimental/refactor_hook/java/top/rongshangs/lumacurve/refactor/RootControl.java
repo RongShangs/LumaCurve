@@ -198,8 +198,8 @@ public final class RootControl implements AutoCloseable {
     JSONObject stop()throws Exception {
         NativePanelRoot.stop();boolean connected=live()!=null;
         if(!connected){String marker=settings.get("hyperlux_brightness_owner_v1");if(marker!=null){JSONObject ownership=new JSONObject(marker);
-            if("dark".equals(ownership.optString("owner"))&&ownership.optInt("user",-1)==0&&ownership.optBoolean("was_auto")&&"0".equals(settings.getSystem("screen_brightness_mode")))
-                if(!settings.putSystem("screen_brightness_mode","1"))throw new IOException("未能恢复暗光锁定前的自动亮度");
+            if(("dark".equals(ownership.optString("owner"))||"raw_panel".equals(ownership.optString("owner")))&&ownership.optInt("user",-1)==0&&ownership.optBoolean("was_auto")&&"0".equals(settings.getSystem("screen_brightness_mode")))
+                if(!settings.putSystem("screen_brightness_mode","1"))throw new IOException("未能恢复此前的自动亮度");
             settings.put("hyperlux_brightness_owner_v1",null);
         }}
         String revision=UUID.randomUUID().toString();

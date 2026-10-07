@@ -36,9 +36,11 @@ final class NativePanelRoot {
   }
  }
  static void start(JSONObject selected)throws Exception{
-  install();
   JSONObject current=PanelNodeDiscovery.discover(new File("/sys"));
   if(!current.optBoolean("supported")||!selected.optString("path").equals(current.optString("path"))||!selected.optString("canonical_path").equals(current.optString("canonical_path"))||selected.optInt("maximum",-1)!=current.optInt("maximum",-2))throw new IOException("主屏节点已变化，请重新打开面板");
+   install();
+   current=PanelNodeDiscovery.discover(new File("/sys"));
+   if(!current.optBoolean("supported")||!selected.optString("path").equals(current.optString("path"))||!selected.optString("canonical_path").equals(current.optString("canonical_path"))||selected.optInt("maximum",-1)!=current.optInt("maximum",-2))throw new IOException("主屏节点已变化，请重新打开面板");
   JSONObject existing=null;try{existing=NativePanelClient.call("STATUS");}catch(Exception ignored){}
   if(existing!=null){if(matches(current,existing))return;throw new IOException("已有守护使用其他节点，请先恢复自动亮度");}
   File log=new File(RootControl.DATA,"main-panel.log");
