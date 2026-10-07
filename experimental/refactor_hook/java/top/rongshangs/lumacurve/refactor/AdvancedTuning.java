@@ -36,19 +36,21 @@ final class AdvancedTuning {
                     synchronized(HookEntry.states){for(HookRuntime s:HookEntry.states.values()){
                         if(thresholdScope.get()!=s||(!s.advanced.enabled[0]&&!(s.lowLightEnabled&&s.lowThresholds.enabled))||!s.onDisplayThread())continue;
                         try{Object impl=HookEntry.get(s.owner,"mAutomaticBrightnessControllerImpl");if(HookEntry.get(impl,"mHysteresisLevelsImpl")!=p.thisObject)continue;
-                            Object abc=HookEntry.get(impl,"mAutomaticBrightnessController");if(!s.normalTuningAllowed(abc,impl))return;
+                            Object abc=HookEntry.get(impl,"mAutomaticBrightnessController");
                             float lux=(Float)p.args[0];if(!Float.isFinite(lux)||lux<0)return;
-                            boolean custom=s.advanced.enabled[0]&&lux<=s.advanced.values[5];
+                            boolean custom=s.advanced.enabled[0]&&lux<=s.advanced.values[5]&&s.normalTuningAllowed(abc,impl);
                             boolean guard=s.lowLightEnabled&&s.lowThresholds.enabled&&lux<=s.lowLightLimit&&s.lowLightApplies(abc,impl,lux);
                             if(!custom&&!guard)return;
                             Object hbm=HookEntry.get(p.thisObject,"mHbmController");
-                            if(hbm!=null){Object data=hbm.getClass().getMethod("getHbmData").invoke(hbm);if(data!=null){float minimum=HookRuntime.optionalNumber(data,"minimumLux");if(!Float.isFinite(minimum)||lux>=minimum)return;}}
+                            if(hbm!=null){Object data=HookEntry.get(hbm,"mHbmData");if(data!=null){float minimum=HookRuntime.optionalNumber(data,"minimumLux");if(!Float.isFinite(minimum)||lux>=minimum){s.thresholdSkipReason="hbm_range";return;}}}
                             float original=(Float)p.getResult();
                             float next=applyThreshold(s,lux,original,bright,small,custom,guard);
                             // Keep the small-change threshold at or below the normal threshold.
                             if(small){Method normal=cls.getDeclaredMethod("getBrighteningThreshold",float.class);float nativeNormal=((Number)XposedBridge.invokeOriginalMethod(normal,p.thisObject,new Object[]{lux})).floatValue();next=Math.min(next,applyThreshold(s,lux,nativeNormal,true,false,custom,guard));}
+                            s.thresholdSkipReason="";s.thresholdError="";
+                            if(guard){s.lastLowThresholdLux=lux;if(small)s.lastLowSmallThreshold=next;else if(bright)s.lastLowBrightThreshold=next;else s.lastLowDarkThreshold=next;}
                             if(Float.compare(next,original)!=0){p.setResult(next);s.thresholdAdjustments++;if(guard)s.lowLightThresholdAdjustments++;}return;
-                        }catch(Throwable unavailable){return;}
+                        }catch(Throwable unavailable){s.thresholdSkipReason="interface_error";String error=unavailable.toString();if(!error.equals(s.thresholdError)){s.thresholdError=error;s.log("暗光阈值未应用："+error);}return;}
                     }}
                 }}));
             }thresholds.add(cls);

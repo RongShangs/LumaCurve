@@ -82,6 +82,14 @@ public class ConfigHostTest{
   for(String key:new String[]{"dark_lock_enabled","manual_panel_enabled"}){bad=clone(file);bad.getJSONObject("options").put(key,1);bad(bad,s,c);}
   for(String key:new String[]{"dark_lock_minutes","dark_lock_enter_lux","dark_lock_exit_lux","dark_lock_exit_seconds"}){bad=clone(file);bad.getJSONObject("options").put(key,"5");bad(bad,s,c);}
   bad=clone(file);bad.getJSONObject("options").put("dark_lock_minutes",1.5);bad(bad,s,c);bad=clone(file);bad.getJSONObject("options").put("dark_lock_enter_lux",10).put("dark_lock_exit_lux",10);bad(bad,s,c);
+  JSONObject submitted=new JSONObject().put("factors","1,1,1,1").put("dark_lock_enabled",true).put("memory_strength",.3f);
+  JSONObject reordered=new JSONObject().put("memory_strength",.3d).put("dark_lock_enabled",true).put("factors","1,1,1,1");
+  check(ConfigurationFile.sameOptions(submitted,reordered));
+  reordered.put("dark_lock_enabled",false);check(!ConfigurationFile.sameOptions(submitted,reordered));
+  reordered.put("dark_lock_enabled",true).put("memory_strength",.4);check(!ConfigurationFile.sameOptions(submitted,reordered));
+  reordered.put("memory_strength",.3).put("new_option",true);check(!ConfigurationFile.sameOptions(submitted,reordered));
+  reordered.remove("new_option");reordered.remove("dark_lock_enabled");check(!ConfigurationFile.sameOptions(submitted,reordered));
+  reordered.put("dark_lock_enabled","true");check(!ConfigurationFile.sameOptions(submitted,reordered));
   System.out.println("Configuration migration: "+cases+" cases PASS; cross-version settings and curve identity, Android not tested");
  }
 }''',encoding='utf-8')

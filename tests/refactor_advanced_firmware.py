@@ -13,6 +13,17 @@ for variant in ['os41','os28']:
  root=a.fixtures/variant
  def read(name):return (root/('com.android.server.display.'+name+'.txt')).read_text(encoding='utf-8')
  abc,ring,dual,hyst,animation,sun,owner=[read(n) for n in ['AutomaticBrightnessController','AmbientLightRingBuffer','DualSensorPolicy','HysteresisLevelsImpl','RefactorAutoBrightnessAnimator','SunlightController','DisplayPowerControllerImpl']]
+ scene=read('SceneDetector');impl=read('AutomaticBrightnessControllerImpl')
+ check('FIELD mSceneDetector Lcom/android/server/display/SceneDetector;' in impl)
+ check('FIELD mIsNightDrivingMode Z' in scene)
+ check('->mIsNightDrivingMode Z' in method(scene,'getDrivingStatus','()Z'))
+ check('->getDrivingStatus()Z' in method(impl,'getDrivingStatus','()Z'))
+ for name,sig in [('nextAmbientLightBrighteningTransition','(J)J'),('nextAmbientLightBrighteningTransition','(J F)J'),('nextAmbientLightDarkeningTransition','(J)J')]:
+  check('->getNightDrivingDebounceConfig()J' in method(abc,name,sig))
+ hbm=read('HighBrightnessModeController')
+ check('FIELD mHbmData Lcom/android/server/display/config/HighBrightnessModeData;' in hbm)
+ check('METHOD getHbmData ()Lcom/android/server/display/config/HighBrightnessModeData; flags=protected' in hbm)
+ check('FIELD mSensorManager Landroid/hardware/SensorManager;' in abc)
  for sig in ['getBrighteningThreshold','getDarkeningThreshold','getBrighteningSmallThreshold']:
   check('METHOD '+sig+' (F)F' in hyst);check('->'+sig+'(F)F' in abc);check('->'+sig+'(F)F' in dual)
  for sig in ['setAmbientLuxWhenInvalid','updateDualSensorPolicy','updateSingleSensorPolicy']:check('METHOD '+sig+' ' in dual)

@@ -8,7 +8,7 @@ final class LowLightAssistEvidence {
   return ring.getClass().getMethod("size").getReturnType()==int.class&&ring.getClass().getMethod("getTime",int.class).getReturnType()==long.class&&ring.getClass().getMethod("getLux",int.class).getReturnType()==float.class&&s.sensorName(0)!=null&&ResponseTuning.supported(s.owner);
  }catch(Throwable unavailable){return false;}}
  static long deadline(HookRuntime s,Object abc,Object impl,long now,long nativeDeadline,float threshold){try{
-  Object dual=HookEntry.get(impl,"mDualSensorPolicy");boolean eligible=s.lowLightEnabled&&s.normalTuningAllowed(abc,impl)&&s.lowLightApplies(abc,impl,s.mainCandidate(abc,impl))&&"main".equals(s.sensorName(((Number)HookEntry.get(dual,"mUseLightSensorFlag")).intValue()));
+  Object dual=HookEntry.get(impl,"mDualSensorPolicy");boolean eligible=s.lowLightEnabled&&s.lowLightApplies(abc,impl,s.mainCandidate(abc,impl))&&"main".equals(s.sensorName(((Number)HookEntry.get(dual,"mUseLightSensorFlag")).intValue()));
   float confirmed=HookRuntime.optionalNumber(abc,"mAmbientLux"),candidate=s.mainCandidate(abc,impl),assist=HookRuntime.optionalNumber(dual,"mAssistFastAmbientLux");eligible&=confirmed<=s.lowLightLimit;
   if(!s.assistGate.enabled||!eligible){s.assistGate.release("inactive");return nativeDeadline;}
   long enabledAt=((Number)HookEntry.get(dual,"mAssistLightSensorEnableTime")).longValue();int warm=((Number)HookEntry.get(dual,"mAssistLightSensorWarmUpTime")).intValue();

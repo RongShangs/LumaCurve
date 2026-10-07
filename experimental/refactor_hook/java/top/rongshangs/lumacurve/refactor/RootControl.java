@@ -138,7 +138,7 @@ public final class RootControl implements AutoCloseable {
         String decoded=new String(Base64.getDecoder().decode(encoded),StandardCharsets.UTF_8);
         JSONObject options=decoded.startsWith("{")?new JSONObject(decoded):new JSONObject().put("factors",decoded);
         String factors=options.getString("factors");
-        BrightnessControlOptions controls=BrightnessControlOptions.parse(options);controls.verify(state);
+        BrightnessControlOptions controls=BrightnessControlOptions.parseStored(options);controls.verify(state);
         AdvancedOptions advanced=AdvancedOptions.parse(options);advanced.verify(state);
         OutdoorOptions outdoor=OutdoorOptions.parse(options);outdoor.verify(state);
         boolean thermal=options.optBoolean("thermal_relax",false);float ceiling=(float)options.optDouble("thermal_ceiling",43);ThermalPolicy.validate(ceiling);
@@ -286,11 +286,18 @@ public final class RootControl implements AutoCloseable {
             return new JSONObject().put("ok",true).put("node",NativePanelRoot.status()).put("runtime",refreshedLive());
         }
         int value=request.getInt("value");if(request.getDouble("value")!=value)throw new IOException("请输入整数节点值");
-        JSONObject node=NativePanelRoot.status();if(!node.optBoolean("supported")||value<10||value>node.getInt("maximum"))throw new IOException("主屏节点值超出范围");
-        if(action.equals("begin")){step="启动主屏原生守护";NativePanelRoot.start();}else if(!action.equals("set"))throw new IOException("未知节点操作");
+        JSONObject node=NativePanelRoot.status();if(!node.optBoolean("supported"))throw new IOException("主屏节点尚不可用："+node.optString("reason","unknown"));if(value<10||value>node.getInt("maximum"))throw new IOException("主屏节点值超出范围");
+        if(action.equals("begin")){step="启动主屏原生守护";NativePanelRoot.start(node);}else if(!action.equals("set"))throw new IOException("未知节点操作");
         request.put("action",action.equals("begin")?"raw_begin":"raw_validate");
         step=action.equals("begin")?"关闭自动亮度并取得系统许可":"确认当前接管会话";
-        JSONObject ack=brightness(Base64.getEncoder().encodeToString(request.toString().getBytes(StandardCharsets.UTF_8)));
+        JSONObject ack;
+        try{ack=brightness(Base64.getEncoder().encodeToString(request.toString().getBytes(StandardCharsets.UTF_8)));}
+        catch(Exception unconfirmed){
+            // A lost ACK can follow a successful mode switch. Roll back only this
+            // session; a stale request must never stop a newer owner's writer.
+            request.put("action","raw_abort");try{brightness(Base64.getEncoder().encodeToString(request.toString().getBytes(StandardCharsets.UTF_8)));}catch(Exception ignored){}
+            try{NativePanelClient.require("STOP "+token);}catch(Exception ignored){}throw unconfirmed;
+        }
         if(!ack.optBoolean("ok"))throw new IOException(ack.optString("message","系统未确认接管"));
         try{
             if(!"0".equals(settings.getSystem("screen_brightness_mode")))throw new IOException("系统自动亮度仍开启，未写节点");

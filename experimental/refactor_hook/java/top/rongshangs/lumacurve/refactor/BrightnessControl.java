@@ -14,6 +14,9 @@ final class BrightnessControl implements SensorEventListener {
     final HookRuntime s;final DarkLockPolicy policy=new DarkLockPolicy();
     BrightnessControlOptions options=new BrightnessControlOptions();FrameworkBrightness display;SensorManager sensors;Sensor main,assist;
     boolean listening,registered,busy,failed;String owner="none",session="",reason="inactive",error="",lastRequest="";
+    static final java.lang.reflect.Method SENSOR_HANDLE=sensorHandle();
+    static java.lang.reflect.Method sensorHandle(){try{java.lang.reflect.Method m=Sensor.class.getDeclaredMethod("getHandle");m.setAccessible(true);return m;}catch(Throwable unavailable){return null;}}
+    long mainSamples,assistSamples,unmatchedSamples;
     float mainLux=Float.NaN,assistLux=Float.NaN,held=Float.NaN,mainScale=1,assistScale=1;long mainAt=-1,assistAt=-1,ignoreBrightnessUntil,lastAutoEnabledAt=-1;
     String brightnessSnapshot="";
     final ContentObserver modeObserver,commandObserver,brightnessObserver;
@@ -59,10 +62,14 @@ final class BrightnessControl implements SensorEventListener {
             if(dual!=null){selectedAssist=(Sensor)HookEntry.get(dual,"mAssistLightSensor");selectedMainScale=((Number)HookEntry.get(dual,"mFovAmplifyFactor")).floatValue();selectedAssistScale=((Number)HookEntry.get(dual,"mAssistFovAmplifyFactor")).floatValue();
                 if(!Float.isFinite(selectedMainScale)||!Float.isFinite(selectedAssistScale)||selectedMainScale<=0||selectedAssistScale<=0||selectedMainScale>100||selectedAssistScale>100)return false;}
             // Xiaomi's native auxiliary ALS uses vendor type 33171055; its consumer reads lux at values[0].
-            if(selectedAssist!=null&&((selectedAssist.getType()!=Sensor.TYPE_LIGHT&&selectedAssist.getType()!=33171055)||selectedAssist.equals(selectedMain)))return false;
-            if(listening&&(main!=selectedMain||assist!=selectedAssist||mainScale!=selectedMainScale||assistScale!=selectedAssistScale))relinquish("sensor_changed",true);
+            if(selectedAssist!=null&&((selectedAssist.getType()!=Sensor.TYPE_LIGHT&&selectedAssist.getType()!=33171055)||sameSensor(selectedAssist,selectedMain)))return false;
+            // SensorEvent.sensor belongs to its registering manager's handle map.
+            // The display service uses a separately constructed SensorManager.
+            SensorManager selectedManager=(SensorManager)HookEntry.get(abc,"mSensorManager");
+            if(selectedManager==null)return false;
+            if(listening&&(!sameSensor(main,selectedMain)||!sameSensor(assist,selectedAssist)||sensors!=selectedManager||mainScale!=selectedMainScale||assistScale!=selectedAssistScale))relinquish("sensor_changed",true);
             main=selectedMain;assist=selectedAssist;mainScale=selectedMainScale;assistScale=selectedAssistScale;
-            sensors=(SensorManager)s.context.getSystemService(Context.SENSOR_SERVICE);return sensors!=null;
+            sensors=selectedManager;return true;
         }catch(Throwable unknown){error=unknown.toString();return false;}
     }
     boolean enabled(){return !s.closed&&!failed&&s.phase.equals("active")&&s.appliesToUser();}
@@ -128,7 +135,11 @@ final class BrightnessControl implements SensorEventListener {
         }catch(Throwable failure){sensors.unregisterListener(this);error=failure.toString();return false;}
     }
     float usable(Sensor sensor,float lux,long time,long now){return sensor!=null&&DarkLockPolicy.valid(lux)&&time>=0&&(sensor.getReportingMode()==Sensor.REPORTING_MODE_ON_CHANGE||now-time<=10000)?lux:Float.NaN;}
-    public void onSensorChanged(SensorEvent e){if(!listening||e.values.length==0)return;float v=e.values[0];long now=SystemClock.uptimeMillis();if(e.sensor.equals(main)){mainLux=v*mainScale;mainAt=now;}else if(e.sensor.equals(assist)){assistLux=v*assistScale;assistAt=now;}else return;tick();}
+    static boolean sameSensor(Sensor a,Sensor b){
+        if(a==b)return true;if(a==null||b==null||a.getType()!=b.getType())return false;
+        try{return SENSOR_HANDLE!=null&&((Number)SENSOR_HANDLE.invoke(a)).intValue()==((Number)SENSOR_HANDLE.invoke(b)).intValue();}catch(Throwable unavailable){return false;}
+    }
+    public void onSensorChanged(SensorEvent e){if(!listening||e==null||e.sensor==null||e.values==null||e.values.length==0)return;float v=e.values[0];long now=SystemClock.uptimeMillis();if(sameSensor(e.sensor,main)){mainLux=v*mainScale;mainAt=now;mainSamples++;}else if(sameSensor(e.sensor,assist)){assistLux=v*assistScale;assistAt=now;assistSamples++;}else{unmatchedSamples++;return;}tick();}
     public void onAccuracyChanged(Sensor sensor,int accuracy){}
     void tick(){
         if(busy||s.closed)return;s.handler.removeCallbacks(timer);
@@ -147,7 +158,7 @@ final class BrightnessControl implements SensorEventListener {
                 if(!Float.isFinite(current)||current<0||current>1)throw new IllegalStateException("当前主屏亮度不可用");
                 claim("dark",java.util.UUID.randomUUID().toString(),current);reason="locked";s.log("暗光持续 "+options.minutes+" 分钟，保持当前主屏亮度");s.queuePublish();
             }else if(action==DarkLockPolicy.EXIT)relinquish("ambient_bright",true);
-            else reason=owner.equals("dark")?"locked":policy.darkSince>=0?"countdown":"watching";
+            else reason=owner.equals("dark")?"locked":!DarkLockPolicy.valid(front)||assist!=null&&!DarkLockPolicy.valid(back)?"waiting_sensor_data":policy.darkSince>=0?"countdown":"watching";
             // Slow health checks catch controller replacement and scene changes without a new lux event.
             // No wake lock: screen-off cancels the timer and both listeners.
             long next=policy.next(options),health=main.getReportingMode()!=Sensor.REPORTING_MODE_ON_CHANGE||assist!=null&&assist.getReportingMode()!=Sensor.REPORTING_MODE_ON_CHANGE?10000:30000;
@@ -158,6 +169,7 @@ final class BrightnessControl implements SensorEventListener {
     JSONObject status()throws JSONException{
         JSONObject j=new JSONObject();options.put(j);boolean supported=supported();j.put("elapsed_ms",SystemClock.elapsedRealtime()).put("manual_panel_supported",mainDisplay()&&RawPanelOutputHooks.supports(s.owner.getClass())).put("dark_lock_supported",supported&&bindSensors()).put("owner",owner).put("reason",reason).put("error",error).put("auto",auto()).put("listening",listening).put("session",session).put("raw_target",rawTarget).put("raw_paused",rawPaused).put("raw_confirmed",rawConfirmed).put("raw_blocked_output_calls",rawBlockedWrites);
         if(DarkLockPolicy.valid(mainLux))j.put("watch_main_lux",mainLux);if(DarkLockPolicy.valid(assistLux))j.put("watch_assist_lux",assistLux);
+        j.put("watch_main_samples",mainSamples).put("watch_assist_samples",assistSamples).put("watch_unmatched_samples",unmatchedSamples).put("watch_main_age_ms",mainAt<0?-1:SystemClock.uptimeMillis()-mainAt).put("watch_assist_age_ms",assistAt<0?-1:SystemClock.uptimeMillis()-assistAt);
         if(main!=null)j.put("watch_main_sensor",main.getName()).put("watch_main_type",main.getType());if(assist!=null)j.put("watch_assist_sensor",assist.getName()).put("watch_assist_type",assist.getType());
         j.put("countdown_left_ms",policy.darkSince<0?0:Math.max(0,policy.darkSince+options.minutes*60000L-SystemClock.uptimeMillis()));
         if(Float.isFinite(held))j.put("held",held);try{if(supported)j.put("range",display.read());}catch(Throwable ignored){}return j;
@@ -190,8 +202,11 @@ final class BrightnessControl implements SensorEventListener {
     void armRaw(String token,int target)throws Exception{
         if(!options.manualPanel)throw new IllegalStateException("主屏手动面板已关闭");
         if(!RawPanelOutputHooks.supports(s.owner.getClass()))throw new IllegalStateException("当前系统尚未接入主屏输出隔离");
+        // A dark lock paused automatic mode on the user's behalf. Preserve that
+        // ownership before relinquishing it, so a failed raw transaction can recover.
+        boolean wasAuto=owner.equals("raw_panel")?rawWasAuto:owner.equals("dark")||auto();
         if(!owner.equals("raw_panel"))relinquish("raw_panel",false);
-        boolean wasAuto=owner.equals("raw_panel")?rawWasAuto:auto();busy=true;
+        busy=true;
         try{
             mark(new JSONObject().put("owner","raw_panel").put("user",0).put("was_auto",wasAuto).put("session",token).toString());
             owner="raw_panel";session=token;rawWasAuto=wasAuto;held=Float.NaN;reason="manual_panel";

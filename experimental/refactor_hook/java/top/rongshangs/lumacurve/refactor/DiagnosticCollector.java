@@ -110,6 +110,7 @@ final class DiagnosticCollector {
         collectSettings();
         for(String resource:new String[]{"config_screenBrightnessNits","config_screenBrightnessBacklight","config_screenBrightnessBacklightFloat","config_autoBrightnessLevels","config_autoBrightnessDisplayValuesNits"})command("resources/"+resource+".txt",3,"cmd","overlay","lookup","android","android:array/"+resource);
         command("backlight.txt",5,"sh","-c","for n in /sys/class/backlight/*; do [ -d \"$n\" ] || continue; echo \"BACKLIGHT $n\"; readlink -f \"$n\"; ls -l \"$n/brightness\"; for f in brightness actual_brightness max_brightness bl_power type; do [ -r \"$n/$f\" ] && { echo \"$f\"; cat \"$n/$f\"; }; done; done; for n in /sys/class/drm/*; do [ -d \"$n\" ] || continue; echo \"DRM $n\"; for f in status enabled dpms; do [ -r \"$n/$f\" ] && { echo \"$f\"; cat \"$n/$f\"; }; done; done; exit 0");
+        command("led-brightness-nodes.txt",5,"sh","-c","for n in /sys/class/leds/*; do [ -d \"$n\" ] || continue; echo \"LED $n\"; readlink -f \"$n\"; ls -l \"$n/brightness\"; for f in brightness max_brightness actual_brightness; do [ -r \"$n/$f\" ] && { echo \"$f\"; head -c 128 \"$n/$f\"; echo; }; done; done; exit 0");
         RootControl.progress("5/8 收集显示配置文件…");
         for(String base:new String[]{"/system","/system_ext","/product","/vendor","/odm"})tree(new File(base+"/etc/displayconfig"),"display-config"+base+"/etc/displayconfig",0);
         RootControl.progress("6/8 提取系统与小米显示框架，计算校验值…");

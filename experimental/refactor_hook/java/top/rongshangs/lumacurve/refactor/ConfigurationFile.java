@@ -7,6 +7,14 @@ import java.util.*;
 final class ConfigurationFile {
     static final int LIMIT=32768;
     static final String FORMAT="hyperlux_config_v2";
+    /** Compare flat option values independently of JSON key order and number boxing. */
+    static boolean sameOptions(JSONObject submitted,JSONObject current)throws JSONException {
+        if(submitted.length()!=current.length())return false;
+        Iterator<String> keys=submitted.keys();while(keys.hasNext()){
+            String key=keys.next();if(!current.has(key)||!new JSONArray().put(submitted.get(key)).toString().equals(new JSONArray().put(current.get(key)).toString()))return false;
+        }
+        return true;
+    }
     static final String[] FLAGS={"thermal_relax","response_override","small_brighten_override","low_light_stability"};
     static final String[] KEYS={"thermal_ceiling","memory_strength","memory_window","memory_lux_range","thermal_cooling","brighten_delay","darken_delay","small_brighten_delay","low_light_limit","low_light_brighten","low_light_darken"};
     static final double[] DEFAULT={43,1,1500,.3,1,1500,5000,5000,50,3000,4000},MIN={38,0,500,.1,1,500,1000,500,5,1000,1000},MAX={50,1,3000,.5,3,10000,15000,15000,100,4000,4000};
@@ -27,7 +35,7 @@ final class ConfigurationFile {
         else if("hyperlux_config_v1".equals(format)){source=file.getJSONObject("options");}
         else if(format.isEmpty()&&file.optInt("schema")==1&&file.has("factors")){source=file;legacy=true;}
         else throw new IllegalArgumentException("不是兼容的 HyperLux 配置文件");
-        JSONObject out=new JSONObject();List<String> notes=new ArrayList<>();BrightnessControlOptions controls=BrightnessControlOptions.parse(source);if(controls.darkLock&&!runtime.optBoolean("dark_lock_supported")){controls.darkLock=false;notes.add("本机暗光锁定接口未就绪，已关闭");}controls.put(out);MemoryOptions memoryOptions=MemoryOptions.parse(source),fitMemory=memoryOptions.fit(runtime.optInt("memory_point_capacity",0));fitMemory.put(out);disable(out,"memory_reset_override",runtime.optBoolean("memory_reset_supported"),notes);disable(out,"memory_timeout_override",runtime.optBoolean("memory_timeout_supported"),notes);if(memoryOptions.maxPoints!=fitMemory.maxPoints)notes.add("持久化节点上限已按本机能力调整");
+        JSONObject out=new JSONObject();List<String> notes=new ArrayList<>();BrightnessControlOptions controls=BrightnessControlOptions.parseStored(source);if(controls.darkLock&&!runtime.optBoolean("dark_lock_supported")){controls.darkLock=false;notes.add("本机暗光锁定接口未就绪，已关闭");}controls.put(out);MemoryOptions memoryOptions=MemoryOptions.parse(source),fitMemory=memoryOptions.fit(runtime.optInt("memory_point_capacity",0));fitMemory.put(out);disable(out,"memory_reset_override",runtime.optBoolean("memory_reset_supported"),notes);disable(out,"memory_timeout_override",runtime.optBoolean("memory_timeout_supported"),notes);if(memoryOptions.maxPoints!=fitMemory.maxPoints)notes.add("持久化节点上限已按本机能力调整");
         for(String k:FLAGS)out.put(k,flag(source,k));
         LowLightThresholds lowThresholds=LowLightThresholds.parse(source);lowThresholds.put(out);if(out.getBoolean("low_light_stability"))disable(out,"low_light_threshold",runtime.optBoolean("low_light_threshold_supported"),notes);
         LowLightAssistGate assistGate=new LowLightAssistGate();assistGate.configure(source);assistGate.put(out);if(out.getBoolean("low_light_stability"))disable(out,"low_light_assist_gate",runtime.optBoolean("low_light_assist_gate_supported"),notes);

@@ -33,7 +33,8 @@ final class HookRuntime {
     float memoryStrength=1;long memoryEvents,lastMemoryLog,lastManualAdjustment=-1;String lastReset="";
     boolean responseEnabled;long brightenDelay=1500,darkenDelay=5000,responseAdjustments,memoryWindow=1500;float memoryLuxRange=.3f,thermalCooling=1;
     boolean smallResponseEnabled;long smallBrightenDelay=5000,smallResponseAdjustments;
-    float lowLightLimit=50;long lowLightBrighten=3000,lowLightDarken=4000;boolean lowLightEnabled;long lowLightMainAdjustments,lowLightAssistAdjustments,lowLightThresholdAdjustments;LowLightThresholds lowThresholds=new LowLightThresholds();
+    float lowLightLimit=50;long lowLightBrighten=3000,lowLightDarken=4000;boolean lowLightEnabled;long lowLightMainAdjustments,lowLightAssistAdjustments,lowLightThresholdAdjustments;LowLightThresholds lowThresholds=new LowLightThresholds();String thresholdSkipReason="",thresholdError="";
+    float lastLowThresholdLux=Float.NaN,lastLowBrightThreshold=Float.NaN,lastLowSmallThreshold=Float.NaN,lastLowDarkThreshold=Float.NaN;
     AdvancedOptions advanced=new AdvancedOptions();long thresholdAdjustments,assistAdjustments,animationAdjustments,sunlightAdjustments,touchAdjustments,delayWindowClamps;double lastAnimationSeconds;
     final LowLightAssistGate assistGate=new LowLightAssistGate();
     long lastMainBrighten=-1,lastMainDarken=-1,lastMainSmall=-1,lastMainExtra;boolean probingScenes;
@@ -170,7 +171,7 @@ final class HookRuntime {
                     long small=config.optLong("small_brighten_delay",5000);DelayPolicy.validateSmall(small);
                     // A temporarily unavailable display/sensor at boot must not disable the curve.
                     // RootControl validates capabilities before applying; this feature retries readiness itself.
-                    BrightnessControlOptions controls=BrightnessControlOptions.parse(config);
+                    BrightnessControlOptions controls=BrightnessControlOptions.parseStored(config);
                     OutdoorOptions outdoorOptions=OutdoorOptions.parse(config);JSONObject outdoorCaps=outdoor.status();outdoorOptions.verify(new JSONObject().put("outdoor_supported",outdoorCaps.optBoolean("supported")).put("outdoor_hbm_supported",outdoorCaps.optBoolean("hbm_tuning_supported")).put("outdoor_range_supported",outdoorCaps.optBoolean("range_supported")).put("outdoor_opr_supported",outdoorCaps.optBoolean("opr_supported")));
                     AdvancedOptions proposed=AdvancedOptions.parse(config);JSONObject capabilities=new JSONObject();AdvancedTuning.capabilities((key,value)->capabilities.put(key,value),this);proposed.verify(capabilities);
                     float lowLimit=(float)config.optDouble("low_light_limit",50);long lowBright=config.optLong("low_light_brighten",3000),lowDark=config.optLong("low_light_darken",4000);LowLightPolicy.validate(lowLimit,lowBright,lowDark);
@@ -279,7 +280,11 @@ final class HookRuntime {
             status.put("low_light_supported",LowLightTuning.supported(this)).put("low_light_stability",lowLightEnabled)
                 .put("low_light_limit_lux",lowLightLimit).put("low_light_brighten_ms",lowLightBrighten).put("low_light_darken_ms",lowLightDarken)
                 .put("low_light_main_adjustments",lowLightMainAdjustments).put("low_light_assist_adjustments",lowLightAssistAdjustments);
-            lowThresholds.put(status);status.put("low_light_threshold_supported",AdvancedTuning.supported(0,this)).put("low_light_threshold_adjustments",lowLightThresholdAdjustments);
+            lowThresholds.put(status);status.put("low_light_threshold_supported",AdvancedTuning.supported(0,this)).put("low_light_threshold_adjustments",lowLightThresholdAdjustments).put("threshold_skip_reason",thresholdSkipReason).put("threshold_error",thresholdError);
+            if(Float.isFinite(lastLowThresholdLux))status.put("last_low_light_threshold_lux",lastLowThresholdLux);
+            if(Float.isFinite(lastLowBrightThreshold))status.put("last_low_light_brightening_threshold",lastLowBrightThreshold);
+            if(Float.isFinite(lastLowSmallThreshold))status.put("last_low_light_small_threshold",lastLowSmallThreshold);
+            if(Float.isFinite(lastLowDarkThreshold))status.put("last_low_light_darkening_threshold",lastLowDarkThreshold);
             assistGate.put(status);status.put("low_light_assist_gate_supported",LowLightAssistEvidence.supported(this)).put("low_light_assist_gate_reason",assistGate.reason).put("low_light_assist_gate_holds",assistGate.holds).put("low_light_assist_gate_releases",assistGate.releases);
             JSONArray trace=new JSONArray();for(PipelineHistory.Frame f:pipelineHistory.snapshot())trace.put(traceJson(f));
             status.put("pipeline_trace",trace).put("output_trace",new JSONArray(outputHistory));
@@ -372,10 +377,14 @@ final class HookRuntime {
             Object dpc=HookEntry.get(owner,"mDisplayPowerController"),display=dpc.getClass().getMethod("getDisplayPowerState").invoke(dpc);
             int screen=((Number)display.getClass().getMethod("getScreenState").invoke(display)).intValue();
             java.lang.reflect.Method idle=abc.getClass().getDeclaredMethod("isInIdleMode");idle.setAccessible(true);
-            return LowLightPolicy.applies(true,(Boolean)kernel.get("mUseAutoBrightness"),screen==2,
-                (Boolean)idle.invoke(abc),(Boolean)impl.getClass().getMethod("getDrivingStatus").invoke(impl),hdr,
+            return LowLightPolicy.appliesInScene(true,(Boolean)kernel.get("mUseAutoBrightness"),screen==2,
+                (Boolean)idle.invoke(abc),(Boolean)impl.getClass().getMethod("getDrivingStatus").invoke(impl),nightDrivingConfirmed(impl),hdr,
                 ((Number)HookEntry.get(abc,"mAmbientLux")).floatValue(),candidateLux,lowLightLimit);
         }catch(Throwable absent){return false;}
+    }
+    static boolean nightDrivingConfirmed(Object impl){
+        try{return Boolean.TRUE.equals(optionalBoolean(HookEntry.get(impl,"mSceneDetector"),"mIsNightDrivingMode"));}
+        catch(Throwable absent){return false;}
     }
     static float optionalNumber(Object o,String field){try{return ((Number)HookEntry.get(o,field)).floatValue();}catch(Throwable absent){return Float.NaN;}}
     static Boolean optionalBoolean(Object o,String field){try{return (Boolean)HookEntry.get(o,field);}catch(Throwable absent){return null;}}

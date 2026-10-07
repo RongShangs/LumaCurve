@@ -31,8 +31,6 @@ final class ResponseTuning {
                             if(HookEntry.get(impl,"mAutomaticBrightnessController")!=p.thisObject)continue;
                             if(!((Boolean)state.kernel.get("mUseAutoBrightness"))){state.assistGate.release("inactive");return;}
                             if((Boolean)idle.invoke(p.thisObject)){state.assistGate.release("inactive");return;}
-                            Method driving=impl.getClass().getMethod("getDrivingStatus");
-                            if(driving.getReturnType()!=boolean.class||(Boolean)driving.invoke(impl)){state.assistGate.release("inactive");return;}
                             boolean small=brighten&&p.args.length==2&&(Float)p.args[1]<((Number)HookEntry.get(p.thisObject,"mAmbientBrighteningThreshold")).floatValue();
                             float candidate=p.args.length==2?(Float)p.args[1]:state.mainCandidate(p.thisObject,impl);
                             boolean guard=state.lowLightApplies(p.thisObject,impl,candidate),custom=(small?state.smallResponseEnabled:state.responseEnabled)&&state.normalTuningAllowed(p.thisObject,impl);
@@ -41,6 +39,13 @@ final class ResponseTuning {
                             long chosen=custom?(small?state.smallBrightenDelay:brighten?state.brightenDelay:state.darkenDelay):base;
                             long horizon=((Number)HookEntry.get(p.thisObject,"mAmbientLightHorizonLong")).longValue();
                             long additional=brighten?0:((Number)HookEntry.get(p.thisObject,"mStepModeDarkenDebounceConfig")).longValue();
+                            // OEM night-driving time is added to every main deadline. Keep it and
+                            // include it in the retained-history budget; never shorten a native wait.
+                            if((Boolean)impl.getClass().getMethod("getDrivingStatus").invoke(impl)){
+                                long night=((Number)impl.getClass().getMethod("getNightDrivingDebounceConfig").invoke(impl)).longValue();
+                                if(night<0||night>60000||additional<0||additional>60000)return;
+                                additional=Math.addExact(additional,night);
+                            }
                             if(custom){long safe=AdvancedPolicy.retainedDelay(chosen,base,horizon,additional);if(safe!=chosen)state.delayWindowClamps++;chosen=safe;}
                             if(guard){long existing=Math.max(base,chosen);
                                 long wanted=LowLightPolicy.chosen(existing,brighten,false,state.lowLightBrighten,state.lowLightDarken);

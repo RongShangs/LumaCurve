@@ -33,5 +33,5 @@ static int panel_set(struct panel_policy *p,const char *s,int value,int max,int6
  p->target=value;return 1;
 }
 static void panel_clear(struct panel_policy *p){memset(p,0,sizeof(*p));p->target=-1;}
-static inline int panel_health(char *out,size_t size,const struct panel_policy *p,int active,int error){return snprintf(out,size,"%s %d %d\n",p->token,active,error);}
+static inline int panel_health(char *out,size_t size,const struct panel_policy *p,int active,int error,int64_t now){return snprintf(out,size,"%s %d %d %lld\n",p->token,active,error,(long long)now);}
 #endif

@@ -892,6 +892,7 @@ public final class UiText {
         WORDS.put("关闭弹窗仍保持选择；开启自动亮度或锁屏即退让。","Closing the popup keeps the choice. Enabling auto or locking the screen releases control.");
         WORDS.put("未找到可用的主屏背光节点","No supported main-display backlight node");
         WORDS.put("节点亮度保持中","Holding panel brightness");
+        WORDS.put("等待光感读数","Waiting for sensor readings");
         WORDS.put("手动模式；滑动接管节点","Manual mode; drag to control the panel");
         WORDS.put("先启用引擎；刚更新应用需重启","Enable the engine; reboot after updating");
         WORDS.put("请输入范围内的整数","Enter an integer within the range");

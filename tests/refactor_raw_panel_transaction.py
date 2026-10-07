@@ -10,7 +10,7 @@ files={
 'top/rongshangs/lumacurve/refactor/RootControl.java':r'''package top.rongshangs.lumacurve.refactor;
 import org.json.*;import java.util.*;import java.io.*;import java.nio.file.*;import java.nio.charset.StandardCharsets;
 class RootControl{
-static final File DATA=new File("build/raw-panel-transaction-tests");Settings settings=new Settings();boolean reject,failMode,failHook;String session="";int hookCalls,aborts;List<String> calls=new ArrayList<>();
+static final File DATA=new File("build/raw-panel-transaction-tests");Settings settings=new Settings();boolean reject,failMode,failHook,loseBeginAck;String session="";int hookCalls,aborts;List<String> calls=new ArrayList<>();
 class Settings{String mode="1";String getSystem(String key){return mode;}boolean putSystem(String key,String value){mode=value;return true;}}
 JSONObject live()throws Exception{return new JSONObject().put("pid",123).put("phase","active");}
 JSONObject refreshedLive()throws Exception{return live();}
@@ -18,12 +18,12 @@ JSONObject brightness(String encoded)throws Exception{hookCalls++;JSONObject req
  if(failHook)throw new IOException("no hook");
  if(action.equals("raw_abort")){aborts++;settings.mode="1";session="";}
  if(reject||action.equals("raw_validate")&&!session.equals(request.getString("session")))return new JSONObject().put("ok",false).put("message","stale gesture");
- if(action.equals("raw_begin")){session=request.getString("session");if(!failMode)settings.mode="0";}
+ if(action.equals("raw_begin")){session=request.getString("session");if(!failMode)settings.mode="0";if(loseBeginAck)throw new IOException("ack lost after mode changed");}
  if(action.equals("raw_restore")){settings.mode="1";session="";}
  return new JSONObject().put("ok",true).put("state",new JSONObject().put("auto",settings.mode.equals("1")).put("owner",session.isEmpty()?"none":"raw_panel").put("session",session));}
 '''+method+'}',
 'top/rongshangs/lumacurve/refactor/NativePanelRoot.java':r'''package top.rongshangs.lumacurve.refactor;import org.json.*;import java.io.*;
-class NativePanelRoot{static boolean failStart;static int starts,stops;static void reset(){failStart=false;starts=stops=0;NativePanelClient.reset();}static JSONObject status()throws Exception{return new JSONObject().put("supported",true).put("maximum",16383).put("actual",NativePanelClient.actual);}static void start()throws Exception{starts++;if(failStart)throw new IOException("exit=6 escape_app_freezer");}static void stop(){stops++;}}
+class NativePanelRoot{static boolean failStart;static int starts,stops;static void reset(){failStart=false;starts=stops=0;NativePanelClient.reset();}static JSONObject status()throws Exception{return new JSONObject().put("supported",true).put("maximum",16383).put("actual",NativePanelClient.actual);}static void start(JSONObject selected)throws Exception{if(selected.getInt("maximum")!=16383)throw new AssertionError("selection lost");starts++;if(failStart)throw new IOException("exit=6 escape_app_freezer");}static void stop(){stops++;}}
 ''',
 'top/rongshangs/lumacurve/refactor/NativePanelClient.java':r'''package top.rongshangs.lumacurve.refactor;import org.json.*;import java.io.*;import java.util.*;
 class NativePanelClient{static int actual=700;static boolean failArm,failSet;static List<String> calls=new ArrayList<>();static void reset(){actual=700;failArm=failSet=false;calls.clear();}static void require(String request)throws Exception{calls.add(request);if(request.startsWith("ARM")&&failArm)throw new IOException("lease rejected");}static JSONObject call(String request)throws Exception{calls.add(request);if(failSet)return new JSONObject().put("ok",false).put("reason","write_or_readback_failed").put("errno",13);actual=Integer.parseInt(request.split(" ")[2]);return new JSONObject().put("ok",true);}}
@@ -46,9 +46,10 @@ c=ctl();NativePanelClient.failArm=true;check(failed(c,"begin",4000,"a").contains
 c=ctl();NativePanelClient.failSet=true;check(failed(c,"begin",4000,"a").contains("写入主屏节点并读回"));check(c.settings.mode.equals("1")&&c.aborts==1&&NativePanelClient.actual==700);check(NativePanelClient.calls.get(2).equals("STOP a"));
 for(Object value:new Object[]{0,9,16384,4000.5}){c=ctl();failed(c,"begin",value,"a");check(NativePanelRoot.starts==0&&c.hookCalls==0&&c.settings.mode.equals("1"));}
 c=ctl();c.rawPanel(req("begin",4000,"new"));check(failed(c,"set",8000,"old").contains("确认当前接管会话"));check(c.session.equals("new")&&c.settings.mode.equals("0")&&NativePanelClient.actual==4000);
-c=ctl();c.failHook=true;check(failed(c,"begin",4000,"a").contains("no hook"));check(c.settings.mode.equals("1")&&NativePanelClient.calls.isEmpty());
+c=ctl();c.failHook=true;check(failed(c,"begin",4000,"a").contains("no hook"));check(c.settings.mode.equals("1")&&NativePanelClient.calls.equals(Arrays.asList("STOP a")));
 c=ctl();c.rawPanel(req("begin",4000,"a"));check(c.rawPanel(req("restore",0,"a")).getBoolean("ok"));check(NativePanelRoot.stops==1&&c.settings.mode.equals("1"));
 c=ctl();c.failHook=true;check(c.rawPanel(req("restore",0,"a")).getBoolean("ok"));check(NativePanelRoot.stops==1&&c.settings.mode.equals("1"));
+c=ctl();c.loseBeginAck=true;check(failed(c,"begin",4000,"acklost").contains("ack lost"));check(c.settings.mode.equals("1")&&c.session.isEmpty()&&c.aborts==1);check(NativePanelClient.calls.equals(Arrays.asList("STOP acklost"))&&NativePanelClient.actual==700);
 System.out.println("Raw panel root transaction: "+cases+" cases PASS; production orchestration with service doubles, Android not tested");
 }}
 '''}

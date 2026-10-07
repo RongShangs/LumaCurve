@@ -53,7 +53,16 @@ final class RawBrightnessPanel {
  void start(){submit(new JSONObjectRequest("status"),false);ui.postDelayed(poll,1000);}
  void show(JSONObject answer){
   if(closed)return;JSONObject node=answer.optJSONObject("node");JSONObject runtime=answer.optJSONObject("runtime");
-  if(node==null||!node.optBoolean("supported")){state.setText(tr("未找到可用的主屏背光节点"));slider.ready=false;inputAction.setEnabled(false);maxAction.setEnabled(false);inputAction.setAlpha(.4f);maxAction.setAlpha(.4f);slider.invalidate();return;}
+  if(node==null||!node.optBoolean("supported")){
+   String reason=node==null?"":node.optString("reason");
+   String message="ambiguous_primary_nodes".equals(reason)?(en?"Multiple display nodes; primary screen is uncertain":"发现多个显示节点，暂不能确定主屏"):
+       "scan_incomplete".equals(reason)?(en?"Node scan incomplete; export diagnostics":"节点扫描不完整，请导出分析包"):
+       "guard_node_mismatch".equals(reason)?(en?"Writer changed; restore automatic brightness first":"守护节点已变化，请先恢复自动亮度"):
+       "node_not_writable".equals(reason)?(en?"Display node is read-only; export diagnostics":"已找到显示节点，但未取得写入权限"):
+       (en?"No identifiable primary brightness node":"未找到可识别的主屏亮度节点");
+   state.setText(message);current.setText("—");target.setText("—");range.setText("—");
+   slider.ready=false;inputAction.setEnabled(false);maxAction.setEnabled(false);inputAction.setAlpha(.4f);maxAction.setAlpha(.4f);slider.invalidate();return;
+  }
   maximum=node.optInt("maximum",10);int actual=node.optInt("actual",-1);JSONObject guard=node.optJSONObject("guard");
   boolean auto=runtime==null||runtime.optBoolean("auto_mode");JSONObject owner=runtime==null?null:runtime.optJSONObject("brightness_control");
   BrightnessTileService.publish(runtime);

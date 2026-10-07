@@ -4,19 +4,22 @@ import java.nio.file.*;
 import java.security.MessageDigest;
 import android.system.Os;
 import org.json.*;
-/** Installs the tiny writer only on explicit raw-panel use. Never touches panel1. */
+/** Installs the tiny writer only on explicit raw-panel use, for the identified primary node. */
 final class NativePanelRoot {
  static final File BIN=new File(RootControl.DATA,"hyperlux-main-panel");
- static final File NODE=new File("/sys/class/backlight/panel0-backlight/brightness"),MAX=new File(NODE.getParentFile(),"max_brightness");
- static int read(File f)throws Exception{String v=new String(Files.readAllBytes(f.toPath()),java.nio.charset.StandardCharsets.US_ASCII).trim();int n=Integer.parseInt(v);if(n<0||n>65535)throw new IOException("主屏节点数值无效");return n;}
+ static int read(File f)throws Exception{return PanelNodeDiscovery.number(f);}
  static JSONObject status()throws Exception{
-  JSONObject j=new JSONObject().put("path",NODE.toString()).put("supported",NODE.isFile()&&MAX.isFile());
+  JSONObject j=PanelNodeDiscovery.discover(new File("/sys"));
   if(!j.optBoolean("supported"))return j;
-  int max=read(MAX);if(max<10)throw new IOException("主屏节点范围无效");j.put("minimum",10).put("maximum",max).put("actual",read(NODE));
-  File driverActual=new File(NODE.getParentFile(),"actual_brightness");if(driverActual.isFile())try{j.put("driver_actual",read(driverActual));}catch(Exception unavailable){j.put("driver_actual_error",unavailable.toString());}
-  try{j.put("guard",NativePanelClient.call("STATUS"));}catch(Exception unavailable){j.put("guard_running",false).put("guard_error",unavailable.toString());}
+  File node=new File(j.getString("path"));
+  File driverActual=new File(node.getParentFile(),"actual_brightness");if(driverActual.isFile())try{j.put("driver_actual",read(driverActual));}catch(Exception unavailable){j.put("driver_actual_error",unavailable.toString());}
+  boolean guardMatches=false;
+  try{JSONObject guard=NativePanelClient.call("STATUS");guardMatches=matches(j,guard);j.put("guard_running",guardMatches);if(guardMatches)j.put("guard",guard);else j.put("supported",false).put("reason","guard_node_mismatch").put("guard_error","guard_node_mismatch");}catch(Exception unavailable){j.put("guard_running",false).put("guard_error",unavailable.toString());}
+  int mode=Os.stat(node.toString()).st_mode;
+  if((mode&0222)==0&&!guardMatches)j.put("supported",false).put("reason","node_not_writable");
   return j;
  }
+ static boolean matches(JSONObject node,JSONObject guard){return guard.optBoolean("ok")&&"raw06-health".equals(guard.optString("native_build"))&&node.optString("path").equals(guard.optString("path"))&&node.optString("canonical_path").equals(guard.optString("canonical_path"))&&node.optInt("maximum",-1)==guard.optInt("maximum",-2);}
  static void install()throws Exception{
   Os.chmod(RootControl.DATA.toString(),0700);
   String source=System.getenv("CLASSPATH");if(source==null||source.isEmpty())throw new IOException("未取得主屏守护所在的 APK 路径");
@@ -32,14 +35,17 @@ final class NativePanelRoot {
    File temp=new File(RootControl.DATA,"hyperlux-main-panel.new");Files.write(temp.toPath(),bytes);Os.chmod(temp.toString(),0700);Files.move(temp.toPath(),BIN.toPath(),StandardCopyOption.REPLACE_EXISTING,StandardCopyOption.ATOMIC_MOVE);
   }
  }
- static void start()throws Exception{
+ static void start(JSONObject selected)throws Exception{
   install();
-  try{if(NativePanelClient.call("STATUS").optBoolean("ok"))return;}catch(Exception ignored){}
+  JSONObject current=PanelNodeDiscovery.discover(new File("/sys"));
+  if(!current.optBoolean("supported")||!selected.optString("path").equals(current.optString("path"))||!selected.optString("canonical_path").equals(current.optString("canonical_path"))||selected.optInt("maximum",-1)!=current.optInt("maximum",-2))throw new IOException("主屏节点已变化，请重新打开面板");
+  JSONObject existing=null;try{existing=NativePanelClient.call("STATUS");}catch(Exception ignored){}
+  if(existing!=null){if(matches(current,existing))return;throw new IOException("已有守护使用其他节点，请先恢复自动亮度");}
   File log=new File(RootControl.DATA,"main-panel.log");
-  Process guard=new ProcessBuilder(BIN.toString(),"--daemon").redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.to(log)).start();
+  Process guard=new ProcessBuilder(BIN.toString(),"--daemon","--node",current.getString("path")).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.to(log)).start();
   String lastProbe="未取得就绪响应";long deadline=System.nanoTime()+1500000000L;
   while(System.nanoTime()<deadline){
-   try{JSONObject reply=NativePanelClient.call("STATUS");if(reply.optBoolean("ok"))return;lastProbe=reply.toString();}catch(Exception unavailable){lastProbe=unavailable.toString();}
+   try{JSONObject reply=NativePanelClient.call("STATUS");if(matches(current,reply))return;lastProbe=reply.toString();}catch(Exception unavailable){lastProbe=unavailable.toString();}
    if(!guard.isAlive())throw startFailure(log,"exit="+guard.exitValue()+"；就绪查询："+lastProbe);
    if(System.nanoTime()<deadline)Thread.sleep(50);
   }

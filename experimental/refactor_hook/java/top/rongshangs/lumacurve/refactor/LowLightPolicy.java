@@ -18,6 +18,11 @@ public final class LowLightPolicy {
             Float.isFinite(confirmedLux)&&confirmedLux>=0&&(confirmedLux<=limit||
                 (Float.isFinite(candidateLux)&&candidateLux>=0&&candidateLux<=limit));
     }
+    /** Only a positively identified OEM night scene may keep low-light evidence enabled. */
+    public static boolean appliesInScene(boolean enabled,boolean automatic,boolean screenOn,
+            boolean idle,boolean driving,boolean nightDriving,boolean hdr,float confirmedLux,float candidateLux,float limit){
+        return applies(enabled,automatic,screenOn,idle,driving&&!nightDriving,hdr,confirmedLux,candidateLux,limit);
+    }
     public static long chosen(long existing,boolean brighten,boolean assist){
         return chosen(existing,brighten,assist,BRIGHTEN_MS,DARKEN_MS);
     }

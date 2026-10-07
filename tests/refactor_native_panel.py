@@ -27,8 +27,8 @@ int main(void){
  CHECK(!panel_set(&p,"old",10,16383,2001));CHECK(panel_set(&p,"new",10000,16383,2001));
  CHECK(!panel_keep(&p,"old",456,2001));CHECK(!panel_keep(&p,"new",457,2001));
  CHECK(panel_keep(&p,"new",456,9999));CHECK(p.expires==17999);CHECK(!panel_keep(&p,"new",456,17999));
- char message[128];CHECK(panel_health(message,sizeof(message),&p,1,0)>0);CHECK(!strcmp(message,"new 1 0\n"));
- CHECK(panel_health(message,sizeof(message),&p,0,13)>0);CHECK(!strcmp(message,"new 0 13\n"));
+ char message[128];CHECK(panel_health(message,sizeof(message),&p,1,0,9999)>0);CHECK(!strcmp(message,"new 1 0 9999\n"));
+ CHECK(panel_health(message,sizeof(message),&p,0,13,10000)>0);CHECK(!strcmp(message,"new 0 13 10000\n"));
  panel_clear(&p);CHECK(!panel_set(&p,"new",500,16383,10000));CHECK(!panel_live(&p,10000));
  CHECK(panel_arm(&p,"driver65535",456,0));CHECK(panel_set(&p,"driver65535",65535,65535,1));
  CHECK(!panel_set(&p,"driver65535",65536,65535,1));

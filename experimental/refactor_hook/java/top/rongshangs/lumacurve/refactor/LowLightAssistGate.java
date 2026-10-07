@@ -12,7 +12,9 @@ final class LowLightAssistGate {
   if(!enabled||!eligible){release("inactive");return nativeDeadline;}
   if(!Float.isFinite(confirmed)||confirmed<0||!Float.isFinite(candidate)||!Float.isFinite(threshold)||threshold<confirmed||candidate<=threshold){release("no_main_rise");return nativeDeadline;}
   if(candidate-confirmed>=Math.max(30,confirmed*1.5f)){release("large_main_rise");return nativeDeadline;}
-  if(!valid||!Float.isFinite(assist)||assist<=.5f||!Float.isFinite(min)||!Float.isFinite(max)||min<=.5f||max<min||oldest<0||newest<oldest||newest>now||now-newest>5000||newest-oldest<1000){
+  // Fresh, valid zero-lux history is evidence of darkness, not a missing sensor.
+  // Keep the same finite wait and release on stale/invalid or changing evidence.
+  if(!valid||!Float.isFinite(assist)||assist<0||!Float.isFinite(min)||!Float.isFinite(max)||min<0||max<min||oldest<0||newest<oldest||newest>now||now-newest>5000||newest-oldest<1000){
    release("assist_unreliable");return nativeDeadline;
   }
   if(max-min>Math.max(2,assist*stableRatio)){release("assist_changed");coolUntil=now+20000;return nativeDeadline;}
