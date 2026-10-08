@@ -120,11 +120,17 @@ public final class MainActivity extends Activity {
     Button compact(String name,Runnable task,LinearLayout parent){Button b=action(name,task);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(44),1);lp.setMargins(dp(3),dp(6),dp(3),dp(4));parent.addView(b,lp);return b;}
     @Override public void onCreate(Bundle saved){
         super.onCreate(saved);openManualPanel=getIntent().getBooleanExtra("manual_brightness_panel",false);restoredUi=saved;darkTheme=(getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK)==android.content.res.Configuration.UI_MODE_NIGHT_YES;INK=themed(INK);MUTED=themed(MUTED);BLUE=themed(BLUE);BG=themed(BG);
-        getWindow().setStatusBarColor(BG);getWindow().setNavigationBarColor(BG);getWindow().getDecorView().setSystemUiVisibility(darkTheme?0:View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
+        if(Build.VERSION.SDK_INT>=30)getWindow().setDecorFitsSystemWindows(false);
+        getWindow().setStatusBarColor(Color.TRANSPARENT);getWindow().setNavigationBarColor(Color.TRANSPARENT);getWindow().getDecorView().setSystemUiVisibility(darkTheme?0:View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
         autoScroll=getPreferences(0).getBoolean("log_auto_scroll",true);refreshSeconds=getPreferences(0).getInt("refresh_seconds",2);english=!getResources().getConfiguration().getLocales().get(0).getLanguage().equals("zh");getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING);
         try{factors=CurvePlan.factors(getPreferences(0).getString("draft","1,1,1,1"));}catch(Exception ignored){}
         curveFloor=getPreferences(0).getFloat("draft_floor",0);
-        root=column();root.setBackgroundColor(BG);setContentView(root);
+        root=column();root.setBackgroundColor(BG);root.setOnApplyWindowInsetsListener((view,insets)->{
+            int top=0;
+            if(Build.VERSION.SDK_INT>=30)top=insets.getInsets(WindowInsets.Type.statusBars()).top;
+            view.setPadding(0,top,0,0);
+            return insets;
+        });setContentView(root);
         header=row(root);header.setPadding(dp(18),0,dp(18),0);header.setLayoutParams(new LinearLayout.LayoutParams(-1,dp(64)));header.setBackground(background(BG,0));
         ImageView icon=image(null,38,12);header.addView(icon);
         LinearLayout brand=column();LinearLayout.LayoutParams brandLp=new LinearLayout.LayoutParams(0,-2,1);brandLp.leftMargin=dp(12);header.addView(brand,brandLp);brand.addView(text("HyperLux",20,INK));
@@ -136,28 +142,30 @@ public final class MainActivity extends Activity {
         FrameLayout contentHost=new FrameLayout(this);contentHost.setClipChildren(false);contentHost.setClipToPadding(false);
         root.addView(contentHost,new LinearLayout.LayoutParams(-1,0,1));
         content=new FrameLayout(this);content.setBackgroundColor(Color.TRANSPARENT);content.setClipChildren(false);content.setClipToPadding(false);
-        content.setPadding(0,0,0,dp(82));
+        content.setPadding(0,0,0,dp(100));
         contentHost.addView(content,new FrameLayout.LayoutParams(-1,-1));
         for(int i=0;i<4;i++){LinearLayout b=column();pages[i]=b;if(i==0||i==2){b.setPadding(dp(16),dp(8),dp(16),dp(6));content.addView(b,new FrameLayout.LayoutParams(-1,-1));}else{ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);b.setPadding(dp(18),dp(10),dp(18),dp(22));scroll.addView(b);content.addView(scroll,new FrameLayout.LayoutParams(-1,-1));scroll.setVisibility(View.GONE);}}
         makeStatus();makeSettings();makeLogs();makeAbout();
         glassDock=new GlassDockView(this);glassDock.setDarkMode(darkTheme);glassDock.bind(content);
-        FrameLayout.LayoutParams dockParams=new FrameLayout.LayoutParams(-1,dp(70),Gravity.BOTTOM);dockParams.leftMargin=dp(18);dockParams.rightMargin=dp(18);dockParams.topMargin=dp(4);dockParams.bottomMargin=dp(12);contentHost.addView(glassDock,dockParams);
+        FrameLayout.LayoutParams dockParams=new FrameLayout.LayoutParams(-1,dp(64),Gravity.BOTTOM);dockParams.leftMargin=dp(28);dockParams.rightMargin=dp(28);dockParams.topMargin=dp(4);dockParams.bottomMargin=dp(28);contentHost.addView(glassDock,dockParams);
         glassDock.setOnApplyWindowInsetsListener((view,insets)->{
             int navigationBottom=0;
             if(Build.VERSION.SDK_INT>=30)navigationBottom=insets.getInsets(WindowInsets.Type.navigationBars()).bottom;
             FrameLayout.LayoutParams lp=(FrameLayout.LayoutParams)view.getLayoutParams();
-            int bottom=dp(12)+Math.min(navigationBottom,dp(28));
-            if(lp.bottomMargin!=bottom){lp.bottomMargin=bottom;view.setLayoutParams(lp);content.setPadding(0,0,0,dp(82)+Math.min(navigationBottom,dp(28)));}
+            int bottom=navigationBottom>0?dp(8)+navigationBottom:dp(28);
+            int contentBottom=dp(64)+bottom+dp(8);
+            if(lp.bottomMargin!=bottom){lp.bottomMargin=bottom;view.setLayoutParams(lp);content.setPadding(0,0,0,contentBottom);}
             return insets;
         });
         glassDock.requestApplyInsets();
         // The dock tabs use horizontal weight (width=0, weight=1).  A vertical
         // container measures those children at zero width, which made the whole
         // navigation bar appear empty even though the dock itself was present.
-        LinearLayout bottom=row();bottomNav=bottom;bottom.setBaselineAligned(false);bottom.setPadding(dp(8),dp(8),dp(8),dp(8));glassDock.addView(bottom,new FrameLayout.LayoutParams(-1,-1));String[] names={"状态","设置","日志","关于"};
+        LinearLayout bottom=row();bottomNav=bottom;bottom.setBaselineAligned(false);bottom.setPadding(dp(4),dp(4),dp(4),dp(4));glassDock.addView(bottom,new FrameLayout.LayoutParams(-1,-1));String[] names={"状态","设置","日志","关于"};
         for(int i=0;i<4;i++){final int index=i;LinearLayout tab=column();tab.setBaselineAligned(false);tab.setGravity(Gravity.CENTER);tab.setBackground(ripple(Color.TRANSPARENT,14));tab.setClickable(true);tab.setOnClickListener(v->select(index));
-            NavIcon iconView=new NavIcon(i);tab.addView(iconView,new LinearLayout.LayoutParams(dp(25),dp(25)));TextView name=text(names[i],12,MUTED);name.setGravity(Gravity.CENTER);name.setIncludeFontPadding(false);name.setPadding(0,dp(4),0,0);tab.addView(name,new LinearLayout.LayoutParams(-1,dp(22)));bottom.addView(tab,new LinearLayout.LayoutParams(0,dp(58),1));nav[i]=tab;navIcons[i]=iconView;navNames[i]=name;}
-        glassDock.setSwipeListener(delta->select(page+delta));select(saved==null?0:saved.getInt("page",0));apply.setEnabled(false);loadSavedBackground();
+            tab.setContentDescription(tr(names[i]));
+            NavIcon iconView=new NavIcon(i);iconView.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);tab.addView(iconView,new LinearLayout.LayoutParams(dp(28),dp(28)));TextView name=text(names[i],12,MUTED);name.setGravity(Gravity.CENTER);name.setIncludeFontPadding(false);name.setPadding(0,dp(2),0,0);tab.addView(name,new LinearLayout.LayoutParams(-1,dp(18)));bottom.addView(tab,new LinearLayout.LayoutParams(0,dp(56),1));nav[i]=tab;navIcons[i]=iconView;navNames[i]=name;}
+        glassDock.setPageCount(4);glassDock.setDragListener(new GlassDockView.DragListener(){public void onDragPosition(float position){}public void onDragFinished(int target){select(target);}});select(saved==null?0:saved.getInt("page",0));apply.setEnabled(false);loadSavedBackground();
     }
     void makeStatus(){
         stateTitle=text("",16,INK);luxReading=text("",20,BLUE);nitReading=text("",20,INK);flow=text("",12,MUTED);thermalState=text("",12,INK);userState=text("",12,MUTED);
@@ -514,7 +522,7 @@ public final class MainActivity extends Activity {
     }
     void offerUpdate(){if(pendingUpdate==null||!visible||permissionDialogVisible||legacyDialogVisible||pendingLegacy!=null||updateDialog!=null)return;JSONObject release=pendingUpdate;pendingUpdate=null;LinearLayout body=column();body.addView(text("版本 "+release.optString("version"),18,BLUE));String notes=release.optString("notes");TextView changes=text(notes.isEmpty()?"查看仓库了解更新内容":notes,13,MUTED);ScrollView scroll=new ScrollView(this);scroll.addView(changes);scroll.setLayoutParams(new LinearLayout.LayoutParams(-1,Math.min(dp(200),dp(70+Math.min(8,notes.length()/40)*16))));body.addView(scroll);AlertDialog d=dialog("有新版本可用",body);updateDialog=d;d.setOnDismissListener(v->{updateDialog=null;offerLegacyModules();});d.show();dialogButton(d,"稍后",null,false);dialogButton(d,"下载更新",()->open(release.optString("url")),true);}
     void select(int value){int previous=page;page=Math.max(0,Math.min(3,value));settingsGroup=-1;if(glassDock!=null)glassDock.setVisibility(View.VISIBLE);if(bottomNav!=null)bottomNav.setVisibility(View.VISIBLE);header.setVisibility(page==3?View.GONE:View.VISIBLE);note.setVisibility(View.GONE);transitionPage(content.getChildAt(page),Integer.compare(page,previous));
-        for(int i=0;i<4;i++){if(nav[i]!=null){navNames[i].setTextColor(i==page?BLUE:MUTED);navIcons[i].selected=i==page;navIcons[i].invalidate();nav[i].setSelected(i==page);}}
+        for(int i=0;i<4;i++){if(nav[i]!=null){navNames[i].setTextColor(i==page?BLUE:MUTED);navIcons[i].selected=i==page;navIcons[i].invalidate();nav[i].setSelected(i==page);}}if(glassDock!=null)glassDock.setSelectedIndex(page);
         // Refresh every visit; retain unapplied edits until a successful save.
         if(page==3&&previous!=3&&visible){checkUpdate(false);refreshThanks();}if(page==2)scrollLogs();if(visible){if(busy)rereadPending=true;else run("inspect",null);}
     }

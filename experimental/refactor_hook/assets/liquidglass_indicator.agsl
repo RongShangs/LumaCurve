@@ -1,0 +1,113 @@
+/*
+ * MIT License
+ * Copyright (c) 2025 QmDeve
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ *
+ * Adapted from AndroidLiquidGlassView:
+ * https://github.com/QmDeve/AndroidLiquidGlassView
+ */
+uniform shader content;
+uniform float2 size;
+uniform float2 sampleSize;
+uniform float4 pillRect;
+uniform float cornerRadius;
+uniform float lensHeight;
+uniform float lensAmount;
+uniform float depthEffect;
+uniform float chromaticAberration;
+uniform float pressProgress;
+
+float sdRoundedRect(float2 point, float2 halfSize, float radius) {
+    float2 q = abs(point) - (halfSize - float2(radius));
+    return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - radius;
+}
+
+float2 gradRoundedRect(float2 point, float2 halfSize, float radius) {
+    float2 q = abs(point) - (halfSize - float2(radius));
+    if (q.x > 0.0 || q.y > 0.0) {
+        float2 outside = max(q, 0.0);
+        float lengthOutside = max(length(outside), 0.001);
+        return sign(point) * outside / lengthOutside;
+    }
+    float useX = step(q.y, q.x);
+    return sign(point) * float2(useX, 1.0 - useX);
+}
+
+float2 safeNormalize(float2 value, float2 fallback) {
+    float len = length(value);
+    return len > 0.001 ? value / len : fallback;
+}
+
+float circleMap(float value) {
+    float x = clamp(value, 0.0, 1.0);
+    return 1.0 - sqrt(max(0.0, 1.0 - x * x));
+}
+
+float2 clampCoord(float2 point) {
+    return clamp(point, float2(0.5), sampleSize - float2(0.5));
+}
+
+half4 sampleContent(float2 point) {
+    return content.eval(clampCoord(point));
+}
+
+half4 main(float2 coord) {
+    float press = clamp(pressProgress, 0.0, 1.0);
+    if (press <= 0.001) return half4(0.0);
+    float2 center = (pillRect.xy + pillRect.zw) * 0.5;
+    float2 halfSize = max((pillRect.zw - pillRect.xy) * 0.5, float2(1.0));
+    float2 centered = coord - center;
+    float radius = clamp(cornerRadius, 0.0, min(halfSize.x, halfSize.y));
+    float sd = sdRoundedRect(centered, halfSize, radius);
+    float coverage = 1.0 - smoothstep(-1.25, 0.0, sd);
+    if (coverage <= 0.001) return half4(0.0);
+
+    float height = max(lensHeight, 0.001);
+    float2 shapeGradient = gradRoundedRect(centered, halfSize, min(radius * 1.5, min(halfSize.x, halfSize.y)));
+    float2 domeGradient = safeNormalize(centered, shapeGradient);
+    float2 gradient = safeNormalize(shapeGradient + depthEffect * domeGradient, shapeGradient);
+    float distance = circleMap(1.0 - clamp(-sd / height, 0.0, 1.0));
+    float edgeGuard = smoothstep(0.0, 1.5, -sd);
+    float2 displacement = distance * edgeGuard * lensAmount * gradient;
+    float dispersion = chromaticAberration
+            * ((centered.x * centered.y) / max(1.0, halfSize.x * halfSize.y));
+    float2 colorSpread = displacement * dispersion;
+
+    half4 sampled = half4(0.0);
+    if (chromaticAberration <= 0.001) {
+        sampled = sampleContent(coord + displacement);
+    } else {
+        half4 r0 = sampleContent(coord + displacement + colorSpread);
+        half4 r1 = sampleContent(coord + displacement + colorSpread * (2.0 / 3.0));
+        half4 r2 = sampleContent(coord + displacement + colorSpread * (1.0 / 3.0));
+        half4 g0 = sampleContent(coord + displacement);
+        half4 b1 = sampleContent(coord + displacement - colorSpread * (1.0 / 3.0));
+        half4 b2 = sampleContent(coord + displacement - colorSpread * (2.0 / 3.0));
+        half4 b3 = sampleContent(coord + displacement - colorSpread);
+        sampled = half4(r0.r / 3.5 + r1.r / 3.5 + r2.r / 3.5 + b3.r / 7.0,
+                r1.g / 7.0 + r2.g / 3.5 + g0.g / 3.5 + b1.g / 3.5,
+                b1.b / 3.0 + b2.b / 3.0 + b3.b / 3.0,
+                (r0.a + r1.a + r2.a + g0.a + b1.a + b2.a + b3.a) / 7.0);
+    }
+
+    sampled.rgb += half3(0.035 * press);
+    float alpha = coverage * press;
+    return half4(sampled.rgb * alpha, sampled.a * alpha);
+}
