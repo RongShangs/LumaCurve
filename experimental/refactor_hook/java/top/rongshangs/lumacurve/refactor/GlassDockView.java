@@ -88,7 +88,6 @@ public final class GlassDockView extends ViewGroup {
     private final Paint selectionEdgePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint bloomPaintA = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint bloomPaintB = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint shadowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final RectF selectedRect = new RectF();
     private final RectF fromRect = new RectF();
     private final RectF toRect = new RectF();
@@ -185,8 +184,6 @@ public final class GlassDockView extends ViewGroup {
         bloomPaintA.setBlendMode(BlendMode.PLUS);
         bloomPaintB.setBlendMode(BlendMode.PLUS);
         bloomPaintB.setAlpha(102);
-        shadowPaint.setColor(0x1a000000);
-        shadowPaint.setShadowLayer(24f * density, 0f, 4f * density, 0x1a000000);
         setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO);
         setDarkMode(false);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -211,6 +208,7 @@ public final class GlassDockView extends ViewGroup {
             setLayerType(LAYER_TYPE_SOFTWARE, null);
         }
         updateOutline();
+        setElevation(4f * density);
     }
 
     /** Bind a sibling content surface to be sampled by the glass effect. */
@@ -263,7 +261,11 @@ public final class GlassDockView extends ViewGroup {
         selectionPaint.setColor(dark ? 0x1affffff : 0x1a000000);
         selectionEdgePaint.setColor(0x00ffffff);
         updateBloomShaders(darkMode);
-        shadowPaint.setShadowLayer(24f * density, 0f, 4f * density, dark ? 0x33000000 : 0x1a000000);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            int shadowColor = dark ? 0x33000000 : 0x1a000000;
+            setOutlineAmbientShadowColor(shadowColor);
+            setOutlineSpotShadowColor(shadowColor);
+        }
         updateEffect();
         invalidate();
     }
@@ -323,6 +325,16 @@ public final class GlassDockView extends ViewGroup {
         super.onDetachedFromWindow();
     }
 
+    @Override protected void onWindowVisibilityChanged(int visibility) {
+        super.onWindowVisibilityChanged(visibility);
+        if (visibility == VISIBLE) invalidate();
+    }
+
+    @Override protected void onVisibilityChanged(View changedView, int visibility) {
+        super.onVisibilityChanged(changedView, visibility);
+        if (visibility == VISIBLE) invalidate();
+    }
+
     @Override protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
         updateOutline();
@@ -361,9 +373,7 @@ public final class GlassDockView extends ViewGroup {
         updatePressAnimation();
         int save = canvas.save();
         if (Math.abs(panelDrift) > .01f) canvas.translate(panelDrift, 0f);
-        // The shadow is painted before the capsule clip so it can fall outside
-        // the material without creating a rectangular edge around the Dock.
-        canvas.drawRoundRect(0f, 0f, getWidth(), getHeight(), cornerRadius, cornerRadius, shadowPaint);
+        // The platform draws the outline shadow outside this clipped material.
         clipPath.reset();
         clipPath.addRoundRect(0, 0, getWidth(), getHeight(), cornerRadius, cornerRadius, Path.Direction.CW);
         canvas.clipPath(clipPath);
@@ -389,7 +399,7 @@ public final class GlassDockView extends ViewGroup {
     }
 
     /**
-     * Draw the WeChat/KernelSU-style selected capsule below the real tab
+     * Draw the WeChat/KernelSU-style selected rounded-rect indicator below tabs
      * controls. Keeping this as one parent layer means the tab icons and labels
      * remain native, while the moving material has no per-tab RenderEffect.
      */
@@ -877,7 +887,9 @@ public final class GlassDockView extends ViewGroup {
         bloomPaintB.getShader().setLocalMatrix(bloomMatrixB);
         canvas.drawRoundRect(bloomRect, cornerRadius, cornerRadius, bloomPaintA);
         canvas.drawRoundRect(bloomRect, cornerRadius, cornerRadius, bloomPaintB);
-        if (isAttachedToWindow() && getVisibility() == VISIBLE) postInvalidateDelayed(50L);
+        if (isAttachedToWindow() && isShown() && getWindowVisibility() == VISIBLE) {
+            postInvalidateDelayed(50L);
+        }
     }
 
     private String loadShader() {
