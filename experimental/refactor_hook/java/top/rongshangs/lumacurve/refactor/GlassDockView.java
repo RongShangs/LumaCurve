@@ -887,9 +887,6 @@ public final class GlassDockView extends ViewGroup {
         bloomPaintB.getShader().setLocalMatrix(bloomMatrixB);
         canvas.drawRoundRect(bloomRect, cornerRadius, cornerRadius, bloomPaintA);
         canvas.drawRoundRect(bloomRect, cornerRadius, cornerRadius, bloomPaintB);
-        if (isAttachedToWindow() && isShown() && getWindowVisibility() == VISIBLE) {
-            postInvalidateDelayed(50L);
-        }
     }
 
     private String loadShader() {
