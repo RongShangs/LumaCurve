@@ -33,7 +33,7 @@
 
 ## 发布物
 
-- APK：`dist/HyperLux-2.3.2.apk`，SHA-256 `09f09723da6bd7d483869a9ef2df3adbc3a365af945e5bc45b3c1562197ba14c`。
+- APK：`dist/HyperLux-2.3.2.apk`；最终 SHA-256 以官网 `downloads/SHA256SUMS.txt` 和 GitHub Release asset digest 为准。
 - 源码：`dist/LumaCurve-2.3.2-source.zip`。
 - 完整包：`dist/LumaCurve-2.3.2.zip`。
 - 静态官网包：`dist/LumaCurve-website-2.3.2.zip`。
