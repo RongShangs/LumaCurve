@@ -1,17 +1,17 @@
 {
   "name": "HyperLux",
-  "version": "2.3.1",
-  "versionCode": 23106,
+  "version": "2.3.2",
+  "versionCode": 23107,
   "distribution": "apk",
   "requires": [
     "Root",
     "LSPosed",
     "HyperOS 4"
   ],
-  "apkUrl": "https://lc.rongshangs.top/downloads/HyperLux-2.3.1.apk",
-  "sourceUrl": "https://lc.rongshangs.top/downloads/LumaCurve-2.3.1-source.zip",
-  "bundleUrl": "https://lc.rongshangs.top/downloads/LumaCurve-2.3.1.zip",
-  "releaseUrl": "https://github.com/RongShangs/LumaCurve/releases/tag/v2.3.1",
-  "sha256": "d20cf69506a3da09fda1cb1e3e54c078d2a88b02e3bb7f2a88c57de8fe98b681",
-  "changelog": "# HyperLux 2.3.1\n\n版本代码 **23106**，构建 **release-2.3.1**。Root + LSPosed，支持 HyperOS 4；沿用包名、图标、签名和现有需求。\n\n## 本版调整\n\n- 修复暗光锁定注册成功但未收到匹配回调的问题：复用系统显示控制器的 SensorManager，以传感器类型和硬件 handle 识别同一感光器。\n- 修复受保护 HBM 数据访问失败导致暗光阈值未应用的问题；明确识别的夜间驾驶场景继续执行暗光保护，同时保留原生额外确认、亮度下限及其他场景保护。诊断增加阈值错误和最近计算结果。\n- 新配置及“睡前保持”默认开启暗光锁定：**主辅均 ≤10 lux 持续 1 分钟进入；任一侧 ≥50 lux 持续 1 秒恢复自动**。已有显式设置保留，早期未配置开关的用户继续保持未启用；选择预设后保存才应用。\n- 主屏手动面板有界发现主屏背光节点，排除副屏和非显示节点；歧义拒绝接管。Java 与原生守护分别验证路径、范围和身份，权限恢复记录绑定当前开机与节点。\n- 修复保存确认返回时覆盖等待期间新改草稿的问题，保留未保存提示，用户可继续保存新修改。\n- 修复暗光锁定转手动接管失败后遗失原自动模式所有权的问题；接管确认丢失时按会话回滚，不停止其他新会话。\n- 手动守护使用单调时钟每 2 秒更新健康记录，超过 5 秒未更新时系统取消接管并停止隔离输出，避免异常退出后的旧记录长期被采信。自动亮度路径不启用守护，也不增加传感器订阅。\n\n## 安装与恢复\n\n覆盖安装 `HyperLux-2.3.1.apk` 后**重启手机**，让系统进程加载新版 Hook。LSPosed 作用域选择系统框架；详细读数应显示 `runtime.build=release-2.3.1`。版本代码高于 beta05，可覆盖同签名正式版与 beta 版，保留已有设置。\n\n异常时先用手动面板“恢复自动”或 APP“停用并恢复”；也可在 LSPosed 取消启用并重启。完整 ZIP 解压后，在同目录 Root 终端执行：\n\n```sh\nsh ./restore_refactor_hook_android.sh\n```\n\n完整 ZIP 是 APK、源码与恢复工具合集，不是 KSU 模块。\n\n## 验证范围\n\n构建执行真实 Java / ARM64 C 编译、现有主机回归、已有私有固件接口静态核对、APK 签名与对齐、最终 APK 原生资产校验。新增回归覆盖保存时继续编辑、暗光锁定转手动失败、确认丢失后回滚、健康记录过期与错误会话。\n\n本版没有连接 Android 设备进行实际 Hook、界面渲染或长期暗光测试。此前用户已确认定时锁定正常；暗光异常升亮的改进仍需本版实机反馈。主机回归和静态核对不能证明所有固件兼容，也不能保证消除所有亮度波动。\n\n正式产物包含 APK、对应源码及恢复工具；官网与 GitHub 正式 Release 提供相同版本下载。网站部署包需将全部内容放入站点根目录。"
+  "apkUrl": "https://lc.rongshangs.top/downloads/HyperLux-2.3.2.apk",
+  "sourceUrl": "https://lc.rongshangs.top/downloads/LumaCurve-2.3.2-source.zip",
+  "bundleUrl": "https://lc.rongshangs.top/downloads/LumaCurve-2.3.2.zip",
+  "releaseUrl": "https://github.com/RongShangs/LumaCurve/releases/tag/v2.3.2",
+  "sha256": "277e246195f413ff543b9de13e75bdd63b9b117c5231f24f72f7ac8a9db52f3c",
+  "changelog": "# HyperLux 2.3.2\n\n版本代码 **23107**，构建 **release-2.3.2**。这是从 2.3.1 主线继续的补丁版，沿用包名、签名约定、HyperOS 4 + Root + LSPosed 运行边界和 GPL-3.0 许可。\n\n## 本次调整\n\n- 亮屏期间继续依赖 Xiaomi 显示控制器已经注册的光感事件。收到环境光事件后立即运行既有判断，保持环境变化的反应速度。\n- 刚亮屏或显示策略切换后的 2 秒内，模块健康检查暂时使用 250ms 间隔；稳定亮屏恢复 30 秒检查。连续上报型传感器使用 10 秒检查上限。\n- 息屏、AOD、Doze 或 ScreenOff 输出策略生效时，释放暗光锁定监听与模块定时任务；恢复交互并确认自动亮度输出后重新接入。\n- `HookRuntime.screenOn()` 同时核对显示状态、`PowerManager.isInteractive()` 和输出策略，避免 HyperOS 在 AOD 阶段仍返回 `ON` 时误把 AOD 当作普通亮屏。\n- 状态广播在屏幕状态变化时立即排队发布，详细读数增加采样阶段、健康检查间隔、事件驱动标志和亮屏观察剩余时间。\n\n## 顺滑度与功耗边界\n\n本版没有新增自定义亮度动画、连续背光写入或独立轮询线程。亮度目标仍由 HyperOS 原生滤波、迟滞、亮暗确认、RampAnimator、温控和省电策略推进。模块只调整自己的监听生命周期和健康检查调度，因此不会用模块动画覆盖系统渐变。\n\n本机 `tcs3760` 主光感和辅助光感均为 `on-change` 传感器。`SensorManager.registerListener` 的参数不能被解释为硬件扫描频率控制；本版能够确定的是减少模块回调、计时器和状态处理，不能承诺改变传感器芯片或 Xiaomi sensorservice 的功耗。实际省电幅度需要在目标固件上用相同亮屏/AOD场景做 A/B 测量。\n\n## 验证范围\n\n- `tests/refactor_brightness_control.py`：183 个 Java 服务双测试用例通过，包含传感器监听、亮屏/AOD边界、手动接管回滚和新采样策略。\n- 构建时会继续执行现有 Refactor、原生资产、配置、状态传输和面板事务回归。\n- 本说明不把主机测试当作真实 Android Hook 或长期功耗测试；安装后应在目标 HyperOS 4 固件上观察 `sampling_phase`、`sampling_health_ms`、`sampling_event_driven` 和事件年龄。\n\n## 安装\n\n安装 `HyperLux-2.3.2.apk`，在 LSPosed 中启用系统框架作用域，然后重启手机。覆盖安装要求与此前版本相同的维护者签名；自行构建的 APK 使用本地签名，只能全新安装。详细读数应显示 `build=release-2.3.2`、`version=2.3.2`。\n\n完整源码与恢复工具随 `LumaCurve-2.3.2-source.zip`、`LumaCurve-2.3.2.zip` 发布。项目按 [GNU GPL-3.0](../../LICENSE) 开源；源码包不包含签名私钥、私有固件或设备采集资料。"
 }

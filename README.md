@@ -2,11 +2,20 @@
 
 **适配 HyperOS 4 的自动亮度工具。** 在系统亮度链路内调整曲线与手动偏好记忆，继续使用系统的双侧感光、场景判定和过渡动画；也可按需调整显示层温控与变化确认时间。
 
-**正式版 2.3.1 / 23106** · Root + LSPosed · GPL-3.0 · 完全开源免费
+**正式版 2.3.2 / 23107** · Root + LSPosed · GPL-3.0 · 完全开源免费
 
 [官网](https://lc.rongshangs.top) · [下载安装](https://github.com/RongShangs/LumaCurve/releases/latest) · [作者博客](https://rongshangs.top) · [酷安@戎Shangs](https://www.coolapk.com/u/3261403)
 
-应用名称为 **HyperLux**，安装包为 `HyperLux-2.3.1.apk`。包名 `top.rongshangs.lumacurve`、蓝色曲线图标、官网及 `RongShangs/LumaCurve` 仓库继续沿用；源码与恢复包沿用 `LumaCurve-` 文件名。
+应用名称为 **HyperLux**，安装包为 `HyperLux-2.3.2.apk`。包名 `top.rongshangs.lumacurve`、蓝色曲线图标、官网及 `RongShangs/LumaCurve` 仓库继续沿用；源码与恢复包沿用 `LumaCurve-` 文件名。
+
+## 2.3.2 更新
+
+- **自适应状态调度**：亮屏稳定时保持光感事件驱动，刚亮屏或显示策略切换后短暂提高健康检查频率，兼顾环境光响应速度与系统进程负担。
+- **AOD / 息屏边界**：同时核对交互状态和实际输出策略；进入 Doze、息屏显示或熄屏时释放模块监听与定时任务，不写入 AOD 亮度，恢复自动亮度策略后再接入。
+- **原生渐变保持不变**：不叠加自定义亮度动画，不直接改硬件扫描周期；目标仍交给 HyperOS 原生滤波、迟滞、ramp 和温控链路处理。
+- **状态可观测**：详细读数增加 `sampling_phase`、事件驱动标志、健康检查间隔和亮屏观察剩余时间，便于核对功耗策略是否生效。
+
+本版继续以 HyperOS 4 的已验证接口为边界，不把 Android 通用实现或其他厂商行为当作小米固件事实。主机回归已覆盖状态策略；完整 APK 构建与真实设备 AOD/亮屏功耗对比仍需在目标固件上单独验收。
 
 ## 2.3.1 更新
 
@@ -16,7 +25,7 @@
 - 手动面板自动识别明确的主屏节点，Java 与原生守护分别校验，权限恢复绑定节点身份。
 - 修复保存等待期间新改设置被覆盖、暗光锁定转手动失败后自动亮度未恢复，以及接管确认丢失后的会话回滚；为守护健康记录增加有效期。
 
-详见 [2.3.1 更新说明](docs/releases/2.3.1.md)和 [发布审阅](docs/review-2.3.1.md)。覆盖安装后重启，确认详细读数为 `release-2.3.1`。本版已完成主机回归及既有固件静态核对，尚无本版长期实机验证结论。
+详见 [2.3.2 更新说明](docs/releases/2.3.2.md)和 [2.3.2 发布审阅](docs/review-2.3.2.md)。覆盖安装后重启，确认详细读数为 `release-2.3.2`。本版完成亮度状态策略主机回归，尚无本版长期实机功耗验证结论。
 
 ## 2.3.0 更新
 
@@ -69,7 +78,7 @@
 - Root、LSPosed、固件接口和旧模块检测，自动检查正式 APK 更新，导出分析包到手机存储根目录。
 - 关于页依次展示简介与链接、交流群、打赏、感谢名单，作者位于最底部。
 
-1.0.0 的模块源码及历史 Release 保留用于追溯。当前安装方法以本页和 2.3.1 APK 为准。
+1.0.0 的模块源码及历史 Release 保留用于追溯。当前安装方法以本页和 2.3.2 APK 为准。
 
 ## 曲线与手动记忆
 
@@ -177,14 +186,14 @@
 
 需要 **HyperOS 4、Root、可用的 LSPosed**。APP 先读取 HyperOS 版本，OS3 等明确不支持版本直接提示；Android API 不是 HyperOS 版本。APK 最低 Android 14（API 34）；兼容以本机接口检测为准，不承诺所有 HyperOS 4 固件均已实测。
 
-1. 安装 [`HyperLux-2.3.1.apk`](https://github.com/RongShangs/LumaCurve/releases/download/v2.3.1/HyperLux-2.3.1.apk)，无需在 KSU 中刷 ZIP。
+1. 安装 [`HyperLux-2.3.2.apk`](https://github.com/shisjsji/LumaCurve/releases/download/v2.3.2/HyperLux-2.3.2.apk)，无需在 KSU 中刷 ZIP。
 2. LSPosed 启用 HyperLux，作用域选择「系统框架 / Android 系统」。**首次启用或更新 Hook 后重启一次**。
 3. 启动 APP 并允许 Root，检查状态与日志页的连接情况。
 4. 修改设置后点击「保存并应用」，后续调曲线和参数无需重启。
 
 同包名、同签名的前版 APP 可以覆盖安装，保留设置和本地预设。旧测试 APP `top.rongshangs.lumacurve.refactor.test` 应取消 LSPosed 启用。
 
-2.3.1 使用版本代码 **23106**，可覆盖同签名的此前正式版和本地测试版；旧版本可检测并提示正式升级。更新后重启一次，详细读数应显示 `build=release-2.3.1`。
+2.3.2 使用版本代码 **23107**，可覆盖同签名的此前正式版和本地测试版；旧版本可检测并提示正式升级。更新后重启一次，详细读数应显示 `build=release-2.3.2`。
 
 APP 检测 `luma_curve`、`luma_curve_official_test`、`ios_auto_brightness` 等已知旧模块，提示卸载；停用或待更新目录也会显示。请在 Root 管理器卸载并重启，应用不直接删除文件。
 
@@ -235,7 +244,7 @@ APP 检测 `luma_curve`、`luma_curve_official_test`、`ios_auto_brightness` 等
 
 用户已确认此前 Refactor 曲线调整有效；辅助光感在既有采集中贴桌为有效 0，拿起后在锁屏前自行恢复。这只代表当次设备和场景，不能保证所有场景均不会失效。
 
-2.3.1 构建执行生产曲线、记忆、配置迁移、预设隔离、暗光策略、输出 Hook 回调、原生节点租约与事务、计时增强和状态传输回归；核对三份已有固件的 HBM 与动态范围链路，并验证原生载荷、APK 签名与对应源码一致性，补充保存期间草稿保护、接管回滚及守护健康记录检查。网站部署另行进行。详细结果随源码中的构建验证记录提供。主机模型和静态检查不能替代本版长期实机验证，不承诺具体 nit 或消除所有波动。
+2.3.2 构建在 2.3.1 回归基础上增加状态调度、AOD 边界和采样策略用例；继续核对生产曲线、记忆、配置迁移、暗光策略、输出 Hook 回调、原生节点租约与事务。网站部署另行进行。详细结果随源码中的构建验证记录提供。主机模型和静态检查不能替代本版长期实机功耗验证，不承诺具体 nit 或消除所有波动。
 
 ## 更新与恢复
 
@@ -257,12 +266,12 @@ sh ./restore_refactor_hook_android.sh
 当前源码位于 [`experimental/refactor_hook/`](experimental/refactor_hook/)，目录名保留开发历史。
 
 ```powershell
-python tools/build_refactor_hook_test.py --skip-device-fixtures
+python tools/build_refactor_hook_test.py --skip-device-fixtures --skip-host-native
 python tools/sync_website.py
 python tools/package_website.py
 ```
 
-需要 JDK 17、Android SDK 37 / Build Tools 37.0.0、NDK 28.2.13676358 和 Xposed API 82。静态 ARM64 原生守护随构建打包。SDK 路径可按本地环境调整，编译依赖校验 SHA-256。没有私有固件资料时使用 `--skip-device-fixtures`，仍运行主机检查和运行时接口检测；有资料时去掉参数核对消费链。
+需要 JDK 17、Android SDK 37 / Build Tools 37.0.0、NDK 28.2.13676358 和 Xposed API 82。静态 ARM64 原生守护随构建打包。SDK 路径可按本地环境调整，编译依赖校验 SHA-256。没有私有固件资料时使用 `--skip-device-fixtures`，仍运行主机检查和运行时接口检测；有资料时去掉参数核对消费链。Windows 没有历史 MSYS2 GCC 时使用 `--skip-host-native`，该选项只跳过两个主机 C 面板测试，构建信息会记录原因，不把它们计为通过。
 
 自行构建使用自己的本地签名，不能覆盖维护者签名的 APK。源码和发行包不包含签名私钥、设备采集资料或小米固件。
 
