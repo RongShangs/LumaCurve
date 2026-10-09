@@ -11,7 +11,25 @@ import org.json.*;
 /** Event-driven mode owner inside system_server; raw output uses an optional native guard. */
 final class BrightnessControl implements SensorEventListener {
     static final String REQUEST="hyperlux_brightness_request_v1",ACK="hyperlux_brightness_ack_v1",OWNER="hyperlux_brightness_owner_v1";
+    /**
+     * Controls module health checks and listener lifetime. SensorManager's rate argument is not
+     * treated as a hardware scan-rate control: both device ALS inputs are on-change sensors.
+     */
+    static final class SamplingPolicy {
+        static final long WAKE_GRACE_MS=2000L,TRANSITION_HEALTH_MS=250L,ON_CHANGE_HEALTH_MS=30000L,CONTINUOUS_HEALTH_MS=10000L;
+        long wakeUntil=-1;
+        void wake(long now){if(now>=0)wakeUntil=now+WAKE_GRACE_MS;}
+        void sleep(){wakeUntil=-1;}
+        boolean inWakeGrace(long now){return wakeUntil>=0&&now<wakeUntil;}
+        long wakeRemaining(long now){return wakeUntil<0?0:Math.max(0,wakeUntil-now);}
+        long healthDelay(boolean onChange,long now){return inWakeGrace(now)?TRANSITION_HEALTH_MS:onChange?ON_CHANGE_HEALTH_MS:CONTINUOUS_HEALTH_MS;}
+        String phase(boolean displayOn,boolean interactive,long now){
+            if(!displayOn||!interactive)return "inactive";
+            return inWakeGrace(now)?"wake_transition":"stable_on";
+        }
+    }
     final HookRuntime s;final DarkLockPolicy policy=new DarkLockPolicy();
+    final SamplingPolicy sampling=new SamplingPolicy();
     BrightnessControlOptions options=new BrightnessControlOptions();FrameworkBrightness display;SensorManager sensors;Sensor main,assist;
     boolean listening,registered,busy,failed;String owner="none",session="",reason="inactive",error="",lastRequest="";
     static final java.lang.reflect.Method SENSOR_HANDLE=sensorHandle();
@@ -32,7 +50,7 @@ final class BrightnessControl implements SensorEventListener {
     boolean rawWasAuto,rawPaused,rawConfirmed,rawScreenOff;int rawTarget=-1;long rawLeaseUntil,rawBlockedWrites;final Runnable rawRenew=()->renewRaw();
     boolean unlocked(){try{android.app.KeyguardManager keyguard=(android.app.KeyguardManager)s.context.getSystemService(Context.KEYGUARD_SERVICE);return keyguard!=null&&!keyguard.isKeyguardLocked();}catch(Throwable missing){return false;}}
     boolean rawOutputBlocked(float value){return Float.isFinite(value)&&value>0&&enabled()&&owner.equals("raw_panel")&&rawConfirmed&&!rawPaused&&!rawScreenOff&&rawTarget>=10&&SystemClock.uptimeMillis()<rawLeaseUntil&&!auto()&&awake()&&unlocked();}
-    void screenOn(){if(owner.equals("raw_panel")){rawScreenOff=false;renewRaw();}else tick();}
+    void screenOn(){sampling.wake(SystemClock.uptimeMillis());if(owner.equals("raw_panel")){rawScreenOff=false;renewRaw();}else tick();}
     BrightnessControl(HookRuntime state){
         s=state;timer=()->tick();snapshot=()->{try{
             if(owner.equals("dark")&&!auto()){float requested=(float)display.read().getDouble("value");if(Math.abs(requested-held)>.0005f){relinquish("user_brightness",false);return;}}
@@ -92,6 +110,7 @@ final class BrightnessControl implements SensorEventListener {
             s.context.getContentResolver().registerContentObserver(Settings.Global.getUriFor(REQUEST),false,commandObserver);registered=true;
             displayEvents=(DisplayManager)s.context.getSystemService(Context.DISPLAY_SERVICE);
             if(displayEvents!=null)displayEvents.registerDisplayListener(displayListener,s.handler);
+            if(awake())sampling.wake(SystemClock.uptimeMillis());
             // Restart recovery only restores an automatic mode that this feature owned.
             String raw=Settings.Global.getString(s.context.getContentResolver(),OWNER);
             if(raw!=null){JSONObject old=new JSONObject(raw);boolean ours=old.optString("owner").equals("dark")&&old.optInt("user",-1)==0&&old.optBoolean("was_auto")&&old.optString("session").matches("[A-Za-z0-9_-]{1,80}");
@@ -123,7 +142,7 @@ final class BrightnessControl implements SensorEventListener {
         if(previous.equals("raw_panel"))s.handler.postDelayed(()->{if(awake())s.requestRecalculation();},400);
         if(!previous.equals("none")){s.log(previous.equals("dark")?"暗光锁定退出："+why:"主屏手动面板已退让："+why);s.queueControlPublish();}
     }
-    void screenOff(){if(owner.equals("raw_panel")){rawScreenOff=true;pauseRaw();}else relinquish("screen_off",true);unlisten();s.handler.removeCallbacks(timer);s.handler.removeCallbacks(retry);failed=false;}
+    void screenOff(){sampling.sleep();if(owner.equals("raw_panel")){rawScreenOff=true;pauseRaw();}else relinquish("screen_off",true);unlisten();s.handler.removeCallbacks(timer);s.handler.removeCallbacks(retry);failed=false;}
     void stop(){relinquish("disabled",true);unlisten();s.handler.removeCallbacks(timer);s.handler.removeCallbacks(retry);options=new BrightnessControlOptions();}
     void close(){stop();if(displayEvents!=null)displayEvents.unregisterDisplayListener(displayListener);if(registered)try{s.context.getContentResolver().unregisterContentObserver(modeObserver);s.context.getContentResolver().unregisterContentObserver(commandObserver);s.context.getContentResolver().unregisterContentObserver(brightnessObserver);}catch(Throwable ignored){}registered=false;}
     void unlisten(){try{if(listening&&sensors!=null)sensors.unregisterListener(this);}catch(Throwable failure){error=failure.toString();}finally{listening=false;mainLux=assistLux=Float.NaN;mainAt=assistAt=-1;}}
@@ -161,13 +180,14 @@ final class BrightnessControl implements SensorEventListener {
             else reason=owner.equals("dark")?"locked":!DarkLockPolicy.valid(front)||assist!=null&&!DarkLockPolicy.valid(back)?"waiting_sensor_data":policy.darkSince>=0?"countdown":"watching";
             // Slow health checks catch controller replacement and scene changes without a new lux event.
             // No wake lock: screen-off cancels the timer and both listeners.
-            long next=policy.next(options),health=main.getReportingMode()!=Sensor.REPORTING_MODE_ON_CHANGE||assist!=null&&assist.getReportingMode()!=Sensor.REPORTING_MODE_ON_CHANGE?10000:30000;
+            boolean onChange=main.getReportingMode()==Sensor.REPORTING_MODE_ON_CHANGE&&(assist==null||assist.getReportingMode()==Sensor.REPORTING_MODE_ON_CHANGE);
+            long next=policy.next(options),health=sampling.healthDelay(onChange,now);
             if(listening)s.handler.postDelayed(timer,next<0?health:Math.max(1,Math.min(health,next-now)));
         }catch(Throwable failure){fail(failure);}
     }
     void fail(Throwable failure){error=failure.toString();failed=true;relinquish("error",true);unlisten();s.handler.removeCallbacks(timer);s.handler.removeCallbacks(retry);if(options.darkLock&&!s.closed&&s.phase.equals("active")&&s.screenOn())s.handler.postDelayed(retry,30000);s.log("主屏亮度控制退出："+error);s.queuePublish();}
     JSONObject status()throws JSONException{
-        JSONObject j=new JSONObject();options.put(j);boolean supported=supported();j.put("elapsed_ms",SystemClock.elapsedRealtime()).put("manual_panel_supported",mainDisplay()&&RawPanelOutputHooks.supports(s.owner.getClass())).put("dark_lock_supported",supported&&bindSensors()).put("owner",owner).put("reason",reason).put("error",error).put("auto",auto()).put("listening",listening).put("session",session).put("raw_target",rawTarget).put("raw_paused",rawPaused).put("raw_confirmed",rawConfirmed).put("raw_blocked_output_calls",rawBlockedWrites);
+        JSONObject j=new JSONObject();options.put(j);boolean supported=supported();long now=SystemClock.uptimeMillis();boolean interactive=s.power!=null&&s.power.isInteractive(),displayOn=s.screenOn();boolean onChange=main!=null&&(main.getReportingMode()==Sensor.REPORTING_MODE_ON_CHANGE&&(assist==null||assist.getReportingMode()==Sensor.REPORTING_MODE_ON_CHANGE));j.put("elapsed_ms",SystemClock.elapsedRealtime()).put("manual_panel_supported",mainDisplay()&&RawPanelOutputHooks.supports(s.owner.getClass())).put("dark_lock_supported",supported&&bindSensors()).put("owner",owner).put("reason",reason).put("error",error).put("auto",auto()).put("listening",listening).put("session",session).put("raw_target",rawTarget).put("raw_paused",rawPaused).put("raw_confirmed",rawConfirmed).put("raw_blocked_output_calls",rawBlockedWrites).put("sampling_phase",sampling.phase(displayOn,interactive,now)).put("sampling_health_ms",displayOn&&interactive?sampling.healthDelay(onChange,now):-1).put("sampling_wake_grace_ms",sampling.wakeRemaining(now)).put("sampling_event_driven",onChange);
         if(DarkLockPolicy.valid(mainLux))j.put("watch_main_lux",mainLux);if(DarkLockPolicy.valid(assistLux))j.put("watch_assist_lux",assistLux);
         j.put("watch_main_samples",mainSamples).put("watch_assist_samples",assistSamples).put("watch_unmatched_samples",unmatchedSamples).put("watch_main_age_ms",mainAt<0?-1:SystemClock.uptimeMillis()-mainAt).put("watch_assist_age_ms",assistAt<0?-1:SystemClock.uptimeMillis()-assistAt);
         if(main!=null)j.put("watch_main_sensor",main.getName()).put("watch_main_type",main.getType());if(assist!=null)j.put("watch_assist_sensor",assist.getName()).put("watch_assist_type",assist.getType());

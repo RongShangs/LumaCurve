@@ -58,9 +58,9 @@ final class HookRuntime {
         power=(PowerManager)context.getSystemService(Context.POWER_SERVICE);
         thermalListener=level->{thermalSeverity=level;environmentChanged();};
         batteryListener=new BroadcastReceiver(){public void onReceive(Context c,Intent intent){
-            if(Intent.ACTION_SCREEN_OFF.equals(intent.getAction())){persistentMemory.screenOff();assistGate.reset();brightnessControl.screenOff();return;}
-            if(Intent.ACTION_SCREEN_ON.equals(intent.getAction())){persistentMemory.screenOn();handler.post(brightnessControl::screenOn);return;}
-            if(Intent.ACTION_USER_PRESENT.equals(intent.getAction())){handler.post(brightnessControl::screenOn);return;}
+            if(Intent.ACTION_SCREEN_OFF.equals(intent.getAction())){persistentMemory.screenOff();assistGate.reset();brightnessControl.screenOff();queuePublish();return;}
+            if(Intent.ACTION_SCREEN_ON.equals(intent.getAction())){persistentMemory.screenOn();handler.post(brightnessControl::screenOn);queuePublish();return;}
+            if(Intent.ACTION_USER_PRESENT.equals(intent.getAction())){handler.post(brightnessControl::screenOn);queuePublish();return;}
             batteryTemperature=intent.hasExtra(BatteryManager.EXTRA_TEMPERATURE)?intent.getIntExtra(BatteryManager.EXTRA_TEMPERATURE,-1000)/10f:Float.NaN;
             environmentChanged();
         }};
@@ -238,7 +238,7 @@ final class HookRuntime {
                 optionalNumber(abc,"mAmbientLux"),0,Float.MAX_VALUE);
         }catch(Throwable unavailable){return false;}
     }
-    boolean screenOn(){try{Object dpc=HookEntry.get(owner,"mDisplayPowerController"),display=dpc.getClass().getMethod("getDisplayPowerState").invoke(dpc);return ((Number)display.getClass().getMethod("getScreenState").invoke(display)).intValue()==2;}catch(Throwable unavailable){return false;}}
+    boolean screenOn(){try{Object dpc=HookEntry.get(owner,"mDisplayPowerController"),display=dpc.getClass().getMethod("getDisplayPowerState").invoke(dpc);if(((Number)display.getClass().getMethod("getScreenState").invoke(display)).intValue()!=2||power==null||!power.isInteractive())return false;String strategy=outputStrategy(dpc);return strategy==null||(!"DozeBrightnessStrategy".equals(strategy)&&!"ScreenOffBrightnessStrategy".equals(strategy));}catch(Throwable unavailable){return false;}}
     boolean animationTuningAllowed(Object abc,Object impl){
         if(!normalTuningAllowed(abc,impl)||(lastManualAdjustment>=0&&SystemClock.uptimeMillis()-lastManualAdjustment<=memoryWindow))return false;
         try{return "AutomaticBrightnessStrategy".equals(outputStrategy(HookEntry.get(owner,"mDisplayPowerController")));}catch(Throwable missing){return false;}

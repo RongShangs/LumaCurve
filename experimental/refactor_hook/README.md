@@ -1,6 +1,6 @@
-# HyperLux 2.3.1 · 正式版
+# HyperLux 2.3.2 · 正式版
 
-适配 HyperOS 4 的 Root + LSPosed 自动亮度工具。构建 release-2.3.1，版本代码 23106；沿用包名、图标与签名。安装后重启一次，启用 LSPosed 系统框架作用域，再保存并应用。
+适配 HyperOS 4 的 Root + LSPosed 自动亮度工具。构建 release-2.3.2，版本代码 23107；沿用包名、图标与签名。安装后重启一次，启用 LSPosed 系统框架作用域，再保存并应用。
 
 自动曲线、双参考、场景和过渡复用 system_server。「强光优先」将全强度自动目标提高至本机映射上限、开放已验证的 HBM / 峰值 / 动态范围；支持时提前触发 HBM，保留原时间预算。支持时可选放宽强光 SDR 的画面灰阶限亮，继续执行温控、省电、HDR 与驱动限制，不保证达到手动节点直写的实际亮度。进入、退出及超时即时请求系统重算，不等待新光感事件。
 
@@ -14,10 +14,18 @@
 
 保存确认不会覆盖等待期间的新草稿；暗光锁定转手动失败或接管确认丢失时，按原自动亮度所有权与当前会话回滚。
 
-详见 [正式更新](../../docs/releases/2.3.1.md)和 [审阅记录](../../docs/review-2.3.1.md)。主机与固件检查不等于本版 Android 全设备实测。异常先在面板恢复自动，或 APP 停用并恢复；完整包解压后 Root 终端执行：
+## 状态调度与功耗边界
+
+亮屏时仍使用系统 `SensorManager` 的事件回调，光感事件到达后立即进入现有曲线与系统亮度过渡链路，不用固定轮询去替代事件流。刚亮屏或显示策略切换后的 2 秒内，仅把模块健康检查临时提高到 250 ms，用于确认交接状态；稳定亮屏恢复 30 秒健康检查。连续上报型传感器的健康检查使用 10 秒上限。
+
+息屏、锁屏 AOD 或 `DozeBrightnessStrategy` / `ScreenOffBrightnessStrategy` 生效时，模块释放自己的传感器监听和定时任务，不写入 AOD 亮度；恢复交互且确认自动亮度策略后才重新接入。设备的 `on-change` 光感扫描周期由 Xiaomi 传感器服务决定，模块不宣称能够强制改变硬件扫描频率。这样可以减少模块回调与状态检查功耗，同时保持环境光变化的事件响应速度；亮度渐变仍由 HyperOS 原生 ramp、滤波、迟滞与动画负责。
+
+状态页的详细读数会显示 `sampling_phase`、健康检查间隔、是否事件驱动及刚亮屏剩余观察时间，便于在不同 HyperOS 4 固件上核对实际状态。
+
+详见 [正式更新](../../docs/releases/2.3.2.md)和 [发布审阅记录](../../docs/review-2.3.2.md)。主机与固件检查不等于本版 Android 全设备实测。异常先在面板恢复自动，或 APP 停用并恢复；完整包解压后 Root 终端执行：
 
     sh ./restore_refactor_hook_android.sh
 
 恢复工具先停止守护并恢复节点权限，再停用 Hook。APK、源码、恢复合集在 dist/，静态官网在 website/，部署副本在 D:/IOS/web。
 
-构建：python tools/build_refactor_hook_test.py；没有私有固件资料时加 --skip-device-fixtures。需要 JDK 17、SDK 37、NDK 28.2.13676358 和 Xposed API 82。源码不包含签名私钥或采集固件。主屏界面参考本地 bright 项目的相对滑动、弹窗和磁贴行为；节点保持采用自己的事务和租约实现。
+构建：python tools/build_refactor_hook_test.py；没有私有固件资料时加 --skip-device-fixtures。若 Windows 环境没有项目历史依赖的 MSYS2 GCC，可额外加 --skip-host-native；这只跳过两个主机 C 面板测试，仍会编译 ARM64 原生资产并在 build-info.json 记录跳过原因。需要 JDK 17、SDK 37、NDK 28.2.13676358 和 Xposed API 82。源码不包含签名私钥或采集固件。主屏界面参考本地 bright 项目的相对滑动、弹窗和磁贴行为；节点保持采用自己的事务和租约实现。

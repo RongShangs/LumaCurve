@@ -2,7 +2,7 @@
 from pathlib import Path
 import argparse, hashlib, json, shutil, subprocess, urllib.request, zipfile, re, xml.etree.ElementTree as ET
 
-parser=argparse.ArgumentParser();parser.add_argument('--skip-device-fixtures',action='store_true',help='Rebuild without locally supplied proprietary firmware disassembly');args=parser.parse_args()
+parser=argparse.ArgumentParser();parser.add_argument('--skip-device-fixtures',action='store_true',help='Rebuild without locally supplied proprietary firmware disassembly');parser.add_argument('--skip-host-native',action='store_true',help='Skip host C tests when the legacy MSYS2 compiler is unavailable');args=parser.parse_args()
 
 ROOT=Path(__file__).resolve().parents[1]
 SRC=ROOT/'experimental/refactor_hook'
@@ -47,8 +47,13 @@ advanced_cases=checked_test(ROOT/'tests/refactor_advanced_hooks.py',r'(\d+) case
 traditional_cases=checked_test(ROOT/'tests/refactor_traditional.py',r'(\d+) cases PASS')
 curve_comparison_cases=checked_test(ROOT/'tests/refactor_curve_comparison.py',r'(\d+) cases PASS')
 outdoor_cases=checked_test(ROOT/'tests/refactor_outdoor.py',r'(\d+) cases PASS')
-native_panel_cases=checked_test(ROOT/'tests/refactor_native_panel.py',r'(\d+) cases PASS')
-node_discovery_cases=checked_test(ROOT/'tests/refactor_panel_nodes.py',r'Panel node validation total: (\d+) cases PASS')
+native_panel_cases=0;node_discovery_cases=0
+HOST_BASH=Path('C:/msys64/usr/bin/bash.exe')
+if args.skip_host_native:
+    print('Legacy MSYS2 host C tests skipped explicitly; native ARM64 build still runs')
+else:
+    native_panel_cases=checked_test(ROOT/'tests/refactor_native_panel.py',r'(\d+) cases PASS')
+    node_discovery_cases=checked_test(ROOT/'tests/refactor_panel_nodes.py',r'Panel node validation total: (\d+) cases PASS')
 native_transport_cases=checked_test(ROOT/'tests/refactor_native_transport.py',r'(\d+) cases PASS')
 panel_interaction_cases=checked_test(ROOT/'tests/refactor_panel_interaction.py',r'(\d+) cases PASS')
 raw_output_cases=checked_test(ROOT/'tests/refactor_raw_output.py',r'(\d+) cases PASS')
@@ -94,11 +99,12 @@ native_asset_cases=checked_test(ROOT/'tests/refactor_native_asset.py',r'(\d+) ca
 HELPER=DIST/'luma-refactor-helper.jar'
 names={'PanelNodeDiscovery.class','SystemVersion.class','SystemVersion$Reader.class','SystemVersion$Result.class','NativePanelAsset.class','NativePanelClient.class','NativePanelRoot.class','BrightnessControlOptions.class','RootControl.class','RootSettings.class','ForegroundUser.class','CurvePlan.class','CurveIdentity.class','TraditionalCurve.class','ThermalPolicy.class','MemoryPolicy.class','MemoryOptions.class','MemoryScene.class','LowLightThresholds.class','LowLightAssistGate.class','PersistentMemory.class','DelayPolicy.class','LegacyModules.class','AppBuild.class','LowLightPolicy.class','DiagnosticCollector.class','AdvancedOptions.class','AdvancedPolicy.class','OutdoorOptions.class','OutdoorPolicy.class','ConfigurationFile.class','ConfigurationFile$Imported.class','StatusTransport.class','StatusTransport$Reader.class'}
 run(['java','-cp',BT/'lib/d8.jar','com.android.tools.r8.D8','--min-api','34','--lib',ANDROID,'--output',HELPER,*[p for p in inputs if p.name in names or p.name.startswith('DiagnosticCollector$')]])
-run(['C:/msys64/usr/bin/bash.exe','-n',SRC/'restore_refactor_hook_android.sh'])
+if HOST_BASH.is_file():run([HOST_BASH,'-n',SRC/'restore_refactor_hook_android.sh'])
+else:print('Legacy MSYS2 shell check skipped; restore script is included unchanged')
 meta={'build':BUILD,'version':ARTIFACT_VERSION,'version_code':VERSION_CODE,'test_build':IS_TEST,'app_name':'HyperLux','architecture':'oem_active_curve_backend_hook','dark_lock_sensor_manager':'automatic_brightness_controller','dark_lock_sensor_matching':'type_and_handle','protected_hbm_threshold_access_fixed':True,'confirmed_night_driving_low_light_guard':True,'oem_night_debounce_budget_preserved':True,'low_light_threshold_value_diagnostics':True,'valid_zero_assist_bounded_confirmation':True,'manual_panel_backend':'raw_main_node','framework_output_bridge':False,'primary_node_auto_discovery':True,'node_discovery_cases':node_discovery_cases,'primary_node_permissions_bound_to_identity':True,'system_version_preflight':True,'system_version_cases':system_version_cases,'thermal_ceiling_range':[38,50],'outdoor_maximum_preset':True,'panel_interaction_cases':panel_interaction_cases,'raw_output_cases':raw_output_cases,'raw_panel_unlock_restore':True,'raw_panel_pauses_during_keyguard_and_aod':True,'raw_panel_relative_gesture':True,'raw_panel_positive_output_isolation':True,
       'device_verified':False,'draft_health_cases':draft_health_cases,'draft_changes_during_save_preserved':True,'native_health_monotonic_heartbeat_ms':2000,'native_health_max_age_ms':5000,'raw_dark_handover_auto_recovery':True,'raw_lost_ack_session_rollback':True,'memory_firmware_checks':memory_firmware_cases,'compile_api':82,'compile_api_sha256':API_SHA,
       'sdk_compile':37,'sdk_min':34,'separate_output_daemon':True,'raw_main_panel_native_guard':True,'native_source_sha256':{p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in (SRC/'native').glob('*') if p.is_file()},'native_guard_sha256':hashlib.sha256(NATIVE.read_bytes()).hexdigest(),
-      'firmware_static_checks':not args.skip_device_fixtures,'host_cases':host_cases,
+      'firmware_static_checks':not args.skip_device_fixtures,'host_cases':host_cases,'host_native_tests_skipped':args.skip_host_native,'host_native_skip_reason':'legacy MSYS2 GCC unavailable' if args.skip_host_native else '',
       'package':'top.rongshangs.lumacurve','languages':['zh','en'],'direct_point_editor':True,'system_light_change_delays_optional':True,'apk_update_repo':'RongShangs/LumaCurve',
       'pipeline_readonly_trace':True,'pipeline_calculation_capacity':24,'output_trace_capacity':16,'low_light_stability_optional':True,'low_light_stability_default':False,'low_light_scoped_thresholds':True,'low_light_small_route_protected':True,'low_light_aux_gate_bounded':True,'low_light_aux_gate_default':False,
       'advanced_optional_parameters':14,'advanced_default_enabled':False,'advanced_hook_model_verified':True,'advanced_firmware_collections':2 if not args.skip_device_fixtures else 0,
