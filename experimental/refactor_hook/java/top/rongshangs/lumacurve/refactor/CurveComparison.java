@@ -24,6 +24,7 @@ final class CurveComparison {
         return !sameCurve(baseline,current);
     }
     boolean systemDefault(){return sameCurve(reference,baseline);}
+    String kind(JSONObject runtime){return current==null?"unavailable":memoryChanged(runtime)?"memory":systemDefault()?"system":"baseline";}
     static boolean sameCurve(Line left,Line right){for(Line line:new Line[]{left,right})for(float lux:line.lux){float a=left.at(lux),b=right.at(lux);if(Math.abs(a-b)>Math.max(.01f,Math.max(a,b)*.001f))return false;}return true;}
     static float[] numbers(JSONArray a)throws JSONException{float[] out=new float[a.length()];for(int i=0;i<out.length;i++){Object v=a.get(i);if(!(v instanceof Number))throw new JSONException("Invalid curve number");out[i]=((Number)v).floatValue();}return out;}
     static CurveComparison read(JSONObject runtime,float[] factors,float floor,boolean draft)throws JSONException{
@@ -35,7 +36,7 @@ final class CurveComparison {
         if("physical_mapping".equals(runtime.optString("curve_backend"))){
             TraditionalCurve full=new TraditionalCurve(numbers(runtime.getJSONArray("factory_full_lux")),numbers(runtime.getJSONArray("factory_full_nit")));
             reference=new Line(full.lux(),full.nit());
-            float[] liveFactors=new float[]{1,1,1,1};for(int i=1;i<3;i++)liveFactors[i]=base[i]/factoryNit[i];
+            float[] liveFactors=new float[]{1,1,1,1};for(int i=1;i<3;i++)liveFactors[i]=base[i]==0&&factoryNit[i]==0?1:base[i]/factoryNit[i];
             baseline=new Line(full.lux(),draft?full.reshape(min,max,factors,floor):full.reshape(min,max,liveFactors,base[0]));
         }
         Line current=null;

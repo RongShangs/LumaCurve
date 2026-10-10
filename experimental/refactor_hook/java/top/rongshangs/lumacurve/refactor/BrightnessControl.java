@@ -16,7 +16,21 @@ final class BrightnessControl implements SensorEventListener {
     boolean listening,registered,busy,failed;String owner="none",session="",reason="inactive",error="",lastRequest="";
     static final java.lang.reflect.Method SENSOR_HANDLE=sensorHandle();
     static java.lang.reflect.Method sensorHandle(){try{java.lang.reflect.Method m=Sensor.class.getDeclaredMethod("getHandle");m.setAccessible(true);return m;}catch(Throwable unavailable){return null;}}
-    long mainSamples,assistSamples,unmatchedSamples;
+    long mainSamples,assistSamples,unmatchedSamples,sensorEvaluations;
+    boolean sensorTickQueued;
+    final Runnable sensorTick=()->runSensorTick();
+    void runSensorTick(){sensorTickQueued=false;if(listening&&!s.closed){sensorEvaluations++;tick();}}
+    void queueSensorTick(){
+        if(sensorTickQueued||screenCleanupQueued||s.closed)return;
+        sensorTickQueued=true;if(!s.handler.post(sensorTick))sensorTickQueued=false;
+    }
+    void sensorChanged(float value){
+        // Never coalesce away invalid data or an interruption of a confirmation window.
+        boolean interrupted=!DarkLockPolicy.valid(value)||!policy.locked&&policy.darkSince>=0&&value>options.enterLux
+            ||policy.locked&&policy.brightSince>=0&&mainLux<options.exitLux&&(assist==null||assistLux<options.exitLux);
+        if(interrupted){s.handler.removeCallbacks(sensorTick);sensorTickQueued=false;sensorEvaluations++;tick();}
+        else queueSensorTick();
+    }
     float mainLux=Float.NaN,assistLux=Float.NaN,held=Float.NaN,mainScale=1,assistScale=1;long mainAt=-1,assistAt=-1,ignoreBrightnessUntil,lastAutoEnabledAt=-1;
     String brightnessSnapshot="";
     final ContentObserver modeObserver,commandObserver,brightnessObserver;
@@ -27,20 +41,30 @@ final class BrightnessControl implements SensorEventListener {
         public void onDisplayRemoved(int id){if(id==0)relinquish("main_display_removed",false);}
         public void onDisplayChanged(int id){if(id==0)displayChanged();}
     };
-    boolean awake(){return s.screenOn()&&s.power!=null&&s.power.isInteractive();}
+    boolean awake(){return !screenCleanupQueued&&s.screenOn()&&s.power!=null&&s.power.isInteractive();}
+    boolean screenCleanupQueued;
+    final Runnable screenCleanup=()->finishScreenCleanup();
+    void finishScreenCleanup(){screenCleanupQueued=false;if(!s.closed)screenOff();}
+    // The OEM screen-state hook must not call providers or services while its locks are held.
+    void screenChanging(){
+        rawScreenOff=true;
+        if(s.closed||screenCleanupQueued)return;
+        screenCleanupQueued=true;
+        if(!s.handler.post(screenCleanup))screenCleanupQueued=false;
+    }
     void displayChanged(){if(!awake())screenOff();else screenOn();}
     boolean rawWasAuto,rawPaused,rawConfirmed,rawScreenOff;int rawTarget=-1;long rawLeaseUntil,rawBlockedWrites;final Runnable rawRenew=()->renewRaw();
     boolean unlocked(){try{android.app.KeyguardManager keyguard=(android.app.KeyguardManager)s.context.getSystemService(Context.KEYGUARD_SERVICE);return keyguard!=null&&!keyguard.isKeyguardLocked();}catch(Throwable missing){return false;}}
-    boolean rawOutputBlocked(float value){return Float.isFinite(value)&&value>0&&enabled()&&owner.equals("raw_panel")&&rawConfirmed&&!rawPaused&&!rawScreenOff&&rawTarget>=10&&SystemClock.uptimeMillis()<rawLeaseUntil&&!auto()&&awake()&&unlocked();}
-    void screenOn(){if(owner.equals("raw_panel")){rawScreenOff=false;renewRaw();}else tick();}
+    boolean rawOutputBlocked(float value){return owner.equals("raw_panel")&&rawConfirmed&&!rawPaused&&!rawScreenOff&&Float.isFinite(value)&&value>0&&rawTarget>=10&&SystemClock.uptimeMillis()<rawLeaseUntil&&enabled()&&!auto()&&awake()&&unlocked();}
+    void screenOn(){if(screenCleanupQueued){s.handler.removeCallbacks(screenCleanup);screenCleanup.run();}if(!registered&&!s.closed)start();if(owner.equals("raw_panel")){rawScreenOff=false;renewRaw();}else tick();}
     BrightnessControl(HookRuntime state){
         s=state;timer=()->tick();snapshot=()->{try{
             if(owner.equals("dark")&&!auto()){float requested=(float)display.read().getDouble("value");if(Math.abs(requested-held)>.0005f){relinquish("user_brightness",false);return;}}
             brightnessSnapshot=brightnessValues();
         }catch(Throwable failure){fail(failure);}
-        };retry=()->{if(s.closed)return;failed=false;tick();};
-        modeObserver=new ContentObserver(s.handler){public void onChange(boolean self){try{if(busy)return;if(auto()){lastAutoEnabledAt=SystemClock.elapsedRealtime();if(!owner.equals("none"))relinquish("user_auto",false);else tick();}else tick();}catch(Throwable failure){fail(failure);}}};
-        brightnessObserver=new ContentObserver(s.handler){public void onChange(boolean self){try{if(!busy&&owner.equals("dark")&&SystemClock.uptimeMillis()>ignoreBrightnessUntil&&!brightnessSnapshot.equals(brightnessValues()))relinquish("user_brightness",false);}catch(Throwable failure){fail(failure);}}};
+        };retry=()->{if(s.closed)return;if(!registered){start();if(!registered)return;}failed=false;tick();};
+        modeObserver=new ContentObserver(s.handler){public void onChange(boolean self){try{if(busy||s.closed)return;if(auto()){lastAutoEnabledAt=SystemClock.elapsedRealtime();if(!owner.equals("none"))relinquish("user_auto",false);else tick();}else tick();}catch(Throwable failure){fail(failure);}}};
+        brightnessObserver=new ContentObserver(s.handler){public void onChange(boolean self){try{if(!s.closed&&!busy&&owner.equals("dark")&&SystemClock.uptimeMillis()>ignoreBrightnessUntil&&!brightnessSnapshot.equals(brightnessValues()))relinquish("user_brightness",false);}catch(Throwable failure){fail(failure);}}};
         commandObserver=new ContentObserver(s.handler){public void onChange(boolean self){command();}};
     }
     boolean auto(){return Settings.System.getInt(s.context.getContentResolver(),Settings.System.SCREEN_BRIGHTNESS_MODE,0)==1;}
@@ -94,15 +118,16 @@ final class BrightnessControl implements SensorEventListener {
             if(displayEvents!=null)displayEvents.registerDisplayListener(displayListener,s.handler);
             // Restart recovery only restores an automatic mode that this feature owned.
             String raw=Settings.Global.getString(s.context.getContentResolver(),OWNER);
-            if(raw!=null){JSONObject old=new JSONObject(raw);boolean ours=old.optString("owner").equals("dark")&&old.optInt("user",-1)==0&&old.optBoolean("was_auto")&&old.optString("session").matches("[A-Za-z0-9_-]{1,80}");
-                if(ours&&HookEntry.currentUser.serial()==0&&!auto()){setAuto(true);s.log("已恢复暗光锁定前的自动亮度（系统进程重启）");}
+            if(raw!=null){JSONObject old=new JSONObject(raw);boolean validSession=old.optString("session").matches("[A-Za-z0-9_-]{1,80}");boolean ours=old.optString("owner").equals("dark")&&old.optInt("user",-1)==0&&old.optBoolean("was_auto")&&validSession;
+                boolean rawWasAuto=old.optString("owner").equals("raw_panel")&&old.optInt("user",-1)==0&&old.optBoolean("was_auto")&&validSession;
+                if((ours||rawWasAuto)&&HookEntry.currentUser.serial()==0&&!auto()){setAuto(true);s.log(ours?"已恢复暗光锁定前的自动亮度（系统进程重启）":"已恢复手动接管前的自动亮度（系统进程重启；未恢复节点目标）");}
                 mark(null);
             }
-        }catch(Throwable failure){fail(failure);}
+        }catch(Throwable failure){unregisterObservers();fail(failure);}
     }
     void configure(BrightnessControlOptions next){
         if(!options.same(next))relinquish("settings_changed",true);
-        options=next;failed=false;error="";tick();
+        options=next;failed=false;error="";if(!registered)start();tick();
     }
     void mode(boolean on)throws Exception{if(!Settings.System.putInt(s.context.getContentResolver(),Settings.System.SCREEN_BRIGHTNESS_MODE,on?1:0)||auto()!=on)throw new IllegalStateException("系统未确认自动亮度模式");}
     void setAuto(boolean on)throws Exception{boolean previous=busy;busy=true;try{mode(on);}finally{busy=previous;}}
@@ -118,15 +143,20 @@ final class BrightnessControl implements SensorEventListener {
     }
     String brightnessValues(){return Settings.System.getString(s.context.getContentResolver(),Settings.System.SCREEN_BRIGHTNESS)+"|"+Settings.System.getString(s.context.getContentResolver(),"screen_brightness_float");}
     void relinquish(String why,boolean restore){
-        String previous=owner;if(previous.equals("raw_panel"))stopRaw();owner="none";session="";held=Float.NaN;policy.reset();reason=why;s.handler.removeCallbacks(snapshot);s.handler.removeCallbacks(timer);s.handler.removeCallbacks(retry);unlisten();
-        try{if(previous.equals("dark")&&restore&&!auto())setAuto(true);mark(null);}catch(Throwable failure){error=failure.toString();}
+        String previous=owner;boolean restoreAuto=restore&&(previous.equals("dark")||previous.equals("raw_panel")&&rawWasAuto);if(previous.equals("raw_panel"))stopRaw();owner="none";session="";held=Float.NaN;policy.reset();reason=why;s.handler.removeCallbacks(snapshot);s.handler.removeCallbacks(timer);s.handler.removeCallbacks(retry);unlisten();
+        try{if(restoreAuto&&!auto())setAuto(true);if(!previous.equals("none"))mark(null);}catch(Throwable failure){error=failure.toString();}
         if(previous.equals("raw_panel"))s.handler.postDelayed(()->{if(awake())s.requestRecalculation();},400);
         if(!previous.equals("none")){s.log(previous.equals("dark")?"暗光锁定退出："+why:"主屏手动面板已退让："+why);s.queueControlPublish();}
     }
-    void screenOff(){if(owner.equals("raw_panel")){rawScreenOff=true;pauseRaw();}else relinquish("screen_off",true);unlisten();s.handler.removeCallbacks(timer);s.handler.removeCallbacks(retry);failed=false;}
-    void stop(){relinquish("disabled",true);unlisten();s.handler.removeCallbacks(timer);s.handler.removeCallbacks(retry);options=new BrightnessControlOptions();}
-    void close(){stop();if(displayEvents!=null)displayEvents.unregisterDisplayListener(displayListener);if(registered)try{s.context.getContentResolver().unregisterContentObserver(modeObserver);s.context.getContentResolver().unregisterContentObserver(commandObserver);s.context.getContentResolver().unregisterContentObserver(brightnessObserver);}catch(Throwable ignored){}registered=false;}
-    void unlisten(){try{if(listening&&sensors!=null)sensors.unregisterListener(this);}catch(Throwable failure){error=failure.toString();}finally{listening=false;mainLux=assistLux=Float.NaN;mainAt=assistAt=-1;}}
+    void screenOff(){s.handler.removeCallbacks(screenCleanup);screenCleanupQueued=false;if(owner.equals("raw_panel")){rawScreenOff=true;pauseRaw();}else relinquish("screen_off",true);unlisten();s.handler.removeCallbacks(timer);s.handler.removeCallbacks(retry);failed=false;}
+    void stop(){s.handler.removeCallbacks(screenCleanup);screenCleanupQueued=false;relinquish("disabled",true);unlisten();s.handler.removeCallbacks(timer);s.handler.removeCallbacks(retry);options=new BrightnessControlOptions();}
+    void close(){stop();unregisterObservers();}
+    void unregisterObservers(){
+        try{if(displayEvents!=null)displayEvents.unregisterDisplayListener(displayListener);}catch(Throwable failure){error=failure.toString();}
+        for(ContentObserver observer:new ContentObserver[]{modeObserver,commandObserver,brightnessObserver})try{s.context.getContentResolver().unregisterContentObserver(observer);}catch(Throwable failure){error=failure.toString();}
+        registered=false;
+    }
+    void unlisten(){s.handler.removeCallbacks(sensorTick);sensorTickQueued=false;try{if(listening&&sensors!=null)sensors.unregisterListener(this);}catch(Throwable failure){error=failure.toString();}finally{listening=false;mainLux=assistLux=Float.NaN;mainAt=assistAt=-1;}}
     boolean listen(){
         if(!bindSensors())return false;if(listening)return true;
         try{if(!sensors.registerListener(this,main,1000000,s.handler))return false;
@@ -139,12 +169,14 @@ final class BrightnessControl implements SensorEventListener {
         if(a==b)return true;if(a==null||b==null||a.getType()!=b.getType())return false;
         try{return SENSOR_HANDLE!=null&&((Number)SENSOR_HANDLE.invoke(a)).intValue()==((Number)SENSOR_HANDLE.invoke(b)).intValue();}catch(Throwable unavailable){return false;}
     }
-    public void onSensorChanged(SensorEvent e){if(!listening||e==null||e.sensor==null||e.values==null||e.values.length==0)return;float v=e.values[0];long now=SystemClock.uptimeMillis();if(sameSensor(e.sensor,main)){mainLux=v*mainScale;mainAt=now;mainSamples++;}else if(sameSensor(e.sensor,assist)){assistLux=v*assistScale;assistAt=now;assistSamples++;}else{unmatchedSamples++;return;}tick();}
+    public void onSensorChanged(SensorEvent e){if(!listening||e==null||e.sensor==null||e.values==null||e.values.length==0)return;float v=e.values[0];long now=SystemClock.uptimeMillis();if(sameSensor(e.sensor,main)){v*=mainScale;mainLux=v;mainAt=now;mainSamples++;}else if(sameSensor(e.sensor,assist)){v*=assistScale;assistLux=v;assistAt=now;assistSamples++;}else{unmatchedSamples++;return;}sensorChanged(v);}
     public void onAccuracyChanged(Sensor sensor,int accuracy){}
     void tick(){
+        if(screenCleanupQueued)return;
         if(busy||s.closed)return;s.handler.removeCallbacks(timer);
         try{
             if(owner.equals("raw_panel")){if(!awake())screenOff();return;}
+            if(!options.darkLock&&!owner.equals("dark")){policy.reset();unlisten();reason=owner.equals("panel")?"manual_panel":"disabled";return;}
             boolean ok=eligible();if(!options.darkLock||!ok||(owner.equals("panel")||owner.equals("raw_panel"))||!auto()&&!owner.equals("dark")){
                 if(owner.equals("dark"))relinquish(ok?"mode_changed":"scene_changed",true);else policy.reset();
                 unlisten();reason=(owner.equals("panel")||owner.equals("raw_panel"))?"manual_panel":!options.darkLock?"disabled":!ok?"scene":"user_manual";return;
@@ -165,11 +197,11 @@ final class BrightnessControl implements SensorEventListener {
             if(listening)s.handler.postDelayed(timer,next<0?health:Math.max(1,Math.min(health,next-now)));
         }catch(Throwable failure){fail(failure);}
     }
-    void fail(Throwable failure){error=failure.toString();failed=true;relinquish("error",true);unlisten();s.handler.removeCallbacks(timer);s.handler.removeCallbacks(retry);if(options.darkLock&&!s.closed&&s.phase.equals("active")&&s.screenOn())s.handler.postDelayed(retry,30000);s.log("主屏亮度控制退出："+error);s.queuePublish();}
+    void fail(Throwable failure){error=failure.toString();failed=true;relinquish("error",true);unlisten();s.handler.removeCallbacks(timer);s.handler.removeCallbacks(retry);if((options.darkLock||options.manualPanel&&!registered)&&!s.closed&&s.phase.equals("active")&&s.screenOn())s.handler.postDelayed(retry,30000);s.log("主屏亮度控制退出："+error);s.queuePublish();}
     JSONObject status()throws JSONException{
         JSONObject j=new JSONObject();options.put(j);boolean supported=supported();j.put("elapsed_ms",SystemClock.elapsedRealtime()).put("manual_panel_supported",mainDisplay()&&RawPanelOutputHooks.supports(s.owner.getClass())).put("dark_lock_supported",supported&&bindSensors()).put("owner",owner).put("reason",reason).put("error",error).put("auto",auto()).put("listening",listening).put("session",session).put("raw_target",rawTarget).put("raw_paused",rawPaused).put("raw_confirmed",rawConfirmed).put("raw_blocked_output_calls",rawBlockedWrites);
         if(DarkLockPolicy.valid(mainLux))j.put("watch_main_lux",mainLux);if(DarkLockPolicy.valid(assistLux))j.put("watch_assist_lux",assistLux);
-        j.put("watch_main_samples",mainSamples).put("watch_assist_samples",assistSamples).put("watch_unmatched_samples",unmatchedSamples).put("watch_main_age_ms",mainAt<0?-1:SystemClock.uptimeMillis()-mainAt).put("watch_assist_age_ms",assistAt<0?-1:SystemClock.uptimeMillis()-assistAt);
+        j.put("watch_main_samples",mainSamples).put("watch_assist_samples",assistSamples).put("watch_unmatched_samples",unmatchedSamples).put("watch_evaluations",sensorEvaluations).put("watch_requested_period_us",1000000).put("watch_main_age_ms",mainAt<0?-1:SystemClock.uptimeMillis()-mainAt).put("watch_assist_age_ms",assistAt<0?-1:SystemClock.uptimeMillis()-assistAt);
         if(main!=null)j.put("watch_main_sensor",main.getName()).put("watch_main_type",main.getType());if(assist!=null)j.put("watch_assist_sensor",assist.getName()).put("watch_assist_type",assist.getType());
         j.put("countdown_left_ms",policy.darkSince<0?0:Math.max(0,policy.darkSince+options.minutes*60000L-SystemClock.uptimeMillis()));
         if(Float.isFinite(held))j.put("held",held);try{if(supported)j.put("range",display.read());}catch(Throwable ignored){}return j;
@@ -218,6 +250,7 @@ final class BrightnessControl implements SensorEventListener {
         }finally{busy=false;}
     }
     void command(){
+        if(s.closed)return;
         String id="";
         try{
             String raw=Settings.Global.getString(s.context.getContentResolver(),REQUEST);if(raw==null||raw.length()>2048)return;

@@ -61,6 +61,14 @@ static int same_node(void){
  struct stat st;char resolved[PATH_MAX];
  return !lstat(node,&st)&&S_ISREG(st.st_mode)&&st.st_dev==node_device&&st.st_ino==node_inode&&realpath(node,resolved)&&!strcmp(resolved,real_node);
 }
+// Opening with O_WRONLY tests Root's actual access, even when the OEM exposes
+// mode 0444. No brightness value or permissions change during this probe.
+static int open_output(void){
+ if(!same_node()){errno=ESTALE;return -1;}
+ int fd=open(node,O_WRONLY|O_CLOEXEC|O_NOFOLLOW);if(fd<0)return -1;
+ struct stat opened;if(fstat(fd,&opened)||!S_ISREG(opened.st_mode)||opened.st_dev!=node_device||opened.st_ino!=node_inode||!same_node()){close(fd);errno=ESTALE;return -1;}
+ return fd;
+}
 static int restore_record(void){
  int fd=open(RECORD,O_RDONLY|O_CLOEXEC|O_NOFOLLOW);if(fd<0)return errno==ENOENT?0:-1;
  struct stat st;if(fstat(fd,&st)||st.st_uid||!S_ISREG(st.st_mode)||(st.st_mode&0077)){close(fd);return -1;}
@@ -81,15 +89,14 @@ static int release_output(void){
 }
 static int acquire_output(void){
  if(output>=0)return 0;
- struct stat st;if(!same_node()||lstat(node,&st)||!(st.st_mode&0222)){errno=EACCES;return -1;}
+ struct stat st;if(!same_node()){errno=ESTALE;return -1;}if(lstat(node,&st))return -1;
  original=st.st_mode&0777;
  // Save permissions before locking. The already-open descriptor remains writable.
  int f=open(RECORD,O_WRONLY|O_CREAT|O_EXCL|O_CLOEXEC|O_NOFOLLOW,0600);if(f<0)return -1;
  struct panel_permissions record={.mode=(unsigned)original,.device=(unsigned long long)st.st_dev,.inode=(unsigned long long)st.st_ino};strcpy(record.boot,boot_id);strcpy(record.path,node);strcpy(record.real,real_node);
  char b[1200];int len=panel_permissions_format(b,sizeof(b),&record);int ok=len>0&&(size_t)len<sizeof(b)&&write(f,b,(size_t)len)==len&&fsync(f)==0;close(f);
  if(!ok){unlink(RECORD);return -1;}
- output=open(node,O_WRONLY|O_CLOEXEC|O_NOFOLLOW);if(output<0){restore_record();return -1;}
- struct stat opened;if(fstat(output,&opened)||opened.st_dev!=node_device||opened.st_ino!=node_inode||!same_node()){release_output();errno=ESTALE;return -1;}
+ output=open_output();if(output<0){int error=errno;restore_record();errno=error;return -1;}
  if(fchmod(output,(mode_t)(original&~0222))){release_output();return -1;}return 0;
 }
 static int write_output(int value){
@@ -111,7 +118,7 @@ static int private_lock(void){
  return 0;
 }
 static void response(int c,int ok,const char *reason){
- char out[2048];int n=snprintf(out,sizeof(out),"{\"ok\":%s,\"reason\":\"%s\",\"backend\":\"raw_main_node\",\"native_build\":\"raw06-health\",\"path\":\"%s\",\"canonical_path\":\"%s\",\"target\":%d,\"actual\":%d,\"maximum\":%d,\"armed\":%s,\"paused\":%s,\"session\":\"%s\",\"write_attempts\":%d,\"write_successes\":%d,\"corrections\":%d,\"errno\":%d}\n",ok?"true":"false",reason,node,real_node,state.target,number(node),maximum,state.armed?"true":"false",state.paused?"true":"false",state.token,attempts,successes,corrections,last_error);
+ char out[2048];int n=snprintf(out,sizeof(out),"{\"ok\":%s,\"reason\":\"%s\",\"backend\":\"raw_main_node\",\"native_build\":\"raw07-openprobe\",\"path\":\"%s\",\"canonical_path\":\"%s\",\"target\":%d,\"actual\":%d,\"maximum\":%d,\"armed\":%s,\"paused\":%s,\"session\":\"%s\",\"write_attempts\":%d,\"write_successes\":%d,\"corrections\":%d,\"errno\":%d}\n",ok?"true":"false",reason,node,real_node,state.target,number(node),maximum,state.armed?"true":"false",state.paused?"true":"false",state.token,attempts,successes,corrections,last_error);
  if(n>0&&(size_t)n<sizeof(out))send(c,out,(size_t)n,MSG_NOSIGNAL);
 }
 static int read_lease(struct panel_lease *lease){
@@ -173,10 +180,9 @@ int main(int argc,char **argv){
  setsid();if(escape_freezer())return startup_fail(6,"escape_app_freezer");
  maximum=number(max_node);int current=number(node);if(maximum<=10||maximum>65535||current<0||current>maximum)return startup_fail(4,"main_panel_range");
  // Open-only check before Java asks the system to disable automatic brightness.
- struct stat writable;if(lstat(node,&writable)||!(writable.st_mode&0222)){errno=EACCES;return startup_fail(4,"primary_node_permission");}
- int probe=open(node,O_WRONLY|O_NOFOLLOW|O_CLOEXEC);if(probe<0)return startup_fail(4,"primary_node_open");close(probe);
+ int probe=open_output();if(probe<0)return startup_fail(4,"primary_node_open");close(probe);
  int server=bind_server();if(server<0)return startup_fail(5,"control_socket");
- fprintf(stderr,"NATIVE_READY build=raw06-health pid=%d maximum=%d path=%s real=%s\n",getpid(),maximum,node,real_node);
+ fprintf(stderr,"NATIVE_READY build=raw07-openprobe pid=%d maximum=%d path=%s real=%s\n",getpid(),maximum,node,real_node);
  signal(SIGTERM,signal_stop);signal(SIGINT,signal_stop);signal(SIGHUP,signal_stop);signal(SIGPIPE,SIG_IGN);panel_clear(&state);
  // Lease rename wakes the guard immediately on screen-off/DOZE or automatic mode.
  int events=inotify_init1(IN_NONBLOCK|IN_CLOEXEC);

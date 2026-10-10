@@ -134,11 +134,12 @@ public final class RootControl implements AutoCloseable {
         int serial=state.optInt("user_serial",-1);
         if(user!=0||serial>0)throw new IOException("本应用暂只支持主用户，请切回主用户后重试");
         if(!ForegroundUser.canApply(user,serial))throw new IOException("系统亮度的用户身份尚未就绪，请稍后再点保存并应用");
-        if(encoded.length()>8192)throw new IOException("参数过长");
+        if(encoded.length()>16384)throw new IOException("参数过长");
         String decoded=new String(Base64.getDecoder().decode(encoded),StandardCharsets.UTF_8);
         JSONObject options=decoded.startsWith("{")?new JSONObject(decoded):new JSONObject().put("factors",decoded);
         String factors=options.getString("factors");
         BrightnessControlOptions controls=BrightnessControlOptions.parseStored(options);controls.verify(state);
+        SceneOptions sceneOptions=SceneOptions.parse(options);sceneOptions.verify(state);
         AdvancedOptions advanced=AdvancedOptions.parse(options);advanced.verify(state);
         OutdoorOptions outdoor=OutdoorOptions.parse(options);outdoor.verify(state);
         boolean thermal=options.optBoolean("thermal_relax",false);float ceiling=(float)options.optDouble("thermal_ceiling",43);ThermalPolicy.validate(ceiling);
@@ -173,7 +174,7 @@ public final class RootControl implements AutoCloseable {
         config.put("low_light_stability",lowLight).put("low_light_limit",lowLimit).put("low_light_brighten",lowBright).put("low_light_darken",lowDark);
         lowThresholds.put(config);
         assistGate.put(config);
-        advanced.put(config);outdoor.put(config);controls.put(config);config.put("curve_floor_nit",floor);
+        sceneOptions.put(config);advanced.put(config);outdoor.put(config);controls.put(config);config.put("curve_floor_nit",floor);
         try {
             prepare();
             progress("提交小米基础曲线并等待系统确认…");
@@ -198,8 +199,8 @@ public final class RootControl implements AutoCloseable {
     JSONObject stop()throws Exception {
         NativePanelRoot.stop();boolean connected=live()!=null;
         if(!connected){String marker=settings.get("hyperlux_brightness_owner_v1");if(marker!=null){JSONObject ownership=new JSONObject(marker);
-            if("dark".equals(ownership.optString("owner"))&&ownership.optInt("user",-1)==0&&ownership.optBoolean("was_auto")&&"0".equals(settings.getSystem("screen_brightness_mode")))
-                if(!settings.putSystem("screen_brightness_mode","1"))throw new IOException("未能恢复暗光锁定前的自动亮度");
+            if(("dark".equals(ownership.optString("owner"))||"raw_panel".equals(ownership.optString("owner")))&&ownership.optInt("user",-1)==0&&ownership.optBoolean("was_auto")&&"0".equals(settings.getSystem("screen_brightness_mode")))
+                if(!settings.putSystem("screen_brightness_mode","1"))throw new IOException("未能恢复此前的自动亮度");
             settings.put("hyperlux_brightness_owner_v1",null);
         }}
         String revision=UUID.randomUUID().toString();
@@ -353,7 +354,7 @@ public final class RootControl implements AutoCloseable {
                     try(BufferedReader input=new BufferedReader(new InputStreamReader(System.in,StandardCharsets.UTF_8))){
                         String line;while((line=input.readLine())!=null){
                             try{
-                                if(line.length()>65536)throw new IOException("请求过长");JSONObject request=new JSONObject(line);if(!"export-config".equals(request.optString("command"))&&line.length()>4096)throw new IOException("请求过长");
+                                if(line.length()>65536)throw new IOException("请求过长");JSONObject request=new JSONObject(line);if(!"export-config".equals(request.optString("command"))&&line.length()>16384)throw new IOException("请求过长");
                                 System.out.println("LUMA_RESULT="+ctl.execute(request.getString("command"),request.optString("payload",null)));
                             }catch(Throwable error){System.out.println("LUMA_RESULT="+new JSONObject().put("ok",false).put("message",error.toString()));}
                             System.out.flush();

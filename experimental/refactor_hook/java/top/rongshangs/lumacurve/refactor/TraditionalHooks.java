@@ -47,8 +47,8 @@ final class TraditionalHooks {
                 }
                 protected void afterHookedMethod(MethodHookParam p){HookRuntime s=state(p.thisObject);if(s!=null&&!p.hasThrowable()){if(Boolean.TRUE.equals(p.getObjectExtra("hyperlux.manual")))s.persistentMemory.manualApplied();s.queuePublish();}}
             }));
-            added.add(XposedBridge.hookMethod(TraditionalAdapter.method(type,"clearUserDataPoints"),new XC_MethodHook(){protected void afterHookedMethod(MethodHookParam p){HookRuntime s=state(p.thisObject);if(s!=null&&!s.changing&&!p.hasThrowable())s.persistentMemory.afterReset();}}));
-            added.add(XposedBridge.hookMethod(output,new XC_MethodHook(){protected void beforeHookedMethod(MethodHookParam p){HookRuntime s=state(p.thisObject);if(s!=null)s.persistentMemory.maybeRestore();}protected void afterHookedMethod(MethodHookParam p){
+            added.add(XposedBridge.hookMethod(TraditionalAdapter.method(type,"clearUserDataPoints"),new XC_MethodHook(){protected void afterHookedMethod(MethodHookParam p){HookRuntime s=state(p.thisObject);if(s!=null&&!s.changing&&!p.hasThrowable())s.persistentMemory.requestAfterReset();}}));
+            added.add(XposedBridge.hookMethod(output,new XC_MethodHook(){protected void beforeHookedMethod(MethodHookParam p){HookRuntime s=state(p.thisObject);if(s!=null)s.persistentMemory.requestRestore();}protected void afterHookedMethod(MethodHookParam p){
                 if(p.hasThrowable())return;HookRuntime s=state(p.thisObject);if(s==null)return;
                 try{TraditionalAdapter a=(TraditionalAdapter)s.kernel;if(HookEntry.get(a.abc,"mCurrentBrightnessMapper")!=p.thisObject)return;
                     float br=(Float)p.getResult();if(!Float.isFinite(br)||br<0||br>1)return;

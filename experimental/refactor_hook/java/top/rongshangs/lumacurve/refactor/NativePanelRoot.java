@@ -3,6 +3,9 @@ import java.io.*;
 import java.nio.file.*;
 import java.security.MessageDigest;
 import android.system.Os;
+import android.system.OsConstants;
+import android.system.StructStat;
+import android.system.ErrnoException;
 import org.json.*;
 /** Installs the tiny writer only on explicit raw-panel use, for the identified primary node. */
 final class NativePanelRoot {
@@ -14,12 +17,22 @@ final class NativePanelRoot {
   File node=new File(j.getString("path"));
   File driverActual=new File(node.getParentFile(),"actual_brightness");if(driverActual.isFile())try{j.put("driver_actual",read(driverActual));}catch(Exception unavailable){j.put("driver_actual_error",unavailable.toString());}
   boolean guardMatches=false;
-  try{JSONObject guard=NativePanelClient.call("STATUS");guardMatches=matches(j,guard);j.put("guard_running",guardMatches);if(guardMatches)j.put("guard",guard);else j.put("supported",false).put("reason","guard_node_mismatch").put("guard_error","guard_node_mismatch");}catch(Exception unavailable){j.put("guard_running",false).put("guard_error",unavailable.toString());}
-  int mode=Os.stat(node.toString()).st_mode;
-  if((mode&0222)==0&&!guardMatches)j.put("supported",false).put("reason","node_not_writable");
+  try{JSONObject guard=NativePanelClient.call("STATUS");guardMatches=matches(j,guard);j.put("guard_running",guardMatches);if(guardMatches)j.put("guard",guard);else return j.put("supported",false).put("reason","guard_node_mismatch").put("guard_error","guard_node_mismatch");}catch(Exception unavailable){j.put("guard_running",false).put("guard_error",unavailable.toString());}
+  j.put("node_mode",Integer.toOctalString(Os.lstat(node.toString()).st_mode&0777));
+  // Root may open a 0444 attribute. Probe the actual access decision without
+  // truncating, writing brightness, changing permissions or starting a guard.
+  if(guardMatches)j.put("write_probe","guard_owns_descriptor");
+  else try{probe(j);j.put("write_probe","open_ok");}
+  catch(Exception denied){j.put("supported",false).put("reason","node_not_writable").put("write_probe","failed").put("write_error",denied.toString());if(denied instanceof ErrnoException)j.put("write_errno",((ErrnoException)denied).errno);}
   return j;
  }
- static boolean matches(JSONObject node,JSONObject guard){return guard.optBoolean("ok")&&"raw06-health".equals(guard.optString("native_build"))&&node.optString("path").equals(guard.optString("path"))&&node.optString("canonical_path").equals(guard.optString("canonical_path"))&&node.optInt("maximum",-1)==guard.optInt("maximum",-2);}
+ static void probe(JSONObject selected)throws Exception{
+  File node=new File(selected.getString("path"));StructStat expected=Os.lstat(node.toString());
+  FileDescriptor fd=Os.open(node.toString(),OsConstants.O_WRONLY|OsConstants.O_CLOEXEC|OsConstants.O_NOFOLLOW,0);
+  try{StructStat opened=Os.fstat(fd);if(!OsConstants.S_ISREG(opened.st_mode)||expected.st_dev!=opened.st_dev||expected.st_ino!=opened.st_ino||!node.toPath().toRealPath().toString().equals(selected.getString("canonical_path")))throw new IOException("主屏节点在权限检查期间发生变化");}
+  finally{Os.close(fd);}
+ }
+ static boolean matches(JSONObject node,JSONObject guard){return guard.optBoolean("ok")&&"raw07-openprobe".equals(guard.optString("native_build"))&&node.optString("path").equals(guard.optString("path"))&&node.optString("canonical_path").equals(guard.optString("canonical_path"))&&node.optInt("maximum",-1)==guard.optInt("maximum",-2);}
  static void install()throws Exception{
   Os.chmod(RootControl.DATA.toString(),0700);
   String source=System.getenv("CLASSPATH");if(source==null||source.isEmpty())throw new IOException("未取得主屏守护所在的 APK 路径");
@@ -36,9 +49,11 @@ final class NativePanelRoot {
   }
  }
  static void start(JSONObject selected)throws Exception{
-  install();
   JSONObject current=PanelNodeDiscovery.discover(new File("/sys"));
   if(!current.optBoolean("supported")||!selected.optString("path").equals(current.optString("path"))||!selected.optString("canonical_path").equals(current.optString("canonical_path"))||selected.optInt("maximum",-1)!=current.optInt("maximum",-2))throw new IOException("主屏节点已变化，请重新打开面板");
+   install();
+   current=PanelNodeDiscovery.discover(new File("/sys"));
+   if(!current.optBoolean("supported")||!selected.optString("path").equals(current.optString("path"))||!selected.optString("canonical_path").equals(current.optString("canonical_path"))||selected.optInt("maximum",-1)!=current.optInt("maximum",-2))throw new IOException("主屏节点已变化，请重新打开面板");
   JSONObject existing=null;try{existing=NativePanelClient.call("STATUS");}catch(Exception ignored){}
   if(existing!=null){if(matches(current,existing))return;throw new IOException("已有守护使用其他节点，请先恢复自动亮度");}
   File log=new File(RootControl.DATA,"main-panel.log");

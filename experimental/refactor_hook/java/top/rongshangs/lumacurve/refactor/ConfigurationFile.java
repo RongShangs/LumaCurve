@@ -7,13 +7,18 @@ import java.util.*;
 final class ConfigurationFile {
     static final int LIMIT=32768;
     static final String FORMAT="hyperlux_config_v2";
-    /** Compare flat option values independently of JSON key order and number boxing. */
+    /** Compare nested preferences independently of JSON object order and number boxing. */
     static boolean sameOptions(JSONObject submitted,JSONObject current)throws JSONException {
         if(submitted.length()!=current.length())return false;
         Iterator<String> keys=submitted.keys();while(keys.hasNext()){
-            String key=keys.next();if(!current.has(key)||!new JSONArray().put(submitted.get(key)).toString().equals(new JSONArray().put(current.get(key)).toString()))return false;
+            String key=keys.next();if(!current.has(key)||!sameValue(submitted.get(key),current.get(key)))return false;
         }
         return true;
+    }
+    static boolean sameValue(Object a,Object b)throws JSONException {
+        if(a instanceof JSONObject&&b instanceof JSONObject)return sameOptions((JSONObject)a,(JSONObject)b);
+        if(a instanceof JSONArray&&b instanceof JSONArray){JSONArray x=(JSONArray)a,y=(JSONArray)b;if(x.length()!=y.length())return false;for(int i=0;i<x.length();i++)if(!sameValue(x.get(i),y.get(i)))return false;return true;}
+        return new JSONArray().put(a).toString().equals(new JSONArray().put(b).toString());
     }
     static final String[] FLAGS={"thermal_relax","response_override","small_brighten_override","low_light_stability"};
     static final String[] KEYS={"thermal_ceiling","memory_strength","memory_window","memory_lux_range","thermal_cooling","brighten_delay","darken_delay","small_brighten_delay","low_light_limit","low_light_brighten","low_light_darken"};
@@ -58,6 +63,10 @@ final class ConfigurationFile {
         for(String group:AdvancedOptions.GROUPS)disable(out,group,runtime.optBoolean(group+"_supported"),notes);
         if(!out.getBoolean("outdoor_enabled")){out.put("outdoor_hbm_tuning",false).put("outdoor_range_unlock",false).put("outdoor_opr_relax",false);}
         if(!out.getBoolean("outdoor_range_unlock"))disable(out,"outdoor_opr_relax",false,notes);
+        SceneOptions scenes=SceneOptions.parse(source);
+        for(int i=0;i<SceneOptions.IDS.length;i++)if(!runtime.optBoolean("scene_"+SceneOptions.IDS[i]+"_supported")&&!scenes.entries[i].mode.equals("system")){scenes.entries[i]=new SceneOptions.Entry(new JSONObject());notes.add("本机场景接口未就绪，已恢复系统："+SceneOptions.NAMES[i]);}
+        if(source.optJSONObject("scene_options")!=null&&source.optJSONObject("scene_options").optJSONArray("rules")!=null&&source.optJSONObject("scene_options").optJSONArray("rules").length()>0)notes.add("已移除旧版自定义场景，保留现有场景设置");
+        scenes.put(out);scenes.verify(runtime);
         AdvancedOptions.parse(out).verify(runtime);OutdoorOptions.parse(out).verify(runtime);
         ThermalPolicy.validate((float)out.getDouble("thermal_ceiling"));ThermalPolicy.validateCooling((float)out.getDouble("thermal_cooling"));MemoryPolicy.validate((float)out.getDouble("memory_strength"));MemoryPolicy.validateGrouping(out.getLong("memory_window"),(float)out.getDouble("memory_lux_range"));
         DelayPolicy.validate(out.getLong("brighten_delay"),out.getLong("darken_delay"));DelayPolicy.validateSmall(out.getLong("small_brighten_delay"));LowLightPolicy.validate((float)out.getDouble("low_light_limit"),out.getLong("low_light_brighten"),out.getLong("low_light_darken"));

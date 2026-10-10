@@ -7,10 +7,12 @@ final class RawPanelOutputHooks {
  static final Set<Class<?>> owners=new HashSet<>(),powerStates=new HashSet<>();
  static boolean supports(Class<?> owner){return owners.contains(owner);}
  static HookRuntime state(Object powerState){
-  synchronized(HookEntry.states){for(HookRuntime s:HookEntry.states.values())try{
+  HookRuntime[] snapshot;
+  synchronized(HookEntry.states){snapshot=HookEntry.states.values().toArray(new HookRuntime[0]);}
+  for(HookRuntime s:snapshot)try{
    if(!s.onDisplayThread())continue;Object dpc=HookEntry.get(s.owner,"mDisplayPowerController");
    if(dpc.getClass().getMethod("getDisplayPowerState").invoke(dpc)==powerState)return s;
-  }catch(Throwable unavailable){}}
+  }catch(Throwable unavailable){}
   return null;
  }
  static void install(Class<?> owner){
@@ -33,7 +35,7 @@ final class RawPanelOutputHooks {
     }
     Method off=power.getDeclaredMethod("setScreenState",int.class,int.class);if(off.getReturnType()!=void.class)throw new IllegalStateException("raw screen ABI");
     hooks.add(XposedBridge.hookMethod(off,new XC_MethodHook(){protected void beforeHookedMethod(MethodHookParam p){
-     HookRuntime s=state(p.thisObject);if(s!=null&&((Integer)p.args[0])!=2)s.brightnessControl.screenOff();
+     HookRuntime s=state(p.thisObject);if(s!=null&&((Integer)p.args[0])!=2)s.brightnessControl.screenChanging();
     }}));
     powerStates.add(power);
    }

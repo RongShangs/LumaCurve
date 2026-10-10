@@ -14,8 +14,10 @@ final class HookRuntime {
     static final String BUILD=AppBuild.BUILD,CONFIG="lumacurve_refactor_config_v1",STATUS="lumacurve_refactor_status_v1",REFRESH="lumacurve_refactor_refresh_v1";
     final Object owner; final CurveBackend kernel; final Handler handler; final Context context;
     final String fingerprint,baselineIdentity; final ContentObserver observer,refresh;
+    final DeferredStateWriter stateWriter;
     final ThermalPolicy thermalGate=new ThermalPolicy();
     final OutdoorController outdoor=new OutdoorController(this);
+    final SceneController scenes=new SceneController(this);
     final BrightnessControl brightnessControl;
     final MemoryPolicy memoryPolicy=new MemoryPolicy();
     final MemoryPersistence persistentMemory=new MemoryPersistence(this);
@@ -45,6 +47,8 @@ final class HookRuntime {
     java.lang.reflect.Method strategyProbe;Object strategyController;
     HookRuntime(Object owner,Object ref,Handler handler)throws Exception {
         this.owner=owner;this.handler=handler;context=(Context)HookEntry.get(owner,"mContext");fingerprint=Build.FINGERPRINT;brightnessControl=new BrightnessControl(this);
+        stateWriter=new DeferredStateWriter((key,value)->Settings.Global.putString(context.getContentResolver(),key,value),
+            failure->XposedBridge.log("HyperLux deferred state: "+failure));
         if(ref.getClass().getName().equals(HookEntry.REFACTOR)){
         Class<?> util=Class.forName("com.android.server.display.RefactorBrightnessUtil",true,ref.getClass().getClassLoader());
         if(HookEntry.field(util,"MIN_NIT").getType()!=float.class||HookEntry.field(util,"MAX_NIT").getType()!=float.class)throw new IllegalStateException("逻辑亮度边界类型已变化");
@@ -54,10 +58,10 @@ final class HookRuntime {
         baselineIdentity=CurveIdentity.of(kernel.name(),kernel.fullLux(),kernel.fullNit(),kernel.min,kernel.max);
         try{hdrProbe=owner.getClass().getDeclaredMethod("isHdrScene");if(hdrProbe.getReturnType()!=boolean.class)hdrProbe=null;else hdrProbe.setAccessible(true);}catch(Throwable optional){}
         observer=new ContentObserver(handler){public void onChange(boolean self){reload();}};
-        refresh=new ContentObserver(handler){public void onChange(boolean self){viewUntil=SystemClock.elapsedRealtime()+5000;refreshUserIdentity();refreshConfiguration();outdoor.tick();if(kernel.plan()!=null&&!appliesToUser())userChanged();else publish();}};
+        refresh=new ContentObserver(handler){public void onChange(boolean self){if(closed)return;viewUntil=SystemClock.elapsedRealtime()+5000;refreshUserIdentity();refreshConfiguration();outdoor.tick();if(kernel.plan()!=null&&!appliesToUser())userChanged();else publish();}};
         power=(PowerManager)context.getSystemService(Context.POWER_SERVICE);
-        thermalListener=level->{thermalSeverity=level;environmentChanged();};
-        batteryListener=new BroadcastReceiver(){public void onReceive(Context c,Intent intent){
+        thermalListener=level->{if(closed)return;thermalSeverity=level;environmentChanged();};
+        batteryListener=new BroadcastReceiver(){public void onReceive(Context c,Intent intent){if(closed)return;
             if(Intent.ACTION_SCREEN_OFF.equals(intent.getAction())){persistentMemory.screenOff();assistGate.reset();brightnessControl.screenOff();return;}
             if(Intent.ACTION_SCREEN_ON.equals(intent.getAction())){persistentMemory.screenOn();handler.post(brightnessControl::screenOn);return;}
             if(Intent.ACTION_USER_PRESENT.equals(intent.getAction())){handler.post(brightnessControl::screenOn);return;}
@@ -85,9 +89,12 @@ final class HookRuntime {
         }catch(Throwable error){fault(error);}
     }
     void close(){
+        if(closed)return;
+        stateWriter.close();
         persistentMemory.close();brightnessControl.close();
         closed=true;memoryLifecycle.close();
-        try{context.getContentResolver().unregisterContentObserver(observer);context.getContentResolver().unregisterContentObserver(refresh);}catch(Throwable ignored){}
+        try{context.getContentResolver().unregisterContentObserver(observer);}catch(Throwable ignored){}
+        try{context.getContentResolver().unregisterContentObserver(refresh);}catch(Throwable ignored){}
         try{if(receiverRegistered)context.unregisterReceiver(batteryListener);}catch(Throwable ignored){}
         try{if(thermalRegistered)power.removeThermalStatusListener(thermalListener);}catch(Throwable ignored){}
         disableOverrides();try{if(kernel.plan()!=null)kernel.configure(null);}catch(Throwable ignored){}
@@ -139,7 +146,7 @@ final class HookRuntime {
         if(closed)return;
         try{JSONObject ack=new JSONObject().put("build",BUILD).put("phase",phase).put("revision",revision).put("message",message)
             .put("pid",android.os.Process.myPid()).put("process_start",processStart()).put("fingerprint",fingerprint).put("elapsed_ms",SystemClock.elapsedRealtime());
-            if(!Settings.Global.putString(context.getContentResolver(),"lumacurve_refactor_ack_v1",ack.toString()))throw new IOException("确认结果写入失败");
+            stateWriter.submit("ack",Collections.singletonMap("lumacurve_refactor_ack_v1",ack.toString()));
         }catch(Throwable error){XposedBridge.log("HyperLux configuration acknowledgement: "+error);}
     }
     void reload(){
@@ -153,7 +160,7 @@ final class HookRuntime {
             if(text==null||text.equals("null")){
                 if(kernel.plan()!=null)kernel.configure(null);disableOverrides();memoryStrength=1;phase="attached";revision="";message="已连接 · 官方曲线";
             }else{
-                if(text.length()>8192)throw new IllegalArgumentException("配置过长");JSONObject config=new JSONObject(text);
+                if(text.length()>16384)throw new IllegalArgumentException("配置过长");JSONObject config=new JSONObject(text);
                 if(config.getInt("schema")!=1)throw new IllegalArgumentException("配置格式不兼容");
                 revision=config.getString("revision");if(!revision.matches("[A-Za-z0-9_-]{1,80}"))throw new IllegalArgumentException("配置标识无效");
                 if(config.getBoolean("enabled")){
@@ -173,6 +180,7 @@ final class HookRuntime {
                     // RootControl validates capabilities before applying; this feature retries readiness itself.
                     BrightnessControlOptions controls=BrightnessControlOptions.parseStored(config);
                     OutdoorOptions outdoorOptions=OutdoorOptions.parse(config);JSONObject outdoorCaps=outdoor.status();outdoorOptions.verify(new JSONObject().put("outdoor_supported",outdoorCaps.optBoolean("supported")).put("outdoor_hbm_supported",outdoorCaps.optBoolean("hbm_tuning_supported")).put("outdoor_range_supported",outdoorCaps.optBoolean("range_supported")).put("outdoor_opr_supported",outdoorCaps.optBoolean("opr_supported")));
+                    SceneOptions proposedScenes=SceneOptions.parse(config);JSONObject sceneCaps=new JSONObject();scenes.put(sceneCaps);proposedScenes.verify(sceneCaps);
                     AdvancedOptions proposed=AdvancedOptions.parse(config);JSONObject capabilities=new JSONObject();AdvancedTuning.capabilities((key,value)->capabilities.put(key,value),this);proposed.verify(capabilities);
                     float lowLimit=(float)config.optDouble("low_light_limit",50);long lowBright=config.optLong("low_light_brighten",3000),lowDark=config.optLong("low_light_darken",4000);LowLightPolicy.validate(lowLimit,lowBright,lowDark);
                     if(config.optBoolean("response_override",false)&&!ResponseTuning.supported(owner))throw new IllegalArgumentException("确认时间接口暂未兼容");
@@ -195,7 +203,7 @@ final class HookRuntime {
                     lowThresholds=nextLowThresholds;
                     assistGate.configure(config);
                     if(lowLightEnabled&&!LowLightTuning.supported(this))throw new IllegalArgumentException("暗光稳定接口尚未完整兼容");
-                    phase="active";brightnessControl.configure(controls);outdoor.configure(outdoorOptions);message="自定义曲线已接入，官方光感和过渡动画继续运行";
+                    phase="active";scenes.configure(proposedScenes);brightnessControl.configure(controls);outdoor.configure(outdoorOptions);message="自定义曲线已接入，官方光感和过渡动画继续运行";
                     persistentMemory.configure(memoryOptions,curveChanged||!persistentMemory.options.persist&&memoryOptions.persist);
                     log(curveChanged?"曲线已应用，重新建立基础锚点":"设置已更新，保留当前手动锚点");
                 }else{
@@ -215,7 +223,17 @@ final class HookRuntime {
             AdvancedTuning.refreshThresholds(this);phase="error";message="未启用："+error;log(message);publish();
         }finally{changing=false;}
     }
+    boolean recalculationQueued,recalculating;
     void requestRecalculation(){
+        if(closed||recalculationQueued||recalculating)return;
+        recalculationQueued=true;
+        if(!handler.post(()->{
+            recalculationQueued=false;if(closed)return;
+            recalculating=true;
+            try{recalculate();}finally{recalculating=false;}
+        }))recalculationQueued=false;
+    }
+    void recalculate(){
         try{
             Object dpc=HookEntry.get(owner,"mDisplayPowerController");if(dpc!=null)dpc.getClass().getMethod("updateBrightness").invoke(dpc);
             Object abc=HookEntry.get(owner,"mAutomaticBrightnessControllerImpl");
@@ -227,7 +245,7 @@ final class HookRuntime {
         handler.post(()->{if(closed)return;try{kernel.configure(null);}catch(Throwable ignored){}
             phase="error";message="接入异常，已尝试恢复官方："+error;log(message);publish();faultPending=false;});
     }
-    void disableOverrides(){brightnessControl.stop();assistGate.reset();outdoor.stop();thermalEnabled=false;responseEnabled=false;smallResponseEnabled=false;lowLightEnabled=false;memoryStrength=1;advanced=new AdvancedOptions();AdvancedTuning.restoreAnimation(this);AdvancedTuning.refreshThresholds(this);}
+    void disableOverrides(){scenes.stop();brightnessControl.stop();assistGate.reset();outdoor.stop();thermalEnabled=false;responseEnabled=false;smallResponseEnabled=false;lowLightEnabled=false;memoryStrength=1;advanced=new AdvancedOptions();AdvancedTuning.restoreAnimation(this);AdvancedTuning.refreshThresholds(this);}
     boolean onDisplayThread(){return !closed&&Looper.myLooper()==handler.getLooper();}
     boolean normalTuningAllowed(Object abc,Object impl){
         if(closed||!phase.equals("active")||!appliesToUser())return false;
@@ -247,12 +265,14 @@ final class HookRuntime {
     boolean appliesToUser(){try{return ForegroundUser.matches(boundUser,kernel.integer("mUserSerial"));}catch(Throwable error){return false;}}
     void userChanged(){disableOverrides();try{kernel.configure(null);phase="error";message="用户已切换，恢复官方策略";log(message);publish();}catch(Throwable error){fault(error);}}
     void sample(float lux,float nit){
-        if(closed||!Float.isFinite(lux)||!Float.isFinite(nit)||lux<0||nit<0)return;
+        if(!onDisplayThread()||!Float.isFinite(lux)||!Float.isFinite(nit)||lux<0||nit<0)return;
         lastLux=lux;lastNit=nit;if(kernel.plan()!=null)consumed++;
-        if(consumed==1||SystemClock.elapsedRealtime()-lastPublish>=publishInterval())publish();
+        if(consumed==1)queueControlPublish();
+        else if(SystemClock.elapsedRealtime()-lastPublish>=publishInterval())queuePublish();
     }
     long publishInterval(){return SystemClock.elapsedRealtime()<viewUntil?2000:10000;}
     void publish(){
+        if(closed)return;
         // Configuration confirmation must not depend on optional diagnostic fields.
         publishAcknowledgement();
         lastPublish=SystemClock.elapsedRealtime();
@@ -294,7 +314,7 @@ final class HookRuntime {
             if(kernel.name().equals("refactor")){int count=kernel.integer("mAnchorCount");JSONArray flags=new JSONArray();boolean[] user=(boolean[])kernel.get("mAnchorIsUserDrag");for(int i=0;i<count;i++)flags.put(user[i]);status.put("manual_anchor_flags",flags);}
             else status.put("physical_mapping_active",HookEntry.get(((TraditionalAdapter)kernel).abc,"mCurrentBrightnessMapper")==((TraditionalAdapter)kernel).mapper);
             JSONObject controls=brightnessControl.status();status.put("brightness_control",controls).put("dark_lock_supported",controls.optBoolean("dark_lock_supported")).put("manual_panel_supported",controls.optBoolean("manual_panel_supported"));
-            collectOfficial(status);JSONObject outdoorState=outdoor.status();status.put("outdoor",outdoorState).put("outdoor_supported",outdoorState.optBoolean("supported")).put("outdoor_hbm_supported",outdoorState.optBoolean("hbm_tuning_supported")).put("outdoor_range_supported",outdoorState.optBoolean("range_supported")).put("outdoor_opr_supported",outdoorState.optBoolean("opr_supported"));
+            collectOfficial(status);scenes.refresh();scenes.put(status);JSONObject outdoorState=outdoor.status();status.put("outdoor",outdoorState).put("outdoor_supported",outdoorState.optBoolean("supported")).put("outdoor_hbm_supported",outdoorState.optBoolean("hbm_tuning_supported")).put("outdoor_range_supported",outdoorState.optBoolean("range_supported")).put("outdoor_opr_supported",outdoorState.optBoolean("opr_supported"));
             if(Float.isFinite(batteryTemperature))status.put("battery_temperature",batteryTemperature);
             if(Float.isFinite(lastOfficialCap))status.put("thermal_last_cap",lastOfficialCap);
             if(Float.isFinite(lastLux))status.put("last_lux",lastLux);
@@ -308,8 +328,7 @@ final class HookRuntime {
                 status.put("screen_state",display.getClass().getMethod("getScreenState").invoke(display));
             }catch(Throwable unavailable){}
             CurvePlan plan=kernel.plan();if(plan!=null)status.put("active_logical_nit",array(plan.nits()));
-            for(Map.Entry<String,String> part:StatusTransport.encode(status).entrySet())
-                if(!Settings.Global.putString(context.getContentResolver(),part.getKey(),part.getValue()))throw new IOException("状态写入失败："+part.getKey());
+            stateWriter.submit("state",StatusTransport.encode(status));
         }catch(Throwable error){XposedBridge.log("LumaCurve status: "+error);}
     }
     void collectOfficial(JSONObject status){
@@ -332,6 +351,8 @@ final class HookRuntime {
             Object dual=HookEntry.get(impl,"mDualSensorPolicy");if(dual!=null){
                 if(usable)readNumber(status,"main_fast_lux",dual,"mMainFastAmbientLux");
                 boolean assist=usable&&Boolean.TRUE.equals(optionalBoolean(dual,"mAssistAmbientLuxValid"));status.put("assist_valid",assist);
+                readBoolean(status,"assist_sampling_enabled",dual,"mAssistLightSensorEnable");readBoolean(status,"assist_ambient_lux_valid",dual,"mAssistAmbientLuxValid");
+                float assistValue=optionalNumber(dual,"mAssistFastAmbientLux");status.put("assist_reading_state",Float.isFinite(assistValue)?assistValue>=0?"valid":"reset":"unavailable");
                 if(assist)readNumber(status,"assist_fast_lux",dual,"mAssistFastAmbientLux");
                 status.put("sensor_policy_flag",HookEntry.get(dual,"mUseLightSensorFlag"));
                 String reference=sensorName(((Number)HookEntry.get(dual,"mUseLightSensorFlag")).intValue());if(reference!=null)status.put("sensor_reference_name",reference);
@@ -345,12 +366,25 @@ final class HookRuntime {
         JSONObject scenes=new JSONObject();
         try{Object impl=HookEntry.get(owner,"mAutomaticBrightnessControllerImpl"),abc=HookEntry.get(impl,"mAutomaticBrightnessController"),scene=HookEntry.get(impl,"mSceneDetector");
             for(String[] f:new String[][]{{"driving","mIsDriving"},{"night_driving","mIsNightDrivingMode"},{"reflective","mIsReflectiveScene"},{"step_mode","mIsStepMode"}})readBoolean(scenes,f[0],scene,f[1]);
+            readBoolean(scenes,"driving_sensor_registered",scene,"mDrivingSensorRegistered");readBoolean(scenes,"night_driving_allowed",scene,"mUseDrivingModeForBrt");
+            readNumber(scenes,"sunrise_minutes",scene,"mSunriseMinutes");readNumber(scenes,"sunset_minutes",scene,"mSunsetMinutes");readNumber(scenes,"night_driving_min_nit",scene,"mMinDrivingEnableNit");
             readBoolean(scenes,"proximity_near",impl,"mProximityPositive");readBoolean(scenes,"night_wake",abc,"mIsNightWakeMode");
+            for(String[] f:new String[][]{{"need_aon","mNeedCheckAonFlare"},{"need_proximity","mNeedCheckProximitySensor"},{"main_darken_candidate","mIsMainDarkenEvent"},{"stream_policy_enabled","mTransientProximityEnabled"},{"aon_enabled","mUseAonFlareEnabled"}})readBoolean(scenes,f[0],scene,f[1]);
+            for(String[] f:new String[][]{{"stream_state","mProxState"},{"aon_state","mAonState"},{"aon_min_lux","mMinAonFlareEnableLux"},{"aon_max_lux","mMaxAonFlareEnableLux"},{"aon_max_wait_ms","mAonFlareMaxDelayTime"},{"step_effective_ms","mStepModeEffectivenessTime"}})readNumber(scenes,f[0],scene,f[1]);
+            if(optionalNumber(scene,"mProxState")==8)readBoolean(scenes,"stream_near",scene,"mProximityStatus");
+            for(String[] f:new String[][]{{"proximity_policy_enabled","mUseProximityEnabled"},{"proximity_sampling","mProximitySensorEnabled"},{"game","mIsGameSceneEnable"},{"prox_touch_enabled","mUseProxAndTouchEnabled"},{"torch_open","mIsTorchOpen"},{"back_camera","mIsBackCamera"},{"assist_policy_enabled","mUseAssistSensorEnabled"},{"non_ui_enabled","mNonUiSensorEnabled"}})readBoolean(scenes,f[0],impl,f[1]);
+            readNumber(scenes,"non_ui_value",impl,"mNonUiSensorData");
+            readBoolean(scenes,"night_wake_target",abc,"mSetNightWakeBrightness");readNumber(scenes,"proximity_threshold",impl,"mProximityThreshold");readNumber(scenes,"night_driving_extra_ms",impl,"mNightDrivingDebounceConfig");
+            try{Object sensor=HookEntry.get(scene,"mStreamProximitySensor");if(sensor!=null)scenes.put("stream_sensor_name",sensor.getClass().getMethod("getName").invoke(sensor));}catch(Throwable absent){}
+
             boolean wasProbing=probingScenes;probingScenes=true;
             try{Object touch=HookEntry.get(impl,"mTouchAreaHelper");java.lang.reflect.Method active=touch.getClass().getDeclaredMethod("isTouchCoverProtectionActive");active.setAccessible(true);scenes.put("touch_protection_active",active.invoke(touch));}catch(Throwable absent){}finally{probingScenes=wasProbing;}
+            try{Object touch=HookEntry.get(impl,"mTouchAreaHelper");readNumber(scenes,"touch_release_seconds",touch,"mTouchEventDebounce");readBoolean(scenes,"touch_tracking",touch,"mTouchTrackingEnabled");}catch(Throwable absent){}
+            boolean probeBefore=probingScenes;probingScenes=true;try{java.lang.reflect.Method active=impl.getClass().getDeclaredMethod("dropDecreaseLuxIfNeeded");active.setAccessible(true);scenes.put("game_darken_blocked",active.invoke(impl));}catch(Throwable absent){}finally{probingScenes=probeBefore;}
             readNumber(scenes,"main_history_ms",abc,"mAmbientLightHorizonLong");readNumber(scenes,"step_extra_ms",abc,"mStepModeDarkenDebounceConfig");
             readNumber(scenes,"small_brightening_lux_threshold",abc,"mAmbientBrighteningSmallThreshold");
-            Object dual=HookEntry.get(impl,"mDualSensorPolicy");readBoolean(scenes,"assist_reset_pending",dual,"mIsPendingResetAssistValue");
+            Object dual=HookEntry.get(impl,"mDualSensorPolicy");readBoolean(scenes,"assist_reset_pending",dual,"mIsPendingResetAssistValue");readNumber(scenes,"other_display_state",dual,"mOtherDisplayState");
+            try{java.lang.reflect.Method check=impl.getClass().getDeclaredMethod("checkAssistSensorValid");check.setAccessible(true);scenes.put("assist_source_valid",check.invoke(impl));}catch(Throwable absent){}
             readNumber(scenes,"assist_brightening_threshold",dual,"mAssistBrighteningThreshold");readNumber(scenes,"assist_darkening_threshold",dual,"mAssistDarkeningThreshold");
         }catch(Throwable missing){}
         try{Object sun=HookEntry.get(owner,"mSunlightController");for(String[] f:new String[][]{{"manual_sunlight_enabled","mSunlightSettingsEnable"},{"manual_sunlight_sensor","mSunlightSensorEnabled"},{"manual_sunlight_active","mSunlightModeActive"},{"manual_sunlight_user_disabled","mSunlightModeDisabledByUser"}})readBoolean(scenes,f[0],sun,f[1]);readNumber(scenes,"manual_sunlight_nit_condition",sun,"mThresholdSunlightNit");}catch(Throwable missing){}

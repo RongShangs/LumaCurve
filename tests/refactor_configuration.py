@@ -90,10 +90,25 @@ public class ConfigHostTest{
   reordered.put("memory_strength",.3).put("new_option",true);check(!ConfigurationFile.sameOptions(submitted,reordered));
   reordered.remove("new_option");reordered.remove("dark_lock_enabled");check(!ConfigurationFile.sameOptions(submitted,reordered));
   reordered.put("dark_lock_enabled","true");check(!ConfigurationFile.sameOptions(submitted,reordered));
+  JSONObject sceneFile=clone(file),sceneCaps=clone(s),policies=new JSONObject();JSONArray rules=new JSONArray();
+  for(String id:SceneOptions.IDS){sceneCaps.put("scene_"+id+"_supported",true);policies.put(id,new JSONObject().put("mode","condition").put("condition",new JSONObject().put("time",true).put("start",1320).put("end",420).put("cover","touch_clear")));}
+  for(int i=0;i<6;i++)rules.put(new JSONObject().put("id","id"+i).put("name",String.join("",Collections.nCopies(24,"夜"))).put("target",SceneOptions.IDS[i]).put("enabled",true).put("condition",new JSONObject().put("lux",true).put("time",true).put("cover","proximity_clear")));
+  sceneFile.getJSONObject("options").put("scene_options",new JSONObject().put("policies",policies).put("rules",rules));String originalScenes=sceneFile.toString();
+  r=ConfigurationFile.read(originalScenes,sceneCaps,c);check(r.notes.size()==1&&r.notes.get(0).contains("已移除"));SceneOptions importedScenes=SceneOptions.parse(r.options);check(!r.options.getJSONObject("scene_options").has("rules"));for(SceneOptions.Entry e:importedScenes.entries)check(e.mode.equals("condition"));
+
+  JSONObject splitFile=clone(sceneFile);splitFile.getJSONObject("options").getJSONObject("scene_options").getJSONObject("policies").getJSONObject("night_driving").getJSONObject("condition").put("confirm_enter",300).put("confirm_exit",900);
+  ConfigurationFile.Imported splitImport=ConfigurationFile.read(splitFile.toString(),sceneCaps,c);SceneOptions splitScenes=SceneOptions.parse(splitImport.options);check(splitScenes.entries[0].condition.confirmEnter==300&&splitScenes.entries[0].condition.confirmExit==900);
+  ConfigurationFile.Imported splitAgain=ConfigurationFile.read(ConfigurationFile.export(splitImport.options,sceneCaps,false,2,true).toString(),sceneCaps,c);check(ConfigurationFile.sameOptions(splitImport.options,splitAgain.options));
+  String payload=Base64.getEncoder().encodeToString(r.options.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));check(payload.length()<16384);check(new JSONObject().put("operation","apply").put("payload",payload).toString().getBytes(java.nio.charset.StandardCharsets.UTF_8).length<16384);
+  check(ConfigurationFile.sameOptions(r.options,ConfigurationFile.read(ConfigurationFile.export(r.options,sceneCaps,false,2,true).toString(),sceneCaps,c).options));
+  r=ConfigurationFile.read(originalScenes,s,c);importedScenes=SceneOptions.parse(r.options);check(r.notes.size()==10);for(SceneOptions.Entry e:importedScenes.entries)check(e.mode.equals("system"));check(!r.options.getJSONObject("scene_options").has("rules"));check(sceneFile.toString().equals(originalScenes));
+  JSONObject nestedA=new JSONObject().put("scene",new JSONObject().put("a",1).put("b",new JSONArray().put(new JSONObject().put("x",1).put("y",true)))),nestedB=new JSONObject().put("scene",new JSONObject().put("b",new JSONArray().put(new JSONObject().put("y",true).put("x",1.0))).put("a",1.0));
+  check(ConfigurationFile.sameOptions(nestedA,nestedB));nestedB.getJSONObject("scene").getJSONArray("b").getJSONObject(0).put("y",false);check(!ConfigurationFile.sameOptions(nestedA,nestedB));
+  check(!ConfigurationFile.sameOptions(new JSONObject().put("rules",new JSONArray().put(1).put(2)),new JSONObject().put("rules",new JSONArray().put(2).put(1))));
   System.out.println("Configuration migration: "+cases+" cases PASS; cross-version settings and curve identity, Android not tested");
  }
 }''',encoding='utf-8')
 classes=O/'classes';classes.mkdir(exist_ok=True)
-names=['BrightnessControlOptions','ConfigurationFile','CurvePlan','AdvancedOptions','AdvancedPolicy','OutdoorOptions','ThermalPolicy','MemoryPolicy','MemoryOptions','DelayPolicy','LowLightPolicy','LowLightThresholds','LowLightAssistGate','SettingsPresets','AppBuild']
+names=['SceneOptions','BrightnessControlOptions','ConfigurationFile','CurvePlan','AdvancedOptions','AdvancedPolicy','OutdoorOptions','ThermalPolicy','MemoryPolicy','MemoryOptions','DelayPolicy','LowLightPolicy','LowLightThresholds','LowLightAssistGate','SettingsPresets','AppBuild']
 subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(J),'-d',str(classes),*[str(S/(n+'.java')) for n in names],str(package/'RootControl.java'),str(package/'ConfigHostTest.java')],check=True)
 subprocess.run(['java','-cp',str(classes)+';'+str(J),'top.rongshangs.lumacurve.refactor.ConfigHostTest'],check=True)

@@ -125,7 +125,7 @@ fixture=fixture.replace('  System.out.println("Traditional curve/adapter/hooks:'
   System.out.println("Traditional curve/adapter/hooks:''')
 sources['top/rongshangs/lumacurve/refactor/TraditionalHostTest.java']=fixture
 
-sources['top/rongshangs/lumacurve/refactor/MemoryPersistence.java']='''package top.rongshangs.lumacurve.refactor;class MemoryPersistence {boolean replaying,pendingRestore;int captures,resets;void cancelRestore(){pendingRestore=false;}void manualApplied(){captures++;}void afterReset(){resets++;}void maybeRestore(){}}'''
+sources['top/rongshangs/lumacurve/refactor/MemoryPersistence.java']='''package top.rongshangs.lumacurve.refactor;class MemoryPersistence {boolean replaying,pendingRestore;int captures,resets;void cancelRestore(){pendingRestore=false;}void manualApplied(){captures++;}void requestAfterReset(){resets++;}void requestRestore(){}}'''
 J=R/'build/refactor-diagnostics/json-20240303.jar'
 files=[]
 for name,value in sources.items():

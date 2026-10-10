@@ -25,6 +25,7 @@ public final class DiagnosticHostTest {
  public static void main(String[] args)throws Exception{
   if(args.length>0&&args[0].equals("sleep")){System.out.println("partial-before-timeout");System.out.flush();Thread.sleep(30000);return;}
   if(args.length>0&&args[0].equals("failed")){System.out.println("failure-details");System.exit(3);return;}
+  if(args.length>0&&args[0].equals("large")){byte[] b=new byte[2*1024*1024+4096];Arrays.fill(b,(byte)'x');System.out.write(b);System.out.print("LATEST-FAULT-MARKER");return;}
   String actual=new String(Files.readAllBytes(Paths.get(args[0])),"UTF-8");JSONObject feed=ThanksFeed.parse(actual);check(feed.getJSONArray("entries").length()==new JSONObject(actual).getJSONArray("entries").length());
   check(ThanksFeed.parse("{\\"schema\\":1,\\"entries\\":[{\\"name\\":\\"Albert_L\\",\\"message\\":\\"能露点什么呢🤔\\"}]}").getJSONArray("entries").getJSONObject(0).getString("message").contains("🤔"));
   invalid("{\\"schema\\":2,\\"entries\\":[]}");invalid("{\\"schema\\":1,\\"entries\\":[{\\"name\\":\\"\\",\\"message\\":\\"x\\"}]}");
@@ -48,6 +49,41 @@ public final class DiagnosticHostTest {
    check(c.manifest.getJSONObject(0).getString("sha256").length()==64);
    check(c.manifest.getJSONObject(1).getString("status").equals("skipped_limit"));check(c.manifest.getJSONObject(2).getString("status").equals("unavailable"));
    check(c.manifest.getJSONObject(4).getString("status").equals("nonzero"));check(c.manifest.getJSONObject(5).getString("status").equals("timeout"));check(c.manifest.getJSONObject(6).getString("status").equals("unavailable"));
+  }
+  // Oversized command output is bounded; a timed-out collection never starts fault commands.
+  File faultArchive=new File(dir,"faults.zip");
+  try(ZipOutputStream z=new ZipOutputStream(new FileOutputStream(faultArchive))){
+   DiagnosticCollector bounded=new DiagnosticCollector(z);bounded.command("large-output.txt",5,java,"-cp",cp,DiagnosticHostTest.class.getName(),"large");
+   check(bounded.manifest.getJSONObject(0).getString("status").equals("truncated"));
+  }
+  try(ZipFile z=new ZipFile(faultArchive)){check(z.getEntry("large-output.txt").getSize()==2*1024*1024);}
+  // Latest fault evidence must survive truncation; non-fault snapshots keep their head.
+  try(ZipOutputStream z=new ZipOutputStream(new FileOutputStream(faultArchive))){
+   DiagnosticCollector bounded=new DiagnosticCollector(z);bounded.command("faults/large-output.txt",5,java,"-cp",cp,DiagnosticHostTest.class.getName(),"large");
+   check(bounded.manifest.getJSONObject(0).getString("detail").contains("retained=tail"));
+  }
+  try(ZipFile z=new ZipFile(faultArchive)){check(z.getEntry("faults/large-output.txt").getSize()==2*1024*1024);check(read(z,"faults/large-output.txt").endsWith("LATEST-FAULT-MARKER"));}
+  // AOSP dump searches AND-combined exact date terms. A lower-bound date would hide today.
+  for(String tag:DiagnosticCollector.FAULT_TAGS){String[] command=DiagnosticCollector.dropboxArguments(tag);check(Arrays.equals(command,new String[]{"dumpsys","-t","4","dropbox","--print",tag}));}
+  boolean invalidTag=false;try{DiagnosticCollector.dropboxArguments("system_server_watchdog --erase");}catch(IllegalArgumentException expected){invalidTag=true;}check(invalidTag);
+  File faultInput=new File(dir,"fault-input");check(faultInput.mkdir());long now=System.currentTimeMillis();
+  for(String name:new String[]{"anr_new","anr_older","anr_expired","unrelated"}){File f=new File(faultInput,name);Files.write(f.toPath(),name.getBytes("UTF-8"));check(f.setLastModified(now-(name.equals("anr_expired")?4L*86400000:name.equals("anr_older")?2000:1000)));}
+  try(ZipOutputStream z=new ZipOutputStream(new FileOutputStream(faultArchive))){DiagnosticCollector recent=new DiagnosticCollector(z);recent.recentFaultFiles(faultInput,"faults/anr",new String[]{"anr_"},1,now);check(recent.manifest.getJSONObject(1).getString("status").equals("skipped_limit"));}
+  try(ZipFile z=new ZipFile(faultArchive)){check(read(z,"faults/anr/anr_new").equals("anr_new"));check(z.size()==1);}
+  File oversized=new File(faultInput,"anr_oversized");try(RandomAccessFile huge=new RandomAccessFile(oversized,"rw")){huge.setLength(8L*1024*1024+1);}check(oversized.setLastModified(now));
+  File gz=new File(faultInput,"system_server_watchdog@fixture.txt.gz");try(GZIPOutputStream g=new GZIPOutputStream(new FileOutputStream(gz))){g.write("WATCHDOG-STACK".getBytes("UTF-8"));}check(gz.setLastModified(now));
+  byte[] compressed=Files.readAllBytes(gz.toPath());
+  try(ZipOutputStream z=new ZipOutputStream(new FileOutputStream(faultArchive))){DiagnosticCollector recent=new DiagnosticCollector(z);recent.recentFaultFiles(faultInput,"faults/anr",new String[]{"anr_"},6,now);check(recent.manifest.getJSONObject(0).getString("status").equals("skipped_limit"));recent.recentFaultFiles(faultInput,"faults/dropbox-files",new String[]{"system_server_watchdog@"},10,now);recent.recentFaultFiles(new File(dir,"absent"),"faults/absent",new String[]{"anr_"},6,now);check(recent.manifest.getJSONObject(recent.manifest.length()-1).getString("status").equals("unavailable"));}
+  try(ZipFile z=new ZipFile(faultArchive)){check(z.getEntry("faults/anr/anr_oversized")==null);check(z.getEntry("faults/anr/anr_expired")==null);check(z.getEntry("faults/anr/unrelated")==null);try(InputStream in=z.getInputStream(z.getEntry("faults/dropbox-files/"+gz.getName()))){byte[] archived=new byte[compressed.length];new DataInputStream(in).readFully(archived);check(in.read()==-1&&Arrays.equals(archived,compressed));}}
+  try(ZipOutputStream z=new ZipOutputStream(new ByteArrayOutputStream())){DiagnosticCollector expired=new DiagnosticCollector(z,1);Thread.sleep(10);expired.recentFaultFiles(faultInput,"faults/anr",new String[]{"anr_"},6,now);check(expired.manifest.getJSONObject(0).getString("status").equals("skipped_budget"));}
+  for(String name:new String[]{"watchdog_pid_123.txt","pre_watchdog_pid_123.txt","BinderTraces_pid123.txt","system_sever_123.hprof"})Files.write(new File(faultInput,name).toPath(),name.getBytes("UTF-8"));
+  try(ZipOutputStream z=new ZipOutputStream(new FileOutputStream(faultArchive))){DiagnosticCollector recent=new DiagnosticCollector(z);recent.recentFaultFiles(faultInput,"faults/miui-watchdog",DiagnosticCollector.MIUI_WATCHDOG_PREFIXES,6,now);recent.recentFaultFiles(faultInput,"faults/binder",new String[]{DiagnosticCollector.ANR_PREFIXES[2]},6,now);}
+  try(ZipFile z=new ZipFile(faultArchive)){check(z.size()==3);check(read(z,"faults/miui-watchdog/watchdog_pid_123.txt").equals("watchdog_pid_123.txt"));check(read(z,"faults/miui-watchdog/pre_watchdog_pid_123.txt").equals("pre_watchdog_pid_123.txt"));check(read(z,"faults/binder/BinderTraces_pid123.txt").equals("BinderTraces_pid123.txt"));check(z.getEntry("faults/miui-watchdog/system_sever_123.hprof")==null);}
+  for(File f:faultInput.listFiles())Files.delete(f.toPath());Files.delete(faultInput.toPath());
+  try(ZipOutputStream z=new ZipOutputStream(new ByteArrayOutputStream())){
+   DiagnosticCollector expired=new DiagnosticCollector(z,1);Thread.sleep(10);expired.collectFaults();
+   check(expired.manifest.length()==8);
+   for(int i=0;i<expired.manifest.length();i++)check(expired.manifest.getJSONObject(i).getString("status").equals("skipped_budget"));
   }
   // Zip write errors propagate instead of being reported as successful diagnostics.
   ZipOutputStream closed=new ZipOutputStream(new ByteArrayOutputStream());closed.close();boolean threw=false;try{new DiagnosticCollector(closed).command("disk-full.txt",5,java,"-version");}catch(IOException expected){threw=true;}check(threw);

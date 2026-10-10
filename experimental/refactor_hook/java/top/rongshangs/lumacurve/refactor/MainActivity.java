@@ -30,10 +30,11 @@ public final class MainActivity extends Activity {
     TextView memoryOverview,memorySystemStatus,memoryDisabledWarning;
     final Map<String,Switch> memorySwitches=new LinkedHashMap<>();final Map<String,SeekBar> memoryParameters=new LinkedHashMap<>();final Map<String,TextView> memoryLabels=new LinkedHashMap<>();
     long memoryWindow=1500,brightenDelay=1500,darkenDelay=5000;float memoryLuxRange=.3f,thermalCooling=1;int refreshSeconds=2;boolean responseOverride,smallBrightenOverride,updateChecked,updateBusy,firmwarePrompted,legacyDialogVisible;long smallBrightenDelay=5000;JSONArray pendingLegacy;String legacyNotice="";
-    Switch responseSwitch,smallBrightenSwitch,lowLightSwitch;boolean lowLightStability;TextView branchOverview;SeekBar smallBrightenSlider;TextView smallBrightenLabel;SeekBar memoryWindowSlider,memoryRangeSlider,coolingSlider,brightenSlider,darkenSlider,refreshSlider;
+    Switch responseSwitch,smallBrightenSwitch,lowLightSwitch;boolean lowLightStability;SeekBar smallBrightenSlider;TextView smallBrightenLabel;SeekBar memoryWindowSlider,memoryRangeSlider,coolingSlider,brightenSlider,darkenSlider,refreshSlider;
     TextView memoryWindowLabel,memoryRangeLabel,coolingLabel,brightenLabel,darkenLabel,refreshLabel,updateLabel;
     JSONObject pendingUpdate;AlertDialog updateDialog;
     final Set<AlertDialog> openDialogs=new HashSet<>();
+    final Map<String,Runnable> detailOpeners=new HashMap<>();final ScrollView[] settingsScrollers=new ScrollView[10];
     LinearLayout thanksList;TextView thanksStatus;boolean thanksBusy,autoScroll=true;long thanksChecked;
     float lowLightLimit=50;long lowLightBrighten=3000,lowLightDarken=4000;
     SeekBar lowLimitSlider,lowBrightSlider,lowDarkSlider;TextView lowLimitLabel,lowBrightLabel,lowDarkLabel;
@@ -41,37 +42,52 @@ public final class MainActivity extends Activity {
     LowLightAssistGate assistGateOptions=new LowLightAssistGate();Switch assistGateSwitch;SeekBar assistGateWait,assistGateTolerance;TextView assistGateWaitLabel,assistGateToleranceLabel,assistGateStatus;
     OutdoorOptions outdoorOptions=new OutdoorOptions();Switch outdoorSwitch,hbmSwitch,rangeSwitch,oprSwitch;TextView outdoorStatus;final SeekBar[] outdoorSliders=new SeekBar[OutdoorOptions.KEYS.length];final TextView[] outdoorLabels=new TextView[OutdoorOptions.KEYS.length];
     AdvancedOptions advanced=new AdvancedOptions();
+    SceneOptions sceneOptions=new SceneOptions();SceneSettings sceneSettings;
     final Switch[] advancedSwitches=new Switch[AdvancedOptions.GROUPS.length];final SeekBar[] advancedSliders=new SeekBar[AdvancedOptions.KEYS.length];final TextView[] advancedLabels=new TextView[AdvancedOptions.KEYS.length];
-    TextView advancedStatus,unsavedHint;final TextView[] settingHints=new TextView[9];Switch logFollow;
-    LinearLayout settingsHome,settingsTarget,bottomNav;final LinearLayout[] settingGroups=new LinearLayout[9];final LinearLayout[] settingScreens=new LinearLayout[9];final Button[] settingApply=new Button[9];int settingsGroup=-1;float curveFloor;
+    TextView advancedStatus,unsavedHint;final TextView[] settingHints=new TextView[10];Switch logFollow;
+    LinearLayout settingsHome,settingsTarget,bottomNav;ScrollView settingsHomeScroll;int settingsHomeY;long settingsScrollRestore;boolean settingsHomeRestoring;final LinearLayout[] settingGroups=new LinearLayout[10];final LinearLayout[] settingScreens=new LinearLayout[10];final Button[] settingApply=new Button[10];int settingsGroup=-1;float curveFloor;
     View displayedPage;long pageTransition;
     BrightnessControlOptions controls=new BrightnessControlOptions();ManualBrightnessPanel manualPanel;boolean openManualPanel;
     Switch darkLockSwitch,manualPanelSwitch;final SeekBar[] controlSliders=new SeekBar[4];final TextView[] controlLabels=new TextView[4];TextView controlStatus;
     java.lang.Process bridge;BufferedReader bridgeReader;BufferedWriter bridgeWriter;
-    final Runnable tick=()->{if(visible){if(!busy&&!permissionBlocked&&(page==0||page==2))run("inspect",null);ui.postDelayed(this.tick,page==0?refreshSeconds*1000:5000);}};
+    final Runnable tick=()->{if(visible){if(!busy&&!permissionBlocked&&(page==0||page==2||page==1&&(settingsGroup==5||settingsGroup==2)))run("inspect",null);ui.postDelayed(this.tick,page==0?refreshSeconds*1000:5000);}};
     int dp(float value){return Math.round(value*getResources().getDisplayMetrics().density);}
     String tr(String value){return UiText.translate(value,english);}
     class LocalText extends TextView{
         LocalText(){super(MainActivity.this);}
-        @Override public void setText(CharSequence value,BufferType type){super.setText(value==null?null:tr(value.toString()),type);}
+        @Override public void setText(CharSequence value,BufferType type){super.setText(value==null?null:value instanceof android.text.Spanned?value:tr(value.toString()),type);}
     }
     class LocalButton extends Button{
         LocalButton(){super(MainActivity.this);setStateListAnimator(null);setElevation(0);setTranslationZ(0);}
         @Override public void setText(CharSequence value,BufferType type){super.setText(value==null?null:tr(value.toString()),type);}
     }
     TextView text(String value,int size,int color){TextView t=new LocalText();t.setText(value);t.setTextSize(size);t.setTextColor(themed(color));t.setPadding(0,dp(4),0,dp(4));return t;}
+    TextView curveLegend(String value){
+        String translated=tr(value);android.text.SpannableString styled=new android.text.SpannableString(translated);
+        String[] tokens={"灰线","蓝线","浅绿线","浅绿色实点","空心点"};int[] colors={themed(0xffa5aab3),BLUE,themed(0xff78b997),themed(0xff78b997),themed(0xff78b997)};
+        for(int i=0;i<tokens.length;i++){String token=tr(tokens[i]);int at=translated.indexOf(token);if(at>=0)styled.setSpan(new android.text.style.ForegroundColorSpan(colors[i]),at,at+token.length(),android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);}
+        TextView view=new TextView(this);view.setText(styled);view.setTextSize(12);view.setTextColor(MUTED);view.setIncludeFontPadding(false);view.setPadding(0,0,0,dp(4));return view;
+    }
     RippleDrawable ripple(int color,float radius){return new RippleDrawable(ColorStateList.valueOf(darkTheme?0x3091b3ff:0x203265df),background(color,radius),background(Color.WHITE,radius));}
     ImageView image(String asset,int size,float radius){ImageView v=new ImageView(this);v.setScaleType(ImageView.ScaleType.CENTER_CROP);v.setBackground(background(0xffeef2ff,radius));v.setClipToOutline(true);
-        try{if(asset==null)v.setImageDrawable(getDrawable(getResources().getIdentifier("icon","drawable",getPackageName())));else try(InputStream input=getAssets().open(asset)){v.setImageBitmap(BitmapFactory.decodeStream(input));}}catch(IOException ignored){}
+        try{if(asset==null)v.setImageDrawable(getDrawable(getResources().getIdentifier("icon","drawable",getPackageName())));else v.setImageBitmap(decodeAsset(asset,size));}catch(IOException ignored){}
         v.setLayoutParams(new LinearLayout.LayoutParams(dp(size),dp(size)));return v;}
-    AlertDialog dialog(String title,View body){LinearLayout actions=column();actions.setOrientation(LinearLayout.HORIZONTAL);actions.setGravity(Gravity.END);actions.setTag("actions");
+    Bitmap decodeAsset(String asset,int size)throws IOException{
+        int target=Math.max(1,dp(size));BitmapFactory.Options bounds=new BitmapFactory.Options();bounds.inJustDecodeBounds=true;
+        try(InputStream input=getAssets().open(asset)){BitmapFactory.decodeStream(input,null,bounds);}
+        BitmapFactory.Options options=new BitmapFactory.Options();int sample=1;
+        while(bounds.outWidth/sample>target*2||bounds.outHeight/sample>target*2)sample<<=1;
+        options.inSampleSize=sample;
+        try(InputStream input=getAssets().open(asset)){return BitmapFactory.decodeStream(input,null,options);}
+    }
+    AlertDialog dialog(String title,View body){LinearLayout actions=column();actions.setOrientation(LinearLayout.HORIZONTAL);actions.setBaselineAligned(false);actions.setGravity(Gravity.END);actions.setTag("actions");
         ResponsiveDialog box=new ResponsiveDialog(this,text(title,20,INK),body,actions);boolean landscape=getResources().getConfiguration().orientation==android.content.res.Configuration.ORIENTATION_LANDSCAPE;box.setPadding(dp(22),dp(landscape?12:20),dp(22),dp(landscape?12:18));box.setBackground(background(BG,24));AlertDialog d=new AlertDialog.Builder(this).setView(box).create();
         box.setClipToOutline(true);Window w=d.getWindow();ResponsiveDialog.configure(this,w,dp(landscape?520:440));if(w!=null)w.setDimAmount(.32f);
         box.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener(){public void onViewAttachedToWindow(View v){openDialogs.add(d);}public void onViewDetachedFromWindow(View v){openDialogs.remove(d);}});
         // Animate the content itself: application styles are not valid WMS animation resources.
         if(android.animation.ValueAnimator.areAnimatorsEnabled()){box.setAlpha(0);d.setOnShowListener(v->box.animate().alpha(1).setDuration(180).start());}return d;}
     void dialogButton(AlertDialog d,String label,Runnable task,boolean primary){View decor=d.getWindow().getDecorView();LinearLayout actions=(LinearLayout)decor.findViewWithTag("actions");
-        Button b=action(label,()->{d.dismiss();if(task!=null)task.run();});b.setTextColor(primary?(darkTheme?BG:Color.WHITE):BLUE);b.setBackground(ripple(primary?BLUE:0xffeef2fa,12));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(46),1);lp.setMargins(dp(4),dp(14),dp(4),0);actions.addView(b,lp);}
+        Button b=compact(label,()->{d.dismiss();if(task!=null)task.run();},actions);b.setTextColor(primary?(darkTheme?BG:Color.WHITE):BLUE);b.setBackground(ripple(primary?BLUE:0xffeef2fa,12));}
     void messageDialog(String title,String message,String yes,Runnable task){AlertDialog d=dialog(title,text(message,14,MUTED));d.show();dialogButton(d,"取消",null,false);dialogButton(d,yes,task,true);}
     void operationFailure(String command,Throwable error){
         String detail=error.getMessage();if(detail==null||detail.isEmpty())detail=error.toString();
@@ -84,12 +100,12 @@ public final class MainActivity extends Activity {
     LinearLayout column(){LinearLayout b=new LinearLayout(this);b.setOrientation(1);return b;}
     GradientDrawable background(int color,float radius){GradientDrawable b=new GradientDrawable();b.setColor(themed(color));b.setCornerRadius(dp(radius));return b;}
     LinearLayout card(LinearLayout parent){LinearLayout b=column();b.setPadding(dp(18),dp(17),dp(18),dp(17));b.setBackground(background(Color.WHITE,18));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.bottomMargin=dp(12);parent.addView(b,lp);return b;}
-    LinearLayout row(LinearLayout parent){LinearLayout r=new LinearLayout(this);r.setGravity(Gravity.CENTER_VERTICAL);parent.addView(r,new LinearLayout.LayoutParams(-1,-2));return r;}
-    Button action(String name,Runnable task){Button b=new LocalButton();b.setText(name);b.setTextSize(14);b.setAllCaps(false);b.setTextColor(BLUE);b.setBackground(ripple(0xffeef2fa,12));b.setMinHeight(0);b.setMinimumHeight(0);b.setPadding(dp(10),0,dp(10),0);b.setOnClickListener(v->task.run());return b;}
-    Button button(String name,Runnable task,LinearLayout parent){Button b=action(name,task);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,dp(44));lp.topMargin=dp(8);lp.bottomMargin=dp(4);parent.addView(b,lp);return b;}
-    Button compact(String name,Runnable task,LinearLayout parent){Button b=action(name,task);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(44),1);lp.setMargins(dp(3),dp(6),dp(3),dp(4));parent.addView(b,lp);return b;}
+    LinearLayout row(LinearLayout parent){LinearLayout r=new LinearLayout(this);r.setBaselineAligned(false);r.setGravity(Gravity.CENTER_VERTICAL);parent.addView(r,new LinearLayout.LayoutParams(-1,-2));return r;}
+    Button action(String name,Runnable task){Button b=new LocalButton();b.setText(name);b.setTextSize(14);b.setAllCaps(false);b.setTextColor(BLUE);b.setBackground(ripple(0xffeef2fa,12));b.setMinHeight(dp(48));b.setMinimumHeight(dp(48));b.setMinWidth(0);b.setMinimumWidth(0);b.setIncludeFontPadding(false);b.setGravity(Gravity.CENTER);b.setPadding(dp(10),0,dp(10),0);b.setOnClickListener(v->task.run());return b;}
+    Button button(String name,Runnable task,LinearLayout parent){Button b=action(name,task);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,dp(48));lp.topMargin=dp(8);lp.bottomMargin=dp(4);parent.addView(b,lp);return b;}
+    Button compact(String name,Runnable task,LinearLayout parent){Button b=action(name,task);boolean dialog="actions".equals(parent.getTag());LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(48),1);lp.setMargins(dp(dialog?4:3),dp(dialog?14:6),dp(dialog?4:3),dp(dialog?0:4));parent.addView(b,lp);return b;}
     @Override public void onCreate(Bundle saved){
-        super.onCreate(saved);openManualPanel=getIntent().getBooleanExtra("manual_brightness_panel",false);restoredUi=saved;darkTheme=(getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK)==android.content.res.Configuration.UI_MODE_NIGHT_YES;INK=themed(INK);MUTED=themed(MUTED);BLUE=themed(BLUE);BG=themed(BG);
+        super.onCreate(saved);settingsHomeY=saved==null?0:saved.getInt("settings_home_y",0);openManualPanel=getIntent().getBooleanExtra("manual_brightness_panel",false);restoredUi=saved;darkTheme=(getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK)==android.content.res.Configuration.UI_MODE_NIGHT_YES;INK=themed(INK);MUTED=themed(MUTED);BLUE=themed(BLUE);BG=themed(BG);
         getWindow().setStatusBarColor(BG);getWindow().setNavigationBarColor(BG);getWindow().getDecorView().setSystemUiVisibility(darkTheme?0:View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
         autoScroll=getPreferences(0).getBoolean("log_auto_scroll",true);refreshSeconds=getPreferences(0).getInt("refresh_seconds",2);english=!getResources().getConfiguration().getLocales().get(0).getLanguage().equals("zh");getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING);
         try{factors=CurvePlan.factors(getPreferences(0).getString("draft","1,1,1,1"));}catch(Exception ignored){}
@@ -98,10 +114,10 @@ public final class MainActivity extends Activity {
         header=row(root);header.setPadding(dp(18),0,dp(18),0);header.setLayoutParams(new LinearLayout.LayoutParams(-1,dp(64)));
         ImageView icon=image(null,38,12);header.addView(icon);
         LinearLayout brand=column();LinearLayout.LayoutParams brandLp=new LinearLayout.LayoutParams(0,-2,1);brandLp.leftMargin=dp(12);header.addView(brand,brandLp);brand.addView(text("HyperLux",20,INK));
-        badge=text("连接中",12,BLUE);badge.setPadding(dp(10),dp(5),dp(10),dp(5));badge.setBackground(background(0xffedf3ff,10));header.addView(badge);
+        badge=text("连接中",12,INK);badge.setPadding(dp(10),dp(5),dp(10),dp(5));badge.setBackground(background(0xffedf3ff,10));header.addView(badge);
         note=text("",12,MUTED);note.setVisibility(View.GONE);
         content=new FrameLayout(this);root.addView(content,new LinearLayout.LayoutParams(-1,0,1));
-        for(int i=0;i<4;i++){LinearLayout b=column();pages[i]=b;if(i==0||i==2){b.setPadding(dp(16),dp(8),dp(16),dp(6));content.addView(b,new FrameLayout.LayoutParams(-1,-1));}else{ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);b.setPadding(dp(18),dp(10),dp(18),dp(22));scroll.addView(b);content.addView(scroll,new FrameLayout.LayoutParams(-1,-1));scroll.setVisibility(View.GONE);}}
+        for(int i=0;i<4;i++){LinearLayout b=column();pages[i]=b;if(i==0||i==2){b.setPadding(dp(i==0?18:16),dp(8),dp(i==0?18:16),dp(i==0?8:6));content.addView(b,new FrameLayout.LayoutParams(-1,-1));}else{ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);if(i==1){settingsHomeScroll=scroll;scroll.setFocusableInTouchMode(true);scroll.setDescendantFocusability(ViewGroup.FOCUS_BEFORE_DESCENDANTS);}b.setPadding(dp(18),dp(10),dp(18),dp(22));scroll.addView(b);content.addView(scroll,new FrameLayout.LayoutParams(-1,-1));scroll.setVisibility(View.GONE);}}
         makeStatus();makeSettings();makeLogs();makeAbout();
         LinearLayout bottom=row(root);bottomNav=bottom;bottom.setBaselineAligned(false);bottom.setPadding(dp(8),dp(8),dp(8),dp(8));String[] names={"状态","设置","日志","关于"};
         for(int i=0;i<4;i++){final int index=i;LinearLayout tab=column();tab.setBaselineAligned(false);tab.setGravity(Gravity.CENTER);tab.setBackground(ripple(Color.TRANSPARENT,14));tab.setClickable(true);tab.setOnClickListener(v->select(index));
@@ -110,15 +126,14 @@ public final class MainActivity extends Activity {
     }
     void makeStatus(){
         stateTitle=text("",16,INK);luxReading=text("",20,BLUE);nitReading=text("",20,INK);flow=text("",12,MUTED);thermalState=text("",12,INK);userState=text("",12,MUTED);
-        branchOverview=text("亮度分支：等待读取 · 点击查看",12,BLUE);branchOverview.setMaxLines(2);branchOverview.setEllipsize(android.text.TextUtils.TruncateAt.END);branchOverview.setGravity(Gravity.CENTER);branchOverview.setIncludeFontPadding(false);branchOverview.setPadding(dp(8),0,dp(8),0);branchOverview.setBackground(ripple(0xffeef3ff,10));branchOverview.setClipToOutline(true);branchOverview.setOnClickListener(v->branches());
-        pipeline=new PipelineBoard();pages[0].addView(pipeline,new LinearLayout.LayoutParams(-1,0,1));
+        pipeline=new PipelineBoard();ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);scroll.setClipToPadding(false);scroll.addView(pipeline,new android.widget.FrameLayout.LayoutParams(-1,-2));pages[0].addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
     }
     SeekBar parameter(LinearLayout parent,int maximum,int initial,java.util.function.IntConsumer changed){SeekBar s=new SeekBar(this);s.setMax(maximum);s.setProgress(initial);parent.addView(s,new LinearLayout.LayoutParams(-1,dp(38)));s.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){public void onProgressChanged(SeekBar v,int p,boolean user){if(user){changed.accept(p);dirty=true;drawCurve();}}public void onStartTrackingTouch(SeekBar v){}public void onStopTrackingTouch(SeekBar v){}});return s;}
     LinearLayout settingsDetails(LinearLayout parent,String key){
-        LinearLayout body=column();boolean expanded=getPreferences(0).getBoolean("detail_"+key,false);
-        Button toggle=action("",()->{});toggle.setText(tr(expanded?"收起详细参数":"展开详细参数")+(expanded?"  ▴":"  ▾"));toggle.setGravity(Gravity.START|Gravity.CENTER_VERTICAL);
-        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,dp(40));lp.topMargin=dp(8);lp.bottomMargin=dp(6);parent.addView(toggle,lp);parent.addView(body);body.setVisibility(expanded?View.VISIBLE:View.GONE);
-        toggle.setOnClickListener(v->{boolean open=body.getVisibility()!=View.VISIBLE;body.setVisibility(open?View.VISIBLE:View.GONE);toggle.setText(tr(open?"收起详细参数":"展开详细参数")+(open?"  ▴":"  ▾"));getPreferences(0).edit().putBoolean("detail_"+key,open).apply();});return body;
+        LinearLayout body=column();boolean expanded=getPreferences(0).getBoolean("detail_"+key,false);final String openText=key.startsWith("scene_")?"收起详细设置":"收起详细参数",closedText=key.startsWith("scene_")?"展开详细设置":"展开详细参数";
+        Button toggle=action("",()->{});toggle.setText(tr(expanded?openText:closedText)+(expanded?"  ▴":"  ▾"));toggle.setGravity(Gravity.START|Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,dp(48));lp.topMargin=dp(8);lp.bottomMargin=dp(6);parent.addView(toggle,lp);parent.addView(body);body.setVisibility(expanded?View.VISIBLE:View.GONE);
+        toggle.setOnClickListener(v->{boolean open=body.getVisibility()!=View.VISIBLE;body.setVisibility(open?View.VISIBLE:View.GONE);toggle.setText(tr(open?openText:closedText)+(open?"  ▴":"  ▾"));getPreferences(0).edit().putBoolean("detail_"+key,open).apply();});detailOpeners.put(key,()->{if(body.getVisibility()!=View.VISIBLE)toggle.performClick();});return body;
     }
     void quickPreset(String group,int mode){if(busy){show("另一项操作还在执行");return;}try{if(runtime==null)throw new IllegalStateException("连接后读取曲线");JSONObject next=SettingsPresets.merge(configuration(),SettingsPresets.patch(group,mode,runtime));loadOptions(next);dirty=true;drawCurve();show("预设已选中，保存并应用后生效");}catch(Exception error){show(error.getMessage());}}
     void quickPresetRow(LinearLayout parent,String group,String first,String second){LinearLayout r=row(parent);compact("系统默认",()->quickPreset(group,0),r);compact(first,()->quickPreset(group,1),r);compact(second,()->quickPreset(group,2),r);}
@@ -126,28 +141,46 @@ public final class MainActivity extends Activity {
         LinearLayout b=card(pages[1]);b.setPadding(dp(16),dp(13),dp(16),dp(13));LinearLayout engineHeading=row(b);engineHeading.setBaselineAligned(false);TextView engineTitle=text("引擎控制",18,INK);engineTitle.setIncludeFontPadding(false);engineHeading.addView(engineTitle,new LinearLayout.LayoutParams(0,-2,1));unsavedHint=text("有未保存的设置",12,0xffbd3434);unsavedHint.setIncludeFontPadding(false);unsavedHint.setGravity(Gravity.END|Gravity.CENTER_VERTICAL);engineHeading.addView(unsavedHint,new LinearLayout.LayoutParams(-2,-2));unsavedHint.setVisibility(View.GONE);LinearLayout r=row(b);apply=compact("保存并应用",this::submit,r);stop=compact("停用并恢复",()->run("stop",null),r);
         LinearLayout files=row(b);compact("导出配置",this::exportConfiguration,files);compact("导入配置",this::importConfiguration,files);
         settingsHome=column();pages[1].addView(settingsHome);
-        String[] names={"亮度曲线","手动记忆","户外高亮","环境变化与确认","亮度过渡","场景与温控","运行状态与界面","暗光稳定与锁定","主屏手动亮度"};
-        String[] descriptions={"基础亮度、暗处下限与曲线预设","偏好强度、持久保存与锁屏交接","强光目标与系统高亮预算","主辅光感阈值与确认时间","分别设置变亮和变暗时长","遮挡保护、阳光屏与温控","兼容状态与界面刷新","减少暗光波动，或定时保持亮度","磁贴面板、直接写值与自动退让"};
-        for(int i:new int[]{0,1,7,2,8,3,4,5,6}){
-            if(i==0||i==3||i==6){TextView section=text(i==0?"亮度与偏好":i==3?"响应与保护":"运行与界面",13,BLUE);section.setPadding(dp(4),dp(12),dp(4),dp(8));settingsHome.addView(section);}
+        String[] names={"亮度曲线","手动记忆","户外高亮","环境变化与确认","亮度过渡","场景判定与控制","运行状态与界面","暗光稳定与锁定","主屏手动亮度","温控与显示保护"};
+        String[] descriptions={"基础亮度、暗处下限与曲线预设","偏好强度、持久保存与锁屏交接","强光增强、HBM 与手动阳光屏","主辅光感阈值与确认时间","分别设置变亮和变暗时长","场景的进入条件、生效效果与退出条件","兼容状态与界面刷新","减少暗光波动，或定时保持亮度","磁贴面板、直接写值与自动退让","显示温控、温度门槛与冷却恢复"};
+        for(int i:new int[]{3,5,0,1,4,7,2,9,8,6}){
+            if(i==3||i==0||i==7||i==8){TextView section=text(i==3?"光感输入与场景":i==0?"曲线目标与响应":i==7?"输出范围与保护":"运行与工具",13,BLUE);section.setPadding(dp(4),dp(12),dp(4),dp(8));settingsHome.addView(section);}
             final int group=i;LinearLayout entry=card(settingsHome);entry.setPadding(dp(16),dp(11),dp(12),dp(11));((LinearLayout.LayoutParams)entry.getLayoutParams()).bottomMargin=dp(8);entry.setBackground(ripple(Color.WHITE,18));entry.setClipToOutline(true);entry.setClickable(true);entry.setOnClickListener(v->showSettingsGroup(group));LinearLayout line=row(entry);line.setBaselineAligned(false);LinearLayout labels=column();line.addView(labels,new LinearLayout.LayoutParams(0,-2,1));TextView name=text(names[i],16,INK);name.setIncludeFontPadding(false);name.setPadding(0,0,0,dp(3));labels.addView(name);TextView description=text(descriptions[i],12,MUTED);description.setIncludeFontPadding(false);description.setPadding(0,0,0,0);labels.addView(description);line.addView(new NavigationArrow(false),new LinearLayout.LayoutParams(dp(28),dp(32)));
             // Each category owns a separate screen and scroll position, outside the settings home.
             LinearLayout screen=column();screen.setBackgroundColor(BG);settingScreens[i]=screen;content.addView(screen,new FrameLayout.LayoutParams(-1,-1));screen.setVisibility(View.GONE);
-            LinearLayout bar=row(screen);bar.setPadding(dp(10),dp(6),dp(18),dp(6));bar.setBaselineAligned(false);NavigationArrow back=new NavigationArrow(true);back.setBackground(ripple(Color.TRANSPARENT,24));back.setClipToOutline(true);back.setClickable(true);back.setFocusable(true);back.setContentDescription(tr("返回设置"));back.setOnClickListener(v->showSettingsGroup(-1));bar.addView(back,new LinearLayout.LayoutParams(dp(48),dp(48)));TextView heading=text(names[i],18,INK);LinearLayout.LayoutParams title=new LinearLayout.LayoutParams(0,-2,1);title.leftMargin=dp(6);bar.addView(heading,title);
-            ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);screen.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));settingGroups[i]=column();settingGroups[i].setPadding(dp(18),dp(10),dp(18),dp(12));scroll.addView(settingGroups[i]);
-            LinearLayout footer=column();footer.setPadding(dp(18),dp(4),dp(18),dp(10));screen.addView(footer);settingHints[i]=text("有未保存的设置",12,0xffbd3434);footer.addView(settingHints[i]);settingHints[i].setVisibility(View.GONE);settingApply[i]=button("保存并应用",this::submit,footer);settingApply[i].setEnabled(false);
+            LinearLayout bar=row(screen);bar.setPadding(dp(10),dp(6),dp(18),dp(6));bar.setBaselineAligned(false);NavigationArrow back=new NavigationArrow(true);back.setBackground(ripple(Color.TRANSPARENT,24));back.setClipToOutline(true);back.setClickable(true);back.setFocusable(true);back.setContentDescription(tr("返回设置"));back.setOnClickListener(v->showSettingsGroup(-1));bar.addView(back,new LinearLayout.LayoutParams(dp(48),dp(48)));TextView heading=text(names[i],18,INK);LinearLayout.LayoutParams title=new LinearLayout.LayoutParams(0,-2,1);title.leftMargin=dp(6);heading.setMaxLines(2);heading.setEllipsize(android.text.TextUtils.TruncateAt.END);heading.setAutoSizeTextTypeUniformWithConfiguration(12,18,1,android.util.TypedValue.COMPLEX_UNIT_SP);LinearLayout navTitle=column();bar.addView(navTitle,title);navTitle.addView(heading);settingHints[i]=text("有未保存的设置",10,0xffbd3434);settingHints[i].setPadding(0,0,0,0);navTitle.addView(settingHints[i]);settingHints[i].setVisibility(View.GONE);settingApply[i]=action("保存并应用",this::submit);settingApply[i].setTextSize(12);settingApply[i].setMinWidth(0);settingApply[i].setMinimumWidth(0);settingApply[i].setMaxLines(2);bar.addView(settingApply[i],new LinearLayout.LayoutParams(dp(104),dp(48)));settingApply[i].setEnabled(false);
+            ScrollView scroll=new ScrollView(this);settingsScrollers[i]=scroll;scroll.setFillViewport(true);screen.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));settingGroups[i]=column();settingGroups[i].setPadding(dp(18),dp(10),dp(18),dp(12));scroll.addView(settingGroups[i]);
         }
         settingsTarget=settingGroups[0];makeCurveSettings();
         settingsTarget=settingGroups[1];makeMemorySettings();
         settingsTarget=settingGroups[2];makeOutdoorSettings();
         settingsTarget=settingGroups[3];makeMainResponseSettings();makeAdvancedSettings(0);makeAdvancedSettings(1);
         settingsTarget=settingGroups[4];makeAdvancedSettings(2);
-        settingsTarget=settingGroups[5];makeThermalSettings();makeAdvancedSettings(4);makeAdvancedSettings(3);
+        settingsTarget=settingGroups[5];sceneSettings=new SceneSettings(this,settingsTarget);makeAdvancedSettings(4,sceneSettings.effects(2));
+        settingsTarget=settingGroups[2];makeAdvancedSettings(3,sceneSettings.addScene(settingsTarget,7));sceneSettings.refresh();
+        settingsTarget=settingGroups[9];makeThermalSettings();
         settingsTarget=settingGroups[6];makeAdvancedStatus();makeRefreshSettings();
         settingsTarget=settingGroups[7];makeDarkLockSettings();makeLowLightSettings();
         settingsTarget=settingGroups[8];makeManualPanelSettings();
     }
-    void showSettingsGroup(int group){settingsGroup=group;header.setVisibility(group<0?View.VISIBLE:View.GONE);if(bottomNav!=null)bottomNav.setVisibility(group<0?View.VISIBLE:View.GONE);transitionPage(group<0?content.getChildAt(1):settingScreens[group],group<0?-1:1);drawCurve();}
+    void showSettingsGroup(int group){rememberSettingsHome();settingsGroup=group;header.setVisibility(group<0?View.VISIBLE:View.GONE);if(bottomNav!=null)bottomNav.setVisibility(group<0?View.VISIBLE:View.GONE);transitionPage(group<0?content.getChildAt(1):settingScreens[group],group<0?-1:1);drawCurve();if(group<0)restoreSettingsHome();}
+    void rememberSettingsHome(){if(settingsHomeScroll!=null&&displayedPage==settingsHomeScroll&&!settingsHomeRestoring)settingsHomeY=settingsHomeScroll.getScrollY();++settingsScrollRestore;settingsHomeRestoring=false;}
+    void restoreSettingsHome(){if(settingsHomeScroll==null)return;final ScrollView scroll=settingsHomeScroll;final int y=settingsHomeY;final long request=++settingsScrollRestore;settingsHomeRestoring=true;scroll.requestFocus();
+        scroll.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener(){public boolean onPreDraw(){if(scroll.getViewTreeObserver().isAlive())scroll.getViewTreeObserver().removeOnPreDrawListener(this);if(settingsScrollRestore==request){settingsHomeRestoring=false;if(!destroyed&&page==1&&settingsGroup<0&&displayedPage==scroll)scroll.scrollTo(0,y);}return true;}});scroll.invalidate();
+    }
+    void openAdvice(StatusAdvice.Action action){
+        if(action.group<0||action.group>=settingScreens.length)return;
+        select(1);showSettingsGroup(action.group);
+        Runnable expand=detailOpeners.get(action.target.startsWith("scene_")?action.target:action.group==2?"outdoor":action.target.equals("low_light")?"low":"");if(expand!=null)expand.run();
+        View target=action.target.equals("range")?rangeSwitch:action.target.equals("opr")?oprSwitch:action.target.equals("thermal")?thermalSwitch:action.target.equals("dark_lock")?darkLockSwitch:action.target.equals("low_light")?lowLightSwitch:action.target.equals("curve")?settingsGraph:action.target.equals("memory")?memorySwitch:sceneSettings==null?null:sceneSettings.find(action.target);
+        ScrollView scroll=settingsScrollers[action.group];if(target!=null&&scroll!=null){scroll.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener(){public boolean onPreDraw(){if(scroll.getViewTreeObserver().isAlive())scroll.getViewTreeObserver().removeOnPreDrawListener(this);if(!destroyed&&displayedPage==settingScreens[action.group]&&target.isShown()){Rect rect=new Rect();target.getDrawingRect(rect);scroll.offsetDescendantRectToMyCoords(target,rect);scroll.smoothScrollTo(0,Math.max(0,rect.top-dp(16)));if(!action.target.startsWith("scene_"))target.requestFocus();}return true;}});scroll.invalidate();}
+    }
+    android.text.SpannableStringBuilder adviceText(StatusAdvice advice){
+        android.text.SpannableStringBuilder result=new android.text.SpannableStringBuilder();if(advice.inlineActions)result.append(tr(advice.detail));
+        for(StatusAdvice.Action action:advice.actions){String label=tr(action.text);int start;if(advice.inlineActions){start=result.toString().indexOf(label);if(start<0)continue;}else{if(result.length()>0)result.append("\n");start=result.length();result.append(label);}
+            result.setSpan(new android.text.style.ClickableSpan(){@Override public void onClick(View widget){openAdvice(action);}@Override public void updateDrawState(android.text.TextPaint paint){paint.setColor(BLUE);paint.setUnderlineText(false);}},start,start+label.length(),android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        }return result;
+    }
     void transitionPage(View target,int direction){
         if(displayedPage==target)return;
         final long generation=++pageTransition;View previous=displayedPage;displayedPage=target;
@@ -163,8 +196,9 @@ public final class MainActivity extends Activity {
     void makeCurveSettings(){
         LinearLayout b=card(settingsTarget);b.addView(text("照度与亮度曲线",18,INK));
         LinearLayout presets=row(b);compact("柔和",()->preset(new float[]{.7f,.8f,.95f,1}),presets);compact("系统默认",()->preset(new float[]{1,1,1,1}),presets);compact("稍亮",()->preset(new float[]{1.2f,1.15f,1.05f,1}),presets);
-        settingsGraph=new CurveView(true);b.addView(settingsGraph,new LinearLayout.LayoutParams(-1,dp(235)));curveHint=text("连接后显示节点范围",12,MUTED);b.addView(curveHint);
-        b.addView(text("灰线：系统默认 · 蓝线：基础曲线\n拖动蓝色节点，或点击输入数值；保存并应用后生效。",12,MUTED));
+        settingsGraph=new CurveView(true);b.addView(settingsGraph,new LinearLayout.LayoutParams(-1,dp(235)));
+        b.addView(curveLegend("灰线：系统默认 · 蓝线：基础曲线"));curveHint=text("连接后显示节点范围",12,MUTED);b.addView(curveHint);
+        b.addView(text("拖动蓝色节点，或点击输入数值；保存并应用后生效。",12,MUTED));
         b.addView(text("实际生效曲线会受到手动记忆影响，可在「手动记忆」页查看。",12,0xffbd3434));
         b.addView(text("左端可设置暗处亮度下限。若调不上去，先提高相邻节点；手动选择和温控仍优先。",12,MUTED));
         presets=row(b);compact("保存为预设",this::savePreset,presets);compact("我的预设",this::pickPreset,presets);
@@ -175,6 +209,11 @@ public final class MainActivity extends Activity {
         b.addView(text("强光优先：提高目标并开放高亮范围；支持时放宽画面灰阶限亮，保留系统过渡和温控保护。保存后生效。",12,MUTED));
         outdoorSwitch=new Switch(this);outdoorSwitch.setText(tr("持续强光下提高亮度"));outdoorSwitch.setTextSize(14);b.addView(outdoorSwitch,new LinearLayout.LayoutParams(-1,dp(48)));
         b.addView(text("持续强光下提高目标亮度。离开强光、锁屏、手动调节或过热时退出。默认关闭。",12,MUTED));
+        rangeSwitch=new Switch(this);rangeSwitch.setText(tr("开放系统映射内的高亮范围"));rangeSwitch.setTextSize(14);b.addView(rangeSwitch,new LinearLayout.LayoutParams(-1,dp(48)));
+        b.addView(text("强光下放宽软件亮度上限，开放本机映射支持的高亮范围。",12,MUTED));
+        oprSwitch=new Switch(this);oprSwitch.setText(tr("强光下放宽画面限亮"));oprSwitch.setTextSize(14);b.addView(oprSwitch,new LinearLayout.LayoutParams(-1,dp(48)));
+        b.addView(text("强光下减少画面内容造成的限亮，提高可用亮度上限；需先开放高亮范围。",12,MUTED));
+        b.addView(text("两项仍受温控、电量和 HBM 时间预算限制。",11,MUTED));
         outdoorStatus=text("等待读取户外高亮条件",13,BLUE);b.addView(outdoorStatus);button("查看高亮条件",this::branches,b);
         b=settingsDetails(b,"outdoor");
         for(int i:new int[]{0,1,5})outdoorParameter(b,i);
@@ -182,10 +221,6 @@ public final class MainActivity extends Activity {
         for(int i:new int[]{2,3,4,6,7})outdoorParameter(details,i);
         hbmSwitch=new Switch(this);hbmSwitch.setText(tr("调整自动 HBM 触发与预算"));hbmSwitch.setTextSize(14);details.addView(hbmSwitch,new LinearLayout.LayoutParams(-1,dp(48)));
         details.addView(text("仅支持带 HBM 计时的设备。预算最多为系统的 2 倍且不超时间窗口；仍受温控与省电限制。",12,MUTED));for(int i:new int[]{8,9})outdoorParameter(details,i);
-        rangeSwitch=new Switch(this);rangeSwitch.setText(tr("开放系统映射内的高亮范围"));rangeSwitch.setTextSize(14);details.addView(rangeSwitch,new LinearLayout.LayoutParams(-1,dp(48)));
-        details.addView(text("实验选项：放宽户外软件上限，仍受本机映射、HBM 预算与保护限制，不保证更亮。",12,MUTED));
-        oprSwitch=new Switch(this);oprSwitch.setText(tr("强光下放宽画面限亮"));oprSwitch.setTextSize(14);details.addView(oprSwitch,new LinearLayout.LayoutParams(-1,dp(48)));
-        details.addView(text("实验选项：仅持续强光、自动亮度下放宽灰阶限亮，最高不超过本机映射范围。温控、低电量、HBM 预算仍有效；HDR 与特殊场景沿用系统。可能增加发热与耗电，默认关闭。",12,MUTED));
         oprSwitch.setOnCheckedChangeListener((v,on)->{if(on!=outdoorOptions.flags[3]){outdoorOptions.flags[3]=on;dirty=true;drawOutdoor();}});
         outdoorSwitch.setOnCheckedChangeListener((v,on)->{if(on!=outdoorOptions.flags[0]){outdoorOptions.flags[0]=on;if(!on){outdoorOptions.flags[1]=false;outdoorOptions.flags[2]=false;outdoorOptions.flags[3]=false;}dirty=true;drawOutdoor();}});
         hbmSwitch.setOnCheckedChangeListener((v,on)->{if(on!=outdoorOptions.flags[1]){outdoorOptions.flags[1]=on;dirty=true;drawOutdoor();}});rangeSwitch.setOnCheckedChangeListener((v,on)->{if(on!=outdoorOptions.flags[2]){outdoorOptions.flags[2]=on;if(!on)outdoorOptions.flags[3]=false;dirty=true;drawOutdoor();}});
@@ -228,7 +263,7 @@ public final class MainActivity extends Activity {
         overview.addView(text("基础曲线定起点，手动记忆改附近亮度，存档供下次恢复。暂时保持亮度不等于清除记忆。",12,MUTED));
         memoryOverview=text("连接后显示实际节点与系统能力",13,BLUE);overview.addView(memoryOverview);
         memoryGraph=new CurveView(false,true);overview.addView(memoryGraph,new LinearLayout.LayoutParams(-1,dp(230)));
-        overview.addView(text("蓝线：已应用基础曲线 · 浅绿线：记忆后的实际曲线\n浅绿色实点：当前记忆 · 空心点：已保存，恢复后才生效",12,MUTED));
+        overview.addView(curveLegend("蓝线：已应用基础曲线 · 浅绿线：记忆后的实际曲线\n浅绿色实点：当前记忆 · 空心点：已保存，恢复后才生效"));
         overview.addView(text("曲线表示亮度目标，最终屏幕亮度仍受温控和场景影响。",12,MUTED));
         button("查看记忆节点与交接记录",this::memoryDetails,overview);
         b=card(settingsTarget);b.addView(text("保存与恢复",18,INK));
@@ -337,7 +372,8 @@ public final class MainActivity extends Activity {
         LinearLayout b=card(settingsTarget);b.addView(text("界面",18,INK));refreshLabel=text("",13,INK);b.addView(refreshLabel);refreshSlider=parameter(b,4,refreshSeconds-1,value->{refreshSeconds=value+1;getPreferences(0).edit().putInt("refresh_seconds",refreshSeconds).apply();});
         b.addView(text("只影响状态显示，不改变亮度调节频率。",12,MUTED));
     }
-    void makeAdvancedSettings(int g){
+    void makeAdvancedSettings(int g){makeAdvancedSettings(g,null);}
+    void makeAdvancedSettings(int g,LinearLayout existing){
         String[] titles={"变化阈值","辅助光感确认","过渡动画","手动模式阳光屏","触摸遮挡保护"};
         String[] explanations={
             "倍率越大越不易调节，最小照度差过滤小波动。仅在设定照度内生效，特殊场景沿用系统。",
@@ -346,9 +382,9 @@ public final class MainActivity extends Activity {
             "调整手动模式阳光屏的进入、退出等待；不强制开启，也不改变自动 HBM 冷却。",
             "只调整手指移开后的等待。0 秒取消额外等待，仍保留遮挡保护。"};
         int[] starts={0,6,9,11,13},ends={6,9,11,13,14};
-        final int group=g;LinearLayout b=card(settingsTarget);b.addView(text(titles[g],18,INK));String[] first={"少些变化","快速确认","柔和过渡","快速响应","快速恢复"},second={"更灵敏","稳妥确认","快速过渡","避免误触发","遮挡少动"};quickPresetRow(b,AdvancedOptions.GROUPS[g],first[g],second[g]);
-            Switch toggle=new Switch(this);toggle.setText(tr("自定义"));toggle.setTextSize(14);toggle.setShowText(false);b.addView(toggle,new LinearLayout.LayoutParams(-1,dp(44)));advancedSwitches[g]=toggle;
-            b.addView(text(explanations[g],12,MUTED));LinearLayout details=settingsDetails(b,AdvancedOptions.GROUPS[g]);
+        final int group=g;LinearLayout b=existing==null?card(settingsTarget):existing;if(existing==null)b.addView(text(titles[g],18,INK));String[] first={"少些变化","快速确认","柔和过渡","快速响应","快速恢复"},second={"更灵敏","稳妥确认","快速过渡","避免误触发","遮挡少动"};quickPresetRow(b,AdvancedOptions.GROUPS[g],first[g],second[g]);
+            Switch toggle=new Switch(this);toggle.setText(tr("自定义"));toggle.setTextSize(14);toggle.setShowText(false);b.addView(toggle,new LinearLayout.LayoutParams(-1,dp(48)));advancedSwitches[g]=toggle;
+            b.addView(text(explanations[g],12,MUTED));LinearLayout details=existing==null?settingsDetails(b,AdvancedOptions.GROUPS[g]):b;
             for(int i=starts[g];i<ends[g];i++){final int key=i;advancedLabels[i]=text("",13,INK);details.addView(advancedLabels[i]);advancedSliders[i]=parameter(details,(int)Math.round((AdvancedOptions.MAX[i]-AdvancedOptions.MIN[i])/AdvancedOptions.STEP[i]),(int)Math.round((AdvancedOptions.DEFAULT[i]-AdvancedOptions.MIN[i])/AdvancedOptions.STEP[i]),value->advanced.values[key]=AdvancedOptions.MIN[key]+value*AdvancedOptions.STEP[key]);}
             toggle.setOnCheckedChangeListener((v,on)->{if(on!=advanced.enabled[group]){advanced.enabled[group]=on;dirty=true;drawAdvanced();}});
     }
@@ -380,14 +416,16 @@ public final class MainActivity extends Activity {
     }
 
     void makeAbout(){
-        LinearLayout b=card(pages[3]);b.setPadding(dp(22),dp(22),dp(22),dp(18));LinearLayout r=row(b);r.addView(image(null,68,20));LinearLayout title=column();LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-2,1);lp.leftMargin=dp(18);r.addView(title,lp);title.addView(text("HyperLux",26,INK));title.addView(text(AppBuild.ARTIFACT_VERSION+" · "+tr(AppBuild.TEST?"曲线适配测试版":"正式版"),14,BLUE));
+        LinearLayout b=card(pages[3]);b.setPadding(dp(22),dp(22),dp(22),dp(18));LinearLayout r=row(b);r.addView(image(null,68,20));LinearLayout title=column();LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-2,1);lp.leftMargin=dp(18);r.addView(title,lp);title.addView(text("HyperLux",26,INK));title.addView(text(AppBuild.ARTIFACT_VERSION+" · "+tr(AppBuild.TEST?"曲线适配测试版":AppBuild.INTERNAL?"内部测试版":"正式版"),14,BLUE));
         TextView intro=text("适配 HyperOS 4 的自动亮度工具。\n\n沿用系统双侧感光与平滑过渡，支持可编辑曲线、手动记忆保存与暗光稳定。户外高亮、温控和变化确认可按需调整，配置支持导入导出。",15,INK);intro.setLineSpacing(dp(5),1);intro.setPadding(0,dp(20),0,dp(16));b.addView(intro);
-        b.addView(text("HyperOS 4 · Root · LSPosed",12,MUTED));updateLabel=text("自动检查应用更新",12,BLUE);updateLabel.setPadding(dp(12),dp(10),dp(12),dp(10));updateLabel.setBackground(background(0xffeef3ff,12));lp=new LinearLayout.LayoutParams(-1,-2);lp.topMargin=dp(10);lp.bottomMargin=dp(6);b.addView(updateLabel,lp);
+        b.addView(text("HyperOS 4 · Root · LSPosed",12,MUTED));updateLabel=text("自动检查应用更新",12,BLUE);updateLabel.setPadding(dp(12),dp(10),dp(12),dp(10));updateLabel.setBackground(ripple(0xffeef3ff,12));updateLabel.setOnClickListener(v->checkUpdate(true));lp=new LinearLayout.LayoutParams(-1,-2);lp.topMargin=dp(10);lp.bottomMargin=dp(6);b.addView(updateLabel,lp);
         r=row(b);compact("官网",()->open("https://lc.rongshangs.top"),r);compact("GitHub",()->open(UpdateChecker.REPO),r);compact("开源协议",()->open("https://www.gnu.org/licenses/gpl-3.0.html"),r);
         LinearLayout group=column();group.setPadding(dp(14),dp(12),dp(14),dp(12));group.setBackground(ripple(0xffeef3ff,14));group.setClipToOutline(true);group.setClickable(true);group.setOnClickListener(v->copyGroupNumber());lp=new LinearLayout.LayoutParams(-1,-2);lp.topMargin=dp(12);b.addView(group,lp);
         group.addView(text("QQ 交流群",12,MUTED));r=row(group);r.setBaselineAligned(false);TextView number=text("314981836",22,BLUE);number.setPadding(0,0,0,0);r.addView(number,new LinearLayout.LayoutParams(0,-2,1));Button copy=action("复制群号",this::copyGroupNumber);copy.setTextSize(12);copy.setPadding(dp(8),0,dp(8),0);r.addView(copy,new LinearLayout.LayoutParams(dp(88),dp(34)));group.addView(text("暗号：1691",12,MUTED));
         b=card(pages[3]);b.addView(text("打赏",18,INK));b.addView(text("完全开源免费。欢迎捐赠 2.3 元支持开发。备注「昵称：想说的一句话」，总计不超过 30 个字符，将会尽快更新到感谢名单。",13,MUTED));r=row(b);compact("微信",()->donate("微信","donate-wechat.jpg"),r);compact("支付宝",()->donate("支付宝","donate-alipay.jpg"),r);
         b=card(pages[3]);b.addView(text("感谢名单",18,INK));thanksList=column();b.addView(thanksList);thanksStatus=text("名单来自官网，联网时自动更新",11,MUTED);b.addView(thanksStatus);
+        b=card(pages[3]);b.addView(text("测试贡献",18,INK));b.addView(text("勿忘 灭",14,INK));
+        b=card(pages[3]);b.addView(text("代码贡献",18,INK));b.addView(text("凌乱的风W",14,INK));b.addView(text("贡献手动接管恢复、系统进程重启与断连兜底、节点校验顺序修复，以及图片解码优化。",12,MUTED));
         try{JSONObject data;try{data=ThanksFeed.parse(getPreferences(0).getString("thanks_cache",null));}catch(Exception absent){data=ThanksFeed.parse(ThanksFeed.read(getAssets().open("thanks.json")));}renderThanks(data);}catch(Exception ignored){thanksStatus.setText("暂时无法读取名单");}
         b=card(pages[3]);r=row(b);r.addView(image("avatar.jpg",46,15));TextView author=text("戎Shang",19,INK);author.setPadding(dp(14),0,0,0);r.addView(author);r=row(b);compact("作者博客",()->open("https://rongshangs.top"),r);compact("酷安主页",()->open("https://www.coolapk.com/u/3261403"),r);
     }
@@ -410,11 +448,19 @@ public final class MainActivity extends Activity {
     }
 
     void checkUpdate(boolean manual){
-        if(updateBusy)return;updateBusy=true;updateChecked=true;updateLabel.setText("正在检查更新…");
-        network.execute(()->{try{JSONObject found=UpdateChecker.check();ui.post(()->{if(destroyed)return;updateBusy=false;if(found.optBoolean("newer")){pendingUpdate=found;updateLabel.setText("发现新版本 "+found.optString("version"));offerUpdate();}else{updateLabel.setText("当前没有新应用版本");if(manual)show("当前没有新应用版本");}});}catch(Exception failure){ui.post(()->{if(destroyed)return;updateBusy=false;updateLabel.setText("暂时无法检查更新");if(manual)show("暂时无法检查更新");});}});
+        if(updateBusy||updateDialog!=null)return;updateBusy=true;updateChecked=true;updateLabel.setText("正在检查更新…");
+        network.execute(()->{try{JSONObject found=UpdateChecker.check();ui.post(()->{if(destroyed)return;updateBusy=false;if(found.optBoolean("newer")){String version=found.optString("version");if(!ReleasePolicy.shouldOffer(version,getPreferences(0).getString("ignored_update_version",""),manual)){pendingUpdate=null;updateLabel.setText(tr("已忽略版本 ")+version);return;}try{found.put("manual_check",manual);}catch(JSONException invalid){show(invalid.getMessage());return;}pendingUpdate=found;updateLabel.setText("发现新版本 "+version);offerUpdate();}else{pendingUpdate=null;updateLabel.setText("当前没有新应用版本");if(manual)show("当前没有新应用版本");}});}catch(Exception failure){ui.post(()->{if(destroyed)return;updateBusy=false;updateLabel.setText("暂时无法检查更新");if(manual)show("暂时无法检查更新");});}});
     }
-    void offerUpdate(){if(pendingUpdate==null||!visible||permissionDialogVisible||legacyDialogVisible||pendingLegacy!=null||updateDialog!=null)return;JSONObject release=pendingUpdate;pendingUpdate=null;LinearLayout body=column();body.addView(text("版本 "+release.optString("version"),18,BLUE));String notes=release.optString("notes");TextView changes=text(notes.isEmpty()?"查看仓库了解更新内容":notes,13,MUTED);ScrollView scroll=new ScrollView(this);scroll.addView(changes);scroll.setLayoutParams(new LinearLayout.LayoutParams(-1,Math.min(dp(200),dp(70+Math.min(8,notes.length()/40)*16))));body.addView(scroll);AlertDialog d=dialog("有新版本可用",body);updateDialog=d;d.setOnDismissListener(v->{updateDialog=null;offerLegacyModules();});d.show();dialogButton(d,"稍后",null,false);dialogButton(d,"下载更新",()->open(release.optString("url")),true);}
-    void select(int value){int previous=page;page=Math.max(0,Math.min(3,value));settingsGroup=-1;if(bottomNav!=null)bottomNav.setVisibility(View.VISIBLE);header.setVisibility(page==3?View.GONE:View.VISIBLE);note.setVisibility(View.GONE);transitionPage(content.getChildAt(page),Integer.compare(page,previous));
+    void offerUpdate(){
+        if(pendingUpdate==null||!visible||permissionDialogVisible||legacyDialogVisible||pendingLegacy!=null||updateDialog!=null)return;
+        JSONObject release=pendingUpdate;pendingUpdate=null;String version=release.optString("version");
+        if(!ReleasePolicy.shouldOffer(version,getPreferences(0).getString("ignored_update_version",""),release.optBoolean("manual_check")))return;
+        LinearLayout body=column();body.addView(text("版本 "+version,18,BLUE));String notes=release.optString("notes");TextView changes=text(notes.isEmpty()?"查看仓库了解更新内容":notes,13,MUTED);ScrollView scroll=new ScrollView(this);scroll.addView(changes);scroll.setLayoutParams(new LinearLayout.LayoutParams(-1,Math.min(dp(200),dp(70+Math.min(8,notes.length()/40)*16))));body.addView(scroll);
+        AlertDialog d=dialog("有新版本可用",body);updateDialog=d;d.setOnDismissListener(v->{updateDialog=null;offerLegacyModules();});
+        button("官网下载",()->{d.dismiss();open(UpdateChecker.WEBSITE);},body);button("GitHub 下载",()->{d.dismiss();open(release.optString("url"));},body);
+        d.show();dialogButton(d,"稍后",null,false);dialogButton(d,"忽略此版本",()->{getPreferences(0).edit().putString("ignored_update_version",version).apply();updateLabel.setText(tr("已忽略版本 ")+version);},false);
+    }
+    void select(int value){rememberSettingsHome();int previous=page;page=Math.max(0,Math.min(3,value));settingsGroup=-1;if(bottomNav!=null)bottomNav.setVisibility(View.VISIBLE);header.setVisibility(page==3?View.GONE:View.VISIBLE);note.setVisibility(View.GONE);transitionPage(content.getChildAt(page),Integer.compare(page,previous));if(page==1)restoreSettingsHome();
         for(int i=0;i<4;i++){if(nav[i]!=null){navNames[i].setTextColor(i==page?BLUE:MUTED);navIcons[i].selected=i==page;navIcons[i].invalidate();nav[i].setSelected(i==page);}}
         // Refresh every visit; retain unapplied edits until a successful save.
         if(page==3&&previous!=3&&visible){checkUpdate(false);refreshThanks();}if(page==2)scrollLogs();if(visible){if(busy)rereadPending=true;else run("inspect",null);}
@@ -432,7 +478,7 @@ public final class MainActivity extends Activity {
         }catch(Exception error){show(error.getMessage());}
     }
     void drawCurve(){
-        drawAdvanced();drawOutdoor();drawControls();
+        drawAdvanced();drawOutdoor();drawControls();if(sceneSettings!=null)sceneSettings.refresh();
 
         drawMemory();
         thermalSwitch.setChecked(thermalRelax);ceilingSlider.setProgress(Math.round(thermalCeiling)-38);ceilingText.setText("电池温度阈值："+Math.round(thermalCeiling)+"℃"+(Math.round(thermalCeiling)==43?"（建议）":""));stateGraph.invalidate();settingsGraph.invalidate();
@@ -457,10 +503,11 @@ public final class MainActivity extends Activity {
     }
     void enableParameter(SeekBar slider,TextView label,boolean enabled){slider.setEnabled(enabled);label.setTextColor(enabled?INK:themed(0xffa5aab3));}
     void drawDraftState(){if(unsavedHint!=null)unsavedHint.setVisibility(dirty?View.VISIBLE:View.GONE);for(int i=0;i<settingApply.length;i++){if(settingApply[i]!=null)settingApply[i].setEnabled(!busy&&runtime!=null&&factoryLux!=null);if(settingHints[i]!=null)settingHints[i].setVisibility(dirty?View.VISIBLE:View.GONE);}}
-    JSONObject configuration()throws Exception{
+    JSONObject configuration()throws Exception{return configuration(true);}
+    JSONObject configuration(boolean validateScenes)throws Exception{
             if(factoryLux==null)throw new IllegalStateException("连接后读取曲线");new CurvePlan(factoryLux,factoryNit,minimum,maximum,factors,curveFloor);ThermalPolicy.validate(thermalCeiling);
             JSONObject options=new JSONObject().put("factors",CurvePlan.encode(factors)).put("thermal_relax",thermalRelax).put("thermal_ceiling",thermalCeiling).put("memory_strength",memoryEnabled?memoryStrength:0).put("memory_window",memoryWindow).put("memory_lux_range",memoryLuxRange).put("thermal_cooling",thermalCooling).put("response_override",responseOverride).put("brighten_delay",brightenDelay).put("darken_delay",darkenDelay).put("small_brighten_override",smallBrightenOverride).put("small_brighten_delay",smallBrightenDelay);
-            advanced.put(options);outdoorOptions.put(options);controls.put(options);BrightnessControlOptions.parse(options);OutdoorOptions.parse(options);
+            if(validateScenes&&sceneSettings!=null)sceneSettings.commit();sceneOptions.put(options);advanced.put(options);outdoorOptions.put(options);controls.put(options);BrightnessControlOptions.parse(options);OutdoorOptions.parse(options);
             options.put("low_light_stability",lowLightStability).put("low_light_limit",lowLightLimit).put("low_light_brighten",lowLightBrighten).put("low_light_darken",lowLightDarken);
             lowThresholds.put(options);
             assistGateOptions.put(options);
@@ -470,12 +517,12 @@ public final class MainActivity extends Activity {
     void importConfiguration(){if(factoryLux==null){show("连接后读取曲线");return;}if(busy){show("另一项操作还在执行");return;}try{Intent picker=new Intent(Intent.ACTION_OPEN_DOCUMENT);picker.addCategory(Intent.CATEGORY_OPENABLE);picker.setType("*/*");picker.putExtra(Intent.EXTRA_MIME_TYPES,new String[]{"application/json","text/plain","application/octet-stream"});startActivityForResult(picker,501);}catch(ActivityNotFoundException unavailable){show("未找到文件选择器");}}
     @Override protected void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);if(request!=501||result!=RESULT_OK||data==null||data.getData()==null)return;Uri uri=data.getData();worker.execute(()->{try(InputStream input=getContentResolver().openInputStream(uri);ByteArrayOutputStream out=new ByteArrayOutputStream()){if(input==null)throw new IOException("无法读取配置文件");byte[] buffer=new byte[4096];int count;while((count=input.read(buffer))!=-1){if(out.size()+count>ConfigurationFile.LIMIT)throw new IOException("配置文件过大");out.write(buffer,0,count);}String content=new String(out.toByteArray(),StandardCharsets.UTF_8);ui.post(()->previewConfiguration(content));}catch(Exception error){ui.post(()->show(error.getMessage()));}});}
     void previewConfiguration(String text){if(destroyed)return;try{if(runtime==null)throw new IllegalStateException("连接后读取曲线");ConfigurationFile.Imported imported=ConfigurationFile.read(text,runtime,configuration());String message="导入后先检查设置，再点击保存并应用。旧版本缺少的新选项使用默认值。";if(dirty)message+="\n\n导入会替换当前尚未保存的设置。";if(!imported.notes.isEmpty())message+="\n\n"+String.join("\n",imported.notes);ScrollView scroll=new ScrollView(this);scroll.addView(MainActivity.this.text(message,14,MUTED));scroll.setLayoutParams(new LinearLayout.LayoutParams(-1,dp(240)));AlertDialog d=dialog("导入配置",scroll);d.show();dialogButton(d,"取消",null,false);dialogButton(d,"导入",()->{try{ConfigurationFile.Imported checked=ConfigurationFile.read(text,runtime,configuration());loadOptions(checked.options);if(checked.ui.has("refresh_seconds"))refreshSeconds=checked.ui.getInt("refresh_seconds");if(checked.ui.has("log_auto_scroll"))autoScroll=checked.ui.getBoolean("log_auto_scroll");getPreferences(0).edit().putInt("refresh_seconds",refreshSeconds).putBoolean("log_auto_scroll",autoScroll).apply();dirty=true;logFollow.setChecked(autoScroll);drawCurve();show("配置已导入，检查后点击保存并应用");}catch(Exception error){show(error.getMessage());}},true);}catch(Exception error){show(error.getMessage());}}
-    void loadOptions(JSONObject config)throws Exception{controls=BrightnessControlOptions.parseStored(config);LowLightAssistGate nextAssistGate=new LowLightAssistGate();nextAssistGate.configure(config);LowLightThresholds nextLowThresholds=LowLightThresholds.parse(config);MemoryOptions nextMemory=MemoryOptions.parse(config);float[] next=CurvePlan.factors(config.getString("factors"));float floor=CurvePlan.floor(config.has("curve_floor_nit")?config.opt("curve_floor_nit"):null);new CurvePlan(factoryLux,factoryNit,minimum,maximum,next,floor);AdvancedOptions a=AdvancedOptions.parse(config);OutdoorOptions o=OutdoorOptions.parse(config);memoryOptions=nextMemory;lowThresholds=nextLowThresholds;assistGateOptions=nextAssistGate;factors=next;curveFloor=floor;advanced=a;outdoorOptions=o;thermalRelax=config.optBoolean("thermal_relax");thermalCeiling=(float)config.optDouble("thermal_ceiling",43);float memory=(float)config.optDouble("memory_strength",1);memoryEnabled=memory>0;if(memoryEnabled)memoryStrength=memory;memoryWindow=config.optLong("memory_window",1500);memoryLuxRange=(float)config.optDouble("memory_lux_range",.3);thermalCooling=(float)config.optDouble("thermal_cooling",1);responseOverride=config.optBoolean("response_override");brightenDelay=config.optLong("brighten_delay",1500);darkenDelay=config.optLong("darken_delay",5000);smallBrightenOverride=config.optBoolean("small_brighten_override");smallBrightenDelay=config.optLong("small_brighten_delay",5000);lowLightStability=config.optBoolean("low_light_stability");lowLightLimit=(float)config.optDouble("low_light_limit",50);lowLightBrighten=config.optLong("low_light_brighten",3000);lowLightDarken=config.optLong("low_light_darken",4000);}
+    void loadOptions(JSONObject config)throws Exception{SceneOptions nextScenes=SceneOptions.parse(config);controls=BrightnessControlOptions.parseStored(config);LowLightAssistGate nextAssistGate=new LowLightAssistGate();nextAssistGate.configure(config);LowLightThresholds nextLowThresholds=LowLightThresholds.parse(config);MemoryOptions nextMemory=MemoryOptions.parse(config);float[] next=CurvePlan.factors(config.getString("factors"));float floor=CurvePlan.floor(config.has("curve_floor_nit")?config.opt("curve_floor_nit"):null);new CurvePlan(factoryLux,factoryNit,minimum,maximum,next,floor);AdvancedOptions a=AdvancedOptions.parse(config);OutdoorOptions o=OutdoorOptions.parse(config);sceneOptions=nextScenes;memoryOptions=nextMemory;lowThresholds=nextLowThresholds;assistGateOptions=nextAssistGate;factors=next;curveFloor=floor;advanced=a;outdoorOptions=o;thermalRelax=config.optBoolean("thermal_relax");thermalCeiling=(float)config.optDouble("thermal_ceiling",43);float memory=(float)config.optDouble("memory_strength",1);memoryEnabled=memory>0;if(memoryEnabled)memoryStrength=memory;memoryWindow=config.optLong("memory_window",1500);memoryLuxRange=(float)config.optDouble("memory_lux_range",.3);thermalCooling=(float)config.optDouble("thermal_cooling",1);responseOverride=config.optBoolean("response_override");brightenDelay=config.optLong("brighten_delay",1500);darkenDelay=config.optLong("darken_delay",5000);smallBrightenOverride=config.optBoolean("small_brighten_override");smallBrightenDelay=config.optLong("small_brighten_delay",5000);lowLightStability=config.optBoolean("low_light_stability");lowLightLimit=(float)config.optDouble("low_light_limit",50);lowLightBrighten=config.optLong("low_light_brighten",3000);lowLightDarken=config.optLong("low_light_darken",4000);}
     void submit(){
         if(factoryLux==null)return;
         try{JSONObject options=configuration();
             run("apply",Base64.getEncoder().encodeToString(options.toString().getBytes(StandardCharsets.UTF_8)));
-        }catch(Exception error){show(error.getMessage());}
+        }catch(Exception error){if(sceneSettings!=null)sceneSettings.revealError();show(error.getMessage());}
     }
     JSONObject presets(){try{return new JSONObject(getPreferences(0).getString("presets","{}"));}catch(Exception error){return new JSONObject();}}
     EditText input(String hint){EditText v=new EditText(this);v.setSingleLine(true);v.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_DONE|android.view.inputmethod.EditorInfo.IME_FLAG_NO_EXTRACT_UI);v.setTextSize(16);v.setHint(tr(hint));v.setTextColor(INK);v.setHintTextColor(MUTED);v.setPadding(dp(12),dp(10),dp(12),dp(10));v.setBackground(background(0xffedf1f7,12));return v;}
@@ -507,29 +554,25 @@ public final class MainActivity extends Activity {
         if(s.equals("ScreenOffBrightnessStrategy"))return "熄屏";if(s.equals("DozeBrightnessStrategy"))return "息屏显示";
         if(s.equals("TemporaryBrightnessStrategy"))return "临时亮度";if(s.equals("OverrideBrightnessStrategy"))return "应用指定亮度";return s;
     }
-    void branchRow(LinearLayout parent,String title,String state,String explanation){LinearLayout b=card(parent);b.setBackground(background(0xffeef3ff,14));b.setPadding(dp(12),dp(10),dp(12),dp(10));b.addView(text(title+" · "+state,14,INK));b.addView(text(explanation,12,MUTED));}
+    void branchRow(LinearLayout parent,String title,String state,String explanation){LinearLayout b=card(parent);b.setBackground(background(0xffeef3ff,14));b.setPadding(dp(12),dp(10),dp(12),dp(10));b.addView(text(title,12,MUTED));b.addView(text(state,14,INK));if(!explanation.isEmpty())b.addView(text(explanation,12,MUTED));}
+    void scenesDialog(){
+        long elapsed=SystemClock.elapsedRealtime();final JSONObject snapshot=runtime;LinearLayout body=column();body.addView(text(SceneCatalog.summary(snapshot,elapsed),14,INK));body.addView(text("优先显示生效场景；详细条件在设置中查看。",12,MUTED));
+        java.util.List<SceneCatalog.Row> rows=SceneCatalog.read(snapshot,elapsed);View firstActive=null;
+        for(boolean active:new boolean[]{true,false}){boolean heading=false;for(SceneCatalog.Row r:rows){if(SceneCatalog.active(r.id,snapshot,elapsed)!=active)continue;if(!heading){body.addView(text(active?"正在影响亮度":"其他场景与策略",14,MUTED));heading=true;}LinearLayout b=card(body);b.setPadding(dp(12),dp(8),dp(12),dp(8));((LinearLayout.LayoutParams)b.getLayoutParams()).bottomMargin=dp(8);LinearLayout line=row(b);TextView title=text(r.title,14,INK);title.setIncludeFontPadding(false);line.addView(title,new LinearLayout.LayoutParams(0,-2,1));TextView state=text(SceneCatalog.briefState(r,snapshot,elapsed),11,active?INK:MUTED);state.setIncludeFontPadding(false);state.setGravity(Gravity.END);line.addView(state);b.addView(text(SceneCatalog.brief(r),12,MUTED));if(active&&firstActive==null)firstActive=b;}}
+        ScrollView scroll=new ScrollView(this);scroll.addView(body);scroll.setLayoutParams(new LinearLayout.LayoutParams(-1,dp(Math.max(140,Math.min(430,getResources().getDisplayMetrics().heightPixels/getResources().getDisplayMetrics().density-210)))));AlertDialog d=dialog("光感输入与场景",scroll);d.show();dialogButton(d,"关闭",null,false);dialogButton(d,"场景设置",()->{select(1);showSettingsGroup(5);},true);
+        positionScene(d,firstActive);
+    }
+    void positionScene(AlertDialog d,View target){if(target==null||d.getWindow()==null)return;View found=d.getWindow().getDecorView().findViewWithTag("dialog-scroll");if(!(found instanceof ScrollView))return;ScrollView viewport=(ScrollView)found;
+        viewport.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener(){public boolean onPreDraw(){if(viewport.getViewTreeObserver().isAlive())viewport.getViewTreeObserver().removeOnPreDrawListener(this);if(d.isShowing()&&target.isShown())viewport.scrollTo(0,Math.max(0,target.getTop()-dp(28)));return true;}});viewport.invalidate();
+    }
     void branches(){
-        LinearLayout body=column();if(runtime!=null&&runtime.optJSONObject("outdoor")!=null)branchRow(body,"户外高亮",outdoorDetails(runtime.optJSONObject("outdoor")),"数值是系统亮度坐标的百分比，不是实际 nit。请求目标、可用范围与实际输出分别记录；画面、温控和驱动仍可能限亮。高亮超时由独立事件计时，不依赖光感不断刷新。 ");JSONObject frame=runtime==null?null:runtime.optJSONObject("last_pipeline");
-        if(runtime!=null&&runtime.optJSONObject("brightness_control")!=null){JSONObject c=runtime.optJSONObject("brightness_control");branchRow(body,"亮度控制方式",c.optString("owner").equals("dark")?"暗光锁定":(c.optString("owner").equals("panel")||c.optString("owner").equals("raw_panel"))?"主屏手动面板":"系统调节","暗光锁定低频监听主辅光感，环境显著变亮后恢复自动。主屏弹窗直接接管背光节点，关闭弹窗仍保持；锁屏和息屏显示期间释放节点，解锁后恢复原目标；开启自动亮度结束保持。");}
-        String reference=runtime==null?"":runtime.optString("sensor_reference_name");
-        branchRow(body,"当前光感参考",reference.equals("main")?"主光感":reference.equals("assist")?"辅助光感":reference.equals("other")?"其他系统策略":"未取得","系统会根据双侧读数与场景切换参考，不意味着两个独立亮度引擎在抢控制权。");
-        branchRow(body,"输出路径",strategy(),"自动、临时、应用指定与系统回退是不同输出策略；回退不代表用户关闭了自动亮度。");
-        if(runtime!=null)branchRow(body,"接入后端",runtime.optString("curve_backend").equals("physical_mapping")?"传统系统曲线":"Refactor 曲线","根据系统正在使用的控制器读取设备本地曲线，保留传感器处理和亮度动画。");
-        branchRow(body,"曲线路径",route(frame),"显示最近一次实际执行的映射路径，不把支持某接口当作正在使用它。");
-        branchRow(body,"场景修正",change(frame,"scene_changed"),"比较同一次计算中，场景处理前后的亮度目标。");
-        branchRow(body,"手动保持修正",change(frame,"override_changed"),"显示系统手动保持策略是否改写目标；手动曲线节点仍可另行影响曲线。");
-        branchRow(body,"户外目标修正",change(frame,"outdoor_changed"),"户外增强在系统手动保持之后、最终范围限亮之前加入目标；不会写入基础曲线或手动记忆。");
-        branchRow(body,"短期记忆模型",observed(frame,"short_term_memory"),"系统记忆模型的状态；模型存在不等于当前曲线一定使用了它。");
-        branchRow(body,"夜间唤醒策略",observed(frame,"night_wake"),"显示策略开关，不代表本次一定改变了亮度。");
-        branchRow(body,"HDR",observed(runtime,"hdr_active"),"视频等 HDR 内容可改变输出亮度，与照度曲线变化分开记录。");
-        branchRow(body,"阳光增强",observed(runtime,"sunlight_active"),"系统高亮控制器的当前状态；仍由系统判断何时触发。");
-        branchRow(body,"暗光稳定",observed(runtime,"low_light_stability"),"延长变化确认，并可提高暗光触发阈值。保留原有传感器数值与系统过渡动画。");
-        if(runtime!=null){branchRow(body,"变化阈值与辅助确认",advancedStatus==null?"":advancedStatus.getText().toString(),"高级选项默认关闭；次数为本次系统进程累计，不代表当前每一帧都在调整。");JSONObject scenes=runtime.optJSONObject("system_scene");if(scenes!=null)branchRow(body,"系统场景与增强条件",sceneSummary(scenes),"只读显示。未出现的字段表示未取得，并非关闭；系统仍负责口袋、反射、驾驶、HDR 和高亮度保护。");}
-        if(runtime!=null)body.addView(text("实际延长确认：主光感 "+runtime.optLong("low_light_main_adjustments")+" · 辅助光感 "+runtime.optLong("low_light_assist_adjustments"),12,MUTED));
-        if(runtime!=null)body.addView(text("暗光阈值实际调整："+runtime.optLong("low_light_threshold_adjustments"),12,MUTED));
-        if(frame!=null){long age=Math.max(0,SystemClock.uptimeMillis()-frame.optLong("uptime_ms"));body.addView(text("最近曲线计算："+format(age/1000d)+" 秒前 · #"+frame.optLong("sequence"),12,MUTED));}
-        body.addView(text("未取得表示该阶段尚未被观察到。曲线计算与后续输出分开记录，导出分析包可查看切换详情。",12,MUTED));
-        ScrollView scroll=new ScrollView(this);scroll.addView(body);scroll.setLayoutParams(new LinearLayout.LayoutParams(-1,Math.min(dp(430),getResources().getDisplayMetrics().heightPixels-dp(240))));AlertDialog d=dialog("亮度分支",scroll);d.show();dialogButton(d,"关闭",null,true);
+        LinearLayout body=column();
+        for(BranchReport.Section section:BranchReport.read(runtime,SystemClock.uptimeMillis(),SystemClock.elapsedRealtime())){
+            TextView heading=text(section.title,16,INK);heading.setPadding(0,dp(12),0,dp(8));body.addView(heading);
+            for(BranchReport.Row item:section.rows)branchRow(body,item.title,item.value,item.detail);
+        }
+        ScrollView scroll=new ScrollView(this);scroll.addView(body);scroll.setLayoutParams(new LinearLayout.LayoutParams(-1,Math.max(dp(120),Math.min(dp(430),getResources().getDisplayMetrics().heightPixels-dp(240)))));
+        AlertDialog d=dialog("亮度分支",scroll);d.show();dialogButton(d,"关闭",null,true);
     }
     static String pretty(JSONObject object){try{return object.toString(2);}catch(Exception ignored){return object.toString();}}
     void donate(String name,String file){try{ImageView v=image(file,240,12);v.setScaleType(ImageView.ScaleType.FIT_CENTER);LinearLayout box=column();box.setGravity(Gravity.CENTER_HORIZONTAL);box.addView(v);TextView reminder=text("记得备注[昵称：想说的话]噢",13,MUTED);reminder.setGravity(Gravity.CENTER);box.addView(reminder);AlertDialog d=dialog(tr(name)+" · "+tr("打赏"),box);d.show();dialogButton(d,"关闭",null,false);}catch(Exception error){show(error.toString());}}
@@ -614,7 +657,7 @@ public final class MainActivity extends Activity {
                 String message=tr("检测到系统版本：")+answer.optString("system_version",tr("未能识别"))+"\n\n"+tr("HyperLux 当前仅支持 HyperOS 4。HyperOS 3 等版本无法使用，授权 Root、启用 LSPosed 或重启不能解决此兼容问题。");
                 compatibility.setText(message);apply.setEnabled(false);stop.setEnabled(false);thermalSwitch.setEnabled(false);memorySwitch.setEnabled(false);drawAdvanced();drawOutdoor();drawControls();stateGraph.invalidate();pipeline.invalidate();permissionPrompt("os","系统版本不支持",message);return;
             }
-            if(!answer.optBoolean("connected")){runtime=null;drawAdvanced();drawOutdoor();drawControls();factoryLux=factoryNit=null;branchOverview.setText("亮度分支：等待读取 · 点击查看");lowLightSwitch.setEnabled(false);badge.setText("未连接");stateTitle.setText("尚未连接系统曲线");luxReading.setText("— nit");nitReading.setText("— nit");compatibility.setText("✓ Root 授权已通过\n○ 系统框架连接未建立\n请核对 LSPosed 作用域和是否重启");apply.setEnabled(false);thermalSwitch.setEnabled(false);memorySwitch.setEnabled(false);stateGraph.invalidate();pipeline.invalidate();
+            if(!answer.optBoolean("connected")){runtime=null;drawAdvanced();drawOutdoor();drawControls();factoryLux=factoryNit=null;lowLightSwitch.setEnabled(false);badge.setText("未连接");stateTitle.setText("尚未连接系统曲线");luxReading.setText("— nit");nitReading.setText("— nit");compatibility.setText("✓ Root 授权已通过\n○ 系统框架连接未建立\n请核对 LSPosed 作用域和是否重启");apply.setEnabled(false);thermalSwitch.setEnabled(false);memorySwitch.setEnabled(false);stateGraph.invalidate();pipeline.invalidate();
                 if(answer.optString("system_compatibility").equals("unknown"))compatibility.append("\n"+tr("未能识别 HyperOS 版本；请核对系统设置中的版本号。"));
                 if(answer.optBoolean("lsp_loaded")){badge.setText("已加载");compatibility.setText("✓ Root 授权已通过\n✓ LSPosed 已加载\n○ 设备曲线尚未连接");if(!answer.optString("hook_issue").equals("curve_incompatible")){permissionBlocked=false;permissionNotice="";show(answer.optString("hook_message"));return;}permissionPrompt("abi","设备曲线尚未连接",answer.optString("hook_message","等待读取设备本地曲线；如持续未连接，请导出分析包。"));return;}
                 permissionPrompt("lsp","LSPosed 尚未接入",answer.optString("hook_issue").equals("restart_required")?"Root 已获授权，但系统仍在运行旧版 Hook。请重启手机以加载新版本。":"Root 已授权。请在 LSPosed 启用 HyperLux，勾选系统框架，然后重启手机。\n从旧测试版迁移时，请先关闭旧版的 LSPosed 开关。");return;}
@@ -628,9 +671,9 @@ public final class MainActivity extends Activity {
             if(!dirty&&config!=null&&config.optBoolean("enabled"))loadOptions(config);
             if(!dirty)outdoorOptions=config!=null&&config.optBoolean("enabled")?OutdoorOptions.parse(config):new OutdoorOptions();
             if(!dirty)controls=config!=null&&config.optBoolean("enabled")?BrightnessControlOptions.parseStored(config):new BrightnessControlOptions();
-            if(!dirty)advanced=config!=null&&config.optBoolean("enabled")?AdvancedOptions.parse(config):new AdvancedOptions();
+            if(!dirty){advanced=config!=null&&config.optBoolean("enabled")?AdvancedOptions.parse(config):new AdvancedOptions();sceneOptions=config!=null&&config.optBoolean("enabled")?SceneOptions.parse(config):new SceneOptions();}
             if(!dirty){assistGateOptions.configure(config==null?new JSONObject():config);lowThresholds=LowLightThresholds.parse(config==null?new JSONObject():config);lowLightStability=config!=null&&config.optBoolean("enabled")&&config.optBoolean("low_light_stability");lowLightLimit=config==null?50:(float)config.optDouble("low_light_limit",50);lowLightBrighten=config==null?3000:config.optLong("low_light_brighten",3000);lowLightDarken=config==null?4000:config.optLong("low_light_darken",4000);}
-            JSONObject currentFrame=runtime.optJSONObject("last_pipeline");branchOverview.setText("曲线："+route(currentFrame)+" · 输出："+strategy()+"\n户外："+(runtime.optJSONObject("outdoor")==null?"未取得":runtime.getJSONObject("outdoor").optString("text"))+" · 点击查看亮度分支");
+
             String phase=runtime.optString("phase");boolean active=phase.equals("active"),auto=runtime.optBoolean("auto_mode");badge.setText(runtime.optJSONObject("brightness_control")!=null&&"dark".equals(runtime.getJSONObject("brightness_control").optString("owner"))?"暗光锁定":!auto?"手动亮度":active?"运行中":phase.equals("error")?"接入异常":"官方基准");
             stateTitle.setText(active?(auto?"自动亮度已接入":"系统处于手动亮度"):phase.equals("error")?"已交回系统控制":"使用系统基础曲线");
             luxReading.setText(runtime.has("calculated_physical_nit")?format(runtime.optDouble("calculated_physical_nit"))+" nit":"等待计算");nitReading.setText(runtime.has("actual_nit")?format(runtime.optDouble("actual_nit"))+" nit":"等待输出");
@@ -653,18 +696,10 @@ public final class MainActivity extends Activity {
             if(manualPanel!=null)manualPanel.update(runtime.optJSONObject("brightness_control"));if(openManualPanel){openManualPanel=false;ui.post(this::showManualPanel);}
         }catch(Exception error){runtime=null;factoryLux=factoryNit=null;apply.setEnabled(false);stateGraph.invalidate();pipeline.invalidate();drawDraftState();show("状态格式不兼容："+error);}
     }
-    String sceneSummary(JSONObject scenes){
-        StringBuilder out=new StringBuilder();
-        String[][] flags={{"touch_protection_active","触摸遮挡保护"},{"proximity_near","距离遮挡"},{"night_wake","夜间唤醒"},{"night_driving","夜间驾驶"},{"reflective","反射判定"},{"step_mode","运动延迟"},{"assist_reset_pending","辅助重置等待"},{"manual_sunlight_active","手动阳光屏"},{"manual_sunlight_sensor","阳光屏传感器"},{"hbm_controller_enabled","HBM 控制器"},{"hbm_time_available","HBM 时间条件"},{"hbm_ambient_allowed","HBM 照度条件"},{"hbm_low_power_block","HBM 省电限制"},{"hdr_layer_present","HDR 图层"},{"dolby_enabled","杜比显示"}};
-        for(String[] f:flags)if(scenes.has(f[0]))out.append(tr(f[1])).append(": ").append(tr(scenes.optBoolean(f[0])?"已触发":"未触发")).append('\n');
-        String[][] numbers={{"main_history_ms","主光感历史窗口","ms"},{"step_extra_ms","运动附加等待","ms"},{"hbm_minimum_lux","HBM 最低照度","lux"},{"hbm_time_window_ms","HBM 时间窗口","ms"},{"hbm_time_max_ms","HBM 时间预算","ms"}};
-        for(String[] f:numbers)if(scenes.has(f[0]))out.append(tr(f[1])).append(": ").append(format(scenes.optDouble(f[0]))).append(' ').append(f[2]).append('\n');
-        return out.length()==0?tr("未取得"):out.toString().trim();
-    }
     static String severity(int level){String[] names={"正常","轻微","中等","严重","危急","紧急","关机"};return level>=0&&level<names.length?names[level]:"未知";}
     @Override public void onResume(){super.onResume();visible=true;permissionNotice="";permissionBlocked=false;run("inspect",null);ui.removeCallbacks(tick);ui.postDelayed(tick,refreshSeconds*1000);checkUpdate(false);if(page==3)refreshThanks();offerLegacyModules();offerUpdate();}
     @Override public void onPause(){visible=false;if(manualPanel!=null)manualPanel.close();finishPageTransition();ui.removeCallbacks(tick);getPreferences(0).edit().putString("draft",CurvePlan.encode(factors)).putString("draft_baseline",loadedBaseline).putFloat("draft_floor",curveFloor).apply();if(!busy)worker.execute(this::closeBridge);super.onPause();}
-    @Override public void onSaveInstanceState(Bundle saved){saved.putInt("page",page);saved.putInt("settings_group",settingsGroup);saved.putBoolean("dirty",dirty);saved.putString("baseline",loadedBaseline);if(dirty&&factoryLux!=null)try{saved.putString("draft_options",configuration().toString());}catch(Exception ignored){}super.onSaveInstanceState(saved);}
+    @Override public void onSaveInstanceState(Bundle saved){rememberSettingsHome();saved.putInt("settings_home_y",settingsHomeY);saved.putInt("page",page);saved.putInt("settings_group",settingsGroup);saved.putBoolean("dirty",dirty);saved.putString("baseline",loadedBaseline);if(dirty&&factoryLux!=null)try{saved.putString("draft_options",configuration(false).toString());}catch(Exception ignored){}super.onSaveInstanceState(saved);}
     @Override public void onDestroy(){destroyed=true;for(AlertDialog d:new ArrayList<>(openDialogs))d.dismiss();if(manualPanel!=null)manualPanel.close();if(!busy)closeBridge();worker.shutdown();network.shutdownNow();super.onDestroy();}
     static JSONArray array(float[] values)throws JSONException{JSONArray result=new JSONArray();for(float n:values)result.put(n);return result;}
     final class NavigationArrow extends View{
@@ -683,18 +718,57 @@ public final class MainActivity extends Activity {
     }
     final class PipelineBoard extends ViewGroup {
         final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);final RectF[] boxes=new RectF[6];
-        PipelineBoard(){super(MainActivity.this);setWillNotDraw(false);for(int i=0;i<6;i++)boxes[i]=new RectF();stateGraph=new CurveView(false);addView(stateGraph);addView(branchOverview);setContentDescription(tr("主光感和辅助光感，经融合与场景判断产生有效照度"));}
-        void layoutBoxes(){float w=getWidth(),h=getHeight(),gap=dp(12),half=(w-gap)/2;boxes[0].set(0,0,half,h*.12f);boxes[1].set(half+gap,0,w,h*.12f);boxes[2].set(0,h*.16f,w,h*.30f);boxes[3].set(0,h*.36f,w,h*.70f);boxes[4].set(0,h*.74f,w,h*.845f);boxes[5].set(0,h*.885f,w,h);}
-        int branchHeight(int h){return Math.min(dp(46),Math.max(dp(30),(int)(h*.085f)));}
-        @Override protected void onMeasure(int ws,int hs){int w=MeasureSpec.getSize(ws),h=MeasureSpec.getSize(hs);setMeasuredDimension(w,h);int bh=branchHeight(h),chartCardHeight=(int)(h*.70f)-(int)(h*.36f);stateGraph.measure(MeasureSpec.makeMeasureSpec(Math.max(0,w-dp(20)),MeasureSpec.EXACTLY),MeasureSpec.makeMeasureSpec(Math.max(0,chartCardHeight-dp(24)-bh),MeasureSpec.EXACTLY));branchOverview.measure(MeasureSpec.makeMeasureSpec(Math.max(0,w-dp(24)),MeasureSpec.EXACTLY),MeasureSpec.makeMeasureSpec(bh,MeasureSpec.EXACTLY));}
-        @Override protected void onLayout(boolean changed,int l,int t,int r,int b){layoutBoxes();RectF graph=boxes[3];int bottom=(int)graph.bottom-dp(12),top=bottom-branchHeight(getHeight());stateGraph.layout(dp(10),(int)graph.top+dp(8),getWidth()-dp(10),top-dp(4));branchOverview.layout(dp(12),top,getWidth()-dp(12),bottom);}
+        final LinearLayout protectionPanel=column();final TextView[] protectionStates=new TextView[3],protectionDetails=new TextView[3];
+        final TextView curveGuide=new TextView(MainActivity.this);final LinearLayout curveInfo=column(),fusedPanel=column();
+        final TextView fusedTitle=text("光感输入与场景",12,MUTED),fusedValue=text("等待读取",21,INK),fusedScene=text("场景：等待读取",10,BLUE);
+        final LinearLayout[] readingPanels=new LinearLayout[3];final TextView[] readingTitles=new TextView[3],readingValues=new TextView[3];
+        final boolean[] readingNumeric={true,true};
+        long adviceAt=-1;JSONObject adviceRuntime;String adviceKey="";
+        PipelineBoard(){
+            super(MainActivity.this);setWillNotDraw(false);for(int i=0;i<6;i++)boxes[i]=new RectF();
+            stateGraph=new CurveView(false);addView(stateGraph);curveInfo.setPadding(dp(10),dp(4),dp(10),dp(4));curveInfo.setBackground(background(0xffeef3ff,12));addView(curveInfo);
+            curveGuide.setTextSize(11);curveGuide.setTextColor(MUTED);curveGuide.setMovementMethod(android.text.method.LinkMovementMethod.getInstance());curveGuide.setIncludeFontPadding(false);curveGuide.setGravity(Gravity.CENTER_VERTICAL);curveGuide.setMaxLines(1);curveGuide.setEllipsize(android.text.TextUtils.TruncateAt.END);curveGuide.setAutoSizeTextTypeUniformWithConfiguration(9,11,1,android.util.TypedValue.COMPLEX_UNIT_SP);curveInfo.addView(curveGuide,new LinearLayout.LayoutParams(-1,-1));
+            fusedPanel.setGravity(Gravity.CENTER);for(TextView line:new TextView[]{fusedTitle,fusedValue,fusedScene}){line.setPadding(0,0,0,0);line.setIncludeFontPadding(true);line.setGravity(Gravity.CENTER);line.setMaxLines(1);line.setEllipsize(android.text.TextUtils.TruncateAt.END);line.setAutoSizeTextTypeUniformWithConfiguration(line==fusedValue?12:9,line==fusedValue?21:line==fusedTitle?12:10,1,android.util.TypedValue.COMPLEX_UNIT_SP);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,0,line==fusedValue?1.8f:1.1f);lp.topMargin=line==fusedValue?dp(4):line==fusedScene?dp(2):0;fusedPanel.addView(line,lp);}fusedScene.setOnClickListener(v->scenesDialog());fusedScene.setFocusable(true);fusedScene.setContentDescription(tr("查看当前场景与全部触发条件"));addView(fusedPanel);
+            for(int i=0;i<3;i++){LinearLayout panel=column();panel.setGravity(Gravity.CENTER);readingPanels[i]=panel;TextView title=text(i==0?"主光感":i==1?"辅助光感":"当前屏幕亮度",12,MUTED),value=text("—",i==2?27:23,INK);readingTitles[i]=title;readingValues[i]=value;value.setAutoSizeTextTypeUniformWithConfiguration(12,i==2?27:23,1,android.util.TypedValue.COMPLEX_UNIT_SP);for(TextView line:new TextView[]{title,value}){line.setPadding(0,0,0,0);line.setIncludeFontPadding(false);line.setGravity(Gravity.CENTER);line.setMaxLines(1);line.setEllipsize(android.text.TextUtils.TruncateAt.END);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.topMargin=line==title?0:dp(8);panel.addView(line,lp);}addView(panel);}
+            TextView protectionTitle=text("输出范围与保护",12,MUTED);protectionTitle.setGravity(Gravity.CENTER);protectionTitle.setPadding(0,0,0,0);protectionTitle.setIncludeFontPadding(false);protectionPanel.addView(protectionTitle,new LinearLayout.LayoutParams(-1,-2));
+            LinearLayout cells=row(protectionPanel);cells.setGravity(Gravity.CENTER);LinearLayout.LayoutParams cellsLp=new LinearLayout.LayoutParams(-1,0,1);cellsLp.topMargin=dp(8);cells.setLayoutParams(cellsLp);
+            for(int i=0;i<3;i++){final int at=i;LinearLayout cell=column();cell.setGravity(Gravity.CENTER);cell.setPadding(dp(4),dp(6),dp(4),dp(6));cell.setBackground(ripple(0xffeef3ff,10));cell.setClipToOutline(true);cell.setOnClickListener(v->{OutputProtection.Item item=OutputProtection.item(at,"","");openAdvice(new StatusAdvice.Action(item.title,item.group,item.target));});cell.setClickable(true);cell.setFocusable(true);LinearLayout.LayoutParams cellLp=new LinearLayout.LayoutParams(0,-1,1);cellLp.leftMargin=i==0?0:dp(8);cells.addView(cell,cellLp);TextView name=text(OutputProtection.item(i,"","").title,11,MUTED);name.setIncludeFontPadding(false);name.setGravity(Gravity.CENTER);name.setPadding(0,0,0,0);cell.addView(name,new LinearLayout.LayoutParams(-1,0,.85f));
+                protectionStates[i]=text("等待读取",i==2?14:12,BLUE);protectionDetails[i]=text("点击查看设置",10,MUTED);for(TextView line:new TextView[]{protectionStates[i],protectionDetails[i]}){line.setIncludeFontPadding(false);line.setPadding(0,0,0,0);line.setGravity(Gravity.CENTER);line.setMaxLines(line==protectionStates[i]?1:2);line.setEllipsize(android.text.TextUtils.TruncateAt.END);line.setAutoSizeTextTypeUniformWithConfiguration(line==protectionStates[i]?9:8,line==protectionStates[i]?(i==2?14:12):10,1,android.util.TypedValue.COMPLEX_UNIT_SP);cell.addView(line,new LinearLayout.LayoutParams(-1,0,line==protectionStates[i]?1.05f:1.1f));}}
+            addView(protectionPanel);
+            setContentDescription(tr("主光感和辅助光感，经融合与场景判断产生有效照度"));refreshAdvice();
+        }
+        StatusPageLayout geometry(int height){return new StatusPageLayout(height,getResources().getDisplayMetrics().density,getResources().getConfiguration().fontScale);}
+        void layoutBoxes(){float w=getWidth(),gap=dp(12),half=(w-gap)/2;StatusPageLayout layout=geometry(getHeight());boxes[0].set(0,layout.top[0],half,layout.bottom[0]);boxes[1].set(half+gap,layout.top[0],w,layout.bottom[0]);for(int i=2;i<6;i++)boxes[i].set(0,layout.top[i-1],w,layout.bottom[i-1]);}
+        @Override protected void onMeasure(int ws,int hs){
+            int w=MeasureSpec.getSize(ws);StatusPageLayout layout=geometry(MeasureSpec.getMode(hs)==MeasureSpec.UNSPECIFIED?0:MeasureSpec.getSize(hs));setMeasuredDimension(w,layout.height);
+            int width=MeasureSpec.makeMeasureSpec(Math.max(0,w-dp(24)),MeasureSpec.EXACTLY),chartHeight=layout.bottom[2]-layout.top[2];
+            stateGraph.measure(width,MeasureSpec.makeMeasureSpec(Math.max(0,chartHeight-dp(24)-dp(8)-layout.infoHeight),MeasureSpec.EXACTLY));
+            curveInfo.measure(width,MeasureSpec.makeMeasureSpec(layout.infoHeight,MeasureSpec.EXACTLY));
+            fusedPanel.measure(width,MeasureSpec.makeMeasureSpec(Math.max(0,layout.bottom[1]-layout.top[1]-dp(24)),MeasureSpec.EXACTLY));
+            protectionPanel.measure(width,MeasureSpec.makeMeasureSpec(Math.max(0,layout.bottom[3]-layout.top[3]-dp(24)),MeasureSpec.EXACTLY));
+            for(int i=0;i<3;i++){int left=i==1?(int)((w-dp(12))/2f+dp(12)):0,right=i==0?(int)((w-dp(12))/2f):w;readingPanels[i].measure(MeasureSpec.makeMeasureSpec(Math.max(0,right-left-dp(24)),MeasureSpec.EXACTLY),MeasureSpec.makeMeasureSpec(Math.max(0,layout.bottom[0]-layout.top[0]-dp(24)),MeasureSpec.EXACTLY));}
+        }
+        @Override protected void onLayout(boolean changed,int l,int t,int r,int b){
+            layoutBoxes();RectF graph=boxes[3];int bottom=(int)graph.bottom-dp(12),infoTop=bottom-geometry(getHeight()).infoHeight;
+            stateGraph.layout(dp(12),(int)graph.top+dp(12),getWidth()-dp(12),infoTop-dp(8));curveInfo.layout(dp(12),infoTop,getWidth()-dp(12),bottom);
+            fusedPanel.layout(dp(12),(int)boxes[2].top+dp(12),getWidth()-dp(12),(int)boxes[2].bottom-dp(12));
+            protectionPanel.layout(dp(12),(int)boxes[4].top+dp(12),getWidth()-dp(12),(int)boxes[4].bottom-dp(12));
+            for(int i=0;i<3;i++){RectF box=boxes[i==2?5:i];readingPanels[i].layout((int)box.left+dp(12),(int)box.top+dp(12),(int)box.right-dp(12),(int)box.bottom-dp(12));}
+        }
+        void refreshAdvice(){
+            long now=SystemClock.uptimeMillis();if(adviceRuntime==runtime&&adviceAt>=0&&now-adviceAt<1000)return;adviceRuntime=runtime;adviceAt=now;
+            long elapsed=SystemClock.elapsedRealtime();OutputProtection.Item[] protection=OutputProtection.read(runtime,now,elapsed);StatusAdvice guide=StatusAdvice.guidance(runtime,elapsed);String scene=tr(SceneCatalog.summary(runtime,elapsed));JSONObject control=runtime==null?null:runtime.optJSONObject("brightness_control");boolean holding=control!=null&&"dark".equals(control.optString("owner"))&&control.optBoolean("listening");boolean manual=runtime!=null&&runtime.has("auto_mode")&&!runtime.optBoolean("auto_mode");
+            String value=!StatusPresentation.fresh(runtime,elapsed)?tr(runtime==null?"等待读取":"状态待刷新"):holding?tr("暗光锁定保持"):manual?tr("自动采样暂停"):!"active".equals(runtime.optString("sensor_status"))?tr("等待有效照度"):reading(runtime.has("official_effective_lux")?"official_effective_lux":"last_lux"," lux");
+            StringBuilder key=new StringBuilder(guide.detail).append('\n').append(scene).append('\n').append(value);for(OutputProtection.Item item:protection)key.append('\n').append(OutputProtection.primary(item,runtime,elapsed)).append(':').append(item.state).append(':').append(item.detail);for(StatusAdvice.Action link:guide.actions)key.append('\n').append(link.text).append(':').append(link.group).append(':').append(link.target);if(key.toString().equals(adviceKey))return;adviceKey=key.toString();
+            for(int i=0;i<3;i++){protectionStates[i].setText(tr(OutputProtection.primary(protection[i],runtime,elapsed)));protectionStates[i].setTextColor(themed(OutputProtection.temperatureAlert(protection[i],runtime,elapsed)?0xffbd3434:BLUE));protectionDetails[i].setText(tr(OutputProtection.secondary(protection[i])));protectionStates[i].setContentDescription(tr(OutputProtection.primary(protection[i],runtime,elapsed))+" · "+tr(protection[i].state)+" · "+tr(protection[i].detail));}curveGuide.setText(adviceText(guide));curveGuide.setContentDescription(tr(guide.detail));fusedValue.setText(value);fusedScene.setText(scene);
+        }
         void prepareLabel(String value,int size,int color,float width){paint.setColor(color);paint.setStyle(Paint.Style.FILL);float scale=Math.min(1,Math.max(.65f,getHeight()/(float)dp(440)));paint.setTextSize(dp(Math.max(9,size*scale)));while(paint.measureText(value)>width&&paint.getTextSize()>dp(9))paint.setTextSize(paint.getTextSize()-1);}
         void label(Canvas c,String value,float x,float y,int size,int color,float width){value=tr(value);prepareLabel(value,size,color,width);c.drawText(value,x-paint.measureText(value)/2,y,paint);}
         void labelStart(Canvas c,String value,float x,float y,int size,int color,float width){value=tr(value);prepareLabel(value,size,color,width);c.drawText(value,x,y,paint);}
         void labelEnd(Canvas c,String value,float x,float y,int size,int color,float width){value=tr(value);prepareLabel(value,size,color,width);c.drawText(value,x-paint.measureText(value),y,paint);}
         String reading(String key,String unit){double value=runtime==null?Double.NaN:runtime.optDouble(key);return Double.isFinite(value)&&value>=0?format(value)+unit:"—";}
         void connection(Canvas c,float x,float y,float bottom){paint.setStyle(Paint.Style.STROKE);paint.setColor(themed(0xff9db4e2));paint.setStrokeWidth(dp(1.4f));paint.setStrokeCap(Paint.Cap.ROUND);c.drawLine(x,y,x,bottom,paint);}
-        @Override protected void onDraw(Canvas c){super.onDraw(c);float w=getWidth();if(w<=0||getHeight()<=0)return;float middle=w/2;boolean animate=visible&&isShown()&&page==0&&runtime!=null&&runtime.optBoolean("auto_mode")&&android.animation.ValueAnimator.areAnimatorsEnabled();
+        @Override protected void onDraw(Canvas c){super.onDraw(c);refreshAdvice();float w=getWidth();if(w<=0||getHeight()<=0)return;float middle=w/2;boolean animate=visible&&isShown()&&page==0&&runtime!=null&&runtime.optBoolean("auto_mode")&&android.animation.ValueAnimator.areAnimatorsEnabled();
             paint.setPathEffect(new DashPathEffect(new float[]{dp(5),dp(5)},animate?-(SystemClock.uptimeMillis()%1000)/1000f*dp(10):0));float merge=(boxes[0].bottom+boxes[2].top)/2;
             // Both paths start at their sensor and end at the merge point, so both flow inward.
             paint.setStyle(Paint.Style.STROKE);paint.setColor(themed(0xff9db4e2));paint.setStrokeWidth(dp(1.4f));paint.setStrokeCap(Paint.Cap.ROUND);paint.setStrokeJoin(Paint.Join.ROUND);
@@ -702,35 +776,38 @@ public final class MainActivity extends Activity {
             for(int i=2;i<5;i++)connection(c,middle,boxes[i].bottom,boxes[i+1].top);paint.setPathEffect(null);paint.setStyle(Paint.Style.FILL);
             for(int i=0;i<6;i++){paint.setColor(themed(i==1?0xffeef0f4:i==2?0xffedf3ff:Color.WHITE));c.drawRoundRect(boxes[i],dp(17),dp(17),paint);}
             JSONObject control=runtime==null?null:runtime.optJSONObject("brightness_control");boolean holding=control!=null&&"dark".equals(control.optString("owner"))&&control.optBoolean("listening");boolean manual=runtime!=null&&!runtime.optBoolean("auto_mode");String sensor=runtime==null?"unknown":runtime.optString("sensor_status","unknown");boolean paused=manual||sensor.equals("paused")||sensor.equals("warming");
-            for(int i=0;i<2;i++){RectF box=boxes[i];label(c,holding?(i==0?"主光感监听":"辅助光感监听"):(i==0?"主光感":"辅助光感"),box.centerX(),box.top+box.height()*.35f,12,MUTED,box.width()-dp(14));double watched=holding?control.optDouble(i==0?"watch_main_lux":"watch_assist_lux",Double.NaN):Double.NaN;label(c,holding?(Double.isFinite(watched)?format(watched)+" lux":"—"):manual||sensor.equals("paused")?"采样暂停":sensor.equals("warming")?"等待采样":reading(i==0?"main_fast_lux":"assist_fast_lux"," lux"),box.centerX(),box.top+box.height()*.77f,22,i==0?BLUE:INK,box.width()-dp(14));}
-            RectF fused=boxes[2];label(c,holding?"暗光锁定":manual?"手动亮度模式":"融合滤波与场景判定",middle,fused.top+fused.height()*.35f,13,MUTED,w-dp(20));label(c,holding?"≥ "+format(control.optDouble("dark_lock_exit_lux"))+" lux · "+control.optInt("dark_lock_exit_seconds")+" 秒后恢复":manual?"开启系统自动亮度后读取":paused?"等待有效照度":reading(runtime!=null&&runtime.has("official_effective_lux")?"official_effective_lux":"last_lux"," lux"),middle,fused.top+fused.height()*.78f,manual?14:24,BLUE,w-dp(20));
+            for(int i=0;i<2;i++){
+                readingText(readingTitles[i],tr(holding?(i==0?"主光感监听":"辅助光感监听"):(i==0?"主光感":"辅助光感")));
+                StatusPresentation.Reading value=StatusPresentation.sensor(runtime,i==1,SystemClock.elapsedRealtime());boolean numeric=Double.isFinite(value.lux);
+                if(readingNumeric[i]!=numeric){readingNumeric[i]=numeric;readingValues[i].setAutoSizeTextTypeUniformWithConfiguration(numeric?12:9,numeric?23:14,1,android.util.TypedValue.COMPLEX_UNIT_SP);}readingText(readingValues[i],tr(numeric?format(value.lux)+" lux":value.text));
+            }
+            RectF fused=boxes[2];
             float thresholdY=(fused.bottom+boxes[3].top)/2+dp(3),thresholdGap=dp(6);if(!paused){labelEnd(c,runtime!=null&&runtime.has("darkening_lux_threshold")?"变暗 < "+format(runtime.optDouble("darkening_lux_threshold"))+" lux":"变暗 —",middle-thresholdGap,thresholdY,10,MUTED,w/2-dp(12));labelStart(c,runtime!=null&&runtime.has("brightening_lux_threshold")?"变亮 > "+format(runtime.optDouble("brightening_lux_threshold"))+" lux":"变亮 —",middle+thresholdGap,thresholdY,10,MUTED,w/2-dp(12));}
-            RectF thermal=boxes[4];labelStart(c,"温控",dp(16),thermal.top+thermal.height()*.60f,14,INK,dp(50));paint.setColor(themed(0xffe5eaf2));paint.setStrokeWidth(dp(1));c.drawLine(dp(72),thermal.top+dp(12),dp(72),thermal.bottom-dp(12),paint);
-            String thermalControl=runtime==null?"暂无读数":runtime.optBoolean("thermal_relax")&&runtime.optBoolean("thermal_permitted")?"减少温控降亮":"系统温控生效";labelStart(c,thermalControl,dp(88),thermal.top+thermal.height()*.40f,13,INK,w-dp(100));labelStart(c,"电池 "+reading("battery_temperature","℃")+" · "+(runtime==null?"未知":severity(runtime.optInt("thermal_severity",-1))),dp(88),thermal.top+thermal.height()*.78f,11,MUTED,w-dp(100));
-            RectF screen=boxes[5];label(c,"当前屏幕亮度",middle,screen.top+screen.height()*.32f,12,MUTED,w-dp(20));label(c,reading("actual_nit"," nit"),middle,screen.top+screen.height()*.78f,27,INK,w-dp(20));if(animate)postInvalidateDelayed(100);
+            readingText(readingValues[2],reading("actual_nit"," nit"));if(animate)postInvalidateDelayed(100);
         }
+        void readingText(TextView view,String value){if(!value.contentEquals(view.getText()))view.setText(value);}
     }
 
     final class CurveView extends View{
         final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);final boolean draft,memory;int point=-1;float startX,startY,startFactor;float[] dragBounds;boolean moved;
         CurveView(boolean draft){this(draft,false);}
         CurveView(boolean draft,boolean memory){super(MainActivity.this);this.draft=draft;this.memory=memory;setContentDescription(tr(draft?"拖动节点调整曲线，点击节点输入数值":memory?"蓝色基础曲线与浅绿色实际曲线":"当前亮度曲线"));setFocusable(draft);}
-        float left(){return dp(draft||memory?38:32);}float top(){return dp(draft||memory?18:8);}float width(){return getWidth()-left()-dp(25);}float height(){return getHeight()-top()-dp(draft||memory?43:22);}
+        float left(){return dp(draft||memory?38:32);}float top(){return dp(draft||memory?18:8);}float width(){return Math.max(0,getWidth()-left()-dp(draft||memory?12:8));}float height(){return getHeight()-top()-dp(draft||memory?28:22);}
         float x(float lux){return left()+(float)(Math.log1p(Math.max(0,Math.min(lux,factoryLux[3])))/Math.log1p(factoryLux[3]))*width();}
         float y(float nit){return top()+height()*(1-nit/maximum);}
         @Override protected void onDraw(Canvas canvas){
             super.onDraw(canvas);paint.setStyle(Paint.Style.FILL);paint.setTextSize(dp(12));paint.setColor(MUTED);
             if(factoryLux==null){canvas.drawText(tr("连接后读取曲线"),dp(10),dp(65),paint);return;}
-            if(!draft&&!memory&&(runtime==null||!(runtime.optJSONObject("last_pipeline")==null&&"refactor".equals(runtime.optString("curve_backend"))&&runtime.has("current_anchors_nit")||"refactor".equals(runtime.optJSONObject("last_pipeline")==null?"":runtime.optJSONObject("last_pipeline").optString("route"))||("physical_mapping".equals(runtime.optString("curve_backend"))&&runtime.optBoolean("physical_mapping_active")&&"mapping".equals(runtime.optJSONObject("last_pipeline")==null?"":runtime.optJSONObject("last_pipeline").optString("route")))))){canvas.drawText(tr("当前路径未取得可绘制曲线"),dp(10),dp(65),paint);return;}
+            if(!draft&&!memory&&!StatusPresentation.fresh(runtime,SystemClock.elapsedRealtime())){canvas.drawText(tr("状态待刷新"),dp(10),dp(65),paint);return;}
             float left=left(),top=top(),width=width(),height=height();if(width<=0||height<=0)return;
             CurveComparison data;try{data=CurveComparison.read(runtime,factors,curveFloor,draft);}catch(Exception invalid){canvas.drawText(tr("曲线数据未就绪"),dp(10),dp(65),paint);return;}
             paint.setStrokeWidth(dp(1));paint.setTextSize(dp(10));for(int i=0;i<3;i++){float yy=top+height*i/2;paint.setColor(themed(0xffe7ebf2));canvas.drawLine(left,yy,left+width,yy,paint);paint.setColor(MUTED);canvas.drawText((100-i*50)+"%",0,yy+dp(4),paint);}
             // Editable drafts never replace the applied baseline or current memory in the other graphs.
-            int currentColor=memory||data.memoryChanged(runtime)?themed(0xff78b997):data.systemDefault()?themed(0xffa5aab3):BLUE;
+            String kind=data.kind(runtime);int currentColor=memory||kind.equals("memory")?themed(0xff78b997):kind.equals("system")?themed(0xffa5aab3):BLUE;
             if(draft){drawLine(canvas,data.reference,themed(0xffa5aab3));drawLine(canvas,data.baseline,BLUE);}
             else if(memory){drawLine(canvas,data.baseline,BLUE);drawLine(canvas,data.current,currentColor);}
             else drawLine(canvas,data.current,currentColor);
-            for(int i=0;i<4;i++){float xx=x(factoryLux[i]);paint.setTextSize(dp(10));paint.setColor(MUTED);String label=format(factoryLux[i]);canvas.drawText(label,xx-paint.measureText(label)/2,top+height+dp(20),paint);
+            for(int i=0;i<4;i++){float xx=x(factoryLux[i]);paint.setTextSize(dp(10));paint.setColor(MUTED);String label=format(factoryLux[i]);canvas.drawText(label,Math.max(0,Math.min(getWidth()-paint.measureText(label),xx-paint.measureText(label)/2)),top+height+dp(20),paint);
                 if(draft){float yy=y(data.baseline.at(factoryLux[i]));paint.setColor(themed(Color.WHITE));canvas.drawCircle(xx,yy,dp(8),paint);paint.setColor(i==3?MUTED:BLUE);canvas.drawCircle(xx,yy,dp(5),paint);}
             }
             if(memory&&runtime!=null){for(String key:new String[]{"memory_saved_anchors","memory_live_points"}){JSONArray points=runtime.optJSONArray(key);if(points==null)continue;paint.setColor(themed(0xff78b997));boolean saved=key.equals("memory_saved_anchors");for(int i=0;i<points.length();i++){JSONObject p=points.optJSONObject(i);if(p==null)continue;double lux=p.optDouble("lux",Double.NaN),nit=p.optDouble("display_nit",Double.NaN);if(!Double.isFinite(lux)||lux<0||!Double.isFinite(nit)||nit<0)continue;float xx=x((float)lux),yy=y((float)Math.min(maximum,nit));paint.setStyle(saved?Paint.Style.STROKE:Paint.Style.FILL);paint.setStrokeWidth(dp(2));canvas.drawCircle(xx,yy,dp(saved?7:4),paint);}}paint.setStyle(Paint.Style.FILL);}

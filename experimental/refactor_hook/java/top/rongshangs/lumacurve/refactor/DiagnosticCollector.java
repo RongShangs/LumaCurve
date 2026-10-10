@@ -53,9 +53,10 @@ final class DiagnosticCollector {
             if(!done){process.destroyForcibly();process.waitFor(2,TimeUnit.SECONDS);}
             // Include partial output and mark timeout/nonzero, rather than aborting the archive.
             long size=temp.length();int cap=2*1024*1024;byte[] data=new byte[(int)Math.min(size,cap)];
-            try(InputStream input=new FileInputStream(temp)){int pos=0,n;while(pos<data.length&&(n=input.read(data,pos,data.length-pos))>0)pos+=n;if(pos!=data.length)data=Arrays.copyOf(data,pos);}
+            boolean tail=name.startsWith("faults/")&&size>cap;
+            try(RandomAccessFile input=new RandomAccessFile(temp,"r")){if(tail)input.seek(size-cap);int pos=0,n;while(pos<data.length&&(n=input.read(data,pos,data.length-pos))>0)pos+=n;if(pos!=data.length)data=Arrays.copyOf(data,pos);}
             output=data;
-            note(name,!done?"timeout":process.exitValue()!=0?"nonzero":size>cap?"truncated":"ok",String.join(" ",args)+"; bytes="+size+"; exit="+(done?process.exitValue():"timeout"));
+            note(name,!done?"timeout":process.exitValue()!=0?"nonzero":size>cap?"truncated":"ok",String.join(" ",args)+"; bytes="+size+"; retained="+(tail?"tail":"head")+"; exit="+(done?process.exitValue():"timeout"));
         }catch(IOException unavailable){note(name,"unavailable",unavailable.toString());}
         finally{if(process!=null&&process.isAlive())process.destroyForcibly();temp.delete();}
         // Archive write failures must abort export; they are not a missing diagnostic source.
@@ -88,8 +89,49 @@ final class DiagnosticCollector {
             if(child.isDirectory())tree(child,destination+"/"+child.getName(),depth+1);else copy(child,destination+"/"+child.getName());
         }
     }
+    void collectFaults()throws Exception{
+        // Capture short-lived evidence before slow dumps and optional firmware copies.
+        // DropBox survives some process/device restarts; absence is never proof of no fault.
+        command("faults/crash-log.txt",6,"logcat","-b","crash","-d","-v","threadtime");
+        command("faults/system-log.txt",6,"logcat","-b","system","-b","main","-d","-v","threadtime",
+            "Watchdog:V","AndroidRuntime:V","ActivityManager:V","ActivityTaskManager:V","WindowManager:V","InputDispatcher:V","SurfaceFlinger:V","SystemUI:V","DEBUG:V","LumaCurve:V","LSPosed-Bridge:V","*:S");
+        command("faults/process-events.txt",6,"logcat","-b","events","-d","-v","threadtime",
+            "am_crash:V","am_anr:V","am_proc_died:V","am_proc_start:V","am_kill:V","boot_progress_system_run:V","*:S");
+        for(String tag:FAULT_TAGS)
+            command("faults/dropbox-"+tag+".txt",6,dropboxArguments(tag));
+    }
+    static final String[] FAULT_TAGS={"system_server_watchdog","system_server_crash","system_server_anr","system_app_crash","system_app_anr"};
+    static final String[] ANR_PREFIXES={"anr_","traces","BinderTraces_pid"},MIUI_WATCHDOG_PREFIXES={"watchdog_pid_","pre_watchdog_pid_"};
+    static String[] dropboxArguments(String tag){
+        if(!Arrays.asList(FAULT_TAGS).contains(tag))throw new IllegalArgumentException("Unknown fault tag");
+        // dumpsys treats dates as exact search terms, not a lower time bound.
+        return new String[]{"dumpsys","-t","4","dropbox","--print",tag};
+    }
+    void recentFaultFiles(File directory,String destination,String[] prefixes,int maximum,long now)throws Exception{
+        if(remainingMillis()<=0){note(destination,"skipped_budget","total collection time budget exhausted");return;}
+        File[] candidates=directory.listFiles();if(candidates==null){note(destination,"unavailable","fault directory absent or inaccessible");return;}
+        Arrays.sort(candidates,Comparator.comparingLong(File::lastModified).reversed().thenComparing(File::getName));
+        File canonical=directory.getCanonicalFile();int selected=0;
+        for(File file:candidates){
+            if(remainingMillis()<=0){note(destination,"skipped_budget","total collection time budget exhausted");break;}
+            String name=file.getName();boolean match=false;for(String prefix:prefixes)if(name.startsWith(prefix)){match=true;break;}
+            if(!match||!file.isFile()||file.lastModified()<now-3L*24*60*60*1000)continue;
+            String path=destination+"/"+name;
+            if(Files.isSymbolicLink(file.toPath())||!canonical.equals(file.getCanonicalFile().getParentFile())){note(path,"skipped_symlink","outside fault directory or symbolic link");continue;}
+            if(selected++>=maximum){note(destination,"skipped_limit","newest "+maximum+" matching files selected");break;}
+            if(file.length()>8L*1024*1024){note(path,"skipped_limit","fault file exceeds 8 MiB; not archived as a partial compressed file");continue;}
+            copy(file,path);
+            if(remainingMillis()<=0)break;
+        }
+    }
     void collect()throws Exception{
-        RootControl.progress("2/8 收集显示、光感、唤醒和温控状态…");
+        RootControl.progress("2/8 优先收集故障记录，再读取显示、光感与电源状态…");
+        collectFaults();
+        long faultTime=System.currentTimeMillis();
+        recentFaultFiles(new File("/data/anr"),"faults/anr",ANR_PREFIXES,6,faultTime);
+        recentFaultFiles(new File("/data/miuilog/stability/scout/watchdog"),"faults/miui-watchdog",MIUI_WATCHDOG_PREFIXES,6,faultTime);
+        String[] rawTags=new String[FAULT_TAGS.length];for(int i=0;i<FAULT_TAGS.length;i++)rawTags[i]=FAULT_TAGS[i]+"@";
+        recentFaultFiles(new File("/data/system/dropbox"),"faults/dropbox-files",rawTags,10,faultTime);
         for(String service:new String[]{"display","sensorservice","power","thermalservice","battery"})command(service+".txt",12,"dumpsys",service);
         command("thermal-zones.txt",5,"sh","-c","for n in /sys/class/thermal/thermal_zone*; do [ -d \"$n\" ] || continue; echo \"ZONE $n\"; for f in type temp; do [ -r \"$n/$f\" ] && { echo \"$f\"; cat \"$n/$f\"; }; done; done; exit 0");
         RootControl.progress("3/8 收集显示接口、资源覆盖与近期系统记录…");
@@ -126,6 +168,6 @@ final class DiagnosticCollector {
         if(new File("/data/local/tmp/luma_curve.log").isFile())command("legacy/recent-log.txt",3,"tail","-n","250","/data/local/tmp/luma_curve.log");
         command("display-second.txt",12,"dumpsys","display");
         RootControl.write(zip,"collection-manifest.json",new JSONObject().put("format",1).put("app_build",AppBuild.BUILD).put("copied_bytes",copied).put("file_limit_bytes",FILE_LIMIT).put("total_file_limit_bytes",TOTAL_LIMIT).put("entries",manifest).toString(2));
-        RootControl.write(zip,"analysis-readme.txt","Read-only, on-demand collection; no brightness writes or sensor registrations. Snapshots are sequential, not simultaneous.\nstate.json/config.json/logs.txt are app/Hook snapshots. pipeline-trace.json and output-trace.json are bounded histories.\nsettings/system.json and settings/*.txt read the three brightness System settings directly through SettingsProvider for primary user 0. Values are exact strings; missing/error/skipped_budget are distinct from zero. No settings shell command or numeric fallback.\ncollection-manifest.json records command errors, timeouts, truncation, unavailable files and SHA-256 hashes of copied files. Partial entries are not complete firmware.\nFirmware and display resources are for private diagnostic analysis, not redistribution in public source, APKs or the website.\n");
+        RootControl.write(zip,"analysis-readme.txt","Read-only, on-demand collection; no brightness writes or sensor registrations. Snapshots are sequential, not simultaneous.\nstate.json/config.json/logs.txt are app/Hook snapshots. pipeline-trace.json and output-trace.json are bounded histories.\nsettings/system.json and settings/*.txt read the three brightness System settings directly through SettingsProvider for primary user 0. Values are exact strings; missing/error/skipped_budget are distinct from zero. No settings shell command or numeric fallback.\ncollection-manifest.json records command errors, timeouts, truncation, unavailable files and SHA-256 hashes of copied files. Partial entries are not complete firmware.\nfaults/ contains bounded crash/system/event logs (latest 2 MiB when truncated) and retained system-server/system-app DropBox tag entries without a CLI date filter. Raw ANR/DropBox files from the last 72 hours are collected newest first, at most 6/10 files and 8 MiB per file; up to 6 recent MIUI Scout watchdog text files and ANR BinderTraces are also selected without heap dumps, before slow display dumps and firmware. DropBox retention is OEM-dependent; empty/missing records do not prove no crash. Full reboot generally loses in-memory logcat and runtime histories; exported archives remain on disk.\nFirmware and display resources are for private diagnostic analysis, not redistribution in public source, APKs or the website.\n");
     }
 }

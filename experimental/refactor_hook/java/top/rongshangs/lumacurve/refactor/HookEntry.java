@@ -72,7 +72,7 @@ public final class HookEntry implements IXposedHookLoadPackage {
             try {
                 installThermal(owner);
                 ResponseTuning.install(owner.getClassLoader());AdvancedTuning.install(owner.getClassLoader());
-                LowLightTuning.install(owner.getClassLoader());
+                LowLightTuning.install(owner.getClassLoader());SceneTuning.install(owner.getClassLoader());
                 PipelineHooks.install(owner);OutdoorTuning.install(owner);RawPanelOutputHooks.install(owner);
                 try {
                 Class<?> ref=Class.forName(REFACTOR,false,owner.getClassLoader());
@@ -99,8 +99,8 @@ public final class HookEntry implements IXposedHookLoadPackage {
                 }));
                 // The adapter changes baseline fields, not private return values.
                 // OEM reset/interpolation code continues to run even when inlined.
-                added.add(XposedBridge.hookMethod(ref.getDeclaredMethod("resetDefaultSpline"),new XC_MethodHook(){protected void afterHookedMethod(MethodHookParam p){HookRuntime state=states.get(p.thisObject);if(state!=null&&state.onDisplayThread()&&!state.changing&&!p.hasThrowable())state.persistentMemory.afterReset();}}));
-                added.add(XposedBridge.hookMethod(output,new XC_MethodHook(){protected void beforeHookedMethod(MethodHookParam param){HookRuntime state=states.get(param.thisObject);if(state!=null&&state.onDisplayThread()&&Float.isNaN((Float)param.args[1])&&!((Boolean)param.args[2]))state.persistentMemory.maybeRestore();}protected void afterHookedMethod(MethodHookParam param){
+                added.add(XposedBridge.hookMethod(ref.getDeclaredMethod("resetDefaultSpline"),new XC_MethodHook(){protected void afterHookedMethod(MethodHookParam p){HookRuntime state=states.get(p.thisObject);if(state!=null&&state.onDisplayThread()&&!state.changing&&!p.hasThrowable())state.persistentMemory.requestAfterReset();}}));
+                added.add(XposedBridge.hookMethod(output,new XC_MethodHook(){protected void beforeHookedMethod(MethodHookParam param){HookRuntime state=states.get(param.thisObject);if(state!=null&&state.onDisplayThread()&&Float.isNaN((Float)param.args[1])&&!((Boolean)param.args[2]))state.persistentMemory.requestRestore();}protected void afterHookedMethod(MethodHookParam param){
                     HookRuntime state=states.get(param.thisObject);if(state==null||param.hasThrowable())return;
                     if(Float.isNaN((Float)param.args[1]) && !((Boolean)param.args[2]))
                         state.sample((Float)param.args[0],(Float)param.getResult());
@@ -172,7 +172,10 @@ public final class HookEntry implements IXposedHookLoadPackage {
             // Validate the replacement before releasing an existing observer.
             HookRuntime state=new HookRuntime(owner,ref,handler);
             if(state.kernel instanceof TraditionalAdapter)TraditionalHooks.install(ref.getClass());
-            synchronized(states){for(HookRuntime old:states.values())old.close();states.clear();}
+            HookRuntime[] previous;
+            synchronized(states){previous=states.values().toArray(new HookRuntime[0]);}
+            for(HookRuntime old:previous)old.close();
+            synchronized(states){states.clear();}
             failedOwners.remove(owner);
             states.put(ref,state);state.start();
         }catch(Throwable error){AttachFailure before=failedOwners.get(owner),failure=new AttachFailure(before==null?1:before.attempts+1);failedOwners.put(owner,failure);

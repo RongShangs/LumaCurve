@@ -22,10 +22,11 @@ sources={
 'de/robv/android/xposed/XposedBridge.java':'package de.robv.android.xposed;public class XposedBridge{public static void log(String text){}}',
 'top/rongshangs/lumacurve/refactor/HookRuntime.java':'''package top.rongshangs.lumacurve.refactor;import java.util.*;import java.io.*;import org.json.*;import android.os.*;import android.provider.Settings;import de.robv.android.xposed.XposedBridge;
 class HookRuntime{static final String CONFIG="config",BUILD="test";String fingerprint="firmware",revision="",phase="attached",message="ready",processedConfig;boolean configProcessed,closed,changing,lowLightEnabled;int reloads;android.content.Context context=new android.content.Context();static String processStart(){return "123";}void refreshUserIdentity(){}
+ final java.util.List<Runnable> jobs=new java.util.ArrayList<>();final DeferredStateWriter stateWriter=new DeferredStateWriter(jobs::add,(k,v)->Settings.Global.putString(context.getContentResolver(),k,v),error->{});void drain(){while(!jobs.isEmpty())jobs.remove(0).run();}
 '''+method('HookRuntime.java','void reload(').split('if(text==null')[0]+'''reloads++;JSONObject j=new JSONObject(text);revision=j.getString("revision");phase=j.optBoolean("enabled")?"active":"attached";publishAcknowledgement();}catch(Exception invalid){phase="error";message="bad settings";publishAcknowledgement();}finally{changing=false;}}
 '''+method('HookRuntime.java','void refreshConfiguration(')+method('HookRuntime.java','void publishAcknowledgement(')+'}',
 'top/rongshangs/lumacurve/refactor/RootControl.java':'''package top.rongshangs.lumacurve.refactor;import org.json.*;import java.util.*;import java.io.*;class RootControl{static final String ACK="lumacurve_refactor_ack_v1",REFRESH="refresh",STATUS="status";JSONObject old;HookRuntime hook;boolean deliver=true;int refreshes,sleeps;Writer settings=new Writer();class Writer{boolean put(String k,String v){refreshes++;if(deliver)hook.refreshConfiguration();return true;}}JSONObject validated(String key){if(!key.equals(ACK))return old;try{String raw=android.provider.Settings.Global.data.get(ACK);if(raw==null)return null;JSONObject ack=new JSONObject(raw);return ack.getString("build").equals("test")&&ack.getInt("pid")==42&&ack.getString("process_start").equals("123")&&ack.getString("fingerprint").equals("firmware")?ack:null;}catch(Exception unavailable){return null;}}JSONObject live(){return old;}
-'''+method('RootControl.java','boolean waitFor(').replace('Thread.sleep(100);','sleeps++;')+method('RootControl.java','String confirmationDetail(')+'}',
+'''+method('RootControl.java','boolean waitFor(').replace('Thread.sleep(100);','sleeps++;hook.drain();')+method('RootControl.java','String confirmationDetail(')+'}',
 'top/rongshangs/lumacurve/refactor/StatusTest.java':r'''package top.rongshangs.lumacurve.refactor;import org.json.*;import java.util.*;import android.provider.Settings;
 public class StatusTest{
  static int cases;static void check(boolean ok){if(!ok)throw new AssertionError("case "+cases);cases++;}
@@ -54,12 +55,12 @@ public class StatusTest{
   for(String value:escapeChunks.values())check(StatusTransport.fits(value));equal(StatusTransport.restore(new JSONObject(escapeChunks.get(StatusTransport.KEY)),escapeChunks::get).getJSONArray("logs"),escaped.getJSONArray("logs"));
   HookRuntime hook=new HookRuntime();RootControl root=new RootControl();root.hook=hook;Settings.Global.data.clear();Settings.Global.data.put("config",new JSONObject().put("revision","submitted").put("enabled",true).toString());
   // Full status is stale/missing, but the config observer/refresh still confirms application.
-  check(root.waitFor("submitted",true));check(hook.reloads==1);check(root.sleeps==0);equal(root.validated(RootControl.ACK).getString("revision"),"submitted");
+  check(root.waitFor("submitted",true));check(hook.reloads==1);check(root.sleeps==1);equal(root.validated(RootControl.ACK).getString("revision"),"submitted");
   hook.lowLightEnabled=true;hook.reload();check(hook.lowLightEnabled);check(hook.reloads==1);check(!hook.changing);
   check(root.waitFor("submitted",true));check(hook.reloads==1);check(hook.lowLightEnabled); // no anchor-resetting duplicate reload
   Settings.Global.data.put("config",new JSONObject().put("revision","off").put("enabled",false).toString());check(root.waitFor("off",false));check(hook.reloads==2);
-  hook.phase="error";hook.message="interface mismatch";hook.publishAcknowledgement();boolean error=false;try{root.waitFor("off",false);}catch(java.io.IOException failure){error=failure.getMessage().equals("interface mismatch");}check(error);
-  Settings.Global.data.clear();root.deliver=false;root.old=new JSONObject().put("revision","old").put("phase","active");check(!root.waitFor("new",true));check(root.sleeps==60);check(root.confirmationDetail().contains("active"));
+  hook.phase="error";hook.message="interface mismatch";hook.publishAcknowledgement();hook.drain();boolean error=false;try{root.waitFor("off",false);}catch(java.io.IOException failure){error=failure.getMessage().equals("interface mismatch");}check(error);
+  hook.drain();Settings.Global.data.clear();root.deliver=false;root.old=new JSONObject().put("revision","old").put("phase","active");root.sleeps=0;check(!root.waitFor("new",true));check(root.sleeps==60);check(root.confirmationDetail().contains("active"));
   // Identity validation does not let a stale boot/build acknowledgment count as success.
   Settings.Global.data.put(RootControl.ACK,new JSONObject().put("build","old-build").put("pid",42).put("process_start","123").put("fingerprint","firmware").put("revision","new").put("phase","active").toString());check(root.validated(RootControl.ACK)==null);check(!root.waitFor("new",true));
   root.old=new JSONObject().put("revision","legacy").put("phase","active");check(root.waitFor("legacy",true));
@@ -72,5 +73,5 @@ files=[]
 for name,text in sources.items():
     p=O/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_text(text,encoding='utf-8');files.append(p)
 C=O/'classes';C.mkdir(exist_ok=True)
-subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(J),'-d',str(C),*[str(p) for p in files],str(S/'StatusTransport.java')],check=True)
+subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(J),'-d',str(C),*[str(p) for p in files],str(S/'StatusTransport.java'),str(S/'DeferredStateWriter.java')],check=True)
 subprocess.run(['java','-cp',str(C)+';'+str(J),'top.rongshangs.lumacurve.refactor.StatusTest'],check=True)

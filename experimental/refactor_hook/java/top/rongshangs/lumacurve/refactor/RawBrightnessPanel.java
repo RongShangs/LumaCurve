@@ -60,7 +60,8 @@ final class RawBrightnessPanel {
        "guard_node_mismatch".equals(reason)?(en?"Writer changed; restore automatic brightness first":"守护节点已变化，请先恢复自动亮度"):
        "node_not_writable".equals(reason)?(en?"Display node is read-only; export diagnostics":"已找到显示节点，但未取得写入权限"):
        (en?"No identifiable primary brightness node":"未找到可识别的主屏亮度节点");
-   state.setText(message);current.setText("—");target.setText("—");range.setText("—");
+   if(node!=null&&node.has("write_errno"))message+=" (errno "+node.optInt("write_errno")+")";
+   state.setText(message);current.setText(node!=null&&node.has("actual")?String.valueOf(node.optInt("actual")):"—");target.setText("—");range.setText(node!=null&&node.has("maximum")?String.valueOf(node.optInt("maximum")):"—");
    slider.ready=false;inputAction.setEnabled(false);maxAction.setEnabled(false);inputAction.setAlpha(.4f);maxAction.setAlpha(.4f);slider.invalidate();return;
   }
   maximum=node.optInt("maximum",10);int actual=node.optInt("actual",-1);JSONObject guard=node.optJSONObject("guard");

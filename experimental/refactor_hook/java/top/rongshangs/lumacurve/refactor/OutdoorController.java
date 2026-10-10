@@ -10,6 +10,7 @@ final class OutdoorController {
     OutdoorOptions options=new OutdoorOptions();HbmAccess access;boolean ticking,failed,probing;String error="",lastReason="";
     long deadline=-1,boosts,rangeRaises,dynamicRaises,oprRaises,goalAt=-1;float goal=Float.NaN,nativeRange=Float.NaN,deliveredRange=Float.NaN,nativeDynamic=Float.NaN,deliveredDynamic=Float.NaN;
     final ArrayDeque<JSONObject> history=new ArrayDeque<>();final Map<String,JSONObject> lastStages=new HashMap<>();
+    final LiveLimitEvidence liveLimits=new LiveLimitEvidence();
     final Runnable wake;
     OutdoorController(HookRuntime s){this.s=s;wake=()->{deadline=-1;if(s.closed)return;tick();s.requestRecalculation();s.queuePublish();};}
     HbmAccess binding(){try{Object hbm=HookEntry.get(s.owner,"mHbmController");if(access==null||access.controller!=hbm){if(access!=null)access.restore();access=new HbmAccess(hbm);}access.observeReplacement();return access;}catch(Throwable unavailable){error=unavailable.toString();return null;}}
@@ -25,8 +26,8 @@ final class OutdoorController {
         }catch(Throwable unknown){return limited;}
     }
     void oprApplied(float input,float limited,float delivered){oprRaises++;stage("outdoor_opr_native",input,limited);stage("outdoor_opr_relax",limited,delivered);}
-    void configure(OutdoorOptions next){if(!options.same(next)){policy.reset();goal=Float.NaN;}options=next;failed=false;error="";tick();}
-    void stop(){s.handler.removeCallbacks(wake);deadline=-1;goal=Float.NaN;options=new OutdoorOptions();policy.step(options,Float.NaN,SystemClock.uptimeMillis(),null);failed=false;
+    void configure(OutdoorOptions next){liveLimits.clear();if(!options.same(next)){policy.reset();goal=Float.NaN;}options=next;failed=false;error="";tick();}
+    void stop(){s.handler.removeCallbacks(wake);deadline=-1;goal=Float.NaN;liveLimits.clear();options=new OutdoorOptions();policy.step(options,Float.NaN,SystemClock.uptimeMillis(),null);failed=false;
         if(access!=null)try{boolean changed=access.restore();if(changed)access.reevaluate(lux());}catch(Throwable failed){error=failed.toString();s.log("户外增强恢复异常："+error);}}
     float lux(){try{Object impl=HookEntry.get(s.owner,"mAutomaticBrightnessControllerImpl"),abc=HookEntry.get(impl,"mAutomaticBrightnessController");if(!Boolean.TRUE.equals(HookRuntime.optionalBoolean(abc,"mAmbientLuxValid")))return Float.NaN;return HookRuntime.optionalNumber(abc,"mAmbientLux");}catch(Throwable unknown){return Float.NaN;}}
     String block(){
@@ -72,8 +73,9 @@ final class OutdoorController {
         deliveredRange=result;if(result>original&&!probing)rangeRaises++;return result;
     }
     float target(float base){
+        if(!options.flags[0])return base;
         tick();if(!policy.active||access==null||block()!=null)return base;
-        try{float max=access.allowedMax(),normal=access.normal();goal=OutdoorPolicy.target(options,lux(),base,Math.min(normal,max),max);if(goal>base){boosts++;goalAt=SystemClock.uptimeMillis();}return goal;}
+        try{float max=access.allowedMax(),normal=access.normal();goal=OutdoorPolicy.target(options,lux(),base,Math.min(normal,max),max);if(OutdoorPolicy.valid(goal))goalAt=SystemClock.uptimeMillis();if(goal>base)boosts++;return goal;}
         catch(Throwable failed){error=failed.toString();return base;}
     }
     float dynamicRange(float original){nativeDynamic=original;float result=original;
@@ -82,6 +84,7 @@ final class OutdoorController {
     }
     void stage(String name,float before,float after){
         if(!OutdoorPolicy.valid(before)||!OutdoorPolicy.valid(after))return;
+        liveLimits.record(name,before,after,SystemClock.uptimeMillis());
         try{JSONObject old=lastStages.get(name);if(old!=null&&Float.compare(before,(float)old.optDouble("before"))==0&&Float.compare(after,(float)old.optDouble("after"))==0)return;
             JSONObject row=new JSONObject().put("stage",name).put("before",before).put("after",after).put("uptime_ms",SystemClock.uptimeMillis()).put("unix_ms",System.currentTimeMillis()).put("limited",after<before-1e-5f);
             if(history.size()>=32)history.removeFirst();history.addLast(row);lastStages.put(name,row);s.queuePublish();
@@ -90,7 +93,7 @@ final class OutdoorController {
     JSONObject status(){JSONObject j=new JSONObject();try{
         HbmAccess h=binding();j.put("supported",supported()).put("hbm_tuning_supported",h!=null&&h.tunable()).put("range_supported",rangeSupported()).put("opr_supported",oprSupported());
         j.put("enabled",options.flags[0]).put("active",policy.active).put("reason",policy.reason).put("text",description(policy.reason)).put("target_adjustments",boosts).put("range_adjustments",rangeRaises).put("dynamic_range_adjustments",dynamicRaises).put("opr_adjustments",oprRaises).put("opr_enabled",options.flags[3]);
-        JSONObject config=new JSONObject();options.put(config);j.put("options",config).put("limit_trace",new JSONArray(history));
+        JSONObject config=new JSONObject();options.put(config);j.put("options",config).put("limit_trace",new JSONArray(history)).put("current_limits",liveLimits.snapshot(SystemClock.uptimeMillis()));
         long now=SystemClock.uptimeMillis();if(deadline>=0)j.put("next_transition_ms",Math.max(0,deadline-now));j.put("cooldown_left_ms",Math.max(0,policy.cooldownUntil-now));
         if(policy.active)j.put("session_left_ms",Math.max(0,(long)options.values[6]-(now-policy.started)));
         if(Float.isFinite(goal))j.put("requested_brightness",goal).put("request_age_ms",Math.max(0,now-goalAt));if(OutdoorPolicy.valid(nativeRange))j.put("native_range_max",nativeRange);if(OutdoorPolicy.valid(deliveredRange))j.put("effective_range_max",deliveredRange);

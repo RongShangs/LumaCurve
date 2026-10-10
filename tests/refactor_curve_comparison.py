@@ -47,6 +47,10 @@ public class CurveComparisonTest {
   r.remove("current_anchors_nit");c=CurveComparison.read(r,factors,0,false);check(!c.memoryChanged(r));check(c.current==null);
   // The traditional default stays default even though the OEM interpolates between its knots.
   r=runtime();r.remove("active_logical_nit");r.put("curve_backend","physical_mapping").put("physical_mapping_active",true).put("factory_full_lux",new JSONArray("[0,5,30,100,600,1000,100000]")).put("factory_full_nit",new JSONArray("[2,20,100,150,300,500,1060]"));c=CurveComparison.read(r,factors,0,false);check(c.systemDefault());check(!c.memoryChanged(r));
+  // Zero-valued OEM plateaus are valid and must not produce a 0/0 factor.
+  r.put("min_logical_nit",0).put("factory_logical_nit",new JSONArray("[0,0,300,1060]")).put("factory_full_nit",new JSONArray("[0,0,0,150,300,500,1060]"));
+  c=CurveComparison.read(r,new float[]{1,1,1,1},0,false);check(c.systemDefault());eq(c.baseline.at(30),0);eq(c.baseline.at(100000),1060);
+  c=CurveComparison.read(r,new float[]{1,1,1.2f,1},0,true);eq(c.baseline.at(30),0);eq(c.baseline.at(600),360);
   System.out.println("Curve comparison: "+cases+" cases PASS; production graph data, Android rendering not tested");
  }
 }''',encoding='utf-8')

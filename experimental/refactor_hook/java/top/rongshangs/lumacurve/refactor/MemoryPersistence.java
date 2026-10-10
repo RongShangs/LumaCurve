@@ -8,16 +8,21 @@ final class MemoryPersistence {
  final HookRuntime state;MemoryOptions options=new MemoryOptions(true,30);
  boolean replaying,pendingRestore,asleep,wakeRestore,archiveLoaded,modelSynced;String pendingWrite,cachedRecord,status="尚无已保存的手动记忆",restoreCause="";
  int savedPoints;long restored,wakeReadyAt,restoreDeadline;float closeLux=Float.NaN,acceptedLux=Float.NaN;
- final Runnable writer=()->flush(),restorer=()->maybeRestore(),expiry=()->expireWake();
+ boolean restoreQueued,resetQueued;
+ final Runnable writer=()->flush(),restorer=()->{restoreQueued=false;maybeRestore();},expiry=()->expireWake(),resetter=()->{resetQueued=false;afterReset();};
  MemoryPersistence(HookRuntime state){this.state=state;}
  String scope()throws Exception{CurvePlan p=state.kernel.plan();if(p==null)throw new IllegalStateException("基础曲线未启用");return CurveIdentity.of(state.fingerprint+":"+state.baselineId()+":"+state.kernel.integer("mUserSerial"),p.lux(),p.nits(),state.kernel.min,state.kernel.max);}
  void configure(MemoryOptions next,boolean reset){
   if(!next.persist){cancelRestore();state.handler.removeCallbacks(writer);pendingWrite=null;status="记忆持久化已关闭";}
   if(!next.unlock&&wakeRestore)cancelRestore();options=next;if(next.persist&&reset){flush();scheduleRestore();}
  }
- void cancelRestore(){pendingRestore=false;state.handler.removeCallbacks(restorer);state.handler.removeCallbacks(expiry);wakeReadyAt=0;restoreDeadline=0;}
+ void cancelRestore(){pendingRestore=false;restoreQueued=resetQueued=false;state.handler.removeCallbacks(restorer);state.handler.removeCallbacks(resetter);state.handler.removeCallbacks(expiry);wakeReadyAt=0;restoreDeadline=0;}
+ // A mapper getter or an unfinished OEM reset must never restore/mutate its own model.
+ void requestRestore(){queueRestore(0);}
+ void queueRestore(long delay){if(state.closed||replaying||!pendingRestore||!options.persist||restoreQueued)return;restoreQueued=true;if(!state.handler.postDelayed(restorer,delay))restoreQueued=false;}
+ void requestAfterReset(){if(state.closed||state.changing||replaying||!options.persist||resetQueued)return;resetQueued=true;if(!state.handler.post(resetter))resetQueued=false;}
  void expireWake(){if(pendingRestore&&wakeRestore&&!asleep&&restoreDeadline>0&&SystemClock.uptimeMillis()>=restoreDeadline){cancelRestore();status="亮屏确认超时，本次不恢复";state.queuePublish();}}
- void scheduleRestore(){if(!state.closed&&!replaying&&options.persist){pendingRestore=true;wakeRestore=false;restoreCause="startup";state.handler.post(restorer);}}
+ void scheduleRestore(){if(!state.closed&&!replaying&&options.persist){pendingRestore=true;wakeRestore=false;restoreCause="startup";requestRestore();}}
  void afterReset(){
   if(state.closed||state.changing||replaying||!options.persist||!state.phase.equals("active")||!state.appliesToUser())return;
   try{if(pendingRestore)return;if(state.power==null||!state.power.isInteractive()){screenOff();return;}if(!Boolean.TRUE.equals(state.kernel.get("mUseAutoBrightness")))scheduleRestore();
@@ -33,8 +38,8 @@ final class MemoryPersistence {
   if(options.persist&&options.unlock){pendingRestore=true;wakeRestore=true;restoreCause="unlock";restoreDeadline=SystemClock.uptimeMillis()+20000;state.handler.removeCallbacks(expiry);state.handler.postDelayed(expiry,20000);status="等待亮屏后的有效照度";}
  }
  void ambientReady(float lux){if(state.closed||!pendingRestore||asleep||!Float.isFinite(lux)||lux<0)return;acceptedLux=lux;
-  if(wakeRestore&&wakeReadyAt==0){wakeReadyAt=SystemClock.uptimeMillis()+options.settleMs;state.handler.removeCallbacks(restorer);state.handler.postDelayed(restorer,options.settleMs);}
-  else maybeRestore();
+  if(wakeRestore&&wakeReadyAt==0){wakeReadyAt=SystemClock.uptimeMillis()+options.settleMs;state.handler.removeCallbacks(restorer);restoreQueued=false;queueRestore(options.settleMs);}
+  else requestRestore();
  }
  boolean ready()throws Exception{
   if(state.closed||asleep||state.changing||replaying||!state.phase.equals("active")||!state.appliesToUser()||!state.onDisplayThread()||state.memoryStrength==0||state.kernel.plan()==null||state.power==null||!state.power.isInteractive()||!Boolean.TRUE.equals(state.kernel.get("mUseAutoBrightness"))||Boolean.TRUE.equals(state.hdrActive()))return false;
@@ -51,7 +56,10 @@ final class MemoryPersistence {
   }catch(Throwable error){status="手动记忆保存失败";state.log(status+"："+error.getMessage());}
  }
  void flush(){if(pendingWrite==null)return;
-  try{JSONObject record=new JSONObject(pendingWrite),model=state.memoryLifecycle.modelRecord();JSONArray p=record.getJSONArray("points");
+  try{JSONObject record=new JSONObject(pendingWrite),model=null;JSONArray p=record.getJSONArray("points");
+   // The debounced points may belong to the baseline/user that was just replaced.
+   // Save those points, but never attach a short-term model from the new scope.
+   try{if(record.getString("scope").equals(scope()))model=state.memoryLifecycle.modelRecord();}catch(Exception unavailable){}
    // The outer ABC callback updates its model after the inner curve hook returns.
    // Capture that model at save time, only if it belongs to a saved user anchor.
    if(model!=null)for(int i=0;i<p.length();i++)if(Math.abs(p.getJSONObject(i).getDouble("lux")-model.getDouble("lux"))<.5){record.put("model",model);break;}

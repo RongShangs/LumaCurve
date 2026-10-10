@@ -14,6 +14,7 @@ final class ResponsiveDialog extends LinearLayout {
         addView(title,new LayoutParams(-1,-2));
         body=new ScrollView(host){@Override protected void onMeasure(int w,int h){int limit=bodyLimit;if(MeasureSpec.getMode(h)!=MeasureSpec.UNSPECIFIED)limit=Math.min(limit,MeasureSpec.getSize(h));super.onMeasure(w,MeasureSpec.makeMeasureSpec(Math.max(1,limit),MeasureSpec.AT_MOST));}};
         body.setFillViewport(false);
+        body.setTag("dialog-scroll");
         // Existing detail dialogs already supply a ScrollView. Reuse its contents,
         // so neither nested scrolling nor an old fixed height constrains this viewport.
         if(content instanceof ScrollView&&((ScrollView)content).getChildCount()==1){ScrollView old=(ScrollView)content;content=old.getChildAt(0);old.removeView(content);}
