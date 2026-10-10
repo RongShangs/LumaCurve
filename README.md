@@ -10,6 +10,27 @@
 
 应用名称为 **HyperLux**，安装包为 `HyperLux-3.0.0.apk`。包名 `top.rongshangs.lumacurve`、蓝色曲线图标、官网及 `RongShangs/LumaCurve` 仓库继续沿用；源码与恢复包沿用 `LumaCurve-` 文件名。
 
+## 界面预览 / Screenshots
+
+<table>
+  <tr>
+    <th>状态页</th>
+    <th>场景判定与控制</th>
+    <th>户外高亮</th>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/3.0.0/status.jpg" alt="HyperLux 3.0.0 状态页：光感、场景、曲线与输出保护" width="260"></td>
+    <td><img src="docs/screenshots/3.0.0/scene-controls.jpg" alt="HyperLux 3.0.0 场景判定与控制设置" width="260"></td>
+    <td><img src="docs/screenshots/3.0.0/outdoor-brightness.jpg" alt="HyperLux 3.0.0 户外高亮设置" width="260"></td>
+  </tr>
+</table>
+
+### 用户强光效果示例
+
+用户提供的强光手电演示，仅展示特定设备与设置下的效果，不代表日常亮度或所有机型的亮度上限。实际输出取决于本机映射、配置和系统保护。
+
+<p><img src="docs/screenshots/3.0.0/user-strong-light-demo.jpg" alt="用户提供的强光手电演示，实际亮度因设备和设置而异" width="640"></p>
+
 ## 3.0.0 正式版
 
 当前构建 `release-3.0.0 / 30002`，提供正式 APK、源码与恢复包。保留原签名与配置，覆盖安装后重启。
