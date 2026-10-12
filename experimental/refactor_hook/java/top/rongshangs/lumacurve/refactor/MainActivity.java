@@ -17,6 +17,7 @@ import java.util.*;
 import java.util.concurrent.*;
 
 public final class MainActivity extends Activity {
+    @Override public android.content.SharedPreferences getPreferences(int mode){return UiPreferences.open(this);}
     int INK=0xff24303c,MUTED=0xff616d79,BLUE=0xff3265df,BG=0xfffafafa;boolean darkTheme;
     int themed(int color){return ThemePalette.color(color,darkTheme);}
     MemoryOptions memoryOptions=new MemoryOptions(true,30);Switch persistSwitch;SeekBar retentionSlider,pointLimitSlider;TextView retentionLabel,pointLimitLabel;Bundle restoredUi;

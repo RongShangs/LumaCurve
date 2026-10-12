@@ -11,7 +11,7 @@ final class SettingsNotice {
     static final String CONFIG="每个人对屏幕亮度的感受都不同。照搬别人的配置，未必适合自己，就像买衣服不能直接照着别人的尺码买。\n\n配置导入、导出是为了备份和恢复自己的偏好，不提倡用户间分享配置，更不提倡跨机型套用。";
     static final String USAGE="• 觉得某种光线下亮度不合适：调整基础亮度曲线（蓝色曲线）。\n\n• 日常使用中亮度不舒服：随时调整控制中心的亮度条。开启手动记忆后，系统会根据你的调整学习偏好，显示为绿色曲线。\n\n• 户外屏幕太暗：按需开启户外高亮，并设置适合自己的增强幅度和亮度上限。\n\n• 暗光下亮度不稳定：调整暗光稳定或暗光锁定。\n\n• 温控相关设置只作用于显示亮度链路，不影响系统其他部分的温控。";
     static final String GUIDANCE="状态页提供实时说明和快捷跳转，各项设置按用途分类，并配有说明、详细参数和预设。这些设计是为了帮助你逐步调出适合自己的亮度体验；预设也应结合实际感受选择。";
-    static final String CLOSING="请根据自己的使用感受调整，不必向别人索要配置。若无法理解 HyperLux 中的功能，不建议使用本工具。";
+    static final String CLOSING="请根据自己的使用感受调整，不必向别人索要配置。";
     final MainActivity a;
     AlertDialog current;Button confirm;NoticeCountdown countdown;Runnable afterDismiss;
     final Runnable update=()->refreshCountdown();

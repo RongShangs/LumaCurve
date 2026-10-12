@@ -1,6 +1,6 @@
 # 3.0.1 本地交付审阅
 
-范围：以正式版 3.0.0 为基线，合入户外 nit 上限、桌面图标开关与首次设置须知。身份为 `release-3.0.1 / 30004`，`TEST=false`、`INTERNAL=false`；只本地打包，不推送 Git，不创建 Release，不部署官网，不操作手机。
+范围：以正式版 3.0.0 为基线，合入户外 nit 上限、桌面图标开关与首次设置须知。身份为 `release-3.0.1 / 30005`，`TEST=false`、`INTERNAL=false`；用户已授权正式推送源码、GitHub Release、LSPosed 分发与官网；不操作手机。
 
 ## 户外上限
 
@@ -24,4 +24,11 @@
 
 ## 验证边界
 
-完整构建结果记录在本地生成的 `build/refactor-hook/verification.json` 与交付包 `build-info.json`。主机模型和固件静态核对不代表本版 Android UI 或亮度真机实测；当前 ADB 无设备，本轮不安装或重启。已发布 3.0.0 APK 保持原哈希；官网仍保留已发布版本。
+完整构建结果记录在本地生成的 `build/refactor-hook/verification.json` 与交付包 `build-info.json`。主机模型和固件静态核对不代表本版 Android UI 或亮度真机实测；当前 ADB 无设备，本轮不安装或重启。已发布 3.0.0 APK 保持原哈希；3.0.1 发布时核对官网、原仓库与 LSPosed 使用同一 APK。
+
+## 正式发布补充复审
+
+- 复现重复须知原因：Android 的 `Activity.getPreferences()` 使用启动组件的本地类名。从 `Launcher` 别名与 `refactor.MainActivity` 设置入口启动会读取不同文件。行为按 [AOSP Activity 源码](https://github.com/aosp-mirror/platform_frameworks_base/blob/master/core/java/android/app/Activity.java)核对。
+- `UiPreferences` 固定沿用原 `refactor.MainActivity` 存储；一次合并旧 Launcher 等入口中缺失的键，原主入口的设置优先。已确认状态取各旧入口的并集；既有确认保留，不被旧 false 覆盖。迁移只执行一次，不回灌旧值，不导入导出须知确认状态。
+- 增加真实 Activity 偏好覆盖方法的回归：先重现旧版双入口不一致，再验证入口切换、反复重建、旧确认迁移、配置类型、预设与刷新偏好保留。清除应用数据后仍需重新确认。
+- 红米卡死按作者明确提供的用户后续测试反馈记为修复完成，不把主机检查当作亲自完成目标设备长期实测。历史排查记录保留原时间点的判断。
