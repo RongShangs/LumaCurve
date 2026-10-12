@@ -17,7 +17,7 @@ final class BranchReport {
     static String reading(JSONObject s,boolean assist,long elapsed){StatusPresentation.Reading r=StatusPresentation.sensor(s,assist,elapsed);return Double.isFinite(r.lux)?String.format(Locale.ROOT,"%.1f lux",r.lux):r.text;}
     static String route(JSONObject f){String r=f==null?"":f.optString("route");return r.equals("refactor")?"Refactor 曲线":r.equals("mapping")?"标准映射曲线":"未取得";}
     static String strategy(JSONObject s){String r=s==null?"":s.optString("output_strategy");switch(r){case "AutomaticBrightnessStrategy":return "自动亮度";case "FallbackBrightnessStrategy":return "系统回退";case "ScreenOffBrightnessStrategy":return "熄屏";case "DozeBrightnessStrategy":return "息屏显示";case "TemporaryBrightnessStrategy":return "临时亮度";case "OverrideBrightnessStrategy":return "应用指定亮度";default:return r.isEmpty()?"未取得":r;}}
-    static String stage(String s){switch(s){case "outdoor_opr_native":case "adjustBrightnessByOpr":return "画面灰阶限亮";case "adjustBrightnessByThermal":return "显示温控";case "adjustBrightnessByBattery":return "电池限亮";case "adjustBrightnessByPowerSaveMode":return "省电限亮";case "adjustBrightnessToPeak":return "峰值范围";case "adjustBrightnessByBcbc":return "画面亮度修正";case "adjustSdrBrightness":return "SDR 输出";default:return s;}}
+    static String stage(String s){switch(s){case "outdoor_nit_limit":return "户外亮度上限";case "outdoor_opr_native":case "adjustBrightnessByOpr":return "画面灰阶限亮";case "adjustBrightnessByThermal":return "显示温控";case "adjustBrightnessByBattery":return "电池限亮";case "adjustBrightnessByPowerSaveMode":return "省电限亮";case "adjustBrightnessToPeak":return "峰值范围";case "adjustBrightnessByBcbc":return "画面亮度修正";case "adjustSdrBrightness":return "SDR 输出";default:return s;}}
     static List<Section> read(JSONObject snapshot,long uptime,long elapsed){
         List<Section> result=new ArrayList<>();JSONObject s=StatusPresentation.fresh(snapshot,elapsed)?snapshot:null;
         JSONObject scenes=StatusPresentation.scenes(s),outdoor=s==null?null:s.optJSONObject("outdoor"),control=s==null?null:s.optJSONObject("brightness_control");
@@ -47,6 +47,7 @@ final class BranchReport {
         long requestAge=outdoor==null?-1:outdoor.optLong("request_age_ms",-1);
         output.row("最近请求目标",requestAge>=0&&requestAge<=5000?percent(outdoor,"requested_brightness"):"未取得有效请求","以下百分比是系统亮度坐标，不是实际 nit。");
         output.row("可用范围上限",percent(outdoor,"display_range_max"),"");output.row("设备映射上限",percent(outdoor,"device_mapping_max"),"");
+        output.row("户外亮度上限",outdoor==null?"未取得":outdoor.has("maximum_nit")?number(outdoor,"maximum_nit"," nit"):"不限制","仅在户外增强生效时限制自动亮度；温控等保护仍可进一步降亮。");
         Section hbm=new Section("系统高亮条件");result.add(hbm);
         hbm.row("HDR",flag(s,"hdr_active","当前生效","当前未生效"),"");hbm.row("阳光增强",flag(s,"sunlight_active","当前生效","当前未生效"),"");
         hbm.row("HBM 控制器",flag(scenes,"hbm_controller_enabled","已启用","未启用"),"控制器开启不代表已经进入高亮。");

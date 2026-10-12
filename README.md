@@ -2,13 +2,13 @@
 
 **适配 HyperOS 4 的自动亮度工具。** 在系统亮度链路内调整曲线与手动偏好记忆，继续使用系统的双侧感光、场景判定和过渡动画；也可按需调整显示层温控与变化确认时间。
 
-**3.0.0 正式版 / 30002** · Root + LSPosed · GPL-3.0 · 完全开源免费
+**3.0.1 正式版 / 30004（本地待发布）** · Root + LSPosed · GPL-3.0 · 完全开源免费
 
 已修复息屏清理、诊断和亮度重算中的风险，保留曲线、场景与已有配置。K90 偶发解锁卡死仍在排查；详见本版已知问题与验证范围。
 
 [官网](https://lc.rongshangs.top) · [下载安装](https://github.com/RongShangs/LumaCurve/releases/latest) · [作者博客](https://rongshangs.top) · [酷安@戎Shangs](https://www.coolapk.com/u/3261403)
 
-应用名称为 **HyperLux**，安装包为 `HyperLux-3.0.0.apk`。包名 `top.rongshangs.lumacurve`、蓝色曲线图标、官网及 `RongShangs/LumaCurve` 仓库继续沿用；源码与恢复包沿用 `LumaCurve-` 文件名。
+应用名称为 **HyperLux**，安装包为 `HyperLux-3.0.1.apk`。包名 `top.rongshangs.lumacurve`、蓝色曲线图标、官网及 `RongShangs/LumaCurve` 仓库继续沿用；源码与恢复包沿用 `LumaCurve-` 文件名。
 
 ## 界面预览 / Screenshots
 
@@ -30,6 +30,16 @@
 用户提供的强光手电演示，仅展示特定设备与设置下的效果，不代表日常亮度或所有机型的亮度上限。实际输出取决于本机映射、配置和系统保护。
 
 <p><img src="docs/screenshots/3.0.0/user-strong-light-demo.jpg" alt="用户提供的强光手电演示，实际亮度因设备和设置而异" width="640"></p>
+
+## 3.0.1 正式版（本地待发布）
+
+当前构建 `release-3.0.1 / 30004`，已生成本地正式包，尚未推送、发布或部署；官网和 Release 仍提供 3.0.0。
+
+- 户外高亮可直接输入 nit 上限，例如 2000 nit；0 表示不限制。按本机映射换算，温控等保护仍可继续降亮。
+- “运行与工具”底部可隐藏桌面图标，并通过 LSPosed 打开应用后恢复。
+- 首次进入设置页显示“用户需知”，10 秒倒计时后点击确定；仅在本机记录确认状态。
+
+沿用原签名和配置，覆盖安装后重启加载新钩子。详见 [3.0.1 更新日志](docs/releases/3.0.1.md)与 [审阅记录](docs/review-3.0.1.md)。本版尚无真机验证结果。
 
 ## 3.0.0 正式版
 

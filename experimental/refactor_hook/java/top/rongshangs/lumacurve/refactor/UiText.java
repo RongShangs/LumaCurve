@@ -1407,6 +1407,32 @@ public final class UiText {
         WORDS.put("确认时间请输入 0–60 秒（最多三位小数）","Enter 0–60 seconds with up to three decimal places");
         WORDS.put("设置：","Setting: ");
         WORDS.put("当前：","Current: ");
+        WORDS.put("户外亮度上限","Outdoor brightness ceiling");
+        WORDS.put("额外增强幅度","Extra boost strength");
+        WORDS.put("不限制","No ceiling");
+        WORDS.put(" · 本机暂不支持"," \u00b7 Unavailable on this device");
+        WORDS.put("仅在户外增强生效时限制自动亮度；0 表示不限制。温控等保护仍可进一步降亮。","Limits automatic brightness only while outdoor boost is active. Set 0 for no ceiling. System protections may dim it further.");
+        WORDS.put("仅在户外增强生效时限制自动亮度；温控等保护仍可进一步降亮。","Only limits automatic brightness during outdoor boost; system protections can dim it further.");
+        WORDS.put("增强幅度只增加目标亮度；需要限制最高亮度时，请设置户外亮度上限。","Boost strength only raises the target. Use the outdoor brightness ceiling to limit the maximum.");
+        WORDS.put("输入最高目标亮度，0 表示不限制。保存并应用后，仅在户外增强期间生效。","Enter the maximum target in nit, or 0 for no ceiling. Save and apply; the ceiling only applies during outdoor boost.");
+        WORDS.put("按系统 nit 映射换算；高于设备映射上限的设置不会让屏幕更亮。","Uses the system nit mapping. A ceiling above the device mapping maximum does not increase brightness.");
+        WORDS.put("输入 nit，0 表示不限制","Enter nit, or 0 for no ceiling");
+        WORDS.put("请输入 0–20000 nit，0 表示不限制","Enter 0\u201320000 nit; 0 means no ceiling");
+        WORDS.put("本机暂不支持 nit 亮度上限","Nit brightness ceilings are unavailable on this device");
+        WORDS.put("户外亮度上限低于本机最小亮度","The outdoor ceiling is below the device minimum brightness");
+        WORDS.put("nit 上限不可用，沿用系统亮度","Nit ceiling unavailable; system brightness retained");
+        WORDS.put("HyperLux 是基于 HyperOS 4 的亮度个性化设置工具。安装后会自动读取本机原有的亮度配置；未修改并应用设置时，沿用系统默认亮度策略。","HyperLux personalizes display brightness on HyperOS 4. It reads the original brightness configuration for your device. Until you change and apply settings, the system brightness behavior remains in use.");
+        WORDS.put("每个人对屏幕亮度的感受都不同。照搬别人的配置，未必适合自己，就像买衣服不能直接照着别人的尺码买。\n\n配置导入、导出是为了备份和恢复自己的偏好，不提倡用户间分享配置，更不提倡跨机型套用。","Everyone perceives brightness differently. Someone else's settings may not suit you, just as their clothing size may not fit you.\n\nConfiguration import and export are intended to back up and restore your own preferences. Sharing configurations is discouraged, especially across different device models.");
+        WORDS.put("• 觉得某种光线下亮度不合适：调整基础亮度曲线（蓝色曲线）。\n\n• 日常使用中亮度不舒服：随时调整控制中心的亮度条。开启手动记忆后，系统会根据你的调整学习偏好，显示为绿色曲线。\n\n• 户外屏幕太暗：按需开启户外高亮，并设置适合自己的增强幅度和亮度上限。\n\n• 暗光下亮度不稳定：调整暗光稳定或暗光锁定。\n\n• 温控相关设置只作用于显示亮度链路，不影响系统其他部分的温控。","• If brightness feels wrong under certain lighting, adjust the base brightness curve (blue).\n\n• If brightness feels uncomfortable in daily use, adjust the Control Center brightness slider. With manual memory enabled, the system learns from your adjustments and shows a green curve.\n\n• If the display is too dim outdoors, enable outdoor boost as needed and choose a suitable boost strength and brightness ceiling.\n\n• If brightness fluctuates in dim light, adjust low-light stability or low-light lock.\n\n• Thermal settings affect the display brightness pipeline only. They do not alter thermal control elsewhere in the system.");
+        WORDS.put("状态页提供实时说明和快捷跳转，各项设置按用途分类，并配有说明、详细参数和预设。这些设计是为了帮助你逐步调出适合自己的亮度体验；预设也应结合实际感受选择。","The status page provides live explanations and shortcuts. Settings are grouped by purpose, with descriptions, detailed parameters and presets. These tools help you gradually find a comfortable brightness experience; choose presets according to your own experience as well.");
+        WORDS.put("请根据自己的使用感受调整，不必向别人索要配置。若无法理解 HyperLux 中的功能，不建议使用本工具。","Adjust settings according to your own experience instead of asking for someone else's configuration. If you cannot understand the functions in HyperLux, using this tool is not recommended.");
+        WORDS.put("用户需知","Before configuring HyperLux");
+        WORDS.put("请使用适合自己的配置","Use settings that suit you");
+        WORDS.put("推荐的使用方式","Recommended usage");
+        WORDS.put("按实际感受逐步调整","Adjust gradually based on your experience");
+        WORDS.put("隐藏桌面图标","Hide launcher icon");
+        WORDS.put("隐藏后仍可从 LSPosed 的模块设置打开 HyperLux。在这里关闭开关即可恢复图标；立即生效，无需保存。","Open HyperLux from its module settings in LSPosed after hiding the icon. Turn this switch off to restore it. Changes take effect immediately.");
+        WORDS.put("无法修改桌面图标，请稍后重试","Could not change the launcher icon. Try again later.");
         PHRASES=new ArrayList<>(WORDS.entrySet());PHRASES.sort((a,b)->Integer.compare(b.getKey().length(),a.getKey().length()));
     }
     public static String translate(String text,boolean english){

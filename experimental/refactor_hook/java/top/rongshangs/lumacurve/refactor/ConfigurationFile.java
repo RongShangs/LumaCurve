@@ -60,6 +60,7 @@ final class ConfigurationFile {
         new CurvePlan(lux,nit,(float)runtime.getDouble("min_logical_nit"),(float)runtime.getDouble("max_logical_nit"),factors,floor);out.put("factors",CurvePlan.encode(factors)).put("curve_floor_nit",floor);
         String[][] caps={{"thermal_relax","thermal_supported"},{"response_override","response_supported"},{"small_brighten_override","small_response_supported"},{"low_light_stability","low_light_supported"},{"outdoor_enabled","outdoor_supported"},{"outdoor_hbm_tuning","outdoor_hbm_supported"},{"outdoor_range_unlock","outdoor_range_supported"},{"outdoor_opr_relax","outdoor_opr_supported"}};
         for(String[] pair:caps)disable(out,pair[0],runtime.optBoolean(pair[1]),notes);
+        if(out.getDouble("outdoor_max_nit")>0&&!runtime.optBoolean("outdoor_nit_limit_supported")){out.put("outdoor_max_nit",0);notes.add("本机 nit 换算接口未就绪，已取消户外亮度上限");}
         for(String group:AdvancedOptions.GROUPS)disable(out,group,runtime.optBoolean(group+"_supported"),notes);
         if(!out.getBoolean("outdoor_enabled")){out.put("outdoor_hbm_tuning",false).put("outdoor_range_unlock",false).put("outdoor_opr_relax",false);}
         if(!out.getBoolean("outdoor_range_unlock"))disable(out,"outdoor_opr_relax",false,notes);

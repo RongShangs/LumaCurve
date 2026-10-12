@@ -18,7 +18,7 @@ final class SettingsPresets {
     if(mode==3){require(caps,"outdoor_range_supported",true);o.flags[2]=true;o.flags[3]=caps.optBoolean("outdoor_opr_supported");
      // Only lower the trigger on a verified, timed HBM controller. Keep its original budget.
      o.flags[1]=caps.optBoolean("outdoor_hbm_supported");if(o.flags[1])o.values[8]=.5;}
-    o.put(p);return p;
+    o.put(p);p.remove("outdoor_max_nit");return p;
    case "response":
     require(caps,"response_supported",enabled);p.put("response_override",enabled).put("small_brighten_override",enabled&&caps.optBoolean("small_response_supported"));
     if(enabled)p.put("brighten_delay",mode==1?1500:3000).put("darken_delay",mode==1?2000:5000).put("small_brighten_delay",mode==1?1500:5000);return p;

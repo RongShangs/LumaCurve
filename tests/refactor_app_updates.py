@@ -14,7 +14,9 @@ class AlertDialog{Consumer<AlertDialog> dismissed;boolean visible;void setOnDism
 class Queue{final ArrayDeque<Runnable> tasks=new ArrayDeque<>();void execute(Runnable r){tasks.add(r);}void post(Runnable r){tasks.add(r);}void drain(){while(!tasks.isEmpty())tasks.remove().run();}}
 class Preferences{Map<String,String> values=new HashMap<>();String getString(String k,String fallback){return values.getOrDefault(k,fallback);}Preferences edit(){return this;}Preferences putString(String k,String v){values.put(k,v);return this;}void apply(){}}
 class UpdateChecker{static final String WEBSITE="https://lc.rongshangs.top";static JSONObject reply;static boolean fail;static int calls;static JSONObject check()throws Exception{calls++;if(fail)throw new Exception("offline");return new JSONObject(reply.toString());}}
+class SettingsNotice{boolean visible;boolean showing(){return visible;}}
 class MainActivity{
+ final SettingsNotice settingsNotice=new SettingsNotice();
  boolean updateBusy,updateChecked,destroyed,visible=true,permissionDialogVisible,legacyDialogVisible;Object pendingLegacy;JSONObject pendingUpdate;AlertDialog updateDialog;
  final Queue network=new Queue(),ui=new Queue();final TextView updateLabel=new TextView();final Preferences prefs;final Map<String,Runnable> buttons=new LinkedHashMap<>();String opened="",notice="";int dialogs;
  MainActivity(Preferences p){prefs=p;}Preferences getPreferences(int mode){return prefs;}String tr(String s){return s;}int dp(int n){return n;}void show(String s){notice=s;}void open(String url){opened=url;}
@@ -41,6 +43,7 @@ public class UpdateTest{
   a.buttons.get("忽略此版本").run();check(prefs.getString("ignored_update_version","").equals("2.5.1"));
   // A deferred automatic offer must recheck the preference before showing.
   release("2.6.0");a=new MainActivity(prefs);a.visible=false;a.checkUpdate(false);a.complete();check(a.pendingUpdate!=null&&a.dialogs==0);prefs.putString("ignored_update_version","2.6.0");a.visible=true;a.offerUpdate();check(a.updateDialog==null&&a.pendingUpdate==null);
+  release("2.6.1");a=new MainActivity(prefs);a.settingsNotice.visible=true;a.checkUpdate(false);a.complete();check(a.pendingUpdate!=null&&a.updateDialog==null);a.settingsNotice.visible=false;a.offerUpdate();check(a.updateDialog.visible);a.buttons.get("稍后").run();
   // Explicit checks can survive deferred permission/legacy dialogs.
   a.visible=false;a.checkUpdate(true);a.complete();a.visible=true;a.offerUpdate();check(a.updateDialog.visible);a.buttons.get("稍后").run();
   a=new MainActivity(new Preferences());a.checkUpdate(false);a.network.drain();a.destroyed=true;a.ui.drain();check(a.dialogs==0&&a.pendingUpdate==null);

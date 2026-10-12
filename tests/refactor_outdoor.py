@@ -40,10 +40,11 @@ sources={
  public float getMaxHbmBrightnessForPeak(){return (Float)XposedBridge.invoke(this,"getMaxHbmBrightnessForPeak",new Class<?>[]{},new Object[]{},()->.85f);}
  private boolean shouldUsePrivacyOprBrightness(){if(throwPrivacy)throw new IllegalStateException("privacy unavailable");return privacy;}
  private boolean isHdrScene(){return hdrScene;}
+ public int nitReads,nitMode;public float nitScale=3500,lastSdrInput;public float convertBrightnessToNit(float b){nitReads++;if(nitMode==1)return Float.NaN;if(nitMode==2)return b>.4f&&b<.7f?100:3500*b*b;if(nitMode==3)return 10+nitScale*b*b;return nitScale*b*b;}
  public float adjustBrightnessByOpr(float b,BrightnessReason reason){return (Float)XposedBridge.invoke(this,"adjustBrightnessByOpr",new Class<?>[]{float.class,BrightnessReason.class},new Object[]{b,reason},()->{if(b>opr)reason.addModifier(8192);return Math.min(b,opr);});}
  private float adjustBrightnessByThermal(float b,boolean hdr,BrightnessReason reason){return (Float)XposedBridge.invoke(this,"adjustBrightnessByThermal",new Class<?>[]{float.class,boolean.class,BrightnessReason.class},new Object[]{b,hdr,reason},()->Math.min(b,thermal));}
  private float adjustBrightnessByBattery(float b,BrightnessReason reason){return (Float)XposedBridge.invoke(this,"adjustBrightnessByBattery",new Class<?>[]{float.class,BrightnessReason.class},new Object[]{b,reason},()->Math.min(b,battery));}
- public float adjustSdrBrightness(float b,boolean auto,BrightnessReason reason,boolean fast,boolean dim){return (Float)XposedBridge.invoke(this,"adjustSdrBrightness",new Class<?>[]{float.class,boolean.class,BrightnessReason.class,boolean.class,boolean.class},new Object[]{b,auto,reason,fast,dim},()->{float out=adjustBrightnessByOpr(dim?Math.min(b,.4f):b,reason);if(throwSdr)throw new IllegalStateException("SDR failed");out=Math.min(out,getMaxHbmBrightnessForPeak());out=Math.min(out,power);out=adjustBrightnessByThermal(out,false,reason);out=adjustBrightnessByBattery(out,reason);animationCalls++;return out;});}
+ public float adjustSdrBrightness(float b,boolean auto,BrightnessReason reason,boolean fast,boolean dim){Object[] args={b,auto,reason,fast,dim};return (Float)XposedBridge.invoke(this,"adjustSdrBrightness",new Class<?>[]{float.class,boolean.class,BrightnessReason.class,boolean.class,boolean.class},args,()->{lastSdrInput=(Float)args[0];float out=adjustBrightnessByOpr(dim?Math.min(lastSdrInput,.4f):lastSdrInput,reason);if(throwSdr)throw new IllegalStateException("SDR failed");out=Math.min(out,getMaxHbmBrightnessForPeak());out=Math.min(out,power);out=adjustBrightnessByThermal(out,false,reason);out=adjustBrightnessByBattery(out,reason);animationCalls++;return out;});}
 }''',
 'top/rongshangs/lumacurve/refactor/OutdoorTest.java':r'''package top.rongshangs.lumacurve.refactor;
 import org.json.*;import com.android.server.display.*;import com.android.server.display.config.*;import com.android.server.display.brightness.*;import android.os.*;
@@ -140,6 +141,52 @@ public class OutdoorTest{static int count;static void check(boolean b){if(!b)thr
   HookRuntime disabled=new HookRuntime();disabled.power.fail=true;int beforeReads=disabled.power.reads;for(int i=0;i<100;i++)eq(disabled.outdoor.target(.5f),.5f);check(disabled.power.reads==beforeReads&&disabled.outdoor.access==null&&!disabled.outdoor.failed);disabled.power.fail=false;
   // Disabling an active enhancement still restores HBM data through configure.
   s.outdoor.configure(new OutdoorOptions());check(!s.outdoor.policy.active);eq(s.outdoor.target(.5f),.5f);
+
+  // A physical-nit ceiling limits an already-high OEM target independently of boost strength.
+  check(off.values[OutdoorOptions.MAX_NIT]==0);owner.opr=.57f;owner.thermal=owner.battery=owner.power=1;
+  JSONObject limited=new JSONObject().put("outdoor_enabled",true).put("outdoor_range_unlock",true).put("outdoor_opr_relax",true).put("outdoor_strength",.5).put("outdoor_max_nit",2000);
+  config=OutdoorOptions.parse(limited);JSONObject nitCaps=new JSONObject().put("outdoor_supported",true).put("outdoor_range_supported",true).put("outdoor_opr_supported",true);
+  try{config.verify(nitCaps);throw new AssertionError();}catch(IllegalArgumentException expected){count++;}config.verify(nitCaps.put("outdoor_nit_limit_supported",true));
+  s.outdoor.validateNitLimit(config);s.outdoor.configure(config);s.handler.advance(SystemClock.now+3000);
+  float cap=s.outdoor.nitCeiling(2000);check(cap>2000f/3500);check(owner.convertBrightnessToNit(cap)<=2000);check(2000-owner.convertBrightnessToNit(cap)<.01);
+  eq(owner.mAutomaticBrightnessControllerImpl.getOverrideLimitBrightness(1,false,30000),cap);
+  eq(owner.adjustSdrBrightness(1,true,new BrightnessReason(),false,false),cap);eq(owner.lastSdrInput,cap);
+  check(s.outdoor.status().getDouble("maximum_nit")==2000);check(s.outdoor.status().getDouble("mapping_max_nit")==3500);
+  int reads=owner.nitReads;for(int i=0;i<100;i++)eq(s.outdoor.nitCeiling(2000),cap);check(owner.nitReads-reads==300);
+  owner.thermal=.3f;eq(owner.adjustSdrBrightness(1,true,new BrightnessReason(),false,false),.3f);owner.thermal=1;
+  owner.battery=.4f;eq(owner.adjustSdrBrightness(1,true,new BrightnessReason(),false,false),.4f);owner.battery=1;
+  owner.power=.2f;eq(owner.adjustSdrBrightness(1,true,new BrightnessReason(),false,false),.2f);owner.power=1;
+  eq(owner.adjustSdrBrightness(.1f,true,new BrightnessReason(),false,false),.1f);
+  // Manual, HDR, privacy and unknown ownership keep the OEM result.
+  eq(owner.adjustSdrBrightness(1,false,new BrightnessReason(),false,false),owner.opr);eq(owner.lastSdrInput,1);
+  for(String scope:new String[]{"privacy","hdr","auto","unknown"}){
+   owner.privacy=scope.equals("privacy");owner.hdrScene=scope.equals("hdr");owner.mAutoBrightnessEnable=!scope.equals("auto");owner.throwPrivacy=scope.equals("unknown");
+   eq(owner.adjustSdrBrightness(1,true,new BrightnessReason(),false,false),owner.opr);eq(owner.lastSdrInput,1);eq(s.outdoor.limit(1),1);
+   owner.privacy=owner.hdrScene=owner.throwPrivacy=false;owner.mAutoBrightnessEnable=true;
+  }
+  for(String gate:new String[]{"screen","user","thread","hdr","power","temperature","manual","output","lux","scene"}){
+   if(gate.equals("screen"))s.screen=false;if(gate.equals("user"))s.user=false;if(gate.equals("thread"))s.thread=false;if(gate.equals("hdr"))s.hdr=true;if(gate.equals("power"))s.power.low=true;if(gate.equals("temperature"))s.batteryTemperature=Float.NaN;if(gate.equals("manual"))s.kernel.auto=false;if(gate.equals("output"))s.strategy="TemporaryBrightnessStrategy";if(gate.equals("lux"))owner.mAutomaticBrightnessControllerImpl.mAutomaticBrightnessController.mAmbientLuxValid=false;if(gate.equals("scene"))s.scene=false;
+   eq(owner.adjustSdrBrightness(1,true,new BrightnessReason(),false,false),owner.opr);eq(owner.lastSdrInput,1);
+   s.screen=s.user=s.thread=s.scene=true;s.hdr=false;s.power.low=false;s.batteryTemperature=30;s.kernel.auto=true;s.strategy="AutomaticBrightnessStrategy";owner.mAutomaticBrightnessControllerImpl.mAutomaticBrightnessController.mAmbientLuxValid=true;
+   s.outdoor.stop();s.outdoor.configure(config);s.handler.advance(SystemClock.now+3000);
+  }
+  owner.throwSdr=true;try{owner.adjustSdrBrightness(1,true,new BrightnessReason(),false,false);throw new AssertionError();}catch(RuntimeException expected){count++;}check(OutdoorOpr.current.get()==null);owner.throwSdr=false;
+  // Both presets/strength and OPR relaxation must remain inside the independent ceiling.
+  config=OutdoorOptions.parse(limited.put("outdoor_strength",1));s.outdoor.configure(config);s.handler.advance(SystemClock.now+3000);eq(owner.adjustSdrBrightness(1,true,new BrightnessReason(),false,false),cap);
+  config=OutdoorOptions.parse(limited.put("outdoor_max_nit",1000));s.outdoor.configure(config);s.handler.advance(SystemClock.now+3000);check(owner.convertBrightnessToNit(owner.adjustSdrBrightness(1,true,new BrightnessReason(),false,false))<=1000);
+  config=OutdoorOptions.parse(limited.put("outdoor_max_nit",4000));s.outdoor.configure(config);s.handler.advance(SystemClock.now+3000);eq(owner.adjustSdrBrightness(1,true,new BrightnessReason(),false,false),1);
+  config=OutdoorOptions.parse(limited.put("outdoor_max_nit",0));s.outdoor.configure(config);s.handler.advance(SystemClock.now+3000);eq(owner.adjustSdrBrightness(1,true,new BrightnessReason(),false,false),1);
+  config=OutdoorOptions.parse(limited.put("outdoor_max_nit",2000).put("outdoor_opr_relax",false).put("outdoor_range_unlock",false));s.outdoor.configure(config);s.handler.advance(SystemClock.now+3000);owner.opr=1;eq(owner.adjustSdrBrightness(1,true,new BrightnessReason(),false,false),cap);
+  owner.nitScale=7000;float changed=s.outdoor.nitCeiling(2000);check(changed<cap);check(owner.convertBrightnessToNit(changed)<=2000);owner.nitScale=3500;
+  // Unsupported/non-monotonic mappings reject activation and retain OEM output at runtime.
+  for(int mode:new int[]{1,2}){owner.nitMode=mode;s.outdoor.configure(config);s.handler.advance(SystemClock.now+3000);check(!s.outdoor.status().getBoolean("nit_limit_supported"));
+   try{s.outdoor.validateNitLimit(config);throw new AssertionError();}catch(IllegalArgumentException expected){count++;}
+   eq(owner.adjustSdrBrightness(1,true,new BrightnessReason(),false,false),.85f);check(s.outdoor.status().has("nit_limit_detail"));owner.nitMode=0;
+  }
+  owner.nitMode=3;config=OutdoorOptions.parse(limited.put("outdoor_max_nit",5));try{s.outdoor.validateNitLimit(config);throw new AssertionError();}catch(IllegalArgumentException expected){count++;}owner.nitMode=0;
+  owner.mHbmController.mBrightnessMin=.1f;config=OutdoorOptions.parse(limited.put("outdoor_max_nit",10));try{s.outdoor.validateNitLimit(config);throw new AssertionError();}catch(IllegalArgumentException expected){count++;}
+  config=OutdoorOptions.parse(limited.put("outdoor_max_nit",35));s.outdoor.validateNitLimit(config);eq(s.outdoor.nitCeiling(35),.1f);owner.mHbmController.mBrightnessMin=0;
+  s.outdoor.configure(new OutdoorOptions());eq(owner.adjustSdrBrightness(1,true,new BrightnessReason(),false,false),.85f);eq(owner.lastSdrInput,1);
   System.out.println("Outdoor production hooks: "+count+" cases PASS; deterministic OEM model, device not verified");
  }
 }'''
@@ -147,6 +194,6 @@ public class OutdoorTest{static int count;static void check(boolean b){if(!b)thr
 for path,text in sources.items():
     file=OUT/path;file.parent.mkdir(parents=True,exist_ok=True);file.write_text(text,encoding='utf-8')
 classes=OUT/'classes';classes.mkdir(exist_ok=True)
-production=[SRC/(name+'.java') for name in ['OutdoorOptions','OutdoorPolicy','HbmAccess','OutdoorController','OutdoorTuning','OutdoorOpr','ThermalPolicy','AdvancedPolicy','LiveLimitEvidence']]
+production=[SRC/(name+'.java') for name in ['OutdoorOptions','OutdoorPolicy','HbmAccess','OutdoorController','OutdoorTuning','OutdoorOpr','ThermalPolicy','AdvancedPolicy','LiveLimitEvidence','NitBrightnessLimit']]
 subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(JSON),'-d',str(classes),*map(str,production),*[str(OUT/p) for p in sources]],check=True)
 subprocess.run(['java','-cp',str(classes)+';'+str(JSON),'top.rongshangs.lumacurve.refactor.OutdoorTest'],check=True)

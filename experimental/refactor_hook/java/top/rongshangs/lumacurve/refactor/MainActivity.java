@@ -34,13 +34,14 @@ public final class MainActivity extends Activity {
     TextView memoryWindowLabel,memoryRangeLabel,coolingLabel,brightenLabel,darkenLabel,refreshLabel,updateLabel;
     JSONObject pendingUpdate;AlertDialog updateDialog;
     final Set<AlertDialog> openDialogs=new HashSet<>();
+    final SettingsNotice settingsNotice=new SettingsNotice(this);Switch hideLauncherSwitch;boolean updatingLauncher;
     final Map<String,Runnable> detailOpeners=new HashMap<>();final ScrollView[] settingsScrollers=new ScrollView[10];
     LinearLayout thanksList;TextView thanksStatus;boolean thanksBusy,autoScroll=true;long thanksChecked;
     float lowLightLimit=50;long lowLightBrighten=3000,lowLightDarken=4000;
     SeekBar lowLimitSlider,lowBrightSlider,lowDarkSlider;TextView lowLimitLabel,lowBrightLabel,lowDarkLabel;
     LowLightThresholds lowThresholds=new LowLightThresholds();Switch lowThresholdSwitch;final SeekBar[] lowThresholdSliders=new SeekBar[4];final TextView[] lowThresholdLabels=new TextView[4];
     LowLightAssistGate assistGateOptions=new LowLightAssistGate();Switch assistGateSwitch;SeekBar assistGateWait,assistGateTolerance;TextView assistGateWaitLabel,assistGateToleranceLabel,assistGateStatus;
-    OutdoorOptions outdoorOptions=new OutdoorOptions();Switch outdoorSwitch,hbmSwitch,rangeSwitch,oprSwitch;TextView outdoorStatus;final SeekBar[] outdoorSliders=new SeekBar[OutdoorOptions.KEYS.length];final TextView[] outdoorLabels=new TextView[OutdoorOptions.KEYS.length];
+    OutdoorOptions outdoorOptions=new OutdoorOptions();Switch outdoorSwitch,hbmSwitch,rangeSwitch,oprSwitch;TextView outdoorStatus;Button outdoorCapButton;final SeekBar[] outdoorSliders=new SeekBar[OutdoorOptions.KEYS.length];final TextView[] outdoorLabels=new TextView[OutdoorOptions.KEYS.length];
     AdvancedOptions advanced=new AdvancedOptions();
     SceneOptions sceneOptions=new SceneOptions();SceneSettings sceneSettings;
     final Switch[] advancedSwitches=new Switch[AdvancedOptions.GROUPS.length];final SeekBar[] advancedSliders=new SeekBar[AdvancedOptions.KEYS.length];final TextView[] advancedLabels=new TextView[AdvancedOptions.KEYS.length];
@@ -83,7 +84,7 @@ public final class MainActivity extends Activity {
     AlertDialog dialog(String title,View body){LinearLayout actions=column();actions.setOrientation(LinearLayout.HORIZONTAL);actions.setBaselineAligned(false);actions.setGravity(Gravity.END);actions.setTag("actions");
         ResponsiveDialog box=new ResponsiveDialog(this,text(title,20,INK),body,actions);boolean landscape=getResources().getConfiguration().orientation==android.content.res.Configuration.ORIENTATION_LANDSCAPE;box.setPadding(dp(22),dp(landscape?12:20),dp(22),dp(landscape?12:18));box.setBackground(background(BG,24));AlertDialog d=new AlertDialog.Builder(this).setView(box).create();
         box.setClipToOutline(true);Window w=d.getWindow();ResponsiveDialog.configure(this,w,dp(landscape?520:440));if(w!=null)w.setDimAmount(.32f);
-        box.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener(){public void onViewAttachedToWindow(View v){openDialogs.add(d);}public void onViewDetachedFromWindow(View v){openDialogs.remove(d);}});
+        box.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener(){public void onViewAttachedToWindow(View v){openDialogs.add(d);}public void onViewDetachedFromWindow(View v){openDialogs.remove(d);ui.post(settingsNotice::showIfNeeded);}});
         // Animate the content itself: application styles are not valid WMS animation resources.
         if(android.animation.ValueAnimator.areAnimatorsEnabled()){box.setAlpha(0);d.setOnShowListener(v->box.animate().alpha(1).setDuration(180).start());}return d;}
     void dialogButton(AlertDialog d,String label,Runnable task,boolean primary){View decor=d.getWindow().getDecorView();LinearLayout actions=(LinearLayout)decor.findViewWithTag("actions");
@@ -162,7 +163,14 @@ public final class MainActivity extends Activity {
         settingsTarget=settingGroups[6];makeAdvancedStatus();makeRefreshSettings();
         settingsTarget=settingGroups[7];makeDarkLockSettings();makeLowLightSettings();
         settingsTarget=settingGroups[8];makeManualPanelSettings();
+        makeLauncherSetting();
     }
+    void makeLauncherSetting(){
+        LinearLayout b=card(settingsHome);hideLauncherSwitch=new Switch(this);hideLauncherSwitch.setText(tr("隐藏桌面图标"));hideLauncherSwitch.setTextSize(14);hideLauncherSwitch.setMinimumHeight(dp(48));b.addView(hideLauncherSwitch,new LinearLayout.LayoutParams(-1,-2));
+        b.addView(text("隐藏后仍可从 LSPosed 的模块设置打开 HyperLux。在这里关闭开关即可恢复图标；立即生效，无需保存。",12,MUTED));syncLauncherSetting();
+        hideLauncherSwitch.setOnCheckedChangeListener((v,hidden)->{if(updatingLauncher)return;try{LauncherVisibility.setHidden(this,hidden);syncLauncherSetting();}catch(RuntimeException unavailable){syncLauncherSetting();show("无法修改桌面图标，请稍后重试");}});
+    }
+    void syncLauncherSetting(){if(hideLauncherSwitch==null)return;updatingLauncher=true;try{hideLauncherSwitch.setChecked(LauncherVisibility.hidden(this));hideLauncherSwitch.setEnabled(true);}catch(RuntimeException unavailable){hideLauncherSwitch.setEnabled(false);}finally{updatingLauncher=false;}}
     void showSettingsGroup(int group){rememberSettingsHome();settingsGroup=group;header.setVisibility(group<0?View.VISIBLE:View.GONE);if(bottomNav!=null)bottomNav.setVisibility(group<0?View.VISIBLE:View.GONE);transitionPage(group<0?content.getChildAt(1):settingScreens[group],group<0?-1:1);drawCurve();if(group<0)restoreSettingsHome();}
     void rememberSettingsHome(){if(settingsHomeScroll!=null&&displayedPage==settingsHomeScroll&&!settingsHomeRestoring)settingsHomeY=settingsHomeScroll.getScrollY();++settingsScrollRestore;settingsHomeRestoring=false;}
     void restoreSettingsHome(){if(settingsHomeScroll==null)return;final ScrollView scroll=settingsHomeScroll;final int y=settingsHomeY;final long request=++settingsScrollRestore;settingsHomeRestoring=true;scroll.requestFocus();
@@ -214,9 +222,12 @@ public final class MainActivity extends Activity {
         oprSwitch=new Switch(this);oprSwitch.setText(tr("强光下放宽画面限亮"));oprSwitch.setTextSize(14);b.addView(oprSwitch,new LinearLayout.LayoutParams(-1,dp(48)));
         b.addView(text("强光下减少画面内容造成的限亮，提高可用亮度上限；需先开放高亮范围。",12,MUTED));
         b.addView(text("两项仍受温控、电量和 HBM 时间预算限制。",11,MUTED));
+        outdoorCapButton=button("户外亮度上限：不限制",this::editOutdoorNitLimit,b);
+        b.addView(text("仅在户外增强生效时限制自动亮度；0 表示不限制。温控等保护仍可进一步降亮。",12,MUTED));
         outdoorStatus=text("等待读取户外高亮条件",13,BLUE);b.addView(outdoorStatus);button("查看高亮条件",this::branches,b);
         b=settingsDetails(b,"outdoor");
         for(int i:new int[]{0,1,5})outdoorParameter(b,i);
+        b.addView(text("增强幅度只增加目标亮度；需要限制最高亮度时，请设置户外亮度上限。",12,MUTED));
         LinearLayout details=column();b.addView(details);
         for(int i:new int[]{2,3,4,6,7})outdoorParameter(details,i);
         hbmSwitch=new Switch(this);hbmSwitch.setText(tr("调整自动 HBM 触发与预算"));hbmSwitch.setTextSize(14);details.addView(hbmSwitch,new LinearLayout.LayoutParams(-1,dp(48)));
@@ -230,14 +241,34 @@ public final class MainActivity extends Activity {
         boolean supported=runtime!=null&&runtime.optBoolean("outdoor_supported"),hbm=runtime!=null&&runtime.optBoolean("outdoor_hbm_supported"),range=runtime!=null&&runtime.optBoolean("outdoor_range_supported");
         outdoorSwitch.setChecked(outdoorOptions.flags[0]);outdoorSwitch.setEnabled(supported||outdoorOptions.flags[0]);hbmSwitch.setChecked(outdoorOptions.flags[1]);hbmSwitch.setEnabled(outdoorOptions.flags[0]&&(hbm||outdoorOptions.flags[1]));rangeSwitch.setChecked(outdoorOptions.flags[2]);rangeSwitch.setEnabled(outdoorOptions.flags[0]&&(range||outdoorOptions.flags[2]));
         oprSwitch.setChecked(outdoorOptions.flags[3]);oprSwitch.setEnabled(outdoorOptions.flags[0]&&outdoorOptions.flags[2]&&(runtime!=null&&runtime.optBoolean("outdoor_opr_supported")||outdoorOptions.flags[3]));
-        String[] labels={"进入照度","全强度照度","进入确认","退出确认","退出照度比例","增强强度","单次最长增强","增强冷却","HBM 触发照度倍率","HBM 时间预算倍率"};
+        boolean nitSupported=runtime!=null&&runtime.optBoolean("outdoor_nit_limit_supported");double cap=outdoorOptions.values[OutdoorOptions.MAX_NIT];
+        outdoorCapButton.setText(tr("户外亮度上限")+"："+(cap>0?format(cap)+" nit":tr("不限制"))+(nitSupported?"":tr(" · 本机暂不支持")));outdoorCapButton.setEnabled(outdoorOptions.flags[0]&&(nitSupported||cap>0));
+        String[] labels={"进入照度","全强度照度","进入确认","退出确认","退出照度比例","额外增强幅度","单次最长增强","增强冷却","HBM 触发照度倍率","HBM 时间预算倍率"};
         for(int i=0;i<outdoorSliders.length;i++)if(outdoorSliders[i]!=null){double value=outdoorOptions.values[i];boolean time=i==2||i==3||i==6||i==7;outdoorLabels[i].setText(tr(labels[i])+"："+format(time?value/1000:i==4||i==5?value*100:value)+(time?tr(" 秒"):i==0||i==1?" lux":i==4||i==5?"%":"×"));outdoorSliders[i].setProgress((int)Math.round((value-OutdoorOptions.MIN[i])/OutdoorOptions.STEP[i]));enableParameter(outdoorSliders[i],outdoorLabels[i],supported&&outdoorOptions.flags[0]&&(i<8||hbm&&outdoorOptions.flags[1]));}
         JSONObject state=runtime==null?null:runtime.optJSONObject("outdoor");outdoorStatus.setText(state==null?tr("等待读取户外高亮条件"):outdoorSummary(state));drawDraftState();
+    }
+    void editOutdoorNitLimit(){
+        LinearLayout body=column();body.addView(text("输入最高目标亮度，0 表示不限制。保存并应用后，仅在户外增强期间生效。",14,MUTED));
+        JSONObject state=runtime==null?null:runtime.optJSONObject("outdoor");final double minimumNit=state==null?0:state.optDouble("mapping_min_nit",0);
+        if(state!=null&&state.has("mapping_max_nit"))body.addView(text(tr("设备映射上限")+"："+format(state.optDouble("mapping_max_nit"))+" nit",13,MUTED));
+        body.addView(text("按系统 nit 映射换算；高于设备映射上限的设置不会让屏幕更亮。",12,MUTED));
+        EditText number=input("输入 nit，0 表示不限制");number.setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);number.setText(format(outdoorOptions.values[OutdoorOptions.MAX_NIT]));body.addView(number);
+        TextView error=text("",12,0xffad5426);body.addView(error);AlertDialog d=dialog("户外亮度上限",body);d.show();dialogButton(d,"取消",null,false);
+        LinearLayout actions=(LinearLayout)d.getWindow().getDecorView().findViewWithTag("actions");Button confirm=compact("确定",()->{
+            try{double value=Double.parseDouble(number.getText().toString().trim());if(!Double.isFinite(value)||value<0||value>OutdoorOptions.MAX[OutdoorOptions.MAX_NIT])throw new IllegalArgumentException(tr("请输入 0–20000 nit，0 表示不限制"));
+                if(value>0&&(runtime==null||!runtime.optBoolean("outdoor_nit_limit_supported")))throw new IllegalArgumentException(tr("本机暂不支持 nit 亮度上限"));
+                if(value>0&&value<minimumNit)throw new IllegalArgumentException(tr("户外亮度上限低于本机最小亮度"));
+                outdoorOptions.values[OutdoorOptions.MAX_NIT]=value;dirty=true;drawOutdoor();d.dismiss();
+            }catch(NumberFormatException invalid){error.setText(tr("请输入 0–20000 nit，0 表示不限制"));}catch(IllegalArgumentException invalid){error.setText(invalid.getMessage());}
+        },actions);confirm.setTextColor(0xffffffff);confirm.setBackground(background(BLUE,12));
     }
     String outdoorSummary(JSONObject state){String message=tr(state.optString("text","未取得"));if(state.has("blocking_condition"))message+=" · "+tr(OutdoorController.description(state.optString("blocking_condition")));if(state.has("session_left_ms"))message+=" · "+tr("剩余 ")+format(state.optDouble("session_left_ms")/1000)+tr(" 秒");return message;}
     String outdoorDetails(JSONObject state){StringBuilder out=new StringBuilder(outdoorSummary(state));
         String[][] fields={{"normal_max","HBM 亮度分界"},{"native_range_max","系统原范围上限"},{"effective_range_max","当前范围上限"},{"dynamic_native_max","照度动态范围原上限"},{"dynamic_effective_max","照度动态范围现上限"},{"device_mapping_max","设备映射上限"},{"display_range_max","显示范围上限"},{"clamper_max","最终限亮器上限"},{"requested_brightness","户外请求目标"},{"actual_brightness","当前屏幕亮度"}};
         for(String[] field:fields)if(state.has(field[0]))out.append("\n").append(tr(field[1])).append(": ").append(format(state.optDouble(field[0])*100)).append("%");
+        out.append("\n").append(tr("户外亮度上限")).append(": ").append(state.has("maximum_nit")?format(state.optDouble("maximum_nit"))+" nit":tr("不限制"));
+        if(state.has("mapping_max_nit"))out.append("\n").append(tr("设备映射上限")).append(": ").append(format(state.optDouble("mapping_max_nit"))).append(" nit");
+        if(state.has("nit_limit_detail"))out.append("\n").append(tr("nit 上限不可用，沿用系统亮度"));
         out.append("\n").append(tr(state.optBoolean("controller_managed")?"本机使用 HBM 控制器":"本机未启用 HBM 计时，不能据此推断没有其他限亮"));
         if(state.has("original_minimum_lux"))out.append("\n").append(tr("HBM 原触发照度")).append(": ").append(format(state.optDouble("original_minimum_lux"))).append(" lux");
         if(state.has("effective_minimumLux"))out.append("\n").append(tr("HBM 当前触发照度")).append(": ").append(format(state.optDouble("effective_minimumLux"))).append(" lux");
@@ -246,7 +277,7 @@ public final class MainActivity extends Activity {
         JSONArray stages=state.optJSONArray("limit_trace");if(stages!=null){out.append("\n\n").append(tr("最近观察到的输出限制"));long now=SystemClock.uptimeMillis();int shown=0;for(int i=stages.length()-1;i>=0&&shown<6;i--){JSONObject stage=stages.optJSONObject(i);if(stage==null||!stage.optBoolean("limited")||now-stage.optLong("uptime_ms")>60000)continue;out.append("\n").append(limitStage(stage.optString("stage"))).append(": ").append(format(stage.optDouble("before")*100)).append("% → ").append(format(stage.optDouble("after")*100)).append("% · ").append(format((now-stage.optLong("uptime_ms"))/1000d)).append(tr(" 秒前"));shown++;}if(shown==0)out.append("\n").append(tr("最近一分钟未观察到降亮，不代表驱动没有限制"));}
         return out.toString();
     }
-    String limitStage(String stage){switch(stage){case "outdoor_opr_native":case "adjustBrightnessByOpr":return tr("画面灰阶限亮");case "adjustBrightnessByThermal":return tr("显示温控");case "adjustBrightnessByBattery":return tr("电池限亮");case "adjustBrightnessByPowerSaveMode":return tr("省电限亮");case "adjustBrightnessToPeak":return tr("峰值范围");case "adjustBrightnessByBcbc":return tr("画面亮度修正");case "adjustSdrBrightness":return tr("SDR 输出");default:return stage;}}
+    String limitStage(String stage){switch(stage){case "outdoor_nit_limit":return tr("户外亮度上限");case "outdoor_opr_native":case "adjustBrightnessByOpr":return tr("画面灰阶限亮");case "adjustBrightnessByThermal":return tr("显示温控");case "adjustBrightnessByBattery":return tr("电池限亮");case "adjustBrightnessByPowerSaveMode":return tr("省电限亮");case "adjustBrightnessToPeak":return tr("峰值范围");case "adjustBrightnessByBcbc":return tr("画面亮度修正");case "adjustSdrBrightness":return tr("SDR 输出");default:return stage;}}
     void makeMemorySettings(){
         LinearLayout b=card(settingsTarget);b.addView(text("记住手动偏好",18,INK));
         LinearLayout strengths=row(b);compact("完整记忆",()->{memoryEnabled=true;memoryStrength=1;dirty=true;drawCurve();},strengths);compact("渐进记忆",()->{memoryEnabled=true;memoryStrength=.25f;dirty=true;drawCurve();},strengths);compact("不记忆",()->{memoryEnabled=false;dirty=true;drawCurve();},strengths);memorySwitch=new Switch(this);memorySwitch.setText(tr("记住我的手动调整"));memorySwitch.setTextSize(14);memorySwitch.setShowText(false);b.addView(memorySwitch,new LinearLayout.LayoutParams(-1,dp(48)));
@@ -441,7 +472,7 @@ public final class MainActivity extends Activity {
     void copyGroupNumber(){android.content.ClipboardManager cm=(android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE);cm.setPrimaryClip(ClipData.newPlainText(tr("QQ 交流群"),"314981836"));show("已复制群号");}
     void rememberLegacy(JSONObject answer){JSONArray modules=answer.optJSONArray("legacy_modules");if(modules==null||modules.length()==0){pendingLegacy=null;legacyNotice="";return;}if(!modules.toString().equals(legacyNotice))pendingLegacy=modules;}
     void offerLegacyModules(){
-        if(pendingLegacy==null||!visible||permissionDialogVisible||legacyDialogVisible||updateDialog!=null)return;
+        if(pendingLegacy==null||!visible||permissionDialogVisible||legacyDialogVisible||updateDialog!=null||settingsNotice.showing())return;
         JSONArray modules=pendingLegacy;pendingLegacy=null;legacyNotice=modules.toString();legacyDialogVisible=true;LinearLayout body=column();body.addView(text("请在 Root 管理器中卸载这些旧模块并重启，避免多套引擎同时调节亮度。",14,INK));
         for(int i=0;i<modules.length();i++){JSONObject module=modules.optJSONObject(i);if(module==null)continue;String state=module.optString("state");body.addView(text(module.optString("name")+"\n"+module.optString("id")+(state.equals("disabled")?" · 已停用":state.equals("pending")?" · 待更新":" · 已安装"),12,MUTED));}
         AlertDialog d=dialog("请卸载旧版亮度模块",body);d.setOnDismissListener(v->{legacyDialogVisible=false;offerUpdate();});d.show();dialogButton(d,"知道了",null,true);
@@ -452,7 +483,7 @@ public final class MainActivity extends Activity {
         network.execute(()->{try{JSONObject found=UpdateChecker.check();ui.post(()->{if(destroyed)return;updateBusy=false;if(found.optBoolean("newer")){String version=found.optString("version");if(!ReleasePolicy.shouldOffer(version,getPreferences(0).getString("ignored_update_version",""),manual)){pendingUpdate=null;updateLabel.setText(tr("已忽略版本 ")+version);return;}try{found.put("manual_check",manual);}catch(JSONException invalid){show(invalid.getMessage());return;}pendingUpdate=found;updateLabel.setText("发现新版本 "+version);offerUpdate();}else{pendingUpdate=null;updateLabel.setText("当前没有新应用版本");if(manual)show("当前没有新应用版本");}});}catch(Exception failure){ui.post(()->{if(destroyed)return;updateBusy=false;updateLabel.setText("暂时无法检查更新");if(manual)show("暂时无法检查更新");});}});
     }
     void offerUpdate(){
-        if(pendingUpdate==null||!visible||permissionDialogVisible||legacyDialogVisible||pendingLegacy!=null||updateDialog!=null)return;
+        if(pendingUpdate==null||!visible||permissionDialogVisible||legacyDialogVisible||pendingLegacy!=null||updateDialog!=null||settingsNotice.showing())return;
         JSONObject release=pendingUpdate;pendingUpdate=null;String version=release.optString("version");
         if(!ReleasePolicy.shouldOffer(version,getPreferences(0).getString("ignored_update_version",""),release.optBoolean("manual_check")))return;
         LinearLayout body=column();body.addView(text("版本 "+version,18,BLUE));String notes=release.optString("notes");TextView changes=text(notes.isEmpty()?"查看仓库了解更新内容":notes,13,MUTED);ScrollView scroll=new ScrollView(this);scroll.addView(changes);scroll.setLayoutParams(new LinearLayout.LayoutParams(-1,Math.min(dp(200),dp(70+Math.min(8,notes.length()/40)*16))));body.addView(scroll);
@@ -464,10 +495,12 @@ public final class MainActivity extends Activity {
         for(int i=0;i<4;i++){if(nav[i]!=null){navNames[i].setTextColor(i==page?BLUE:MUTED);navIcons[i].selected=i==page;navIcons[i].invalidate();nav[i].setSelected(i==page);}}
         // Refresh every visit; retain unapplied edits until a successful save.
         if(page==3&&previous!=3&&visible){checkUpdate(false);refreshThanks();}if(page==2)scrollLogs();if(visible){if(busy)rereadPending=true;else run("inspect",null);}
+        if(page==1)settingsNotice.showIfNeeded();
     }
     void show(String message){if(!destroyed){note.setText(message);note.setVisibility(message==null||message.isEmpty()?View.GONE:View.VISIBLE);if(message!=null&&!message.isEmpty()&&page!=2)Toast.makeText(this,tr(message),Toast.LENGTH_SHORT).show();}}
     void permissionPrompt(String key,String title,String message){
         permissionBlocked=true;if(!visible||destroyed||permissionDialogVisible||permissionNotice.equals(key))return;
+        if(settingsNotice.showing()){settingsNotice.afterDismiss=()->permissionPrompt(key,title,message);return;}
         permissionNotice=key;permissionDialogVisible=true;LinearLayout body=column();TextView icon=text(key.equals("root")?"ROOT":key.equals("lsp")?"LSPosed":key.equals("os")?"HyperOS 4":"接口检查",14,BLUE);icon.setPadding(dp(12),dp(8),dp(12),dp(8));icon.setBackground(background(0xffedf3ff,12));body.addView(icon);body.addView(text(message,14,MUTED));
         AlertDialog d=dialog(title,body);d.setOnDismissListener(v->{permissionDialogVisible=false;ui.post(()->{offerLegacyModules();offerUpdate();});});d.show();dialogButton(d,"稍后",null,false);dialogButton(d,"重新检测",()->{permissionNotice="";permissionBlocked=false;ui.postDelayed(()->run("inspect",null),150);},true);
     }
@@ -697,8 +730,8 @@ public final class MainActivity extends Activity {
         }catch(Exception error){runtime=null;factoryLux=factoryNit=null;apply.setEnabled(false);stateGraph.invalidate();pipeline.invalidate();drawDraftState();show("状态格式不兼容："+error);}
     }
     static String severity(int level){String[] names={"正常","轻微","中等","严重","危急","紧急","关机"};return level>=0&&level<names.length?names[level]:"未知";}
-    @Override public void onResume(){super.onResume();visible=true;permissionNotice="";permissionBlocked=false;run("inspect",null);ui.removeCallbacks(tick);ui.postDelayed(tick,refreshSeconds*1000);checkUpdate(false);if(page==3)refreshThanks();offerLegacyModules();offerUpdate();}
-    @Override public void onPause(){visible=false;if(manualPanel!=null)manualPanel.close();finishPageTransition();ui.removeCallbacks(tick);getPreferences(0).edit().putString("draft",CurvePlan.encode(factors)).putString("draft_baseline",loadedBaseline).putFloat("draft_floor",curveFloor).apply();if(!busy)worker.execute(this::closeBridge);super.onPause();}
+    @Override public void onResume(){super.onResume();visible=true;permissionNotice="";permissionBlocked=false;syncLauncherSetting();settingsNotice.resume();run("inspect",null);ui.removeCallbacks(tick);ui.postDelayed(tick,refreshSeconds*1000);checkUpdate(false);if(page==3)refreshThanks();offerLegacyModules();offerUpdate();}
+    @Override public void onPause(){visible=false;settingsNotice.pause();if(manualPanel!=null)manualPanel.close();finishPageTransition();ui.removeCallbacks(tick);getPreferences(0).edit().putString("draft",CurvePlan.encode(factors)).putString("draft_baseline",loadedBaseline).putFloat("draft_floor",curveFloor).apply();if(!busy)worker.execute(this::closeBridge);super.onPause();}
     @Override public void onSaveInstanceState(Bundle saved){rememberSettingsHome();saved.putInt("settings_home_y",settingsHomeY);saved.putInt("page",page);saved.putInt("settings_group",settingsGroup);saved.putBoolean("dirty",dirty);saved.putString("baseline",loadedBaseline);if(dirty&&factoryLux!=null)try{saved.putString("draft_options",configuration(false).toString());}catch(Exception ignored){}super.onSaveInstanceState(saved);}
     @Override public void onDestroy(){destroyed=true;for(AlertDialog d:new ArrayList<>(openDialogs))d.dismiss();if(manualPanel!=null)manualPanel.close();if(!busy)closeBridge();worker.shutdown();network.shutdownNow();super.onDestroy();}
     static JSONArray array(float[] values)throws JSONException{JSONArray result=new JSONArray();for(float n:values)result.put(n);return result;}

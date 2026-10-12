@@ -105,6 +105,16 @@ public class ConfigHostTest{
   JSONObject nestedA=new JSONObject().put("scene",new JSONObject().put("a",1).put("b",new JSONArray().put(new JSONObject().put("x",1).put("y",true)))),nestedB=new JSONObject().put("scene",new JSONObject().put("b",new JSONArray().put(new JSONObject().put("y",true).put("x",1.0))).put("a",1.0));
   check(ConfigurationFile.sameOptions(nestedA,nestedB));nestedB.getJSONObject("scene").getJSONArray("b").getJSONObject(0).put("y",false);check(!ConfigurationFile.sameOptions(nestedA,nestedB));
   check(!ConfigurationFile.sameOptions(new JSONObject().put("rules",new JSONArray().put(1).put(2)),new JSONObject().put("rules",new JSONArray().put(2).put(1))));
+  // Direct nit limits round-trip, degrade explicitly on unsupported firmware, and survive presets.
+  JSONObject nitCaps=clone(oprCaps).put("outdoor_supported",true).put("outdoor_range_supported",true).put("outdoor_hbm_supported",true).put("outdoor_opr_supported",true).put("outdoor_nit_limit_supported",true),nitOptions=clone(oprConfig).put("outdoor_range_unlock",true).put("outdoor_max_nit",2000);
+  JSONObject nitFile=ConfigurationFile.export(nitOptions,nitCaps,true,2,true);ConfigurationFile.Imported nitImport=ConfigurationFile.read(nitFile.toString(),nitCaps,c);
+  check(nitImport.options.getDouble("outdoor_max_nit")==2000);if(!nitImport.notes.isEmpty())throw new AssertionError(nitImport.notes.toString());
+  nitImport=ConfigurationFile.read(nitFile.toString(),clone(nitCaps).put("outdoor_nit_limit_supported",false),c);check(nitImport.options.getDouble("outdoor_max_nit")==0);check(nitImport.notes.size()==1&&nitImport.notes.get(0).contains("nit"));
+  for(int mode=0;mode<4;mode++){JSONObject chosen=SettingsPresets.merge(nitOptions,SettingsPresets.patch("outdoor",mode,nitCaps));check(chosen.getDouble("outdoor_max_nit")==2000);}
+  JSONObject oldNitFile=clone(nitFile);oldNitFile.getJSONObject("options").remove("outdoor_max_nit");check(ConfigurationFile.read(oldNitFile.toString(),nitCaps,c).options.getDouble("outdoor_max_nit")==0);
+  JSONObject badNit=clone(nitFile);badNit.getJSONObject("options").put("outdoor_max_nit",-1);nitImport=ConfigurationFile.read(badNit.toString(),nitCaps,c);check(nitImport.options.getDouble("outdoor_max_nit")==0&&nitImport.notes.size()==1);
+  badNit=clone(nitFile);badNit.getJSONObject("options").put("outdoor_max_nit",20001);nitImport=ConfigurationFile.read(badNit.toString(),nitCaps,c);check(nitImport.options.getDouble("outdoor_max_nit")==20000&&nitImport.notes.size()==1);
+  badNit=clone(nitFile);badNit.getJSONObject("options").put("outdoor_max_nit","2000");bad(badNit,nitCaps,c);
   System.out.println("Configuration migration: "+cases+" cases PASS; cross-version settings and curve identity, Android not tested");
  }
 }''',encoding='utf-8')
