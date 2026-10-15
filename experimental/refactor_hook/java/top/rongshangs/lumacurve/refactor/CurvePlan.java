@@ -5,6 +5,12 @@ import java.util.Arrays;
 /** Editing coordinates: OEM logical nit for Refactor, physical nit for mapping. */
 public final class CurvePlan {
     private final float[] lux, nit;
+    private CurvePlan(float[] x,float[] y,float min,float max){
+        if(x==null||y==null||x.length!=y.length||x.length<2||x.length>4096||x[0]!=0||!Float.isFinite(min)||!Float.isFinite(max)||min<0||max<=min)throw new IllegalArgumentException("保存的基础曲线无效");
+        for(int i=0;i<x.length;i++)if(!Float.isFinite(x[i])||x[i]<0||!Float.isFinite(y[i])||y[i]<min||y[i]>max||i>0&&(x[i]<=x[i-1]||y[i]<y[i-1]))throw new IllegalArgumentException("保存的基础曲线节点无效");
+        lux=x.clone();nit=y.clone();
+    }
+    public static CurvePlan points(float[] x,float[] y,float min,float max){return new CurvePlan(x,y,min,max);}
     public CurvePlan(float[] factoryLux, float[] factoryNit, float min, float max, float[] factors) {
         this(factoryLux,factoryNit,min,max,factors,0);
     }
@@ -28,8 +34,8 @@ public final class CurvePlan {
     public float at(float value) {
         if(!Float.isFinite(value) || value<0) throw new IllegalArgumentException("照度无效");
         if(value<=lux[0]) return nit[0];
-        for(int i=1;i<4;i++) if(value<=lux[i]) return nit[i-1]+(nit[i]-nit[i-1])*(value-lux[i-1])/(lux[i]-lux[i-1]);
-        return nit[3];
+        for(int i=1;i<lux.length;i++) if(value<=lux[i]) return nit[i-1]+(nit[i]-nit[i-1])*(value-lux[i-1])/(lux[i]-lux[i-1]);
+        return nit[nit.length-1];
     }
     public float[] lux(){return lux.clone();}
     public float[] nits(){return nit.clone();}

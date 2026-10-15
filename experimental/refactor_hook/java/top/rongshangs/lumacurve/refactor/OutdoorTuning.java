@@ -7,10 +7,10 @@ import de.robv.android.xposed.*;
 /** Targets enter BEFORE downstream caps and animation. Driver/thermal/power limits remain; optional OPR relaxation is scoped to strong auto SDR. */
 final class OutdoorTuning {
     static final Set<Class<?>> owners=new HashSet<>(),ranges=new HashSet<>(),peaks=new HashSet<>(),dynamicRanges=new HashSet<>(),nitCaps=new HashSet<>();
-    static final Map<Class<?>,Method[]> nitGuards=new HashMap<>();
-    static boolean nitScope(Object owner){try{Method[] guards=nitGuards.get(owner.getClass());return guards!=null&&Boolean.TRUE.equals(HookEntry.get(owner,"mAutoBrightnessEnable"))&&Boolean.FALSE.equals(guards[0].invoke(owner))&&Boolean.FALSE.equals(guards[1].invoke(owner));}catch(Throwable unavailable){return false;}}
+    static final Map<Class<?>,OutdoorSdrScope> nitGuards=new HashMap<>();
+    static boolean nitScope(Object owner){try{OutdoorSdrScope scope=nitGuards.get(owner.getClass());return scope!=null&&scope.allows(owner);}catch(Throwable unavailable){return false;}}
     static HookRuntime state(Object hbm){synchronized(HookEntry.states){for(HookRuntime s:HookEntry.states.values())if(s.onDisplayThread())try{if(HookEntry.get(s.owner,"mHbmController")==hbm)return s;}catch(Throwable ignored){}}return null;}
-    static void install(Class<?> owner){if(owners.contains(owner))return;List<XC_MethodHook.Unhook> hooks=new ArrayList<>();
+    static synchronized void install(Class<?> owner){if(owners.contains(owner))return;List<XC_MethodHook.Unhook> hooks=new ArrayList<>();
         try{
             ClassLoader loader=owner.getClassLoader();Class<?> impl=Class.forName("com.android.server.display.AutomaticBrightnessControllerImpl",false,loader);
             Method target=HbmAccess.method(impl,"getOverrideLimitBrightness",float.class,float.class,boolean.class,float.class);
@@ -49,12 +49,12 @@ final class OutdoorTuning {
             installNitCap(owner);
         }catch(Throwable unavailable){for(XC_MethodHook.Unhook h:hooks)h.unhook();XposedBridge.log("HyperLux outdoor interface unavailable: "+unavailable);}
     }
-    static void installNitCap(Class<?> owner){
+    static synchronized void installNitCap(Class<?> owner){
         if(nitCaps.contains(owner))return;
         try{
             Class<?> reason=Class.forName("com.android.server.display.brightness.BrightnessReason",false,owner.getClassLoader());
             Method sdr=HbmAccess.method(owner,"adjustSdrBrightness",float.class,float.class,boolean.class,reason,boolean.class,boolean.class);
-            Method hdr=HbmAccess.method(owner,"isHdrScene",boolean.class),privacy=HbmAccess.method(owner,"shouldUsePrivacyOprBrightness",boolean.class);
+            OutdoorSdrScope scope=OutdoorSdrScope.resolve(owner);
             HbmAccess.typed(owner,"mAutoBrightnessEnable",boolean.class);
             XposedBridge.hookMethod(sdr,new XC_MethodHook(){
                 boolean eligible(MethodHookParam p,HookRuntime s)throws Exception{
@@ -74,7 +74,7 @@ final class OutdoorTuning {
                     }catch(Throwable unavailable){/* Unknown mapping retains system control. */}
                 }
             });
-            nitGuards.put(owner,new Method[]{hdr,privacy});nitCaps.add(owner);
+            nitGuards.put(owner,scope);nitCaps.add(owner);
         }catch(Throwable unavailable){XposedBridge.log("HyperLux outdoor nit limit unavailable: "+unavailable);}
     }
 }

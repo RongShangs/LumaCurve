@@ -28,6 +28,9 @@ public final class MainActivity extends Activity {
     float factors[]={1,1,1,1},factoryLux[],factoryNit[],minimum,maximum,thermalCeiling=43,memoryStrength=1;boolean thermalRelax,memoryEnabled=true,busy,visible,dirty,destroyed;
     Switch memorySwitch;SeekBar memorySlider;PipelineBoard pipeline;boolean english,rereadPending,legacyChecked;String permissionNotice="",loadedBaseline="";boolean permissionDialogVisible,permissionBlocked;ScrollView logScroller;
     JSONObject runtime,lastAnswer;CurveView stateGraph,settingsGraph,memoryGraph;int page;
+    SavedCurve savedBase;ApplicationBrightnessSettings appBrightnessSettings;Switch darkManualHoldSwitch;TextView darkManualHoldDescription;
+    Button saveMemoryBaseButton,restoreMemoryBaseButton;
+    AlertDialog curveSaveProgress;
     TextView memoryOverview,memorySystemStatus,memoryDisabledWarning;
     final Map<String,Switch> memorySwitches=new LinkedHashMap<>();final Map<String,SeekBar> memoryParameters=new LinkedHashMap<>();final Map<String,TextView> memoryLabels=new LinkedHashMap<>();
     long memoryWindow=1500,brightenDelay=1500,darkenDelay=5000;float memoryLuxRange=.3f,thermalCooling=1;int refreshSeconds=2;boolean responseOverride,smallBrightenOverride,updateChecked,updateBusy,firmwarePrompted,legacyDialogVisible;long smallBrightenDelay=5000;JSONArray pendingLegacy;String legacyNotice="";
@@ -36,7 +39,7 @@ public final class MainActivity extends Activity {
     JSONObject pendingUpdate;AlertDialog updateDialog;
     final Set<AlertDialog> openDialogs=new HashSet<>();
     final SettingsNotice settingsNotice=new SettingsNotice(this);Switch hideLauncherSwitch;boolean updatingLauncher;
-    final Map<String,Runnable> detailOpeners=new HashMap<>();final ScrollView[] settingsScrollers=new ScrollView[10];
+    final Map<String,Runnable> detailOpeners=new HashMap<>();final ScrollView[] settingsScrollers=new ScrollView[11];
     LinearLayout thanksList;TextView thanksStatus;boolean thanksBusy,autoScroll=true;long thanksChecked;
     float lowLightLimit=50;long lowLightBrighten=3000,lowLightDarken=4000;
     SeekBar lowLimitSlider,lowBrightSlider,lowDarkSlider;TextView lowLimitLabel,lowBrightLabel,lowDarkLabel;
@@ -46,8 +49,8 @@ public final class MainActivity extends Activity {
     AdvancedOptions advanced=new AdvancedOptions();
     SceneOptions sceneOptions=new SceneOptions();SceneSettings sceneSettings;
     final Switch[] advancedSwitches=new Switch[AdvancedOptions.GROUPS.length];final SeekBar[] advancedSliders=new SeekBar[AdvancedOptions.KEYS.length];final TextView[] advancedLabels=new TextView[AdvancedOptions.KEYS.length];
-    TextView advancedStatus,unsavedHint;final TextView[] settingHints=new TextView[10];Switch logFollow;
-    LinearLayout settingsHome,settingsTarget,bottomNav;ScrollView settingsHomeScroll;int settingsHomeY;long settingsScrollRestore;boolean settingsHomeRestoring;final LinearLayout[] settingGroups=new LinearLayout[10];final LinearLayout[] settingScreens=new LinearLayout[10];final Button[] settingApply=new Button[10];int settingsGroup=-1;float curveFloor;
+    TextView advancedStatus,unsavedHint;final TextView[] settingHints=new TextView[11];Switch logFollow;
+    LinearLayout settingsHome,settingsTarget,bottomNav;ScrollView settingsHomeScroll;int settingsHomeY;long settingsScrollRestore;boolean settingsHomeRestoring;final LinearLayout[] settingGroups=new LinearLayout[11];final LinearLayout[] settingScreens=new LinearLayout[11];final Button[] settingApply=new Button[11];int settingsGroup=-1;float curveFloor;
     View displayedPage;long pageTransition;
     BrightnessControlOptions controls=new BrightnessControlOptions();ManualBrightnessPanel manualPanel;boolean openManualPanel;
     Switch darkLockSwitch,manualPanelSwitch;final SeekBar[] controlSliders=new SeekBar[4];final TextView[] controlLabels=new TextView[4];TextView controlStatus;
@@ -143,9 +146,9 @@ public final class MainActivity extends Activity {
         LinearLayout b=card(pages[1]);b.setPadding(dp(16),dp(13),dp(16),dp(13));LinearLayout engineHeading=row(b);engineHeading.setBaselineAligned(false);TextView engineTitle=text("引擎控制",18,INK);engineTitle.setIncludeFontPadding(false);engineHeading.addView(engineTitle,new LinearLayout.LayoutParams(0,-2,1));unsavedHint=text("有未保存的设置",12,0xffbd3434);unsavedHint.setIncludeFontPadding(false);unsavedHint.setGravity(Gravity.END|Gravity.CENTER_VERTICAL);engineHeading.addView(unsavedHint,new LinearLayout.LayoutParams(-2,-2));unsavedHint.setVisibility(View.GONE);LinearLayout r=row(b);apply=compact("保存并应用",this::submit,r);stop=compact("停用并恢复",()->run("stop",null),r);
         LinearLayout files=row(b);compact("导出配置",this::exportConfiguration,files);compact("导入配置",this::importConfiguration,files);
         settingsHome=column();pages[1].addView(settingsHome);
-        String[] names={"亮度曲线","手动记忆","户外高亮","环境变化与确认","亮度过渡","场景判定与控制","运行状态与界面","暗光稳定与锁定","主屏手动亮度","温控与显示保护"};
-        String[] descriptions={"基础亮度、暗处下限与曲线预设","偏好强度、持久保存与锁屏交接","强光增强、HBM 与手动阳光屏","主辅光感阈值与确认时间","分别设置变亮和变暗时长","场景的进入条件、生效效果与退出条件","兼容状态与界面刷新","减少暗光波动，或定时保持亮度","磁贴面板、直接写值与自动退让","显示温控、温度门槛与冷却恢复"};
-        for(int i:new int[]{3,5,0,1,4,7,2,9,8,6}){
+        String[] names={"亮度曲线","手动记忆","户外高亮","环境变化与确认","亮度过渡","场景判定与控制","运行状态与界面","暗光稳定与锁定","主屏手动亮度","温控与显示保护","应用自动亮度名单"};
+        String[] descriptions={"基础亮度、暗处下限与曲线预设","偏好强度、持久保存与锁屏交接","强光增强、HBM 与手动阳光屏","主辅光感阈值与确认时间","分别设置变亮和变暗时长","场景的进入条件、生效效果与退出条件","兼容状态与界面刷新","减少暗光波动，或定时保持亮度","磁贴面板、直接写值与自动退让","显示温控、温度门槛与冷却恢复","指定应用前台时暂停，退出后恢复"};
+        for(int i:new int[]{3,5,0,1,4,7,2,9,8,10,6}){
             if(i==3||i==0||i==7||i==8){TextView section=text(i==3?"光感输入与场景":i==0?"曲线目标与响应":i==7?"输出范围与保护":"运行与工具",13,BLUE);section.setPadding(dp(4),dp(12),dp(4),dp(8));settingsHome.addView(section);}
             final int group=i;LinearLayout entry=card(settingsHome);entry.setPadding(dp(16),dp(11),dp(12),dp(11));((LinearLayout.LayoutParams)entry.getLayoutParams()).bottomMargin=dp(8);entry.setBackground(ripple(Color.WHITE,18));entry.setClipToOutline(true);entry.setClickable(true);entry.setOnClickListener(v->showSettingsGroup(group));LinearLayout line=row(entry);line.setBaselineAligned(false);LinearLayout labels=column();line.addView(labels,new LinearLayout.LayoutParams(0,-2,1));TextView name=text(names[i],16,INK);name.setIncludeFontPadding(false);name.setPadding(0,0,0,dp(3));labels.addView(name);TextView description=text(descriptions[i],12,MUTED);description.setIncludeFontPadding(false);description.setPadding(0,0,0,0);labels.addView(description);line.addView(new NavigationArrow(false),new LinearLayout.LayoutParams(dp(28),dp(32)));
             // Each category owns a separate screen and scroll position, outside the settings home.
@@ -164,6 +167,7 @@ public final class MainActivity extends Activity {
         settingsTarget=settingGroups[6];makeAdvancedStatus();makeRefreshSettings();
         settingsTarget=settingGroups[7];makeDarkLockSettings();makeLowLightSettings();
         settingsTarget=settingGroups[8];makeManualPanelSettings();
+        appBrightnessSettings=new ApplicationBrightnessSettings(this,settingGroups[10]);
         makeLauncherSetting();
     }
     void makeLauncherSetting(){
@@ -298,6 +302,8 @@ public final class MainActivity extends Activity {
         overview.addView(curveLegend("蓝线：已应用基础曲线 · 浅绿线：记忆后的实际曲线\n浅绿色实点：当前记忆 · 空心点：已保存，恢复后才生效"));
         overview.addView(text("曲线表示亮度目标，最终屏幕亮度仍受温控和场景影响。",12,MUTED));
         button("查看记忆节点与交接记录",this::memoryDetails,overview);
+        saveMemoryBaseButton=button("将当前绿色曲线保存为基础曲线",this::saveMemoryBaseline,overview);
+        restoreMemoryBaseButton=button("恢复设备原始基础曲线",this::restoreOriginalBaseline,overview);
         b=card(settingsTarget);b.addView(text("保存与恢复",18,INK));
         memoryFlag(b,"memory_persist","跨重启保留手动记忆");persistSwitch=memorySwitches.get("memory_persist");
         b=settingsDetails(b,"memory-save");
@@ -322,6 +328,7 @@ public final class MainActivity extends Activity {
     void memoryFlag(LinearLayout parent,String key,String label){Switch v=new Switch(this);v.setText(tr(label));v.setTextSize(14);parent.addView(v,new LinearLayout.LayoutParams(-1,dp(48)));memorySwitches.put(key,v);v.setOnCheckedChangeListener((button,on)->{try{JSONObject options=new JSONObject();memoryOptions.put(options);if(on!=options.optBoolean(key)){memoryOptions=memoryOptions.with(key,on);dirty=true;drawCurve();}}catch(Exception invalid){show(invalid.getMessage());}});}
     void memoryParameter(LinearLayout parent,String key,String label,double min,double max,double step,String unit){TextView name=text("",13,INK);parent.addView(name);memoryLabels.put(key,name);SeekBar bar=parameter(parent,(int)Math.round((max-min)/step),0,value->{double next=min+value*step;if(key.equals("memory_reset_off_minutes")&&next>memoryOptions.forceMinutes)memoryOptions=memoryOptions.with("memory_reset_force_minutes",(int)next);if(key.equals("memory_reset_force_minutes")&&next<memoryOptions.offMinutes)next=memoryOptions.offMinutes;memoryOptions=memoryOptions.with(key,next);});bar.setTag(new Object[]{label,min,step,unit});memoryParameters.put(key,bar);}
     void drawMemory(){if(memoryDisabledWarning!=null)memoryDisabledWarning.setVisibility(memoryEnabled?View.GONE:View.VISIBLE);if(memoryGraph==null)return;try{JSONObject o=new JSONObject();memoryOptions.put(o);boolean connected=runtime!=null,persist=connected&&memoryEnabled&&runtime.optBoolean("memory_persist_supported")&&memoryOptions.persist;
+        if(saveMemoryBaseButton!=null)saveMemoryBaseButton.setEnabled(connected&&!busy&&!dirty&&runtime.optInt("memory_live_count")>0&&StatusPresentation.fresh(runtime,SystemClock.elapsedRealtime()));if(restoreMemoryBaseButton!=null)restoreMemoryBaseButton.setEnabled(connected&&!busy&&savedBase!=null);
         for(Map.Entry<String,Switch> e:memorySwitches.entrySet()){String k=e.getKey();Switch v=e.getValue();v.setChecked(o.getBoolean(k));boolean supported=k.equals("memory_reset_override")?connected&&runtime.optBoolean("memory_reset_supported"):k.equals("memory_timeout_override")?connected&&runtime.optBoolean("memory_timeout_supported"):connected&&runtime.optBoolean("memory_persist_supported");v.setEnabled((supported&&memoryEnabled&&(k.equals("memory_persist")||k.startsWith("memory_reset_")||k.startsWith("memory_timeout_")||persist))||o.getBoolean(k)&&!supported);}
         for(Map.Entry<String,SeekBar> e:memoryParameters.entrySet()){String k=e.getKey();SeekBar bar=e.getValue();Object[] spec=(Object[])bar.getTag();double min=(Double)spec[1],step=(Double)spec[2],value=o.getDouble(k);if(k.equals("memory_max_points"))bar.setMax(connected?runtime.optInt("memory_point_capacity",0):7);bar.setProgress((int)Math.round((value-min)/step));String shown=k.equals("memory_max_points")&&value==0?tr("自动（按本机能力）"):format(k.equals("memory_restore_ratio")?value*100:k.equals("memory_restore_settle")?value/1000:value)+tr((String)spec[3]);memoryLabels.get(k).setText(tr((String)spec[0])+"："+shown);
             boolean enabled=persist;if(k.startsWith("memory_restore_"))enabled=persist&&memoryOptions.unlock&&(!k.equals("memory_restore_ratio")&&!k.equals("memory_restore_min_lux")||memoryOptions.sameScene);if(k.startsWith("memory_reset_"))enabled=connected&&memoryEnabled&&memoryOptions.resetOverride&&runtime.optBoolean("memory_reset_supported");if(k.equals("memory_timeout_minutes"))enabled=connected&&memoryEnabled&&memoryOptions.timeoutOverride&&runtime.optBoolean("memory_timeout_supported");enableParameter(bar,memoryLabels.get(k),enabled);
@@ -333,6 +340,13 @@ public final class MainActivity extends Activity {
     String memoryEvent(String key){switch(key){case "display_policy":return tr("亮屏／熄屏交接");case "resetShortTermModel":case "environment_reset":return tr("系统重建记忆曲线");case "invalidate":return tr("短期模型标为失效");case "shouldUseGoodCurve":return tr("系统检查备用曲线");case "needResetShortTermModelPolicy":return tr("系统评估锁屏后的记忆");case "archive_restored":return tr("已恢复偏好存档");default:return tr(key);}}
     void memoryDetails(){if(runtime==null){show("等待读取手动锚点");return;}LinearLayout body=column();body.addView(text("当前节点",16,INK));memoryPointRows(body,runtime.optJSONArray("memory_live_points"));body.addView(text("存档节点",16,INK));memoryPointRows(body,runtime.optJSONArray("memory_saved_anchors"));body.addView(text(runtime.optString("memory_persist_status"),13,BLUE));JSONObject model=runtime.optJSONObject("memory_short_term_model");if(model!=null)body.addView(text("短期模型："+format(model.optDouble("lux"))+" lux · "+tr(model.optBoolean("valid")?"有效":"已失效，等待系统判断"),12,MUTED));body.addView(text("最近交接",16,INK));JSONArray events=runtime.optJSONArray("memory_lifecycle");if(events!=null)for(int i=events.length()-1;i>=0;i--){JSONObject e=events.optJSONObject(i);if(e!=null)body.addView(text(new java.text.SimpleDateFormat("HH:mm:ss",Locale.ROOT).format(new Date(e.optLong("time_ms")))+" · "+memoryEvent(e.optString("event"))+" · "+(e.has("manual_points_before")?e.optInt("manual_points_before")+" → ":"")+e.optInt("manual_points")+tr(" 个手动点"),12,MUTED));}ScrollView scroll=new ScrollView(this);scroll.addView(body);scroll.setLayoutParams(new LinearLayout.LayoutParams(-1,dp(350)));AlertDialog d=dialog("手动记忆详情",scroll);d.show();dialogButton(d,"知道了",null,true);}
     void memoryPointRows(LinearLayout body,JSONArray points){if(points==null||points.length()==0){body.addView(text("无手动节点",12,MUTED));return;}for(int i=0;i<points.length();i++){JSONObject p=points.optJSONObject(i);if(p!=null)body.addView(text(format(p.optDouble("lux"))+" lux · "+(p.has("display_nit")?curvePercent(p.optDouble("display_nit")/maximum*100)+"%":"—")+tr("（曲线坐标）"),13,INK));}}
+    void saveMemoryBaseline(){
+        if(busy||runtime==null)return;if(dirty){show("请先保存并应用当前设置，再保存手动记忆曲线");return;}
+        try{SavedCurve.capture(runtime);String options=Base64.getEncoder().encodeToString(configuration().toString().getBytes(StandardCharsets.UTF_8));
+            AlertDialog d=dialog("保存为基础曲线",text("将系统当前的绿色曲线设为新的蓝色基础曲线，清除已转入基础的手动点，避免重复叠加。之后仍可继续学习新的手动调整。",14,MUTED));d.show();dialogButton(d,"取消",null,false);dialogButton(d,"保存",()->run("promote-memory",options),true);
+        }catch(Exception unavailable){show(unavailable.getMessage());}
+    }
+    void restoreOriginalBaseline(){if(runtime==null||factoryLux==null||busy)return;try{savedBase=null;factoryNit=RootControl.numbers(runtime.getJSONArray("factory_logical_nit"));factors=new float[]{1,1,1,1};curveFloor=0;dirty=true;drawCurve();show("已选用设备原始基础曲线，点击保存并应用后生效");}catch(Exception unavailable){show(unavailable.getMessage());}}
     void makeThermalSettings(){
         LinearLayout b=card(settingsTarget);b.addView(text("温控",18,INK));LinearLayout thermalPresets=row(b);compact("系统默认",()->quickPreset("thermal",0),thermalPresets);compact("适度放宽",()->quickPreset("thermal",1),thermalPresets);thermalSwitch=new Switch(this);thermalSwitch.setText(tr("减少温控降亮"));thermalSwitch.setTextSize(14);thermalSwitch.setShowText(false);b.addView(thermalSwitch,new LinearLayout.LayoutParams(-1,dp(48)));
         thermalSwitch.setOnCheckedChangeListener((v,on)->{if(on!=thermalRelax){thermalRelax=on;dirty=true;drawCurve();}});
@@ -380,9 +394,13 @@ public final class MainActivity extends Activity {
         LinearLayout b=card(settingsTarget);b.addView(text("暗光定时锁定",18,INK));
         LinearLayout presets=row(b);compact("不锁定",()->{controls.darkLock=false;dirty=true;drawCurve();},presets);compact("睡前保持",()->{controls.bedtime();dirty=true;drawCurve();},presets);
         darkLockSwitch=new Switch(this);darkLockSwitch.setText(tr("暗光持续后关闭自动亮度"));b.addView(darkLockSwitch,new LinearLayout.LayoutParams(-1,dp(48)));darkLockSwitch.setOnCheckedChangeListener((v,on)->{if(on!=controls.darkLock){controls.darkLock=on;dirty=true;drawCurve();}});
-        b.addView(text("保持进入时的亮度；照度明显升高后恢复自动。锁屏或重新开启自动亮度即退出。你主动关闭的自动亮度不会被重新开启。",12,MUTED));
+        b.addView(text("保持进入时的亮度；照度明显升高后恢复自动。息屏或重新开启自动亮度即退出。你主动关闭的自动亮度不会被重新开启。",12,MUTED));
         b.addView(text("需要主辅光感共同确认暗处；任一侧持续变亮可退出。锁定期间低频监听光感，温控和应用指定亮度仍生效。",12,MUTED));
-        controlStatus=text("等待读取暗光锁定状态",12,BLUE);b.addView(controlStatus);LinearLayout details=settingsDetails(b,"dark_lock");
+        controlStatus=text("等待读取暗光锁定状态",12,BLUE);b.addView(controlStatus);
+        darkManualHoldSwitch=new Switch(this);darkManualHoldSwitch.setText(tr("手动调整后继续锁定"));darkManualHoldSwitch.setTextSize(14);darkManualHoldSwitch.setMinimumHeight(dp(48));b.addView(darkManualHoldSwitch,new LinearLayout.LayoutParams(-1,-2));
+        darkManualHoldDescription=text("",12,MUTED);b.addView(darkManualHoldDescription);
+        darkManualHoldSwitch.setOnCheckedChangeListener((v,on)->{if(controls.manualHold!=on){controls.manualHold=on;dirty=true;drawCurve();}});
+        LinearLayout details=settingsDetails(b,"dark_lock");
         int[] maximums={29,29,99,29},initial={4,4,5,4};for(int i=0;i<4;i++){final int key=i;controlLabels[i]=text("",13,INK);details.addView(controlLabels[i]);controlSliders[i]=parameter(details,maximums[i],initial[i],n->{if(key==0){controls.enterLux=1+n;controls.exitLux=Math.max(controls.exitLux,controls.enterLux+5);}else if(key==1)controls.minutes=1+n;else if(key==2)controls.exitLux=Math.max(controls.enterLux+5,5+n*5);else controls.exitSeconds=1+n;});}
     }
     void makeManualPanelSettings(){
@@ -394,6 +412,7 @@ public final class MainActivity extends Activity {
         button("打开主屏亮度面板",this::showManualPanel,b);button("添加控制中心磁贴",this::addBrightnessTile,b);
     }
     void drawControls(){if(darkLockSwitch==null||manualPanelSwitch==null)return;boolean supported=runtime!=null&&runtime.optBoolean("dark_lock_supported");darkLockSwitch.setChecked(controls.darkLock);darkLockSwitch.setEnabled(supported||controls.darkLock);manualPanelSwitch.setChecked(controls.manualPanel);manualPanelSwitch.setEnabled(runtime!=null&&runtime.optBoolean("manual_panel_supported"));
+        if(darkManualHoldSwitch!=null){darkManualHoldSwitch.setChecked(controls.manualHold);darkManualHoldSwitch.setEnabled(supported||controls.manualHold);darkManualHoldDescription.setText(controls.manualHold?"当前方案：保留新亮度并继续锁定；任一光感持续达到退出阈值后恢复自动亮度。":"当前方案：手动调整即结束锁定，保持手动亮度；环境变亮后也不自动开启。");}
         String[] labels={"进入照度："+format(controls.enterLux)+" lux","等待时间："+controls.minutes+" 分钟","退出照度："+format(controls.exitLux)+" lux","退出确认："+controls.exitSeconds+" 秒"};int[] p={Math.round(controls.enterLux)-1,controls.minutes-1,Math.round((controls.exitLux-5)/5),controls.exitSeconds-1};for(int i=0;i<4;i++){controlSliders[i].setProgress(p[i]);controlLabels[i].setText(labels[i]);enableParameter(controlSliders[i],controlLabels[i],supported&&controls.darkLock);}
         JSONObject c=runtime==null?null:runtime.optJSONObject("brightness_control");String reason=c==null?"":c.optString("reason");String state=reason.equals("locked")?"已保持当前亮度":reason.equals("countdown")?"暗光计时中":reason.equals("watching")?"等待持续暗光":reason.equals("waiting_sensor_data")?"等待光感读数":reason.equals("user_manual")?"用户手动模式，不自动恢复":reason.equals("manual_panel")?"主屏手动面板控制中":reason.equals("error")?"接口异常，已退出":"未锁定";controlStatus.setText(state+(c!=null&&reason.equals("countdown")?" · "+Math.round(c.optLong("countdown_left_ms")/1000.0)+" 秒":""));
     }
@@ -448,7 +467,7 @@ public final class MainActivity extends Activity {
     }
 
     void makeAbout(){
-        LinearLayout b=card(pages[3]);b.setPadding(dp(22),dp(22),dp(22),dp(18));LinearLayout r=row(b);r.addView(image(null,68,20));LinearLayout title=column();LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-2,1);lp.leftMargin=dp(18);r.addView(title,lp);title.addView(text("HyperLux",26,INK));title.addView(text(AppBuild.ARTIFACT_VERSION+" · "+tr(AppBuild.TEST?"曲线适配测试版":AppBuild.INTERNAL?"内部测试版":"正式版"),14,BLUE));
+        LinearLayout b=card(pages[3]);b.setPadding(dp(22),dp(22),dp(22),dp(18));LinearLayout r=row(b);r.addView(image(null,68,20));LinearLayout title=column();LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-2,1);lp.leftMargin=dp(18);r.addView(title,lp);title.addView(text("HyperLux",26,INK));title.addView(text(AppBuild.ARTIFACT_VERSION+" · "+tr(AppBuild.BETA?"Beta 测试版":AppBuild.TEST?"曲线适配测试版":AppBuild.INTERNAL?"内部测试版":"正式版"),14,BLUE));
         TextView intro=text("适配 HyperOS 4 的自动亮度工具。\n\n沿用系统双侧感光与平滑过渡，支持可编辑曲线、手动记忆保存与暗光稳定。户外高亮、温控和变化确认可按需调整，配置支持导入导出。",15,INK);intro.setLineSpacing(dp(5),1);intro.setPadding(0,dp(20),0,dp(16));b.addView(intro);
         b.addView(text("HyperOS 4 · Root · LSPosed",12,MUTED));updateLabel=text("自动检查应用更新",12,BLUE);updateLabel.setPadding(dp(12),dp(10),dp(12),dp(10));updateLabel.setBackground(ripple(0xffeef3ff,12));updateLabel.setOnClickListener(v->checkUpdate(true));lp=new LinearLayout.LayoutParams(-1,-2);lp.topMargin=dp(10);lp.bottomMargin=dp(6);b.addView(updateLabel,lp);
         r=row(b);compact("官网",()->open("https://lc.rongshangs.top"),r);compact("GitHub",()->open(UpdateChecker.REPO),r);compact("开源协议",()->open("https://www.gnu.org/licenses/gpl-3.0.html"),r);
@@ -507,12 +526,12 @@ public final class MainActivity extends Activity {
     }
     void preset(float[] next){
         if(factoryLux==null){show("连接后读取曲线");return;}
-        try{float[] adjusted=CurveEditor.preset(next,factoryNit,minimum,maximum);
+        try{savedBase=null;factoryNit=RootControl.numbers(runtime.getJSONArray("factory_logical_nit"));float[] adjusted=CurveEditor.preset(next,factoryNit,minimum,maximum);
             factors=adjusted;curveFloor=0;dirty=true;drawCurve();show(Arrays.equals(next,adjusted)?"曲线已选中，点击保存并应用后生效":"预设已按本机可调范围调整，保存并应用后生效");
         }catch(Exception error){show(error.getMessage());}
     }
     void drawCurve(){
-        drawAdvanced();drawOutdoor();drawControls();if(sceneSettings!=null)sceneSettings.refresh();
+        drawAdvanced();drawOutdoor();drawControls();if(sceneSettings!=null)sceneSettings.refresh();if(appBrightnessSettings!=null)appBrightnessSettings.refresh();
 
         drawMemory();
         thermalSwitch.setChecked(thermalRelax);ceilingSlider.setProgress(Math.round(thermalCeiling)-38);ceilingText.setText("电池温度阈值："+Math.round(thermalCeiling)+"℃"+(Math.round(thermalCeiling)==43?"（建议）":""));stateGraph.invalidate();settingsGraph.invalidate();
@@ -545,13 +564,13 @@ public final class MainActivity extends Activity {
             options.put("low_light_stability",lowLightStability).put("low_light_limit",lowLightLimit).put("low_light_brighten",lowLightBrighten).put("low_light_darken",lowLightDarken);
             lowThresholds.put(options);
             assistGateOptions.put(options);
-            memoryOptions.put(options);options.put("curve_floor_nit",curveFloor);return options;
+            memoryOptions.put(options);options.put("curve_floor_nit",curveFloor);if(savedBase!=null)savedBase.put(options);return options;
     }
     void exportConfiguration(){if(busy){show("另一项操作还在执行");return;}try{JSONObject file=ConfigurationFile.export(configuration(),runtime,dirty,refreshSeconds,autoScroll);run("export-config",Base64.getEncoder().encodeToString(file.toString().getBytes(StandardCharsets.UTF_8)));}catch(Exception error){show(error.getMessage());}}
     void importConfiguration(){if(factoryLux==null){show("连接后读取曲线");return;}if(busy){show("另一项操作还在执行");return;}try{Intent picker=new Intent(Intent.ACTION_OPEN_DOCUMENT);picker.addCategory(Intent.CATEGORY_OPENABLE);picker.setType("*/*");picker.putExtra(Intent.EXTRA_MIME_TYPES,new String[]{"application/json","text/plain","application/octet-stream"});startActivityForResult(picker,501);}catch(ActivityNotFoundException unavailable){show("未找到文件选择器");}}
     @Override protected void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);if(request!=501||result!=RESULT_OK||data==null||data.getData()==null)return;Uri uri=data.getData();worker.execute(()->{try(InputStream input=getContentResolver().openInputStream(uri);ByteArrayOutputStream out=new ByteArrayOutputStream()){if(input==null)throw new IOException("无法读取配置文件");byte[] buffer=new byte[4096];int count;while((count=input.read(buffer))!=-1){if(out.size()+count>ConfigurationFile.LIMIT)throw new IOException("配置文件过大");out.write(buffer,0,count);}String content=new String(out.toByteArray(),StandardCharsets.UTF_8);ui.post(()->previewConfiguration(content));}catch(Exception error){ui.post(()->show(error.getMessage()));}});}
     void previewConfiguration(String text){if(destroyed)return;try{if(runtime==null)throw new IllegalStateException("连接后读取曲线");ConfigurationFile.Imported imported=ConfigurationFile.read(text,runtime,configuration());String message="导入后先检查设置，再点击保存并应用。旧版本缺少的新选项使用默认值。";if(dirty)message+="\n\n导入会替换当前尚未保存的设置。";if(!imported.notes.isEmpty())message+="\n\n"+String.join("\n",imported.notes);ScrollView scroll=new ScrollView(this);scroll.addView(MainActivity.this.text(message,14,MUTED));scroll.setLayoutParams(new LinearLayout.LayoutParams(-1,dp(240)));AlertDialog d=dialog("导入配置",scroll);d.show();dialogButton(d,"取消",null,false);dialogButton(d,"导入",()->{try{ConfigurationFile.Imported checked=ConfigurationFile.read(text,runtime,configuration());loadOptions(checked.options);if(checked.ui.has("refresh_seconds"))refreshSeconds=checked.ui.getInt("refresh_seconds");if(checked.ui.has("log_auto_scroll"))autoScroll=checked.ui.getBoolean("log_auto_scroll");getPreferences(0).edit().putInt("refresh_seconds",refreshSeconds).putBoolean("log_auto_scroll",autoScroll).apply();dirty=true;logFollow.setChecked(autoScroll);drawCurve();show("配置已导入，检查后点击保存并应用");}catch(Exception error){show(error.getMessage());}},true);}catch(Exception error){show(error.getMessage());}}
-    void loadOptions(JSONObject config)throws Exception{SceneOptions nextScenes=SceneOptions.parse(config);controls=BrightnessControlOptions.parseStored(config);LowLightAssistGate nextAssistGate=new LowLightAssistGate();nextAssistGate.configure(config);LowLightThresholds nextLowThresholds=LowLightThresholds.parse(config);MemoryOptions nextMemory=MemoryOptions.parse(config);float[] next=CurvePlan.factors(config.getString("factors"));float floor=CurvePlan.floor(config.has("curve_floor_nit")?config.opt("curve_floor_nit"):null);new CurvePlan(factoryLux,factoryNit,minimum,maximum,next,floor);AdvancedOptions a=AdvancedOptions.parse(config);OutdoorOptions o=OutdoorOptions.parse(config);sceneOptions=nextScenes;memoryOptions=nextMemory;lowThresholds=nextLowThresholds;assistGateOptions=nextAssistGate;factors=next;curveFloor=floor;advanced=a;outdoorOptions=o;thermalRelax=config.optBoolean("thermal_relax");thermalCeiling=(float)config.optDouble("thermal_ceiling",43);float memory=(float)config.optDouble("memory_strength",1);memoryEnabled=memory>0;if(memoryEnabled)memoryStrength=memory;memoryWindow=config.optLong("memory_window",1500);memoryLuxRange=(float)config.optDouble("memory_lux_range",.3);thermalCooling=(float)config.optDouble("thermal_cooling",1);responseOverride=config.optBoolean("response_override");brightenDelay=config.optLong("brighten_delay",1500);darkenDelay=config.optLong("darken_delay",5000);smallBrightenOverride=config.optBoolean("small_brighten_override");smallBrightenDelay=config.optLong("small_brighten_delay",5000);lowLightStability=config.optBoolean("low_light_stability");lowLightLimit=(float)config.optDouble("low_light_limit",50);lowLightBrighten=config.optLong("low_light_brighten",3000);lowLightDarken=config.optLong("low_light_darken",4000);}
+    void loadOptions(JSONObject config)throws Exception{SavedCurve nextBase=SavedCurve.parse(config);float[] officialNit=RootControl.numbers(runtime.getJSONArray("factory_logical_nit"));float[] editableNit=nextBase==null?officialNit:nextBase.controls(factoryLux);SceneOptions nextScenes=SceneOptions.parse(config);controls=BrightnessControlOptions.parseStored(config);LowLightAssistGate nextAssistGate=new LowLightAssistGate();nextAssistGate.configure(config);LowLightThresholds nextLowThresholds=LowLightThresholds.parse(config);MemoryOptions nextMemory=MemoryOptions.parse(config);float[] next=CurvePlan.factors(config.getString("factors"));float floor=CurvePlan.floor(config.has("curve_floor_nit")?config.opt("curve_floor_nit"):null);SavedCurve.plan(nextBase,factoryLux,officialNit,minimum,maximum,next,floor);savedBase=nextBase;factoryNit=editableNit;AdvancedOptions a=AdvancedOptions.parse(config);OutdoorOptions o=OutdoorOptions.parse(config);sceneOptions=nextScenes;memoryOptions=nextMemory;lowThresholds=nextLowThresholds;assistGateOptions=nextAssistGate;factors=next;curveFloor=floor;advanced=a;outdoorOptions=o;thermalRelax=config.optBoolean("thermal_relax");thermalCeiling=(float)config.optDouble("thermal_ceiling",43);float memory=(float)config.optDouble("memory_strength",1);memoryEnabled=memory>0;if(memoryEnabled)memoryStrength=memory;memoryWindow=config.optLong("memory_window",1500);memoryLuxRange=(float)config.optDouble("memory_lux_range",.3);thermalCooling=(float)config.optDouble("thermal_cooling",1);responseOverride=config.optBoolean("response_override");brightenDelay=config.optLong("brighten_delay",1500);darkenDelay=config.optLong("darken_delay",5000);smallBrightenOverride=config.optBoolean("small_brighten_override");smallBrightenDelay=config.optLong("small_brighten_delay",5000);lowLightStability=config.optBoolean("low_light_stability");lowLightLimit=(float)config.optDouble("low_light_limit",50);lowLightBrighten=config.optLong("low_light_brighten",3000);lowLightDarken=config.optLong("low_light_darken",4000);}
     void submit(){
         if(factoryLux==null)return;
         try{JSONObject options=configuration();
@@ -564,7 +583,7 @@ public final class MainActivity extends Activity {
         if(factoryLux==null){show("连接系统后再保存预设");return;}try{new CurvePlan(factoryLux,factoryNit,minimum,maximum,factors,curveFloor);}catch(Exception error){show(error.getMessage());return;}
         EditText input=input("预设名称，最多 24 字");input.setFilters(new android.text.InputFilter[]{new android.text.InputFilter.LengthFilter(24)});AlertDialog d=dialog("保存曲线预设",input);d.show();dialogButton(d,"取消",null,false);dialogButton(d,"保存",()->{
             String name=input.getText().toString().trim();if(name.isEmpty()){show("请填写预设名称");return;}try{JSONObject all=presets();all.put(name,new JSONObject().put("factors",CurvePlan.encode(factors)).put("curve_floor_nit",curveFloor).put("baseline_id",loadedBaseline).put("fingerprint",Build.FINGERPRINT).put("factory_lux",array(factoryLux)));
-                getPreferences(0).edit().putString("presets",all.toString()).apply();show("预设已保存到本机："+name);}catch(Exception error){show(error.toString());}
+                if(savedBase!=null)savedBase.put(all.getJSONObject(name));getPreferences(0).edit().putString("presets",all.toString()).apply();show("预设已保存到本机："+name);}catch(Exception error){show(error.toString());}
         },true);
     }
     void pickPreset(){
@@ -572,7 +591,7 @@ public final class MainActivity extends Activity {
         LinearLayout list=column();ScrollView scroll=new ScrollView(this);scroll.addView(list);scroll.setLayoutParams(new LinearLayout.LayoutParams(-1,Math.min(dp(280),Math.max(dp(60),names.size()*dp(54)))));AlertDialog chooser=dialog("我的曲线预设",scroll);
         for(String name:names)button(name,()->{chooser.dismiss();try{JSONObject value=all.getJSONObject(name);
             if(!Build.FINGERPRINT.equals(value.optString("fingerprint"))){show("该预设来自其他固件，请先核对曲线节点");return;}
-            if(value.has("baseline_id")&&!loadedBaseline.equals(value.getString("baseline_id"))){show("该预设来自其他固件，请先核对曲线节点");return;}float[] next=CurvePlan.factors(value.getString("factors"));float floor=CurvePlan.floor(value.has("curve_floor_nit")?value.opt("curve_floor_nit"):null);float[] adjusted=CurveEditor.preset(next,factoryNit,minimum,maximum);new CurvePlan(factoryLux,factoryNit,minimum,maximum,adjusted,floor);AlertDialog d=dialog(name,text("载入后点击保存并应用。",14,MUTED));d.show();dialogButton(d,"删除",()->{all.remove(name);getPreferences(0).edit().putString("presets",all.toString()).apply();show("已删除预设");},false);dialogButton(d,"载入",()->{factors=adjusted;curveFloor=floor;dirty=true;drawCurve();show("曲线已选中，点击保存并应用后生效");},true);
+            if(value.has("baseline_id")&&!loadedBaseline.equals(value.getString("baseline_id"))){show("该预设来自其他固件，请先核对曲线节点");return;}float[] next=CurvePlan.factors(value.getString("factors"));float floor=CurvePlan.floor(value.has("curve_floor_nit")?value.opt("curve_floor_nit"):null);SavedCurve presetBase=SavedCurve.parse(value);float[] presetNit=presetBase==null?RootControl.numbers(runtime.getJSONArray("factory_logical_nit")):presetBase.controls(factoryLux);float[] adjusted=CurveEditor.preset(next,presetNit,minimum,maximum);new CurvePlan(factoryLux,presetNit,minimum,maximum,adjusted,floor);AlertDialog d=dialog(name,text("载入后点击保存并应用。",14,MUTED));d.show();dialogButton(d,"删除",()->{all.remove(name);getPreferences(0).edit().putString("presets",all.toString()).apply();show("已删除预设");},false);dialogButton(d,"载入",()->{savedBase=presetBase;factoryNit=presetNit;factors=adjusted;curveFloor=floor;dirty=true;drawCurve();show("曲线已选中，点击保存并应用后生效");},true);
         }catch(Exception error){show(error.toString());}},list);
         chooser.show();dialogButton(chooser,"关闭",null,false);
     }
@@ -649,9 +668,11 @@ public final class MainActivity extends Activity {
         try{return payload!=null&&ConfigurationFile.sameOptions(new JSONObject(new String(Base64.getDecoder().decode(payload),StandardCharsets.UTF_8)),configuration());}
         catch(Exception invalidDraft){return false;}
     }
+    void finishCurveSaveProgress(){AlertDialog progress=curveSaveProgress;curveSaveProgress=null;if(progress!=null)progress.dismiss();}
     void run(String command,String payload){
         if(busy||destroyed)return;busy=true;apply.setEnabled(false);stop.setEnabled(false);drawDraftState();
-        if(!command.equals("inspect"))show(command.equals("apply")?"正在应用曲线和温控选项…":command.equals("stop")?"正在恢复官方策略…":command.equals("reset-memory")?"正在清除手动记忆…":command.equals("export-config")?"正在导出配置…":"正在导出分析包…");
+        if(command.equals("promote-memory")){curveSaveProgress=dialog("保存为基础曲线",text("正在保存手动记忆曲线…",14,MUTED));curveSaveProgress.setCancelable(false);curveSaveProgress.setCanceledOnTouchOutside(false);curveSaveProgress.show();}
+        if(!command.equals("inspect"))show(command.equals("apply")?"正在应用曲线和温控选项…":command.equals("stop")?"正在恢复官方策略…":command.equals("reset-memory")?"正在清除手动记忆…":command.equals("promote-memory")?"正在保存手动记忆曲线…":command.equals("export-config")?"正在导出配置…":"正在导出分析包…");
         worker.execute(()->{
             try{
                 if(command.equals("inspect")){SystemVersion.Result platform=SystemVersion.read();if(platform.unsupported()){
@@ -667,14 +688,14 @@ public final class MainActivity extends Activity {
                         prefs.putBoolean("legacy_imported",true).apply();
                     }}catch(Exception ignored){}
                 }
-                JSONObject state=command.equals("inspect")?result:(command.equals("apply")||command.equals("stop")||command.equals("reset-memory"))?request("inspect",null):null;
-                ui.post(()->{if(destroyed)return;busy=false;stop.setEnabled(true);if(command.equals("apply")){dirty=!draftStillMatches(payload);}
+                JSONObject state=command.equals("inspect")?result:(command.equals("apply")||command.equals("promote-memory")||command.equals("stop")||command.equals("reset-memory"))?request("inspect",null):null;
+                ui.post(()->{if(destroyed)return;finishCurveSaveProgress();busy=false;stop.setEnabled(true);if(command.equals("apply")||command.equals("promote-memory")){dirty=!draftStillMatches(payload);}
                     if(state!=null)render(state);else apply.setEnabled(runtime!=null&&factoryLux!=null);drawDraftState();offerLegacyModules();offerUpdate();
                     if(rereadPending){rereadPending=false;ui.post(()->run("inspect",null));}
                     if(!command.equals("inspect")){String message=result.optString("message",result.has("path")?"已导出："+result.optString("path"):"操作完成");show(message);
                         if(result.has("path")){boolean configFile=command.equals("export-config");AlertDialog d=dialog(configFile?"配置已导出":"分析包已导出",text(result.optString("path")+"\n\n"+(configFile?"文件位于设备存储根目录。包含当前设置，可在后续版本导入。":"包含设备与显示信息，请按需分享。"),14,MUTED));d.show();dialogButton(d,"知道了",null,true);}}
                 });
-            }catch(Throwable error){closeBridge();ui.post(()->{if(destroyed)return;busy=false;stop.setEnabled(true);if(command.equals("inspect")){runtime=null;factoryLux=factoryNit=null;badge.setText("连接中断");stateTitle.setText("等待连接");thermalSwitch.setEnabled(false);memorySwitch.setEnabled(false);permissionPrompt("root","需要 Root 授权","请在 Root 管理器中允许 HyperLux 获得 Root 权限，再点击重新检测。\nRoot 可用后才会继续检查 LSPosed。");}apply.setEnabled(runtime!=null&&factoryLux!=null);drawDraftState();operationFailure(command,error);if(rereadPending){rereadPending=false;ui.post(()->run("inspect",null));}});}
+            }catch(Throwable error){closeBridge();ui.post(()->{if(destroyed)return;finishCurveSaveProgress();busy=false;stop.setEnabled(true);if(command.equals("inspect")){runtime=null;factoryLux=factoryNit=null;badge.setText("连接中断");stateTitle.setText("等待连接");thermalSwitch.setEnabled(false);memorySwitch.setEnabled(false);permissionPrompt("root","需要 Root 授权","请在 Root 管理器中允许 HyperLux 获得 Root 权限，再点击重新检测。\nRoot 可用后才会继续检查 LSPosed。");}apply.setEnabled(runtime!=null&&factoryLux!=null);drawDraftState();operationFailure(command,error);if(rereadPending){rereadPending=false;ui.post(()->run("inspect",null));}});}
             finally{if(!visible)closeBridge();}
         });
     }
@@ -698,11 +719,11 @@ public final class MainActivity extends Activity {
             runtime=answer.getJSONObject("runtime");if(!runtime.has("factory_lux")){factoryLux=factoryNit=null;badge.setText("不兼容");compatibility.setText(runtime.optString("message"));show("");apply.setEnabled(false);thermalSwitch.setEnabled(false);memorySwitch.setEnabled(false);permissionPrompt("abi","系统接口尚未兼容",runtime.optString("message"));return;}
             factoryLux=RootControl.numbers(runtime.getJSONArray("factory_lux"));factoryNit=RootControl.numbers(runtime.getJSONArray("factory_logical_nit"));minimum=(float)runtime.getDouble("min_logical_nit");maximum=(float)runtime.getDouble("max_logical_nit");
             String baseline=runtime.optString("baseline_id");
-            if(!baseline.equals(loadedBaseline)){loadedBaseline=baseline;dirty=false;curveFloor=0;factors=new float[]{1,1,1,1};if(baseline.equals(getPreferences(0).getString("draft_baseline","")))try{factors=CurvePlan.factors(getPreferences(0).getString("draft","1,1,1,1"));curveFloor=getPreferences(0).getFloat("draft_floor",0);}catch(Exception ignored){}}
+            if(!baseline.equals(loadedBaseline)){loadedBaseline=baseline;dirty=false;curveFloor=0;savedBase=null;factors=new float[]{1,1,1,1};if(baseline.equals(getPreferences(0).getString("draft_baseline","")))try{factors=CurvePlan.factors(getPreferences(0).getString("draft","1,1,1,1"));curveFloor=getPreferences(0).getFloat("draft_floor",0);}catch(Exception ignored){}}
             JSONObject config=answer.optJSONObject("config");
             if(config!=null&&(!Build.FINGERPRINT.equals(config.optString("fingerprint"))||!runtime.optString("curve_backend").equals(config.optString("curve_backend",runtime.optString("curve_backend").equals("refactor")?"refactor":""))||(config.has("baseline_id")&&!baseline.equals(config.optString("baseline_id")))))config=null;
             if(restoredUi!=null){Bundle previousUi=restoredUi;restoredUi=null;if(previousUi.getBoolean("dirty")&&baseline.equals(previousUi.getString("baseline"))){try{loadOptions(new JSONObject(previousUi.getString("draft_options")));dirty=true;}catch(Exception invalid){show("未保存的设置无法恢复，请重新检查");}}int group=previousUi.getInt("settings_group",-1);if(page==1&&group>=0&&group<settingGroups.length)showSettingsGroup(group);}
-            if(!dirty&&config!=null&&config.optBoolean("enabled"))loadOptions(config);
+            if(!dirty&&config!=null&&config.optBoolean("enabled"))loadOptions(config);else if(dirty&&savedBase!=null)factoryNit=savedBase.controls(factoryLux);else if(!dirty)savedBase=null;
             if(!dirty)outdoorOptions=config!=null&&config.optBoolean("enabled")?OutdoorOptions.parse(config):new OutdoorOptions();
             if(!dirty)controls=config!=null&&config.optBoolean("enabled")?BrightnessControlOptions.parseStored(config):new BrightnessControlOptions();
             if(!dirty){advanced=config!=null&&config.optBoolean("enabled")?AdvancedOptions.parse(config):new AdvancedOptions();sceneOptions=config!=null&&config.optBoolean("enabled")?SceneOptions.parse(config):new SceneOptions();}
@@ -713,6 +734,7 @@ public final class MainActivity extends Activity {
             luxReading.setText(runtime.has("calculated_physical_nit")?format(runtime.optDouble("calculated_physical_nit"))+" nit":"等待计算");nitReading.setText(runtime.has("actual_nit")?format(runtime.optDouble("actual_nit"))+" nit":"等待输出");
             flow.setText(runtime.optBoolean("auto_mode")?"照度定位曲线，换算亮度后交由系统平滑调节。":"当前为手动亮度，曲线将在开启自动亮度后参与调节。");
             if(runtime.optJSONObject("brightness_control")!=null&&"dark".equals(runtime.optJSONObject("brightness_control").optString("owner"))){stateTitle.setText("暗光锁定，保持当前亮度");flow.setText("自动亮度暂停；主辅光感继续低频监听，持续变亮后恢复自动。");}
+            if(runtime.optJSONObject("brightness_control")!=null&&"app".equals(runtime.optJSONObject("brightness_control").optString("owner"))){stateTitle.setText("应用暂停自动亮度");flow.setText("当前应用在暂停名单中；退出后恢复自动亮度。");}
             String thermal=!runtime.optBoolean("thermal_supported")?"该固件接口未兼容":!runtime.optBoolean("thermal_relax")?"系统温控生效":runtime.optBoolean("thermal_permitted")?"减少温控降亮已启用":!runtime.has("battery_temperature")||runtime.optInt("thermal_severity",-1)<0?"等待温度读数，系统温控生效":"温度较高，系统温控生效";
             thermalState.setText("温控："+thermal+"\n电池 "+(runtime.has("battery_temperature")?format(runtime.optDouble("battery_temperature"))+"℃":"无读数")+"；系统热状态 "+severity(runtime.optInt("thermal_severity",-1)));
             double anchor=runtime.optDouble("user_anchor_lux",-1);userState.setText("手动偏好："+(anchor>=0?"系统锚点位于 "+format(anchor)+" lux":"当前没有手动锚点"));
@@ -834,7 +856,7 @@ public final class MainActivity extends Activity {
             if(factoryLux==null){canvas.drawText(tr("连接后读取曲线"),dp(10),dp(65),paint);return;}
             if(!draft&&!memory&&!StatusPresentation.fresh(runtime,SystemClock.elapsedRealtime())){canvas.drawText(tr("状态待刷新"),dp(10),dp(65),paint);return;}
             float left=left(),top=top(),width=width(),height=height();if(width<=0||height<=0)return;
-            CurveComparison data;try{data=CurveComparison.read(runtime,factors,curveFloor,draft);}catch(Exception invalid){canvas.drawText(tr("曲线数据未就绪"),dp(10),dp(65),paint);return;}
+            CurveComparison data;try{data=CurveComparison.read(runtime,factors,curveFloor,draft,savedBase);}catch(Exception invalid){canvas.drawText(tr("曲线数据未就绪"),dp(10),dp(65),paint);return;}
             paint.setStrokeWidth(dp(1));paint.setTextSize(dp(10));for(int i=0;i<3;i++){float yy=top+height*i/2;paint.setColor(themed(0xffe7ebf2));canvas.drawLine(left,yy,left+width,yy,paint);paint.setColor(MUTED);canvas.drawText((100-i*50)+"%",0,yy+dp(4),paint);}
             // Editable drafts never replace the applied baseline or current memory in the other graphs.
             String kind=data.kind(runtime);int currentColor=memory||kind.equals("memory")?themed(0xff78b997):kind.equals("system")?themed(0xffa5aab3):BLUE;

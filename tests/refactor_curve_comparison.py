@@ -55,5 +55,5 @@ public class CurveComparisonTest {
  }
 }''',encoding='utf-8')
 classes=O/'classes';classes.mkdir(exist_ok=True)
-subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(J),'-d',str(classes),*[str(S/(n+'.java')) for n in ['CurveComparison','CurvePlan','TraditionalCurve']],str(test)],check=True)
+subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(J),'-d',str(classes),*[str(S/(n+'.java')) for n in ['CurveComparison','SavedCurve','CurvePlan','TraditionalCurve']],str(test)],check=True)
 subprocess.run(['java','-cp',str(classes)+';'+str(J),'top.rongshangs.lumacurve.refactor.CurveComparisonTest'],check=True)

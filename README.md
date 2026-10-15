@@ -2,13 +2,13 @@
 
 **适配 HyperOS 4 的自动亮度工具。** 在系统亮度链路内调整曲线与手动偏好记忆，继续使用系统的双侧感光、场景判定和过渡动画；也可按需调整显示层温控与变化确认时间。
 
-**3.0.1 正式版 / 30005** · Root + LSPosed · GPL-3.0 · 完全开源免费
+**3.0.2 正式版 / 30009** · Root + LSPosed · GPL-3.0 · 完全开源免费
 
 已修复息屏清理、诊断和亮度重算中的风险，保留曲线、场景与已有配置。修复部分红米机型唤醒、解锁时偶发卡死与系统重启的问题。
 
 [官网](https://lc.rongshangs.top) · [下载安装](https://github.com/RongShangs/LumaCurve/releases/latest) · [作者博客](https://rongshangs.top) · [酷安@戎Shangs](https://www.coolapk.com/u/3261403)
 
-应用名称为 **HyperLux**，安装包为 `HyperLux-3.0.1.apk`。包名 `top.rongshangs.lumacurve`、蓝色曲线图标、官网及 `RongShangs/LumaCurve` 仓库继续沿用；源码与恢复包沿用 `LumaCurve-` 文件名。
+应用名称为 **HyperLux**，安装包为 `HyperLux-3.0.2.apk`。包名 `top.rongshangs.lumacurve`、蓝色曲线图标、官网及 `RongShangs/LumaCurve` 仓库继续沿用；源码与恢复包沿用 `LumaCurve-` 文件名。
 
 ## 界面预览 / Screenshots
 

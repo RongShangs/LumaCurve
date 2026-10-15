@@ -26,6 +26,7 @@ class Window{final View decor=new View();View getDecorView(){return decor;}}
 class AlertDialog{Window window=new Window();boolean showing=true;Window getWindow(){return window;}boolean isShowing(){return showing;}}
 class SceneSettings {View target;void commit(){}View find(String key){return target;}}
 class MainActivity {
+ SavedCurve savedBase;
  final Map<String,Runnable> detailOpeners=new HashMap<>();final ScrollView[] settingsScrollers=new ScrollView[10];final View[] settingScreens=new View[10];
  View displayedPage,rangeSwitch=new View(),oprSwitch=new View(),thermalSwitch=new View(),darkLockSwitch=new View(),lowLightSwitch=new View(),settingsGraph=new View(),memorySwitch=new View();boolean destroyed,dirty=true;int page,group;
  float[] factoryLux={0,30,600,100000},factoryNit={2,100,300,1060},factors={1,1,1,1};float minimum=1,maximum=1060,curveFloor=0,thermalCeiling=43,memoryStrength=1,memoryLuxRange=.3f,thermalCooling=1,lowLightLimit=50;
@@ -79,6 +80,6 @@ public class NavigationTest {
  }
 }''',encoding='utf-8')
 classes=O/'classes';classes.mkdir(exist_ok=True)
-names=['SceneOptions','CurvePlan','CurveComparison','TraditionalCurve','ThermalPolicy','MemoryPolicy','MemoryOptions','AdvancedOptions','AdvancedPolicy','OutdoorOptions','BrightnessControlOptions','LowLightThresholds','LowLightAssistGate','StatusAdvice','LiveLimitEvidence']
+names=['SceneOptions','CurvePlan','CurveComparison','SavedCurve','TraditionalCurve','ThermalPolicy','MemoryPolicy','MemoryOptions','AdvancedOptions','AdvancedPolicy','OutdoorOptions','BrightnessControlOptions','LowLightThresholds','LowLightAssistGate','StatusAdvice','LiveLimitEvidence']
 subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(J),'-d',str(classes),*[str(S/(n+'.java')) for n in names],str(test)],check=True)
 subprocess.run(['java','-cp',str(classes)+os.pathsep+str(J),'top.rongshangs.lumacurve.refactor.NavigationTest'],check=True)

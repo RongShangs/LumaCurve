@@ -105,6 +105,8 @@ final class OutdoorController {
     }
     JSONObject status(){JSONObject j=new JSONObject();try{
         HbmAccess h=binding();j.put("supported",supported()).put("hbm_tuning_supported",h!=null&&h.tunable()).put("range_supported",rangeSupported()).put("opr_supported",oprSupported());
+        j.put("sdr_compatibility_profile",OutdoorSdrScope.profile(s.owner.getClass()));
+        String scopeDetail=OutdoorSdrScope.detail(s.owner.getClass());if(!scopeDetail.isEmpty())j.put("sdr_compatibility_detail",scopeDetail);
         float cap=nitCeiling(options.values[OutdoorOptions.MAX_NIT]);j.put("nit_limit_supported",OutdoorPolicy.valid(cap));
         if(nitLimit!=null&&Float.isFinite(nitLimit.maximumNit))j.put("mapping_max_nit",nitLimit.maximumNit).put("mapping_min_nit",nitLimit.minimumNit);
         if(options.values[OutdoorOptions.MAX_NIT]>0){j.put("maximum_nit",options.values[OutdoorOptions.MAX_NIT]);if(OutdoorPolicy.valid(cap))j.put("nit_limit_brightness",cap);else j.put("nit_limit_detail",nitLimitError);}

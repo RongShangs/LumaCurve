@@ -83,14 +83,14 @@ public final class RefactorAdapter extends CurveBackend {
     }
     public void configure(float[] factors,float floor) throws Exception {
         if(factors!=null && (factors.length!=4 || factors[3]!=1f))throw new IllegalArgumentException("本应用高照度端保持官方上限");
-        CurvePlan next=factors==null?null:new CurvePlan(factoryLux,factoryNit,min,max,factors,floor);
+        CurvePlan next=factors==null?null:proposed(factors,floor);
         Map<String,Object> before=new HashMap<>();
         for(String name:ARRAYS){Object a=get(name);Object copy=Array.newInstance(a.getClass().getComponentType(),Array.getLength(a));System.arraycopy(a,0,copy,0,Array.getLength(a));before.put(name,copy);}
         for(String name:SCALARS)before.put(name,get(name));
         CurvePlan previous=active;
         try {
             active=next;
-            float[] desired=next==null?factoryNit:next.nits();
+            float[] desired=next==null?factoryNit:new float[]{next.at(factoryLux[0]),next.at(factoryLux[1]),next.at(factoryLux[2]),next.at(factoryLux[3])};
             // Change the real baseline fields read by defaultAtLux and resetDefaultSpline.
             // This works even if private interpolation helpers were inlined by ART.
             for(int i=0;i<3;i++)set(BASE[i],desired[i]);
@@ -108,12 +108,14 @@ public final class RefactorAdapter extends CurveBackend {
     public void afterReset() throws Exception {
         CurvePlan plan=active;if(plan==null)return;
         // resetDefaultSpline already cleared the OEM short-term model and drag flags.
-        if(integer("mAnchorCount")!=4 || integer("mGoodAnchorCount")!=4)
+        int expected=plan.lux().length;
+        if((integer("mAnchorCount")!=4&&integer("mAnchorCount")!=expected)||(integer("mGoodAnchorCount")!=4&&integer("mGoodAnchorCount")!=expected))
             throw new IllegalStateException("系统默认锚点数量已变化");
-        float[] x=plan.lux(),y=plan.nits();
+        float[] x=plan.lux(),y=plan.nits();if(x.length>7)throw new IllegalStateException("本机基础曲线容器不足");
         for(String prefix:new String[]{"mAnchor","mGoodAnchor"}) {
-            System.arraycopy(x,0,get(prefix+"Lux"),0,4);
-            System.arraycopy(y,0,get(prefix+"Nit"),0,4);
+            System.arraycopy(x,0,get(prefix+"Lux"),0,x.length);
+            System.arraycopy(y,0,get(prefix+"Nit"),0,y.length);
         }
+        set("mAnchorCount",x.length);set("mGoodAnchorCount",x.length);
     }
 }

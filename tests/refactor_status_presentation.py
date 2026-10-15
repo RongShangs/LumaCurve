@@ -60,5 +60,5 @@ public class StatusPresentationTest{
  }
 }''',encoding='utf-8')
 classes=O/'classes';classes.mkdir(exist_ok=True)
-subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(J),'-d',str(classes),*[str(S/(n+'.java')) for n in ['SensorState','StatusPresentation','BranchReport','StatusAdvice','LiveLimitEvidence','UiText','CurveComparison','CurvePlan','TraditionalCurve']],str(stub),str(test)],check=True)
+subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(J),'-d',str(classes),*[str(S/(n+'.java')) for n in ['SensorState','StatusPresentation','BranchReport','StatusAdvice','LiveLimitEvidence','UiText','CurveComparison','SavedCurve','CurvePlan','TraditionalCurve']],str(stub),str(test)],check=True)
 subprocess.run(['java','-cp',str(classes)+os.pathsep+str(J),'top.rongshangs.lumacurve.refactor.StatusPresentationTest'],check=True)

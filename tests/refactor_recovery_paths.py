@@ -52,8 +52,8 @@ public class ReviewEdges{
  static JSONObject node()throws Exception{return new JSONObject().put("supported",true).put("path","/sys/class/backlight/panel0-backlight/brightness").put("canonical_path","/sys/devices/panel0/brightness").put("maximum",16383);}
  static void nodes()throws Exception{PanelNodeDiscovery.value=node();PanelNodeDiscovery.scans=NativePanelClient.probes=NativePanelRoot.installs=0;NativePanelRoot.changeDuringInstall=false;NativePanelClient.reply=node().put("ok",true).put("native_build","raw07-openprobe");}
  public static void main(String[] args)throws Exception{
-  for(String kind:new String[]{"dark","raw_panel"}){RootControl c=owner(kind,true,0);check(c.stop().getBoolean("ok"));check(c.settings.mode.equals("1")&&c.settings.modeWrites==1);check(c.settings.get("hyperlux_brightness_owner_v1")==null);check(!new JSONObject(c.settings.get("config")).getBoolean("enabled"));check(NativePanelRoot.stops==1&&c.resumes==0);}
-  for(String kind:new String[]{"dark","raw_panel","panel","unknown"}){RootControl c=owner(kind,false,0);c.stop();check(c.settings.mode.equals("0")&&c.settings.modeWrites==0);}
+  for(String kind:new String[]{"dark","app","raw_panel"}){RootControl c=owner(kind,true,0);check(c.stop().getBoolean("ok"));check(c.settings.mode.equals("1")&&c.settings.modeWrites==1);check(c.settings.get("hyperlux_brightness_owner_v1")==null);check(!new JSONObject(c.settings.get("config")).getBoolean("enabled"));check(NativePanelRoot.stops==1&&c.resumes==0);}
+  for(String kind:new String[]{"dark","app","raw_panel","panel","unknown"}){RootControl c=owner(kind,false,0);c.stop();check(c.settings.mode.equals("0")&&c.settings.modeWrites==0);}
   RootControl c=owner("raw_panel",true,10);c.stop();check(c.settings.mode.equals("0")&&c.settings.modeWrites==0);
   c=owner("raw_panel",true,0);c.settings.mode="1";c.stop();check(c.settings.modeWrites==0);
   c=owner("raw_panel",true,0);c.settings.rejectMode=true;try{c.stop();throw new AssertionError("mode failure accepted");}catch(IOException expected){check(true);}check(c.settings.get("hyperlux_brightness_owner_v1")!=null&&c.settings.get("config")==null);

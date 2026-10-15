@@ -52,12 +52,14 @@ public final class RootControl implements AutoCloseable {
             return status;
         }catch(Exception unavailable){return null;}
     }
-    JSONObject refreshedLive()throws Exception {
+    JSONObject refreshedLive()throws Exception {return refreshedLive(false);}
+    JSONObject refreshedLive(boolean requireFresh)throws Exception {
         JSONObject state=live();
         if(state!=null){
-            long before=state.optLong("elapsed_ms");
+            long before=state.optLong("elapsed_ms");boolean received=false;
             settings.put(REFRESH,UUID.randomUUID().toString());
-            for(int i=0;i<10;i++){JSONObject newer=live();if(newer!=null&&newer.optLong("elapsed_ms")>before){state=newer;break;}Thread.sleep(30);}
+            for(int i=0;i<(requireFresh?40:10);i++){JSONObject newer=live();if(newer!=null&&newer.optLong("elapsed_ms")>before){state=newer;received=true;break;}Thread.sleep(requireFresh?50:30);}
+            if(requireFresh&&!received)throw new IOException("曲线状态尚未刷新，请稍后重试；当前手动记忆没有改动");
         }
         return state;
     }
@@ -134,7 +136,7 @@ public final class RootControl implements AutoCloseable {
         int serial=state.optInt("user_serial",-1);
         if(user!=0||serial>0)throw new IOException("本应用暂只支持主用户，请切回主用户后重试");
         if(!ForegroundUser.canApply(user,serial))throw new IOException("系统亮度的用户身份尚未就绪，请稍后再点保存并应用");
-        if(encoded.length()>16384)throw new IOException("参数过长");
+        if(encoded.length()>40000)throw new IOException("参数过长");
         String decoded=new String(Base64.getDecoder().decode(encoded),StandardCharsets.UTF_8);
         JSONObject options=decoded.startsWith("{")?new JSONObject(decoded):new JSONObject().put("factors",decoded);
         String factors=options.getString("factors");
@@ -160,7 +162,9 @@ public final class RootControl implements AutoCloseable {
         float[] f=CurvePlan.factors(factors);
         float floor=CurvePlan.floor(options.has("curve_floor_nit")?options.opt("curve_floor_nit"):null);
         if(f[3]!=1f)throw new IOException("高照度端暂保持官方上限，请保持第四个参数为 100%");
-        new CurvePlan(numbers(state.getJSONArray("factory_lux")),numbers(state.getJSONArray("factory_logical_nit")),
+        SavedCurve saved=SavedCurve.parse(options);
+        if(saved!=null)saved.verifyBackend(state.optString("curve_backend"));
+        SavedCurve.plan(saved,numbers(state.getJSONArray("factory_lux")),numbers(state.getJSONArray("factory_logical_nit")),
             (float)state.getDouble("min_logical_nit"),(float)state.getDouble("max_logical_nit"),f,floor);
         String previous=settings.get(CONFIG);
         boolean wasActive=state.optString("phase").equals("active");
@@ -175,6 +179,9 @@ public final class RootControl implements AutoCloseable {
         lowThresholds.put(config);
         assistGate.put(config);
         sceneOptions.put(config);advanced.put(config);outdoor.put(config);controls.put(config);config.put("curve_floor_nit",floor);
+        if(saved!=null)saved.put(config);
+        if(options.has("reset_anchors")){String reset=options.getString("reset_anchors");if(!reset.matches("[A-Za-z0-9_-]{1,80}"))throw new IOException("记忆清除标识无效");config.put("reset_anchors",reset);}
+        if(config.toString().getBytes(StandardCharsets.UTF_8).length>28000)throw new IOException("配置超过安全保存范围，请减少应用名单或曲线节点");
         try {
             prepare();
             progress("提交小米基础曲线并等待系统确认…");
@@ -199,7 +206,7 @@ public final class RootControl implements AutoCloseable {
     JSONObject stop()throws Exception {
         NativePanelRoot.stop();boolean connected=live()!=null;
         if(!connected){String marker=settings.get("hyperlux_brightness_owner_v1");if(marker!=null){JSONObject ownership=new JSONObject(marker);
-            if(("dark".equals(ownership.optString("owner"))||"raw_panel".equals(ownership.optString("owner")))&&ownership.optInt("user",-1)==0&&ownership.optBoolean("was_auto")&&"0".equals(settings.getSystem("screen_brightness_mode")))
+            if(("dark".equals(ownership.optString("owner"))||"app".equals(ownership.optString("owner"))||"raw_panel".equals(ownership.optString("owner")))&&ownership.optInt("user",-1)==0&&ownership.optBoolean("was_auto")&&"0".equals(settings.getSystem("screen_brightness_mode")))
                 if(!settings.putSystem("screen_brightness_mode","1"))throw new IOException("未能恢复此前的自动亮度");
             settings.put("hyperlux_brightness_owner_v1",null);
         }}
@@ -333,6 +340,14 @@ public final class RootControl implements AutoCloseable {
         try(FileChannel lock=FileChannel.open(new File(DATA,"control.lock").toPath(),StandardOpenOption.CREATE,StandardOpenOption.WRITE);FileLock held=lock.tryLock()){
             if(held==null)throw new IOException("另一项操作还在执行");
             if(command.equals("apply")&&payload!=null)return apply(payload);
+            if(command.equals("promote-memory")){
+                JSONObject state=refreshedLive(true);if(state==null)throw new IOException("尚未连接当前系统曲线");long age=android.os.SystemClock.elapsedRealtime()-state.optLong("elapsed_ms",-1);if(age<0||age>15000)throw new IOException("曲线状态已过期，请刷新后重试");SavedCurve curve=SavedCurve.capture(state);
+                String raw=settings.get(CONFIG);if(raw==null)throw new IOException("请先保存并应用当前设置");JSONObject options=new JSONObject(raw);
+                if(!options.optBoolean("enabled")||!state.optString("revision").equals(options.optString("revision")))throw new IOException("配置正在变化，请刷新后重试");
+                curve.put(options);options.put("factors","1.0,1.0,1.0,1.0").put("curve_floor_nit",0).put("reset_anchors",UUID.randomUUID().toString());
+                JSONObject result=apply(Base64.getEncoder().encodeToString(options.toString().getBytes(StandardCharsets.UTF_8)));
+                result.put("message","已将当前手动记忆曲线保存为基础曲线，手动记忆可继续学习");return result;
+            }
             if(command.equals("stop"))return stop();
             if(command.equals("reset-memory")){
                 JSONObject state=live();if(state==null||!state.has("factory_lux"))throw new IOException("尚未连接兼容的系统曲线");
@@ -354,7 +369,7 @@ public final class RootControl implements AutoCloseable {
                     try(BufferedReader input=new BufferedReader(new InputStreamReader(System.in,StandardCharsets.UTF_8))){
                         String line;while((line=input.readLine())!=null){
                             try{
-                                if(line.length()>65536)throw new IOException("请求过长");JSONObject request=new JSONObject(line);if(!"export-config".equals(request.optString("command"))&&line.length()>16384)throw new IOException("请求过长");
+                                if(line.length()>65536)throw new IOException("请求过长");JSONObject request=new JSONObject(line);if(!"export-config".equals(request.optString("command"))&&!"apply".equals(request.optString("command"))&&!"promote-memory".equals(request.optString("command"))&&line.length()>16384)throw new IOException("请求过长");
                                 System.out.println("LUMA_RESULT="+ctl.execute(request.getString("command"),request.optString("payload",null)));
                             }catch(Throwable error){System.out.println("LUMA_RESULT="+new JSONObject().put("ok",false).put("message",error.toString()));}
                             System.out.flush();

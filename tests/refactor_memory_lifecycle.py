@@ -64,6 +64,6 @@ files=[]
 for name,source in sources.items():
     p=O/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_text(source,encoding='utf-8');files.append(p)
 C=O/'classes';C.mkdir(exist_ok=True)
-names=['MemoryScene','MemoryOptions','PersistentMemory','MemoryPersistence','MemoryLifecycle','CurveBackend','CurvePlan','CurveIdentity','RefactorAdapter','TraditionalAdapter','TraditionalCurve']
+names=['MemoryScene','MemoryOptions','PersistentMemory','MemoryPersistence','MemoryLifecycle','CurveBackend','SavedCurve','CurvePlan','CurveIdentity','RefactorAdapter','TraditionalAdapter','TraditionalCurve']
 subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(J),'-d',str(C),*[str(S/(n+'.java')) for n in names],*map(str,files)],check=True)
 subprocess.run(['java','-cp',str(C)+';'+str(J),'top.rongshangs.lumacurve.refactor.LifecycleHostTest'],check=True)

@@ -4,6 +4,7 @@ package top.rongshangs.lumacurve.refactor;
 public abstract class CurveBackend {
     public float[] factoryLux,factoryNit;
     public final float min,max;
+    public SavedCurve savedBase;
     protected CurveBackend(float min,float max){this.min=min;this.max=max;}
     public abstract Object get(String name)throws Exception;
     public float number(String name)throws Exception{return ((Number)get(name)).floatValue();}
@@ -11,6 +12,10 @@ public abstract class CurveBackend {
     public abstract CurvePlan plan();
     public abstract void configure(float[] factors)throws Exception;
     public void configure(float[] factors,float floor)throws Exception{if(floor!=0)throw new IllegalArgumentException("此曲线路径不支持亮度下限");configure(factors);}
+    public void configure(float[] factors,float floor,SavedCurve saved)throws Exception{SavedCurve old=savedBase;savedBase=saved;try{configure(factors,floor);}catch(Exception failure){savedBase=old;throw failure;}}
+    protected CurvePlan proposed(float[] factors,float floor){return SavedCurve.plan(savedBase,factoryLux,factoryNit,min,max,factors,floor);}
+    public float[] baselineLux(){return plan()==null?fullLux():plan().lux();}
+    public float[] baselineNit(){return plan()==null?fullNit():plan().nits();}
     public abstract void clearMemory()throws Exception;
     public abstract float currentAt(float lux)throws Exception;
     public float memoryAt(float lux)throws Exception{return currentAt(lux);}

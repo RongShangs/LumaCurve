@@ -41,6 +41,7 @@ final class ConfigurationFile {
         else if(format.isEmpty()&&file.optInt("schema")==1&&file.has("factors")){source=file;legacy=true;}
         else throw new IllegalArgumentException("不是兼容的 HyperLux 配置文件");
         JSONObject out=new JSONObject();List<String> notes=new ArrayList<>();BrightnessControlOptions controls=BrightnessControlOptions.parseStored(source);if(controls.darkLock&&!runtime.optBoolean("dark_lock_supported")){controls.darkLock=false;notes.add("本机暗光锁定接口未就绪，已关闭");}controls.put(out);MemoryOptions memoryOptions=MemoryOptions.parse(source),fitMemory=memoryOptions.fit(runtime.optInt("memory_point_capacity",0));fitMemory.put(out);disable(out,"memory_reset_override",runtime.optBoolean("memory_reset_supported"),notes);disable(out,"memory_timeout_override",runtime.optBoolean("memory_timeout_supported"),notes);if(memoryOptions.maxPoints!=fitMemory.maxPoints)notes.add("持久化节点上限已按本机能力调整");
+        if(!runtime.optBoolean("app_auto_supported")&&!controls.manualApps.isEmpty()){controls.manualApps.clear();controls.put(out);notes.add("本机前台事件接口未就绪，已清空自动亮度应用名单");}
         for(String k:FLAGS)out.put(k,flag(source,k));
         LowLightThresholds lowThresholds=LowLightThresholds.parse(source);lowThresholds.put(out);if(out.getBoolean("low_light_stability"))disable(out,"low_light_threshold",runtime.optBoolean("low_light_threshold_supported"),notes);
         LowLightAssistGate assistGate=new LowLightAssistGate();assistGate.configure(source);assistGate.put(out);if(out.getBoolean("low_light_stability"))disable(out,"low_light_assist_gate",runtime.optBoolean("low_light_assist_gate_supported"),notes);
@@ -57,7 +58,8 @@ final class ConfigurationFile {
         float floor=same?CurvePlan.floor(source.has("curve_floor_nit")?source.opt("curve_floor_nit"):null):CurvePlan.floor(current.has("curve_floor_nit")?current.opt("curve_floor_nit"):null);
         if(!same)notes.add("曲线基准不同，已保留本机曲线与亮度下限");
         float[] lux=RootControl.numbers(runtime.getJSONArray("factory_lux")),nit=RootControl.numbers(runtime.getJSONArray("factory_logical_nit"));
-        new CurvePlan(lux,nit,(float)runtime.getDouble("min_logical_nit"),(float)runtime.getDouble("max_logical_nit"),factors,floor);out.put("factors",CurvePlan.encode(factors)).put("curve_floor_nit",floor);
+        SavedCurve saved=SavedCurve.parse(same?source:current);if(saved!=null){saved.verifyBackend(runtime.optString("curve_backend"));saved.put(out);}
+        SavedCurve.plan(saved,lux,nit,(float)runtime.getDouble("min_logical_nit"),(float)runtime.getDouble("max_logical_nit"),factors,floor);out.put("factors",CurvePlan.encode(factors)).put("curve_floor_nit",floor);
         String[][] caps={{"thermal_relax","thermal_supported"},{"response_override","response_supported"},{"small_brighten_override","small_response_supported"},{"low_light_stability","low_light_supported"},{"outdoor_enabled","outdoor_supported"},{"outdoor_hbm_tuning","outdoor_hbm_supported"},{"outdoor_range_unlock","outdoor_range_supported"},{"outdoor_opr_relax","outdoor_opr_supported"}};
         for(String[] pair:caps)disable(out,pair[0],runtime.optBoolean(pair[1]),notes);
         if(out.getDouble("outdoor_max_nit")>0&&!runtime.optBoolean("outdoor_nit_limit_supported")){out.put("outdoor_max_nit",0);notes.add("本机 nit 换算接口未就绪，已取消户外亮度上限");}

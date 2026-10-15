@@ -115,10 +115,18 @@ public class ConfigHostTest{
   JSONObject badNit=clone(nitFile);badNit.getJSONObject("options").put("outdoor_max_nit",-1);nitImport=ConfigurationFile.read(badNit.toString(),nitCaps,c);check(nitImport.options.getDouble("outdoor_max_nit")==0&&nitImport.notes.size()==1);
   badNit=clone(nitFile);badNit.getJSONObject("options").put("outdoor_max_nit",20001);nitImport=ConfigurationFile.read(badNit.toString(),nitCaps,c);check(nitImport.options.getDouble("outdoor_max_nit")==20000&&nitImport.notes.size()==1);
   badNit=clone(nitFile);badNit.getJSONObject("options").put("outdoor_max_nit","2000");bad(badNit,nitCaps,c);
+  SavedCurve learnedBase=new SavedCurve(new float[]{0,7,30,300,600,1200,100000},new float[]{10,15,40,90,150,350,1000});JSONObject learnedOptions=clone(c);learnedBase.put(learnedOptions);learnedOptions.put("curve_floor_nit",0);
+  JSONObject learnedFile=ConfigurationFile.export(learnedOptions,s,false,2,true);ConfigurationFile.Imported learnedRead=ConfigurationFile.read(learnedFile.toString(),s,c);check(SavedCurve.same(learnedBase,SavedCurve.parse(learnedRead.options)));check(learnedRead.notes.isEmpty());
+  JSONObject differentBase=clone(learnedFile).put("baseline_id","another");learnedRead=ConfigurationFile.read(differentBase.toString(),s,learnedOptions);check(SavedCurve.same(learnedBase,SavedCurve.parse(learnedRead.options)));check(learnedRead.notes.size()==1);
+  JSONObject brokenBase=clone(learnedFile);brokenBase.getJSONObject("options").getJSONObject(SavedCurve.KEY).put("nit",new JSONArray("[0,1]"));bad(brokenBase,s,c);
+  JSONObject appsFile=clone(learnedFile);appsFile.getJSONObject("options").put("dark_lock_manual_hold",true).put("manual_brightness_apps",new JSONArray().put("com.example.game"));JSONObject appCaps=clone(s).put("app_auto_supported",true);
+  learnedRead=ConfigurationFile.read(appsFile.toString(),appCaps,c);check(learnedRead.options.getBoolean("dark_lock_manual_hold"));check(learnedRead.options.getJSONArray("manual_brightness_apps").getString(0).equals("com.example.game"));check(learnedRead.notes.isEmpty());
+  learnedRead=ConfigurationFile.read(appsFile.toString(),s,c);check(learnedRead.options.getJSONArray("manual_brightness_apps").length()==0);check(learnedRead.notes.size()==1);check(learnedRead.options.getBoolean("dark_lock_manual_hold"));
+  appsFile.getJSONObject("options").put("manual_brightness_apps",new JSONArray().put("com.example;bad"));bad(appsFile,appCaps,c);
   System.out.println("Configuration migration: "+cases+" cases PASS; cross-version settings and curve identity, Android not tested");
  }
 }''',encoding='utf-8')
 classes=O/'classes';classes.mkdir(exist_ok=True)
-names=['SceneOptions','BrightnessControlOptions','ConfigurationFile','CurvePlan','AdvancedOptions','AdvancedPolicy','OutdoorOptions','ThermalPolicy','MemoryPolicy','MemoryOptions','DelayPolicy','LowLightPolicy','LowLightThresholds','LowLightAssistGate','SettingsPresets','AppBuild']
+names=['SceneOptions','BrightnessControlOptions','ConfigurationFile','SavedCurve','CurvePlan','AdvancedOptions','AdvancedPolicy','OutdoorOptions','ThermalPolicy','MemoryPolicy','MemoryOptions','DelayPolicy','LowLightPolicy','LowLightThresholds','LowLightAssistGate','SettingsPresets','AppBuild']
 subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(J),'-d',str(classes),*[str(S/(n+'.java')) for n in names],str(package/'RootControl.java'),str(package/'ConfigHostTest.java')],check=True)
 subprocess.run(['java','-cp',str(classes)+';'+str(J),'top.rongshangs.lumacurve.refactor.ConfigHostTest'],check=True)

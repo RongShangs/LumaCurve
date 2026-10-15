@@ -160,7 +160,7 @@ final class HookRuntime {
             if(text==null||text.equals("null")){
                 if(kernel.plan()!=null)kernel.configure(null);disableOverrides();memoryStrength=1;phase="attached";revision="";message="已连接 · 官方曲线";
             }else{
-                if(text.length()>16384)throw new IllegalArgumentException("配置过长");JSONObject config=new JSONObject(text);
+                if(text.getBytes(java.nio.charset.StandardCharsets.UTF_8).length>28000)throw new IllegalArgumentException("配置过长");JSONObject config=new JSONObject(text);
                 if(config.getInt("schema")!=1)throw new IllegalArgumentException("配置格式不兼容");
                 revision=config.getString("revision");if(!revision.matches("[A-Za-z0-9_-]{1,80}"))throw new IllegalArgumentException("配置标识无效");
                 if(config.getBoolean("enabled")){
@@ -191,8 +191,9 @@ final class HookRuntime {
                     if(thermal&&!HookEntry.thermalSupported.contains(owner.getClass()))throw new IllegalArgumentException("此固件的温控亮度接口尚未兼容");
                     float[] factors=CurvePlan.factors(config.getString("factors"));
                     float floor=CurvePlan.floor(config.has("curve_floor_nit")?config.opt("curve_floor_nit"):null);
-                    boolean curveChanged=kernel.plan()==null||!Arrays.equals(kernel.plan().nits(),new CurvePlan(kernel.factoryLux,kernel.factoryNit,kernel.min,kernel.max,factors,floor).nits());
-                    if(curveChanged)kernel.configure(factors,floor);
+                    SavedCurve nextBase=SavedCurve.parse(config);if(nextBase!=null)nextBase.verifyBackend(kernel.name());CurvePlan nextPlan=SavedCurve.plan(nextBase,kernel.factoryLux,kernel.factoryNit,kernel.min,kernel.max,factors,floor);
+                    boolean curveChanged=kernel.plan()==null||!SavedCurve.same(kernel.savedBase,nextBase)||!Arrays.equals(kernel.plan().nits(),nextPlan.nits())||!Arrays.equals(kernel.plan().lux(),nextPlan.lux());
+                    if(curveChanged)kernel.configure(factors,floor,nextBase);
                     AdvancedTuning.restoreAnimation(this);advanced=proposed;
                     boundUser=config.getInt("user_serial");thermalCeiling=ceiling;thermalEnabled=thermal;memoryStrength=strength;
                     if(memoryWindow!=memoryMs||memoryLuxRange!=memoryRange)memoryPolicy.configure(memoryMs,memoryRange);memoryWindow=memoryMs;memoryLuxRange=memoryRange;thermalCooling=cooling;thermalGate.configure(cooling);
@@ -314,6 +315,7 @@ final class HookRuntime {
             if(kernel.name().equals("refactor")){int count=kernel.integer("mAnchorCount");JSONArray flags=new JSONArray();boolean[] user=(boolean[])kernel.get("mAnchorIsUserDrag");for(int i=0;i<count;i++)flags.put(user[i]);status.put("manual_anchor_flags",flags);}
             else status.put("physical_mapping_active",HookEntry.get(((TraditionalAdapter)kernel).abc,"mCurrentBrightnessMapper")==((TraditionalAdapter)kernel).mapper);
             JSONObject controls=brightnessControl.status();status.put("brightness_control",controls).put("dark_lock_supported",controls.optBoolean("dark_lock_supported")).put("manual_panel_supported",controls.optBoolean("manual_panel_supported"));
+            status.put("app_auto_supported",controls.optBoolean("app_auto_supported"));
             collectOfficial(status);scenes.refresh();scenes.put(status);JSONObject outdoorState=outdoor.status();status.put("outdoor",outdoorState).put("outdoor_supported",outdoorState.optBoolean("supported")).put("outdoor_hbm_supported",outdoorState.optBoolean("hbm_tuning_supported")).put("outdoor_range_supported",outdoorState.optBoolean("range_supported")).put("outdoor_opr_supported",outdoorState.optBoolean("opr_supported")).put("outdoor_nit_limit_supported",outdoorState.optBoolean("nit_limit_supported"));
             if(Float.isFinite(batteryTemperature))status.put("battery_temperature",batteryTemperature);
             if(Float.isFinite(lastOfficialCap))status.put("thermal_last_cap",lastOfficialCap);
@@ -327,7 +329,7 @@ final class HookRuntime {
                 if(Float.isFinite(nit)&&nit>=0)status.put("actual_nit",nit);
                 status.put("screen_state",display.getClass().getMethod("getScreenState").invoke(display));
             }catch(Throwable unavailable){}
-            CurvePlan plan=kernel.plan();if(plan!=null)status.put("active_logical_nit",array(plan.nits()));
+            CurvePlan plan=kernel.plan();if(plan!=null){float[] handles=new float[4];for(int i=0;i<4;i++)handles[i]=plan.at(kernel.factoryLux[i]);status.put("active_logical_nit",array(handles)).put("applied_base_lux",array(kernel.baselineLux())).put("applied_base_nit",array(kernel.baselineNit()));}
             stateWriter.submit("state",StatusTransport.encode(status));
         }catch(Throwable error){XposedBridge.log("LumaCurve status: "+error);}
     }

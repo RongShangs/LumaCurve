@@ -77,6 +77,6 @@ public class SceneTest{
  }
 }''',encoding='utf-8')
 classes=O/'classes';classes.mkdir(exist_ok=True)
-names=['OutputProtection','SceneOptions','ScenePolicy','SceneCatalog','StatusLimits','StatusAdvice','LiveLimitEvidence','StatusPresentation','CurveComparison','CurvePlan','TraditionalCurve','UiText']
+names=['OutputProtection','SceneOptions','ScenePolicy','SceneCatalog','StatusLimits','StatusAdvice','LiveLimitEvidence','StatusPresentation','CurveComparison','SavedCurve','CurvePlan','TraditionalCurve','UiText']
 subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(J),'-d',str(classes),*[str(S/(n+'.java')) for n in names],str(p)],check=True)
 subprocess.run(['java','-cp',str(classes)+os.pathsep+str(J),'top.rongshangs.lumacurve.refactor.SceneTest'],check=True)

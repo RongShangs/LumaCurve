@@ -28,17 +28,22 @@ final class CurveComparison {
     static boolean sameCurve(Line left,Line right){for(Line line:new Line[]{left,right})for(float lux:line.lux){float a=left.at(lux),b=right.at(lux);if(Math.abs(a-b)>Math.max(.01f,Math.max(a,b)*.001f))return false;}return true;}
     static float[] numbers(JSONArray a)throws JSONException{float[] out=new float[a.length()];for(int i=0;i<out.length;i++){Object v=a.get(i);if(!(v instanceof Number))throw new JSONException("Invalid curve number");out[i]=((Number)v).floatValue();}return out;}
     static CurveComparison read(JSONObject runtime,float[] factors,float floor,boolean draft)throws JSONException{
+        return read(runtime,factors,floor,draft,null);
+    }
+    static CurveComparison read(JSONObject runtime,float[] factors,float floor,boolean draft,SavedCurve saved)throws JSONException{
         float[] factoryLux=numbers(runtime.getJSONArray("factory_lux")),factoryNit=numbers(runtime.getJSONArray("factory_logical_nit"));
         float min=(float)runtime.getDouble("min_logical_nit"),max=(float)runtime.getDouble("max_logical_nit");
-        float[] base=draft?new CurvePlan(factoryLux,factoryNit,min,max,factors,floor).nits()
+        float[] base=draft?new CurvePlan(factoryLux,saved==null?factoryNit:saved.controls(factoryLux),min,max,factors,floor).nits()
             :runtime.has("active_logical_nit")?numbers(runtime.getJSONArray("active_logical_nit")):factoryNit;
         Line reference=new Line(factoryLux,factoryNit),baseline=new Line(factoryLux,base);
         if("physical_mapping".equals(runtime.optString("curve_backend"))){
             TraditionalCurve full=new TraditionalCurve(numbers(runtime.getJSONArray("factory_full_lux")),numbers(runtime.getJSONArray("factory_full_nit")));
             reference=new Line(full.lux(),full.nit());
             float[] liveFactors=new float[]{1,1,1,1};for(int i=1;i<3;i++)liveFactors[i]=base[i]==0&&factoryNit[i]==0?1:base[i]/factoryNit[i];
-            baseline=new Line(full.lux(),draft?full.reshape(min,max,factors,floor):full.reshape(min,max,liveFactors,base[0]));
+            if(!(draft&&saved!=null)&&!(!draft&&runtime.has("applied_base_lux")&&runtime.has("applied_base_nit")))baseline=new Line(full.lux(),draft?full.reshape(min,max,factors,floor):full.reshape(min,max,liveFactors,base[0]));
         }
+        if(draft&&saved!=null){CurvePlan plan=SavedCurve.plan(saved,factoryLux,factoryNit,min,max,factors,floor);baseline=new Line(plan.lux(),plan.nits());}
+        if(!draft&&runtime.has("applied_base_lux")&&runtime.has("applied_base_nit"))baseline=new Line(numbers(runtime.getJSONArray("applied_base_lux")),numbers(runtime.getJSONArray("applied_base_nit")));
         Line current=null;
         JSONObject frame=runtime.optJSONObject("last_pipeline");String backend=runtime.optString("curve_backend");
         boolean activeRoute=frame==null||"refactor".equals(backend)&&"refactor".equals(frame.optString("route"))

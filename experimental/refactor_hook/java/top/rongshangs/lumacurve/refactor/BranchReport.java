@@ -42,7 +42,7 @@ final class BranchReport {
         curve.row("短期记忆模型",flag(f,"short_term_memory","模型有效","模型未生效"),"模型状态不等于当前曲线一定由记忆改变。");
         Section output=new Section("实时输出与限制");result.add(output);StatusAdvice advice=StatusAdvice.read(snapshot,uptime,elapsed);
         output.row("当前主要状态",advice.title,advice.detail);output.row("输出路径",strategy(s),"系统回退不代表用户关闭了自动亮度。");
-        String owner=control==null?"":control.optString("owner");output.row("亮度控制方式",owner.equals("dark")?"暗光锁定":owner.equals("panel")||owner.equals("raw_panel")?"主屏手动面板":s!=null&&s.has("auto_mode")?s.optBoolean("auto_mode")?"系统自动调节":"系统手动亮度":"未取得","");
+        String owner=control==null?"":control.optString("owner");output.row("亮度控制方式",owner.equals("dark")?"暗光锁定":owner.equals("app")?"应用暂停自动亮度":owner.equals("panel")||owner.equals("raw_panel")?"主屏手动面板":s!=null&&s.has("auto_mode")?s.optBoolean("auto_mode")?"系统自动调节":"系统手动亮度":"未取得","");
         output.row("当前屏幕亮度",number(s,"actual_nit"," nit"),"");
         long requestAge=outdoor==null?-1:outdoor.optLong("request_age_ms",-1);
         output.row("最近请求目标",requestAge>=0&&requestAge<=5000?percent(outdoor,"requested_brightness"):"未取得有效请求","以下百分比是系统亮度坐标，不是实际 nit。");

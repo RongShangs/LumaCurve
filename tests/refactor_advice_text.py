@@ -97,5 +97,5 @@ public class AdviceTextTest{
  }
 }''',encoding='utf-8')
 classes=O/'classes';classes.mkdir(exist_ok=True)
-subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(J),'-d',str(classes),*[str(S/(name+'.java')) for name in ['OutputProtection','SceneOptions','SceneCatalog','StatusLimits','LiveLimitEvidence','StatusAdvice','StatusPresentation','UiText','CurveComparison','CurvePlan','TraditionalCurve']],*[str(p) for p in files],str(test)],check=True)
+subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(J),'-d',str(classes),*[str(S/(name+'.java')) for name in ['OutputProtection','SceneOptions','SceneCatalog','StatusLimits','LiveLimitEvidence','StatusAdvice','StatusPresentation','UiText','CurveComparison','SavedCurve','CurvePlan','TraditionalCurve']],*[str(p) for p in files],str(test)],check=True)
 subprocess.run(['java','-cp',str(classes)+os.pathsep+str(J),'top.rongshangs.lumacurve.refactor.AdviceTextTest'],check=True)

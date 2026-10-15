@@ -9,7 +9,7 @@ import java.util.*;
 final class StatusTransport {
     static final int LIMIT=30000,CHUNK=12000,MAX_PARTS=32;
     static final String KEY="lumacurve_refactor_status_v1";
-    static final String[] SECTIONS={"logs","pipeline_trace","output_trace","outdoor.limit_trace","factory_full_lux","factory_full_nit","current_anchors_lux","current_anchors_nit","memory_lifecycle","memory_live_points","memory_saved_anchors"};
+    static final String[] SECTIONS={"logs","pipeline_trace","output_trace","outdoor.limit_trace","factory_full_lux","factory_full_nit","current_anchors_lux","current_anchors_nit","memory_lifecycle","memory_live_points","memory_saved_anchors","applied_base_lux","applied_base_nit"};
     interface Reader{String get(String key)throws Exception;}
     static JSONObject copy(JSONObject source)throws JSONException{
         JSONObject out=new JSONObject();Iterator<String> keys=source.keys();while(keys.hasNext()){String key=keys.next();out.put(key,source.get(key));}return out;

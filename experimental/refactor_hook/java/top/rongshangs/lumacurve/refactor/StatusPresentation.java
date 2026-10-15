@@ -19,6 +19,7 @@ final class StatusPresentation {
         if(!fresh(s,elapsed)){names.add("状态待刷新");return names;}
         JSONObject c=s.optJSONObject("brightness_control"),o=scenes(s);String owner=c==null?"":c.optString("owner");
         if("dark".equals(owner))names.add("暗光锁定保持中");
+        else if("app".equals(owner))names.add("应用暂停自动亮度");
         else if("panel".equals(owner)||"raw_panel".equals(owner))names.add("主屏手动面板");
         else if(s.has("auto_mode")&&!s.optBoolean("auto_mode"))names.add("手动亮度模式");
         if(o.optBoolean("night_driving"))names.add("夜间驾驶（系统判定）");

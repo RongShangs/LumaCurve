@@ -123,6 +123,16 @@ fixture=fixture.replace('  System.out.println("Traditional curve/adapter/hooks:'
   otherState.changing=true;otherAdapter.configure(f);otherState.changing=false;near(other.mConfig.mNits[4],24);check(otherAbc.resets==1);otherAdapter.configure(null);check(other.mConfig==nativeConfig&&otherAdapter.plan()==null);
   otherState.memoryStrength=0;int beforeDrag=other.dragCalls;call(other,"addUserDataPoint",new Class<?>[]{float.class,float.class},30f,.4f);check(other.dragCalls==beforeDrag);
   System.out.println("Traditional curve/adapter/hooks:''')
+sources['com/android/server/display/MiuiPhysicalBrightnessMappingStrategy.java']=sources['com/android/server/display/MiuiPhysicalBrightnessMappingStrategy.java'].replace('Spline(float[] x,float[] y)','public Spline(float[] x,float[] y)')
+fixture=fixture.replace('  System.out.println("Traditional curve/adapter/hooks:',r'''  MiuiPhysicalBrightnessMappingStrategy savedMapper=new MiuiPhysicalBrightnessMappingStrategy(nativeConfig);ABC savedAbc=new ABC();savedAbc.mBrightnessMappingStrategyMap.mapper=savedAbc.mCurrentBrightnessMapper=savedMapper;
+  TraditionalAdapter savedAdapter=new TraditionalAdapter(owner,savedMapper,savedAbc,()->0);savedAdapter.configure(one);savedAdapter.restoreManualPoints(new org.json.JSONArray().put(new org.json.JSONObject().put("lux",30).put("value",.045)));
+  savedMapper.mBrightnessSpline=new MiuiPhysicalBrightnessMappingStrategy.Spline(x,dense.reshape(1,1000,new float[]{1,1.5f,1.3f,1}));
+  SavedCurve captured=new SavedCurve(savedAdapter.currentLux(),savedAdapter.currentNit());savedAdapter.configure(one,0,captured);
+  check(savedAdapter.savedBase==captured&&savedAdapter.manualPoints().length()==0);check(Arrays.equals(savedMapper.mConfig.mLux,captured.lux));check(Arrays.equals(savedMapper.mConfig.mNits,captured.nit));
+  check(savedMapper.mConfig.mCorrectionsByPackageName.equals(nativeConfig.mCorrectionsByPackageName));check(savedMapper.mConfig.mShortTermModelTimeout==nativeConfig.mShortTermModelTimeout);
+  for(float lux:captured.lux)near(savedAdapter.currentAt(lux),captured.at(lux));savedAdapter.clearMemory();for(float lux:captured.lux)near(savedAdapter.currentAt(lux),captured.at(lux));
+  Object beforeSaved=savedMapper.mConfig;savedMapper.fail=true;try{savedAdapter.configure(one,0,null);throw new AssertionError();}catch(IllegalStateException expected){cases++;}check(savedAdapter.savedBase==captured&&savedMapper.mConfig==beforeSaved);savedMapper.fail=false;savedAdapter.configure(null);check(savedMapper.mConfig==nativeConfig);
+  System.out.println("Traditional curve/adapter/hooks:''')
 sources['top/rongshangs/lumacurve/refactor/TraditionalHostTest.java']=fixture
 
 sources['top/rongshangs/lumacurve/refactor/MemoryPersistence.java']='''package top.rongshangs.lumacurve.refactor;class MemoryPersistence {boolean replaying,pendingRestore;int captures,resets;void cancelRestore(){pendingRestore=false;}void manualApplied(){captures++;}void requestAfterReset(){resets++;}void requestRestore(){}}'''
@@ -131,6 +141,6 @@ files=[]
 for name,value in sources.items():
     p=O/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_text(value,encoding='utf-8');files.append(p)
 C=O/'classes';C.mkdir(exist_ok=True)
-production=['CurvePlan','CurveBackend','TraditionalCurve','TraditionalAdapter','TraditionalHooks','CurveIdentity','BackendSelection','MemoryPolicy','MemoryOptions','PersistentMemory']
+production=['CurvePlan','CurveBackend','SavedCurve','TraditionalCurve','TraditionalAdapter','TraditionalHooks','CurveIdentity','BackendSelection','MemoryPolicy','MemoryOptions','PersistentMemory']
 subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(J),'-d',str(C),*[str(f) for f in files],*[str(S/(n+'.java')) for n in production]],check=True)
 subprocess.run(['java','-cp',str(C)+';'+str(J),'top.rongshangs.lumacurve.refactor.TraditionalHostTest'],check=True)

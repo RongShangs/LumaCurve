@@ -16,6 +16,7 @@ public final class TraditionalAdapter extends CurveBackend {
     private CurvePlan active;private Boolean persistenceSupported;
     Object applied;
     boolean updating;
+    float[] appliedBaseLux,appliedBaseNit;
     private static final java.util.concurrent.ConcurrentMap<Class<?>,java.util.concurrent.ConcurrentMap<String,Field>> sharedFields=new java.util.concurrent.ConcurrentHashMap<>();
     private final Map<String,Field> fields=new HashMap<>();
     public TraditionalAdapter(Object owner,Object mapper,Object abc,IntSupplier user)throws Exception {
@@ -69,6 +70,8 @@ public final class TraditionalAdapter extends CurveBackend {
     public CurvePlan plan(){return active;}
     public float[] fullLux(){return original.lux();}
     public float[] fullNit(){return original.nit();}
+    public float[] baselineLux(){return active==null?original.lux():appliedBaseLux.clone();}
+    public float[] baselineNit(){return active==null?original.nit():appliedBaseNit.clone();}
     public float currentAt(float lux)throws Exception{return ((Number)splineMethod.invoke(read(mapper,"mBrightnessSpline"),lux)).floatValue();}
     public float memoryAt(float lux)throws Exception{return adjustedInterpolation==null?((Number)convert.invoke(mapper,currentAt(lux))).floatValue():((Number)adjustedInterpolation.invoke(read(mapper,"mAdjustedNitsToBrightnessSpline"),currentAt(lux))).floatValue();}
     public void clearMemory()throws Exception{if(read(abc,"mCurrentBrightnessMapper")==mapper)reset.invoke(abc);else method(mapper.getClass(),"clearUserDataPoints").invoke(mapper);}
@@ -83,13 +86,15 @@ public final class TraditionalAdapter extends CurveBackend {
     public float[] currentLux()throws Exception {
         // Draw the OEM spline itself, including its between-node interpolation.
         TreeSet<Float> points=new TreeSet<>();for(float v:original.lux())points.add(v);
+        if(savedBase!=null&&active!=null)for(float v:savedBase.lux)points.add(v);
         float userLux=number("mUserLux");if(Float.isFinite(userLux)&&userLux>=0&&userLux<=factoryLux[3])points.add(userLux);
         for(int i=0;i<=128;i++)points.add((float)Math.expm1(Math.log1p(factoryLux[3])*i/128));
         float[] result=new float[points.size()];int i=0;for(float v:points)result[i++]=v;return result;
     }
     public float[] currentNit()throws Exception{float[] x=currentLux(),n=new float[x.length];for(int i=0;i<x.length;i++)n[i]=currentAt(x[i]);return n;}
     Object configuration(float[] factors,float floor)throws Exception {
-        return configConstructor.newInstance(original.lux(),original.reshape(min,max,factors,floor),
+        CurvePlan saved=savedBase==null?null:proposed(factors,floor);
+        return configConstructor.newInstance(saved==null?original.lux():saved.lux(),saved==null?original.reshape(min,max,factors,floor):saved.nits(),
             new HashMap<>((Map<?,?>)read(baseline,"mCorrectionsByPackageName")),new HashMap<>((Map<?,?>)read(baseline,"mCorrectionsByCategory")),
             read(baseline,"mDescription"),read(baseline,"mShouldCollectColorSamples"),read(baseline,"mShortTermModelTimeout"),
             read(baseline,"mShortTermModelLowerLuxMultiplier"),read(baseline,"mShortTermModelUpperLuxMultiplier"));
@@ -98,12 +103,14 @@ public final class TraditionalAdapter extends CurveBackend {
         configure(factors,0);
     }
     public void configure(float[] factors,float floor)throws Exception {
-        CurvePlan next=factors==null?null:new CurvePlan(factoryLux,factoryNit,min,max,factors,floor);
+        CurvePlan next=factors==null?null:proposed(factors,floor);
         Object current=read(mapper,"mConfig");
         if(factors==null&&active==null)return;
         // An OEM/cloud/user replacement must not be overwritten by our recovery.
         if(current!=baseline&&current!=applied){active=null;applied=null;if(factors==null)return;throw new IllegalStateException("系统基准曲线已改变，请重启应用后重新读取");}
         Object desired=next==null?baseline:configuration(factors,floor);
+        Object desiredCurve=method(desired.getClass(),"getCurve").invoke(desired);
+        float[] nextLux=((float[])read(desiredCurve,"first")).clone(),nextNit=((float[])read(desiredCurve,"second")).clone();
         Map<Field,Object> before=snapshot(mapper),modelBefore=snapshot(read(abc,"mShortTermModel"));
         Object model=read(abc,"mShortTermModel");CurvePlan old=active;Object oldApplied=applied;
         updating=true;
@@ -118,6 +125,7 @@ public final class TraditionalAdapter extends CurveBackend {
             if(read(abc,"mCurrentBrightnessMapper")==mapper)reset.invoke(abc);
             else method(mapper.getClass(),"clearUserDataPoints").invoke(mapper);
             active=next;
+            appliedBaseLux=nextLux;appliedBaseNit=nextNit;
         }catch(Throwable error){restore(mapper,before);restore(model,modelBefore);active=old;applied=oldApplied;throw new IllegalStateException("传统曲线更新失败，已回滚",error);}finally{updating=false;}
     }
     static Map<Field,Object> snapshot(Object target)throws Exception {

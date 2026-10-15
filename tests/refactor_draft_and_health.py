@@ -8,7 +8,13 @@ O = R / 'build/refactor-draft-health-tests'
 J = R / 'build/refactor-diagnostics/json-20240303.jar'
 text = (S / 'MainActivity.java').read_text(encoding='utf-8')
 start = text.index('    boolean draftStillMatches(')
-method = text[start:text.index('    void run(', start)]
+depth=0
+for end in range(text.index('{',start),len(text)):
+    if text[end]=='{':depth+=1
+    elif text[end]=='}':
+        depth-=1
+        if depth==0:break
+method=text[start:end+1]
 completion = 'dirty=!draftStillMatches(payload);'
 assert completion in text, 'apply completion must preserve changes made during the request'
 config = (S / 'ConfigurationFile.java').read_text(encoding='utf-8')

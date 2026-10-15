@@ -1,6 +1,6 @@
 """Run the actual mode controller against Android service doubles; no device claims."""
 from pathlib import Path
-import subprocess
+import subprocess,ast
 R=Path(__file__).resolve().parents[1];S=R/'experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor'
 O=R/'build/refactor-brightness-control-tests';O.mkdir(parents=True,exist_ok=True)
 J=R/'build/refactor-diagnostics/json-20240303.jar'
@@ -26,13 +26,22 @@ public static class Global{public static int writes;public static final Map<Stri
 'android/hardware/display/DisplayManagerGlobal':'''package android.hardware.display;public class DisplayManagerGlobal{public static DisplayManagerGlobal instance=new DisplayManagerGlobal();public BrightnessInfo info=new BrightnessInfo();public static DisplayManagerGlobal getInstance(){return instance;}public BrightnessInfo getBrightnessInfo(int id){if(id!=0)throw new AssertionError("wrong screen");return info;}}''',
 'android/hardware/display/DisplayManager':'''package android.hardware.display;public class DisplayManager{public float value=.25f;public int writes;public boolean fail,failUnregister;public DisplayListener listener;public interface DisplayListener{void onDisplayAdded(int id);void onDisplayRemoved(int id);void onDisplayChanged(int id);}public void registerDisplayListener(DisplayListener l,android.os.Handler h){listener=l;}public void unregisterDisplayListener(DisplayListener l){if(failUnregister)throw new IllegalStateException("display service unavailable");listener=null;}public float getBrightness(int id){if(id!=0)throw new AssertionError("wrong screen");return value;}public void setBrightness(int id,float v){if(fail)throw new IllegalStateException("write rejected");if(id!=0)throw new AssertionError("wrong screen");writes++;value=v;DisplayManagerGlobal.instance.info.brightness=v;}}''',
 }
+fixture_tree=ast.parse((R/'tests/refactor_outdoor.py').read_text(encoding='utf-8'))
+fixture_sources=ast.literal_eval(next(n.value for n in fixture_tree.body if isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id=='sources' for t in n.targets)))
+for name in ['de/robv/android/xposed/XC_MethodHook.java','de/robv/android/xposed/XposedBridge.java']:stubs[name[:-5]]=fixture_sources[name]
+stubs.update({
+'android/content/ComponentName':'''package android.content;public class ComponentName{String pkg;public ComponentName(String p){pkg=p;}public String getPackageName(){return pkg;}}''',
+'android/app/ActivityTaskManager':'''package android.app;public class ActivityTaskManager{public static com.android.server.wm.ActivityTaskManagerService service=new com.android.server.wm.ActivityTaskManagerService();public static Object getService(){return service;}public static class RootTaskInfo{public android.content.ComponentName topActivity;public int userId,displayId;}}''',
+'com/android/server/wm/ActivityRecord':'''package com.android.server.wm;public class ActivityRecord{public String packageName;public int mUserId,displayId;public ActivityRecord(String p,int u,int d){packageName=p;mUserId=u;displayId=d;}public int getDisplayId(){return displayId;}}''',
+'com/android/server/wm/ActivityTaskManagerService':'''package com.android.server.wm;import de.robv.android.xposed.XposedBridge;public class ActivityTaskManagerService{public ActivityRecord mLastResumedActivity;public int queries;public Runnable duringQuery;public boolean failQuery;public void setLastResumedActivityUncheckLocked(ActivityRecord r,String why){XposedBridge.invoke(this,"setLastResumedActivityUncheckLocked",new Class<?>[]{ActivityRecord.class,String.class},new Object[]{r,why},()->{mLastResumedActivity=r;return null;});}public android.app.ActivityTaskManager.RootTaskInfo getFocusedRootTaskInfo(){queries++;if(mLastResumedActivity==null)return null;android.app.ActivityTaskManager.RootTaskInfo i=new android.app.ActivityTaskManager.RootTaskInfo();i.topActivity=new android.content.ComponentName(mLastResumedActivity.packageName);i.userId=mLastResumedActivity.mUserId;i.displayId=mLastResumedActivity.displayId;Runnable task=duringQuery;duringQuery=null;if(task!=null)task.run();if(failQuery)throw new IllegalStateException("query failed");return i;}}'''
+})
 for name,text in stubs.items():sources.append(write(name,text))
 base='top/rongshangs/lumacurve/refactor/'
 sources.append(write(base+'RawPanelLease', '''package top.rongshangs.lumacurve.refactor;class RawPanelLease{static String token="none";static long until;static int active,target;static boolean ok=true;static boolean healthy(String t){return ok;}static void clear(){token="none";until=0;active=0;target=-1;}static void write(String t,int p,long e,int a,int v){token=t;until=e;active=a;target=v;}}'''))
 sources.append(write(base+'RawPanelOutputHooks', '''package top.rongshangs.lumacurve.refactor;class RawPanelOutputHooks{static boolean ok=true;static boolean supports(Class<?> c){return ok;}}'''))
 sources.append(write(base+'NativePanelClient', '''package top.rongshangs.lumacurve.refactor;class NativePanelClient{static void require(String s){}}'''))
 sources.append(write('android/os/Process', '''package android.os;public class Process{public static int myPid(){return 123;}}'''))
-sources.append(write(base+'HookEntry', '''package top.rongshangs.lumacurve.refactor;public class HookEntry{static final ForegroundUser currentUser=new ForegroundUser();static{currentUser.switched(0);}static Object get(Object o,String key)throws Exception{java.lang.reflect.Field f=o.getClass().getDeclaredField(key);f.setAccessible(true);return f.get(o);}}'''))
+sources.append(write(base+'HookEntry', '''package top.rongshangs.lumacurve.refactor;public class HookEntry{static final ForegroundUser currentUser=new ForegroundUser();static{currentUser.switched(0);}static java.lang.reflect.Field field(Class<?> c,String key)throws Exception{for(Class<?> k=c;k!=null;k=k.getSuperclass())try{java.lang.reflect.Field f=k.getDeclaredField(key);f.setAccessible(true);return f;}catch(NoSuchFieldException e){}throw new NoSuchFieldException(key);}static Object get(Object o,String key)throws Exception{return field(o.getClass(),key).get(o);}}'''))
 sources.append(write(base+'HookRuntime', '''package top.rongshangs.lumacurve.refactor;import android.content.*;import android.os.*;import java.util.*;public class HookRuntime{static final String BUILD="test";final Context context=new Context();final Handler handler=new Handler();final PowerManager power=new PowerManager();final Owner owner=new Owner();final String fingerprint="device";HookRuntime(){owner.mAutomaticBrightnessControllerImpl.mAutomaticBrightnessController.mSensorManager=(android.hardware.SensorManager)context.sensor;}boolean closed,on=true,user=true,hdr;String phase="active";int publishes,fastPublishes;List<String> logs=new ArrayList<>();boolean screenOn(){return on;}boolean appliesToUser(){return user;}Boolean hdrActive(){return hdr;}void log(String t){logs.add(t);}void requestRecalculation(){}void queuePublish(){publishes++;}void queueControlPublish(){fastPublishes++;}static String processStart(){return "123";}static Boolean optionalBoolean(Object o,String key){try{return (Boolean)HookEntry.get(o,key);}catch(Exception e){return null;}}
 public static class Owner{public int mDisplayId=0;public Impl mAutomaticBrightnessControllerImpl=new Impl();}public static class Impl{public boolean mProximityPositive=false;public ABC mAutomaticBrightnessController=new ABC();public Dual mDualSensorPolicy=new Dual();}public static class ABC{public android.hardware.SensorManager mSensorManager;public boolean mAmbientLuxValid=true,mLightSensorEnabled=true;public float mAmbientLux=1;public android.hardware.Sensor mLightSensor=new android.hardware.Sensor(5);}public static class Dual{public float mFovAmplifyFactor=1,mAssistFovAmplifyFactor=1;public android.hardware.Sensor mAssistLightSensor=new android.hardware.Sensor(33171055);}}'''))
 sources.append(write(base+'BrightnessControlHostTest', '''package top.rongshangs.lumacurve.refactor;
@@ -42,6 +51,7 @@ static int cases;static void check(boolean b){if(!b)throw new AssertionError("ca
 static BrightnessControl controller()throws Exception{Settings.Global.values.clear();Settings.System.values.clear();RawPanelLease.ok=true;RawPanelOutputHooks.ok=true;SystemClock.now=0;DisplayManagerGlobal.instance=new DisplayManagerGlobal();HookRuntime s=new HookRuntime();Settings.System.values.put("mode","1");BrightnessControl c=new BrightnessControl(s);c.start();BrightnessControlOptions o=new BrightnessControlOptions();o.darkLock=true;o.enterLux=5;o.exitLux=30;o.minutes=1;o.exitSeconds=5;c.configure(o);return c;}
 static void sample(BrightnessControl c,float front,float back){c.onSensorChanged(new SensorEvent(c.main,front));c.onSensorChanged(new SensorEvent(c.assist,back));c.s.handler.due();}
 static void time(BrightnessControl c,long n){SystemClock.now=n;c.s.handler.due();}
+static void settle(BrightnessControl c){c.s.handler.due();time(c,SystemClock.now+150);}
 static int writes(BrightnessControl c){return ((DisplayManager)c.s.context.display).writes;}
 static JSONObject command(BrightnessControl c,String action,String session,double value)throws Exception{String id="req"+cases+SystemClock.now+action;JSONObject r=new JSONObject().put("id",id).put("build","test").put("process_start","123").put("elapsed",SystemClock.now).put("gesture_elapsed",SystemClock.now).put("action",action).put("session",session).put("value",value);Settings.Global.putString(c.s.context.getContentResolver(),BrightnessControl.REQUEST,r.toString());return new JSONObject(Settings.Global.getString(c.s.context.getContentResolver(),BrightnessControl.ACK));}
 public static void main(String[] ignored)throws Exception{
@@ -163,10 +173,61 @@ c=controller();c.s.context.resolver.failUnregisterAt=1;c.close();check(c.s.conte
 HookRuntime partial=new HookRuntime();partial.context.resolver.failRegistrationAt=2;BrightnessControl incomplete=new BrightnessControl(partial);incomplete.start();check(!incomplete.registered&&partial.context.resolver.count()==0);check(partial.context.resolver.unregisterCalls==3);
 partial.context.resolver.failRegistrationAt=-1;time(incomplete,30000);check(incomplete.registered&&partial.context.resolver.count()==4);check(command(incomplete,"raw_begin","reconnected",1000).getBoolean("ok"));incomplete.close();check(partial.context.resolver.count()==0);
 c=controller();c.s.closed=true;Settings.Global.values.remove(BrightnessControl.ACK);Settings.Global.values.put(BrightnessControl.REQUEST,new JSONObject().put("id","old-observer").toString());c.command();check(Settings.Global.values.get(BrightnessControl.ACK)==null);
+// Retain ownership after a manual gesture, then restore auto after real sustained light.
+c=controller();c.options.manualHold=true;sample(c,1,1);time(c,60000);time(c,63000);((DisplayManager)c.s.context.display).value=.45f;
+Settings.System.putInt(c.s.context.getContentResolver(),"brightness",100);time(c,63149);check(c.owner.equals("dark"));time(c,63150);check(c.owner.equals("dark")&&!c.auto()&&Math.abs(c.held-.45f)<.00001f&&c.listening);check(writes(c)==1);
+sample(c,60,1);time(c,68149);check(!c.auto());time(c,68150);check(c.auto()&&c.owner.equals("none"));c.close();
+// A queued manual update cannot reclaim an explicitly enabled automatic mode.
+c=controller();c.options.manualHold=true;sample(c,1,1);time(c,60000);time(c,63000);Settings.System.putInt(c.s.context.getContentResolver(),"brightness",101);Settings.System.putInt(c.s.context.getContentResolver(),"mode",1);time(c,64000);check(c.auto()&&c.owner.equals("none")&&!c.s.handler.jobs.containsKey(c.manualUpdate));c.close();
+check(!BrightnessControlOptions.parse(new JSONObject()).manualHold);check(BrightnessControlOptions.parse(new JSONObject().put("dark_lock_manual_hold",true)).manualHold);
+for(Object raw:new Object[]{"true",1,new JSONObject()})try{BrightnessControlOptions.parse(new JSONObject().put("dark_lock_manual_hold",raw));throw new AssertionError();}catch(IllegalArgumentException expected){cases++;}
+for(String pkg:new String[]{"bad name","com.demo;reboot","../etc","com..demo","com."})try{BrightnessControlOptions.parse(new JSONObject().put("manual_brightness_apps",new JSONArray().put(pkg)));throw new AssertionError();}catch(IllegalArgumentException expected){cases++;}
+check(BrightnessControlOptions.parse(new JSONObject().put("manual_brightness_apps",new JSONArray().put("com.demo.game").put("com.demo.game"))).manualApps.size()==1);
+// Exercise the real deferred foreground Hook; it must not query providers in the WM callback.
+com.android.server.wm.ActivityTaskManagerService atm=android.app.ActivityTaskManager.service;
+c=controller();BrightnessControlOptions appOptions=BrightnessControlOptions.parse(new JSONObject().put("dark_lock_enabled",false).put("manual_brightness_apps",new JSONArray().put("com.demo.game").put("com.demo.other")));
+atm.mLastResumedActivity=new com.android.server.wm.ActivityRecord("com.demo.game",0,0);c.configure(appOptions);settle(c);check(c.owner.equals("app")&&!c.auto()&&!c.listening);int q=atm.queries,w=writes(c);
+for(int i=0;i<50;i++)atm.setLastResumedActivityUncheckLocked(new com.android.server.wm.ActivityRecord("com.demo.other",0,0),"test");check(atm.queries==q&&writes(c)==w);settle(c);check(c.owner.equals("app")&&writes(c)==w&&atm.queries==q);
+for(int i=0;i<50;i++)c.screenOn();settle(c);check(atm.queries==q&&writes(c)==w);c.s.power.fail=true;Settings.System.failRead=true;try{atm.setLastResumedActivityUncheckLocked(new com.android.server.wm.ActivityRecord("com.demo.game",0,0),"locked-callback");check(writes(c)==w);}finally{c.s.power.fail=false;Settings.System.failRead=false;}settle(c);check(c.owner.equals("app"));
+atm.setLastResumedActivityUncheckLocked(new com.android.server.wm.ActivityRecord("com.demo.home",0,0),"exit");check(!c.auto());settle(c);check(c.auto()&&c.owner.equals("none"));
+// Initially manual users are never owned or restored.
+Settings.System.putInt(c.s.context.getContentResolver(),"mode",0);atm.setLastResumedActivityUncheckLocked(new com.android.server.wm.ActivityRecord("com.demo.game",0,0),"enter");settle(c);check(!c.auto()&&c.owner.equals("none"));atm.setLastResumedActivityUncheckLocked(null,"exit");settle(c);check(!c.auto());
+// Explicit auto inside a listed app suppresses takeover until that app leaves.
+Settings.System.putInt(c.s.context.getContentResolver(),"mode",1);atm.setLastResumedActivityUncheckLocked(new com.android.server.wm.ActivityRecord("com.demo.game",0,0),"enter");settle(c);check(c.owner.equals("app"));Settings.System.putInt(c.s.context.getContentResolver(),"mode",1);check(c.auto()&&c.owner.equals("none"));for(int i=0;i<5;i++)atm.setLastResumedActivityUncheckLocked(new com.android.server.wm.ActivityRecord("com.demo.game",0,0),"same");settle(c);check(c.auto());
+c.screenOff();c.screenOn();settle(c);check(c.auto()&&c.appSuppressed.equals("com.demo.game"));
+atm.setLastResumedActivityUncheckLocked(new com.android.server.wm.ActivityRecord("com.demo.home",0,0),"leave");settle(c);atm.setLastResumedActivityUncheckLocked(new com.android.server.wm.ActivityRecord("com.demo.game",0,0),"return");settle(c);check(c.owner.equals("app")&&!c.auto());
+// A secondary display/user and screen-off release only our automatic-mode ownership.
+atm.setLastResumedActivityUncheckLocked(new com.android.server.wm.ActivityRecord("com.demo.game",0,1),"secondary");settle(c);check(c.auto());atm.setLastResumedActivityUncheckLocked(new com.android.server.wm.ActivityRecord("com.demo.game",10,0),"other-user");settle(c);check(c.auto()&&c.owner.equals("none"));atm.setLastResumedActivityUncheckLocked(new com.android.server.wm.ActivityRecord("com.demo.game",0,0),"primary");settle(c);check(!c.auto());c.screenOff();check(c.auto()&&c.owner.equals("none")&&!ForegroundApps.targets.contains(c));c.screenOn();settle(c);check(c.owner.equals("app"));c.stop();check(c.auto()&&ForegroundApps.targets.isEmpty());c.close();
+// Dark lock transfers automatic-mode ownership to the app, then raw control wins explicitly.
+c=controller();sample(c,1,1);time(c,60000);check(c.owner.equals("dark"));c.options.manualApps.add("com.demo.game");ForegroundApps.attach(c);atm.setLastResumedActivityUncheckLocked(new com.android.server.wm.ActivityRecord("com.demo.game",0,0),"transfer");settle(c);check(c.owner.equals("app")&&!c.listening);check(command(c,"raw_begin","app-raw",1000).getBoolean("ok"));check(c.owner.equals("raw_panel")&&c.rawWasAuto);check(command(c,"raw_restore","app-raw",0).getBoolean("ok"));c.screenOn();settle(c);check(c.auto()&&c.owner.equals("none")&&c.appSuppressed.equals("com.demo.game"));c.close();check(ForegroundApps.targets.isEmpty());
+// A fresh WM event received during the initial query must win over the old query result.
+c=controller();atm.mLastResumedActivity=new com.android.server.wm.ActivityRecord("com.demo.game",0,0);
+atm.duringQuery=()->atm.setLastResumedActivityUncheckLocked(new com.android.server.wm.ActivityRecord("com.demo.home",0,0),"query-race");
+c.configure(appOptions);settle(c);check(c.foreground.pkg.equals("com.demo.home"));check(c.auto()&&c.owner.equals("none")&&writes(c)==0);c.close();
+// Even a same-identity event invalidates a query result captured before it.
+c=controller();atm.mLastResumedActivity=new com.android.server.wm.ActivityRecord("com.demo.game",0,0);c.options=appOptions;
+c.enqueueForeground(new ForegroundApps.Snapshot("com.demo.home",0,0));ForegroundApps.attach(c);
+atm.duringQuery=()->atm.setLastResumedActivityUncheckLocked(new com.android.server.wm.ActivityRecord("com.demo.home",0,0),"same-query-race");
+settle(c);check(c.foreground.pkg.equals("com.demo.home"));check(c.auto()&&writes(c)==0);c.close();
+// Applying a list while asleep must not attach or perform the initial service query.
+c=controller();c.s.on=false;c.screenOff();q=atm.queries;c.configure(appOptions);settle(c);
+check(!ForegroundApps.targets.contains(c)&&atm.queries==q);check(!c.s.handler.jobs.containsKey(c.foregroundQuery)&&!c.foregroundQueued);
+c.s.on=true;c.screenOn();settle(c);check(ForegroundApps.targets.contains(c)&&atm.queries==q+1);c.close();
+// A failed query also cannot replace a newer WM identity or report its stale error.
+c=controller();atm.mLastResumedActivity=new com.android.server.wm.ActivityRecord("com.demo.home",0,0);atm.failQuery=true;
+atm.duringQuery=()->atm.setLastResumedActivityUncheckLocked(new com.android.server.wm.ActivityRecord("com.demo.game",0,0),"failed-query-race");
+c.configure(appOptions);settle(c);atm.failQuery=false;check(c.foreground.pkg.equals("com.demo.game")&&c.owner.equals("app"));check(c.error.isEmpty());c.close();
+// Detaching during a query invalidates its result and leaves no late work behind.
+c=controller();atm.mLastResumedActivity=new com.android.server.wm.ActivityRecord("com.demo.game",0,0);final BrightnessControl detached=c;
+atm.duringQuery=()->{detached.s.on=false;detached.screenOff();};c.configure(appOptions);settle(c);
+check(c.foreground.pkg.isEmpty()&&c.auto()&&c.owner.equals("none"));check(!c.foregroundQueued&&!ForegroundApps.targets.contains(c));c.close();
+// An inactive engine must not subscribe just because an old list remains in memory.
+c=controller();c.options=appOptions;c.s.phase="attached";q=atm.queries;ForegroundApps.attach(c);settle(c);
+check(!ForegroundApps.targets.contains(c)&&atm.queries==q);c.close();
 System.out.println("Brightness mode control: "+cases+" cases PASS; actual controller with service doubles, Android not tested");
 }}
 '''))
 classes=O/'classes';classes.mkdir(exist_ok=True)
-names=['BrightnessControl','BrightnessControlOptions','DarkLockPolicy','FrameworkBrightness','ForegroundUser']
+names=['BrightnessControl','BrightnessControlOptions','DarkLockPolicy','FrameworkBrightness','ForegroundUser','ForegroundApps']
 subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(J),'-d',str(classes),*[str(p) for p in sources],*[str(S/(n+'.java')) for n in names]],check=True)
 subprocess.run(['java','-cp',str(classes)+';'+str(J),'top.rongshangs.lumacurve.refactor.BrightnessControlHostTest'],check=True)

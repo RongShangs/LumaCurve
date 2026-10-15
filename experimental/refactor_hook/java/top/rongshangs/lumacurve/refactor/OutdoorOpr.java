@@ -19,15 +19,14 @@ final class OutdoorOpr {
         final Object reason;final int modifiers;
         Attempt(Object reason,int modifiers){this.reason=reason;this.modifiers=modifiers;}
     }
-    static void install(Class<?> owner){
+    static synchronized void install(Class<?> owner){
         if(owners.contains(owner))return;
         List<XC_MethodHook.Unhook> hooks=new ArrayList<>();
         try{
             Class<?> reason=Class.forName("com.android.server.display.brightness.BrightnessReason",false,owner.getClassLoader());
             Method sdr=HbmAccess.method(owner,"adjustSdrBrightness",float.class,float.class,boolean.class,reason,boolean.class,boolean.class);
             Method opr=HbmAccess.method(owner,"adjustBrightnessByOpr",float.class,float.class,reason);
-            Method privacy=HbmAccess.method(owner,"shouldUsePrivacyOprBrightness",boolean.class);
-            Method hdr=HbmAccess.method(owner,"isHdrScene",boolean.class);
+            OutdoorSdrScope scope=OutdoorSdrScope.resolve(owner);
             Method get=HbmAccess.method(reason,"getModifier",int.class),set=HbmAccess.method(reason,"setModifier",void.class,int.class);
             HbmAccess.typed(owner,"mAutoBrightnessEnable",boolean.class);
             hooks.add(XposedBridge.hookMethod(sdr,new XC_MethodHook(){
@@ -44,8 +43,7 @@ final class OutdoorOpr {
                 boolean eligible(MethodHookParam p,HookRuntime s)throws Exception{
                     Frame frame=current.get();
                     return frame!=null&&frame.owner==p.thisObject&&frame.auto&&s!=null&&s.onDisplayThread()
-                        &&Boolean.TRUE.equals(HookEntry.get(p.thisObject,"mAutoBrightnessEnable"))
-                        &&Boolean.FALSE.equals(hdr.invoke(p.thisObject))&&Boolean.FALSE.equals(privacy.invoke(p.thisObject))
+                        &&scope.allows(p.thisObject)
                         &&s.outdoor.oprAllowed();
                 }
                 protected void beforeHookedMethod(MethodHookParam p){

@@ -74,6 +74,7 @@ public final class HookEntry implements IXposedHookLoadPackage {
                 ResponseTuning.install(owner.getClassLoader());AdvancedTuning.install(owner.getClassLoader());
                 LowLightTuning.install(owner.getClassLoader());SceneTuning.install(owner.getClassLoader());
                 PipelineHooks.install(owner);OutdoorTuning.install(owner);RawPanelOutputHooks.install(owner);
+                ForegroundApps.install(owner.getClassLoader());
                 try {
                 Class<?> ref=Class.forName(REFACTOR,false,owner.getClassLoader());
                 Method output=ref.getDeclaredMethod("getCurrentNit",float.class,float.class,boolean.class);
@@ -99,7 +100,10 @@ public final class HookEntry implements IXposedHookLoadPackage {
                 }));
                 // The adapter changes baseline fields, not private return values.
                 // OEM reset/interpolation code continues to run even when inlined.
-                added.add(XposedBridge.hookMethod(ref.getDeclaredMethod("resetDefaultSpline"),new XC_MethodHook(){protected void afterHookedMethod(MethodHookParam p){HookRuntime state=states.get(p.thisObject);if(state!=null&&state.onDisplayThread()&&!state.changing&&!p.hasThrowable())state.persistentMemory.requestAfterReset();}}));
+                added.add(XposedBridge.hookMethod(ref.getDeclaredMethod("resetDefaultSpline"),new XC_MethodHook(){protected void afterHookedMethod(MethodHookParam p){HookRuntime state=states.get(p.thisObject);if(state!=null&&state.onDisplayThread()&&!state.changing&&!p.hasThrowable()){
+                    if(state.kernel.savedBase!=null&&state.phase.equals("active")&&state.appliesToUser())try{((RefactorAdapter)state.kernel).afterReset();}catch(Throwable failure){state.handler.post(()->state.fault(failure));}
+                    state.persistentMemory.requestAfterReset();}}}));
+                added.add(XposedBridge.hookMethod(ref.getDeclaredMethod("defaultAtLux",float.class),new XC_MethodHook(){protected void afterHookedMethod(MethodHookParam p){HookRuntime state=states.get(p.thisObject);if(state!=null&&!p.hasThrowable()&&state.onDisplayThread()&&state.kernel.savedBase!=null&&state.kernel.plan()!=null&&state.phase.equals("active")&&state.appliesToUser()){float lux=(Float)p.args[0];if(Float.isFinite(lux)&&lux>=0)p.setResult(state.kernel.plan().at(lux));}}}));
                 added.add(XposedBridge.hookMethod(output,new XC_MethodHook(){protected void beforeHookedMethod(MethodHookParam param){HookRuntime state=states.get(param.thisObject);if(state!=null&&state.onDisplayThread()&&Float.isNaN((Float)param.args[1])&&!((Boolean)param.args[2]))state.persistentMemory.requestRestore();}protected void afterHookedMethod(MethodHookParam param){
                     HookRuntime state=states.get(param.thisObject);if(state==null||param.hasThrowable())return;
                     if(Float.isNaN((Float)param.args[1]) && !((Boolean)param.args[2]))
