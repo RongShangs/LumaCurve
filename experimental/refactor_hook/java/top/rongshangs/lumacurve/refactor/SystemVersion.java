@@ -15,7 +15,7 @@ final class SystemVersion {
         final int major;final String version,status;
         Result(int major,String version){this.major=major;this.version=version;status=major<0?"unknown":major==4?"supported":"unsupported";}
         boolean unsupported(){return status.equals("unsupported");}
-        void put(JSONObject j)throws JSONException{j.put("system_version",version).put("system_major",major).put("system_compatibility",status);}
+        void put(JSONObject j)throws JSONException{j.put("system_version",version).put("system_major",major).put("system_compatibility",status).put("system_version_diagnostic_only",true);}
     }
     static int major(String value){
         if(value==null||value.length()>128)return -1;

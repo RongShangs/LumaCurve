@@ -43,7 +43,8 @@ public final class HookEntry implements IXposedHookLoadPackage {
     public void handleLoadPackage(XC_LoadPackage.LoadPackageParam p)throws Throwable {
         if(android.os.Process.myUid()!=1000 || !(p.packageName.equals("android")||p.packageName.equals("system")) ||
                 !(p.processName.equals("android")||p.processName.equals("system")||p.processName.equals("system_server")))return;
-        String platform=os();int major=SystemVersion.major(platform);if(major!=4){InjectionStatus.write(null,major<0?"system_version_unknown":"unsupported_system",major<0?"未能识别 HyperOS 版本；请核对系统设置中的版本号。":"HyperLux 当前仅支持 HyperOS 4，当前版本："+platform);return;}
+        // Compatibility is determined independently from actual display interfaces.
+
         InjectionStatus.write(null,"injected","LSPosed 已加载，正在识别设备曲线");
         XposedBridge.log("HyperLux "+AppBuild.BUILD+": system_server entry, package="+p.packageName+", process="+p.processName);
         if(discover(p.classLoader))return;

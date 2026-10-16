@@ -16,6 +16,7 @@ decode=between('MainActivity.java','    Bitmap decodeAsset(','    AlertDialog di
 test=O/'edges/ReviewEdges.java';test.parent.mkdir(exist_ok=True)
 test.write_text(r'''package top.rongshangs.lumacurve.refactor;
 import java.io.*;import java.util.*;import org.json.*;
+class OutdoorNodeRoot{static void stop(){}}
 class RootControl{
  static final File DATA=new File("build/refactor-recovery-tests/edges");static final String CONFIG="config";
  final Store settings=new Store();boolean connected,confirm=true;int resumes;
@@ -40,7 +41,7 @@ class AssetLoader{int width,height;List<AssetStream> streams=new ArrayList<>();I
 class ImageCandidate{final AssetLoader loader=new AssetLoader();int density=1;int dp(int v){return v*density;}AssetLoader getAssets(){return loader;}
 '''+decode+r'''}
 class RuntimeCandidate{
- boolean closed,receiverRegistered=true,thermalRegistered=true;final Part persistentMemory=new Part(),brightnessControl=new Part(),memoryLifecycle=new Part(),kernel=new Part(),stateWriter=new Part();
+ boolean closed,receiverRegistered=true,thermalRegistered=true;final Part outdoorNode=new Part(),persistentMemory=new Part(),brightnessControl=new Part(),memoryLifecycle=new Part(),kernel=new Part(),stateWriter=new Part();
  final Object observer=new Object(),refresh=new Object(),batteryListener=new Object(),thermalListener=new Object();final ContextDouble context=new ContextDouble(observer);final Part power=new Part();int disabled;
  void disableOverrides(){disabled++;}
  static class Part{int closes,configures,removed;void close(){closes++;}Object plan(){return new Object();}void configure(Object p){configures++;}void removeThermalStatusListener(Object p){removed++;}}

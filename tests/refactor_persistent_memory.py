@@ -47,12 +47,12 @@ public class MemoryHostTest {
   bad(()->PersistentMemory.read("{","scope",now,30));bad(()->PersistentMemory.read(raw,"scope",now,0));bad(()->PersistentMemory.encode("",p,now));bad(()->PersistentMemory.encode("scope",points(-1,10),now));bad(()->PersistentMemory.encode("scope",points(1,-1),now));bad(()->PersistentMemory.encode("scope",points(1,10,1,20),now));bad(()->PersistentMemory.encode("scope",new JSONArray("[{lux:1,value:'x'}]"),now));bad(()->PersistentMemory.read(new JSONObject(record.toString()).put("saved_at","123").toString(),"scope",now,30));
   for(Object schema:new Object[]{"1",1.5,2,JSONObject.NULL})bad(()->PersistentMemory.read(new JSONObject(record.toString()).put("schema",schema).toString(),"scope",now,30));
   JSONArray excess=new JSONArray();for(int i=0;i<8;i++)excess.put(new JSONObject().put("lux",i).put("value",i));bad(()->PersistentMemory.encode("scope",excess,now));
-  check(MemoryOptions.parse(new JSONObject()).persist);check(MemoryOptions.parse(new JSONObject()).days==30);check(MemoryOptions.parse(new JSONObject()).maxPoints==0);check(new MemoryOptions(true,30,7).fit(1).maxPoints==1);
+  check(!MemoryOptions.parse(new JSONObject()).persist);check(MemoryOptions.parse(new JSONObject()).days==30);check(MemoryOptions.parse(new JSONObject()).maxPoints==0);check(new MemoryOptions(true,30,7).fit(1).maxPoints==1);
   for(Object invalid:new Object[]{"1",1.5,-1,8,JSONObject.NULL})bad(()->MemoryOptions.parse(new JSONObject().put("memory_max_points",invalid)));
   bad(()->MemoryOptions.parse(new JSONObject().put("memory_persist",1)));bad(()->MemoryOptions.parse(new JSONObject().put("memory_retention_days",10000000000L)));
-  Backend b=new Backend();HookRuntime s=new HookRuntime(b);MemoryPersistence m=new MemoryPersistence(s);m.options=m.options.with("memory_restore_same_scene",false);Settings.Global.data.clear();Settings.Global.writes=0;
+  Backend b=new Backend();HookRuntime s=new HookRuntime(b);MemoryPersistence m=new MemoryPersistence(s);m.options=m.options.with("memory_persist",true).with("memory_restore_unlock",true).with("memory_restore_same_scene",false);Settings.Global.data.clear();Settings.Global.writes=0;
   b.anchors=points(30,80);m.manualApplied();b.anchors=points(30,90);m.manualApplied();check(Settings.Global.writes==0);check(s.handler.jobs.size()==1);s.handler.drain();check(Settings.Global.writes==1);check(m.pendingWrite==null);check(PersistentMemory.read(Settings.Global.data.get(PersistentMemory.KEY),m.scope(),now+10000,30).getJSONObject(0).getInt("value")==90);
-  b.clearMemory();m.configure(new MemoryOptions(true,30).with("memory_restore_same_scene",false),true);s.handler.drain();check(b.restores==1);check(b.anchors.getJSONObject(0).getInt("value")==90);check(m.restored==1);
+  b.clearMemory();m.configure(new MemoryOptions(true,30).with("memory_restore_unlock",true).with("memory_restore_same_scene",false),true);s.handler.drain();check(b.restores==1);check(b.anchors.getJSONObject(0).getInt("value")==90);check(m.restored==1);
   b.clearMemory();m.afterReset();s.handler.drain();check(b.restores==1); // Environmental reset remains effective.
   b.auto=false;m.afterReset();s.handler.drain();check(m.pendingRestore&&b.restores==1);b.auto=true;m.maybeRestore();check(b.restores==2);
   b.clearMemory();s.power.awake=false;m.afterReset();s.handler.drain();check(m.pendingRestore);s.power.awake=true;m.screenOn();m.ambientReady(30);android.os.SystemClock.now+=2000;s.user=false;m.maybeRestore();check(m.pendingRestore);s.user=true;s.hdr=true;m.maybeRestore();check(m.pendingRestore);s.hdr=false;s.changing=true;m.maybeRestore();check(m.pendingRestore);s.changing=false;s.memoryStrength=0;m.maybeRestore();check(m.pendingRestore);s.memoryStrength=1;m.maybeRestore();check(b.restores==3);
@@ -61,7 +61,7 @@ public class MemoryHostTest {
   b.anchors=points(10,10,30,30,100,100);m.configure(new MemoryOptions(true,30,2).with("memory_restore_same_scene",false),false);m.manualApplied();s.handler.drain();b.clearMemory();m.scheduleRestore();s.handler.drain();check(b.anchors.length()==2);check(b.anchors.getJSONObject(0).getInt("lux")==30);b.capacity=1;b.clearMemory();m.scheduleRestore();s.handler.drain();check(b.anchors.length()==1);check(b.anchors.getJSONObject(0).getInt("lux")==100);
   // Disable cancels pending writes, retains disk data and cannot replay it.
   int writes=Settings.Global.writes;b.anchors=points(30,120);m.manualApplied();m.configure(new MemoryOptions(false,30),false);s.handler.drain();check(Settings.Global.writes==writes);b.clearMemory();m.scheduleRestore();m.maybeRestore();check(b.anchors.length()==0);
-  m.configure(new MemoryOptions(true,30).with("memory_restore_same_scene",false),true);s.handler.drain();check(b.anchors.length()==1);m.clear();b.clearMemory();m.scheduleRestore();s.handler.drain();check(b.anchors.length()==0);check(!Settings.Global.data.containsKey(PersistentMemory.KEY));
+  m.configure(new MemoryOptions(true,30).with("memory_restore_unlock",true).with("memory_restore_same_scene",false),true);s.handler.drain();check(b.anchors.length()==1);m.clear();b.clearMemory();m.scheduleRestore();s.handler.drain();check(b.anchors.length()==0);check(!Settings.Global.data.containsKey(PersistentMemory.KEY));
   // Curve, firmware and user changes invalidate archives. Ordinary tuning does not.
   b.anchors=points(30,50);m.manualApplied();s.handler.drain();b.clearMemory();String originalScope=m.scope();b.configure(new float[]{1,1.1f,1,1});check(!originalScope.equals(m.scope()));m.scheduleRestore();s.handler.drain();check(b.anchors.length()==0);b.configure(new float[]{1,1,1,1});s.fingerprint="firmware-b";m.scheduleRestore();s.handler.drain();check(b.anchors.length()==0);s.fingerprint="firmware-a";b.user=1;m.scheduleRestore();s.handler.drain();check(b.anchors.length()==0);b.user=0;
   b.fail=true;m.scheduleRestore();s.handler.drain();check(!m.pendingRestore&&!m.replaying&&b.anchors.length()==0);b.fail=false;
@@ -72,12 +72,12 @@ public class MemoryHostTest {
   int count=o.mAnchorCount,order=o.mOrderCounter;float[] x=o.mAnchorLux.clone(),y=o.mAnchorNit.clone();o.fail=true;try{ref.restoreManualPoints(points(200,70));throw new AssertionError();}catch(IllegalStateException expected){cases++;}check(o.mAnchorCount==count&&o.mOrderCounter==order&&Arrays.equals(x,o.mAnchorLux)&&Arrays.equals(y,o.mAnchorNit));
   bad(()->ref.restoreManualPoints(points(6000,30)));bad(()->ref.restoreManualPoints(points(200,1001)));
   // New options are portable, strictly typed, and independent of native grouping.
-  MemoryOptions defaults=MemoryOptions.parse(new JSONObject());check(defaults.unlock&&defaults.sameScene&&defaults.replaceOnUnlock&&!defaults.resetOverride&&!defaults.timeoutOverride);JSONObject packed=new JSONObject();defaults.with("memory_restore_settle",2500).with("memory_timeout_minutes",90).put(packed);check(MemoryOptions.parse(packed).settleMs==2500&&MemoryOptions.parse(packed).timeoutMinutes==90);check(defaults.with("memory_restore_unlock",false).fit(1).unlock==false);
+  MemoryOptions defaults=MemoryOptions.parse(new JSONObject());check(!defaults.persist&&!defaults.unlock&&defaults.sameScene&&defaults.replaceOnUnlock&&!defaults.resetOverride&&!defaults.timeoutOverride);JSONObject packed=new JSONObject();defaults.with("memory_restore_settle",2500).with("memory_timeout_minutes",90).put(packed);check(MemoryOptions.parse(packed).settleMs==2500&&MemoryOptions.parse(packed).timeoutMinutes==90);check(defaults.with("memory_restore_unlock",false).fit(1).unlock==false);
   for(String key:new String[]{"memory_restore_unlock","memory_restore_same_scene","memory_restore_replace","memory_reset_override","memory_timeout_override"})bad(()->MemoryOptions.parse(new JSONObject().put(key,1)));
   bad(()->defaults.with("memory_restore_settle",100));bad(()->defaults.with("memory_restore_ratio",0));bad(()->defaults.with("memory_reset_off_minutes",31));bad(()->defaults.with("memory_timeout_minutes",1.5));bad(()->defaults.with("memory_reset_force_minutes",1));bad(()->defaults.with("memory_reset_override",true).verify(new JSONObject()));
   check(MemoryScene.near(30,40,.5f,5));check(!MemoryScene.near(30,50,.5f,5));check(MemoryScene.near(0,5,.5f,5));check(!MemoryScene.near(Float.NaN,5,.5f,5));check(!MemoryScene.near(10,-1,.5f,5));check(!MemoryScene.reset(30,51,359999,defaults));check(MemoryScene.reset(30,51,360000,defaults));check(!MemoryScene.reset(30,50,360000,defaults));check(MemoryScene.reset(30,30,1800000,defaults));
   // Wake restore waits for fresh ambient input, then settles. It can replace an old Good curve.
-  Backend wb=new Backend();HookRuntime ws=new HookRuntime(wb);MemoryPersistence wm=new MemoryPersistence(ws);Settings.Global.data.clear();ws.memoryLifecycle.lux=30;ws.memoryLifecycle.record=new JSONObject().put("lux",30).put("brightness",.2);
+  Backend wb=new Backend();HookRuntime ws=new HookRuntime(wb);MemoryPersistence wm=new MemoryPersistence(ws);wm.options=wm.options.with("memory_persist",true).with("memory_restore_unlock",true);Settings.Global.data.clear();ws.memoryLifecycle.lux=30;ws.memoryLifecycle.record=new JSONObject().put("lux",30).put("brightness",.2);
   wb.anchors=points(30,80);wm.manualApplied();ws.handler.drain();check(PersistentMemory.model(Settings.Global.data.get(PersistentMemory.KEY)).getDouble("brightness")==.2);
   wm.screenOff();wb.anchors=points(30,100);ws.power.awake=false;wm.maybeRestore();check(wb.restores==0);ws.power.awake=true;wm.screenOn();wm.maybeRestore();check(wb.restores==0);wm.ambientReady(30);wm.maybeRestore();check(wb.restores==0);android.os.SystemClock.now+=1600;wm.maybeRestore();check(wb.anchors.getJSONObject(0).getInt("value")==80&&wb.restores==1&&ws.memoryLifecycle.restores==1);
   // A significant scene change ends the attempt but retains the saved archive.
@@ -89,21 +89,21 @@ public class MemoryHostTest {
   // Missing-only mode keeps a live OEM point; disabling unlock restoration leaves wake untouched.
   wm.configure(wm.options.with("memory_restore_replace",false),false);wm.screenOff();wb.anchors=points(30,140);wm.screenOn();wm.ambientReady(30);android.os.SystemClock.now+=1600;wm.maybeRestore();check(wb.anchors.getJSONObject(0).getInt("value")==140&&wb.restores==1);
   wm.configure(wm.options.with("memory_restore_unlock",false),false);wm.screenOff();wb.clearMemory();wm.screenOn();wm.ambientReady(30);android.os.SystemClock.now+=1600;wm.maybeRestore();check(!wm.pendingRestore&&wb.anchors.length()==0);
-  wm.configure(defaults,false);wm.screenOff();wm.screenOn();wm.ambientReady(30);android.os.SystemClock.now+=21000;wm.maybeRestore();check(!wm.pendingRestore&&wb.anchors.length()==0);
+  wm.configure(defaults.with("memory_persist",true).with("memory_restore_unlock",true),false);wm.screenOff();wm.screenOn();wm.ambientReady(30);android.os.SystemClock.now+=21000;wm.maybeRestore();check(!wm.pendingRestore&&wb.anchors.length()==0);
   // Replacement failure restores all Refactor arrays and flags, including final arrays.
   // Wake expiry must work even if HDR/manual mode prevents readiness or no sensor event arrives.
-  wm.configure(defaults,false);wm.screenOff();wm.screenOn();ws.hdr=true;android.os.SystemClock.now+=20000;wm.maybeRestore();check(!wm.pendingRestore);ws.hdr=false;
+  wm.configure(defaults.with("memory_persist",true).with("memory_restore_unlock",true),false);wm.screenOff();wm.screenOn();ws.hdr=true;android.os.SystemClock.now+=20000;wm.maybeRestore();check(!wm.pendingRestore);ws.hdr=false;
   wm.screenOff();wm.screenOn();android.os.SystemClock.now+=20000;wm.expiry.run();check(!wm.pendingRestore&&wm.status.equals("亮屏确认超时，本次不恢复"));
   wm.screenOff();wm.screenOn();wm.manualApplied();check(!ws.handler.jobs.contains(wm.expiry));
   o.fail=false;ref.replaceManualPoints(points(10,10));check(o.mAnchorCount==5&&ref.manualPoints().length()==1);float[] beforeY=o.mAnchorNit.clone();int beforeCount=o.mAnchorCount;o.fail=true;try{ref.replaceManualPoints(points(100,80));throw new AssertionError();}catch(IllegalStateException expected){cases++;}check(Arrays.equals(beforeY,o.mAnchorNit)&&o.mAnchorCount==beforeCount);
   // A delayed save must not attach a model from a replacement baseline/user.
-  Backend scoped=new Backend();HookRuntime scopedState=new HookRuntime(scoped);MemoryPersistence scopedMemory=new MemoryPersistence(scopedState);
+  Backend scoped=new Backend();HookRuntime scopedState=new HookRuntime(scoped);MemoryPersistence scopedMemory=new MemoryPersistence(scopedState);scopedMemory.options=scopedMemory.options.with("memory_persist",true);
   scoped.anchors=points(30,80);scopedMemory.manualApplied();String oldScope=scopedMemory.scope();scopedState.memoryLifecycle.record=new JSONObject().put("lux",30).put("brightness",.9).put("valid",true);
   scoped.configure(new float[]{1,1.5f,1,1});scopedMemory.flush();JSONObject scopedRecord=new JSONObject(Settings.Global.data.get(PersistentMemory.KEY));check(scopedRecord.getString("scope").equals(oldScope));check(!scopedRecord.has("model"));check(scopedRecord.getJSONArray("points").getJSONObject(0).getInt("value")==80);
   scopedMemory.manualApplied();scoped.user=10;scopedMemory.flush();check(!new JSONObject(Settings.Global.data.get(PersistentMemory.KEY)).has("model"));
   scoped.user=0;scopedMemory.manualApplied();scoped.configure(null);scopedMemory.flush();check(scopedMemory.pendingWrite==null);check(!new JSONObject(Settings.Global.data.get(PersistentMemory.KEY)).has("model"));
   // A mapper read can request restoration, but must finish before model writes or service reads.
-  Backend deferred=new Backend();HookRuntime deferredState=new HookRuntime(deferred);MemoryPersistence deferredMemory=new MemoryPersistence(deferredState);
+  Backend deferred=new Backend();HookRuntime deferredState=new HookRuntime(deferred);MemoryPersistence deferredMemory=new MemoryPersistence(deferredState);deferredMemory.options=deferredMemory.options.with("memory_persist",true);
   deferred.anchors=points(30,75);deferredMemory.manualApplied();deferredMemory.flush();deferred.clearMemory();deferredState.handler.jobs.clear();deferredState.power.reads=0;
   deferredMemory.scheduleRestore();for(int i=0;i<10000;i++)deferredMemory.requestRestore();
   check(deferred.restores==0&&deferred.anchors.length()==0);check(deferredState.power.reads==0);check(deferredState.handler.jobs.size()==1&&deferredMemory.restoreQueued);
@@ -120,6 +120,21 @@ public class MemoryHostTest {
   // Canvas and native widgets share readable light/dark semantic surfaces.
   for(boolean dark:new boolean[]{false,true})for(int surface:new int[]{0xfffafafa,0xffffffff,0xffeef2fa,0xffedf3ff})for(int text:new int[]{0xff24303c,0xff616d79,0xff3265df})check(contrast(ThemePalette.color(text,dark),ThemePalette.color(surface,dark))>=4.5);
   check(contrast(0xff11151c,ThemePalette.color(0xff3265df,true))>=4.5);check(ThemePalette.color(0xfffafafa,true)!=0xfffafafa);check(ThemePalette.color(0xff3265df,false)==0xff3265df);
+
+  // Missing flags are opt-out on cold start, partial migration and runtime-only UI reads.
+  for(int mask=0;mask<4;mask++){JSONObject stored=new JSONObject().put("enabled",true);if((mask&1)!=0)stored.put("memory_persist",false);if((mask&2)!=0)stored.put("memory_restore_unlock",false);MemoryOptions off=MemoryOptions.parse(stored);check(!off.persist&&!off.unlock);JSONObject packedOff=new JSONObject();off.put(packedOff);check(!MemoryOptions.parse(packedOff).persist&&!MemoryOptions.parse(packedOff).unlock);}
+  MemoryOptions explicit=MemoryOptions.parse(new JSONObject().put("memory_persist",true).put("memory_restore_unlock",true));check(explicit.persist&&explicit.unlock);
+  check(!MemoryOptions.forDisplay(null,null).persist&&!MemoryOptions.forDisplay(null,null).unlock);
+  JSONObject effectiveOff=new JSONObject().put("memory_persist",false).put("memory_restore_unlock",false);
+  check(!MemoryOptions.forDisplay(null,effectiveOff).persist&&!MemoryOptions.forDisplay(null,effectiveOff).unlock);
+  check(!MemoryOptions.forDisplay(new JSONObject().put("enabled",false).put("memory_persist",true),effectiveOff).persist);
+  check(MemoryOptions.forDisplay(new JSONObject().put("enabled",true).put("memory_persist",true).put("memory_restore_unlock",true),effectiveOff).persist);
+  Backend cold=new Backend();HookRuntime coldState=new HookRuntime(cold);MemoryPersistence coldMemory=new MemoryPersistence(coldState);
+  Settings.Global.data.put(PersistentMemory.KEY,PersistentMemory.encode(coldMemory.scope(),points(30,333),System.currentTimeMillis()).toString());int coldWrites=Settings.Global.writes;
+  check(!coldMemory.options.persist&&!coldMemory.options.unlock);
+  coldMemory.configure(MemoryOptions.parse(new JSONObject()),true);coldMemory.scheduleRestore();coldMemory.afterReset();coldMemory.screenOff();coldMemory.screenOn();coldMemory.ambientReady(30);coldMemory.requestRestore();coldState.handler.drain();coldMemory.maybeRestore();
+  check(cold.restores==0&&cold.anchors.length()==0&&!coldMemory.pendingRestore);check(Settings.Global.writes==coldWrites);
+  cold.anchors=points(30,99);coldMemory.manualApplied();coldState.handler.drain();check(cold.anchors.getJSONObject(0).getInt("value")==99&&coldMemory.pendingWrite==null);check(Settings.Global.writes==coldWrites);check(Settings.Global.data.containsKey(PersistentMemory.KEY));
   System.out.println("Persistent memory/theme: "+cases+" cases PASS; service and OEM models, device not verified");
  }
 }'''

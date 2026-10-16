@@ -20,7 +20,7 @@ public final class MainActivity extends Activity {
     @Override public android.content.SharedPreferences getPreferences(int mode){return UiPreferences.open(this);}
     int INK=0xff24303c,MUTED=0xff616d79,BLUE=0xff3265df,BG=0xfffafafa;boolean darkTheme;
     int themed(int color){return ThemePalette.color(color,darkTheme);}
-    MemoryOptions memoryOptions=new MemoryOptions(true,30);Switch persistSwitch;SeekBar retentionSlider,pointLimitSlider;TextView retentionLabel,pointLimitLabel;Bundle restoredUi;
+    MemoryOptions memoryOptions=new MemoryOptions(false,30);Switch persistSwitch;SeekBar retentionSlider,pointLimitSlider;TextView retentionLabel,pointLimitLabel;Bundle restoredUi;
     final ExecutorService worker=Executors.newSingleThreadExecutor(),network=Executors.newSingleThreadExecutor();final Handler ui=new Handler(Looper.getMainLooper());
     FrameLayout content;LinearLayout root,header,pages[]=new LinearLayout[4];
     TextView badge,note,stateTitle,luxReading,nitReading,flow,thermalState,userState,compatibility,logText,curveHint,memoryText,memoryStatus;
@@ -28,7 +28,7 @@ public final class MainActivity extends Activity {
     float factors[]={1,1,1,1},factoryLux[],factoryNit[],minimum,maximum,thermalCeiling=43,memoryStrength=1;boolean thermalRelax,memoryEnabled=true,busy,visible,dirty,destroyed;
     Switch memorySwitch;SeekBar memorySlider;PipelineBoard pipeline;boolean english,rereadPending,legacyChecked;String permissionNotice="",loadedBaseline="";boolean permissionDialogVisible,permissionBlocked;ScrollView logScroller;
     JSONObject runtime,lastAnswer;CurveView stateGraph,settingsGraph,memoryGraph;int page;
-    SavedCurve savedBase;ApplicationBrightnessSettings appBrightnessSettings;Switch darkManualHoldSwitch;TextView darkManualHoldDescription;
+    SavedCurve savedBase;ApplicationBrightnessSettings appBrightnessSettings;Switch darkManualExitSwitch;TextView darkManualExitDescription;
     Button saveMemoryBaseButton,restoreMemoryBaseButton;
     AlertDialog curveSaveProgress;
     TextView memoryOverview,memorySystemStatus,memoryDisabledWarning;
@@ -45,7 +45,7 @@ public final class MainActivity extends Activity {
     SeekBar lowLimitSlider,lowBrightSlider,lowDarkSlider;TextView lowLimitLabel,lowBrightLabel,lowDarkLabel;
     LowLightThresholds lowThresholds=new LowLightThresholds();Switch lowThresholdSwitch;final SeekBar[] lowThresholdSliders=new SeekBar[4];final TextView[] lowThresholdLabels=new TextView[4];
     LowLightAssistGate assistGateOptions=new LowLightAssistGate();Switch assistGateSwitch;SeekBar assistGateWait,assistGateTolerance;TextView assistGateWaitLabel,assistGateToleranceLabel,assistGateStatus;
-    OutdoorOptions outdoorOptions=new OutdoorOptions();Switch outdoorSwitch,hbmSwitch,rangeSwitch,oprSwitch;TextView outdoorStatus;Button outdoorCapButton;final SeekBar[] outdoorSliders=new SeekBar[OutdoorOptions.KEYS.length];final TextView[] outdoorLabels=new TextView[OutdoorOptions.KEYS.length];
+    OutdoorOptions outdoorOptions=new OutdoorOptions();Switch outdoorSwitch,hbmSwitch,rangeSwitch,oprSwitch,nodeBoostSwitch;TextView outdoorStatus;Button outdoorCapButton;final SeekBar[] outdoorSliders=new SeekBar[OutdoorOptions.KEYS.length];final TextView[] outdoorLabels=new TextView[OutdoorOptions.KEYS.length];
     AdvancedOptions advanced=new AdvancedOptions();
     SceneOptions sceneOptions=new SceneOptions();SceneSettings sceneSettings;
     final Switch[] advancedSwitches=new Switch[AdvancedOptions.GROUPS.length];final SeekBar[] advancedSliders=new SeekBar[AdvancedOptions.KEYS.length];final TextView[] advancedLabels=new TextView[AdvancedOptions.KEYS.length];
@@ -216,6 +216,7 @@ public final class MainActivity extends Activity {
         b.addView(text("左端可设置暗处亮度下限。若调不上去，先提高相邻节点；手动选择和温控仍优先。",12,MUTED));
         presets=row(b);compact("保存为预设",this::savePreset,presets);compact("我的预设",this::pickPreset,presets);
     }
+    SeekBar nodeTargetSlider;TextView nodeTargetLabel;
     void makeOutdoorSettings(){
         LinearLayout b=card(settingsTarget);b.addView(text("户外高亮增强",18,INK));quickPresetRow(b,"outdoor","温和增强","均衡增强");
         button("强光优先",()->quickPreset("outdoor",3),b);
@@ -229,10 +230,15 @@ public final class MainActivity extends Activity {
         b.addView(text("两项仍受温控、电量和 HBM 时间预算限制。",11,MUTED));
         outdoorCapButton=button("户外亮度上限：不限制",this::editOutdoorNitLimit,b);
         b.addView(text("仅在户外增强生效时限制自动亮度；0 表示不限制。温控等保护仍可进一步降亮。",12,MUTED));
+        nodeBoostSwitch=new Switch(this);nodeBoostSwitch.setText(tr("强制达到节点上限"));nodeBoostSwitch.setTextSize(14);b.addView(nodeBoostSwitch,new LinearLayout.LayoutParams(-1,dp(48)));
+        b.addView(text("达到全强度照度且系统输出到顶后，提高到设定节点。默认使用设备上限，时长跟随户外增强；需开启高亮范围、画面放宽，并取消 nit 上限。",12,MUTED));
+        nodeTargetLabel=text("等待读取主屏节点上限",13,INK);b.addView(nodeTargetLabel);nodeTargetSlider=parameter(b,0,0,value->{int maximum=runtime==null?0:runtime.optInt("outdoor_node_maximum");if(OutdoorNodeTarget.known(maximum))outdoorOptions.nodeTarget=OutdoorNodeTarget.stored(OutdoorNodeTarget.MINIMUM+value,maximum);});
+        b.addView(text("节点值不是 nit。目标低于系统当前节点时沿用系统输出，系统下调时退让。启用时使用 Root 守护，关闭后停止。",12,MUTED));
+        nodeBoostSwitch.setOnCheckedChangeListener((v,on)->{if(on!=outdoorOptions.nodeBoost){outdoorOptions.nodeBoost=on;dirty=true;drawOutdoor();}});
         outdoorStatus=text("等待读取户外高亮条件",13,BLUE);b.addView(outdoorStatus);button("查看高亮条件",this::branches,b);
         b=settingsDetails(b,"outdoor");
         for(int i:new int[]{0,1,5})outdoorParameter(b,i);
-        b.addView(text("增强幅度只增加目标亮度；需要限制最高亮度时，请设置户外亮度上限。",12,MUTED));
+        b.addView(text("增强幅度只调整常规户外亮度；节点目标由上方滑动杆独立设置。",12,MUTED));
         LinearLayout details=column();b.addView(details);
         for(int i:new int[]{2,3,4,6,7})outdoorParameter(details,i);
         hbmSwitch=new Switch(this);hbmSwitch.setText(tr("调整自动 HBM 触发与预算"));hbmSwitch.setTextSize(14);details.addView(hbmSwitch,new LinearLayout.LayoutParams(-1,dp(48)));
@@ -247,10 +253,15 @@ public final class MainActivity extends Activity {
         outdoorSwitch.setChecked(outdoorOptions.flags[0]);outdoorSwitch.setEnabled(supported||outdoorOptions.flags[0]);hbmSwitch.setChecked(outdoorOptions.flags[1]);hbmSwitch.setEnabled(outdoorOptions.flags[0]&&(hbm||outdoorOptions.flags[1]));rangeSwitch.setChecked(outdoorOptions.flags[2]);rangeSwitch.setEnabled(outdoorOptions.flags[0]&&(range||outdoorOptions.flags[2]));
         oprSwitch.setChecked(outdoorOptions.flags[3]);oprSwitch.setEnabled(outdoorOptions.flags[0]&&outdoorOptions.flags[2]&&(runtime!=null&&runtime.optBoolean("outdoor_opr_supported")||outdoorOptions.flags[3]));
         boolean nitSupported=runtime!=null&&runtime.optBoolean("outdoor_nit_limit_supported");double cap=outdoorOptions.values[OutdoorOptions.MAX_NIT];
+        boolean nodeReady=outdoorOptions.flags[0]&&outdoorOptions.flags[2]&&outdoorOptions.flags[3]&&cap==0;if(!nodeReady)outdoorOptions.nodeBoost=false;nodeBoostSwitch.setChecked(outdoorOptions.nodeBoost);nodeBoostSwitch.setEnabled(nodeReady&&(runtime!=null&&runtime.optBoolean("outdoor_node_supported")||outdoorOptions.nodeBoost));
+        drawNodeTarget(nodeReady);
         outdoorCapButton.setText(tr("户外亮度上限")+"："+(cap>0?format(cap)+" nit":tr("不限制"))+(nitSupported?"":tr(" · 本机暂不支持")));outdoorCapButton.setEnabled(outdoorOptions.flags[0]&&(nitSupported||cap>0));
         String[] labels={"进入照度","全强度照度","进入确认","退出确认","退出照度比例","额外增强幅度","单次最长增强","增强冷却","HBM 触发照度倍率","HBM 时间预算倍率"};
         for(int i=0;i<outdoorSliders.length;i++)if(outdoorSliders[i]!=null){double value=outdoorOptions.values[i];boolean time=i==2||i==3||i==6||i==7;outdoorLabels[i].setText(tr(labels[i])+"："+format(time?value/1000:i==4||i==5?value*100:value)+(time?tr(" 秒"):i==0||i==1?" lux":i==4||i==5?"%":"×"));outdoorSliders[i].setProgress((int)Math.round((value-OutdoorOptions.MIN[i])/OutdoorOptions.STEP[i]));enableParameter(outdoorSliders[i],outdoorLabels[i],supported&&outdoorOptions.flags[0]&&(i<8||hbm&&outdoorOptions.flags[1]));}
         JSONObject state=runtime==null?null:runtime.optJSONObject("outdoor");outdoorStatus.setText(state==null?tr("等待读取户外高亮条件"):outdoorSummary(state));drawDraftState();
+    }
+    void drawNodeTarget(boolean nodeReady){
+        if(nodeTargetSlider!=null){int maximum=runtime==null?0:runtime.optInt("outdoor_node_maximum");boolean known=OutdoorNodeTarget.known(maximum);nodeTargetSlider.setMax(known?maximum-OutdoorNodeTarget.MINIMUM:0);nodeTargetSlider.setProgress(known?OutdoorNodeTarget.resolve(outdoorOptions.nodeTarget,maximum)-OutdoorNodeTarget.MINIMUM:0);nodeTargetLabel.setText(known?tr("增强目标节点：")+OutdoorNodeTarget.resolve(outdoorOptions.nodeTarget,maximum)+" / "+maximum:tr("等待读取主屏节点上限"));enableParameter(nodeTargetSlider,nodeTargetLabel,known&&nodeReady&&outdoorOptions.nodeBoost&&runtime.optBoolean("outdoor_node_supported"));}
     }
     void editOutdoorNitLimit(){
         LinearLayout body=column();body.addView(text("输入最高目标亮度，0 表示不限制。保存并应用后，仅在户外增强期间生效。",14,MUTED));
@@ -267,7 +278,7 @@ public final class MainActivity extends Activity {
             }catch(NumberFormatException invalid){error.setText(tr("请输入 0–20000 nit，0 表示不限制"));}catch(IllegalArgumentException invalid){error.setText(invalid.getMessage());}
         },actions);confirm.setTextColor(0xffffffff);confirm.setBackground(background(BLUE,12));
     }
-    String outdoorSummary(JSONObject state){String message=tr(state.optString("text","未取得"));if(state.has("blocking_condition"))message+=" · "+tr(OutdoorController.description(state.optString("blocking_condition")));if(state.has("session_left_ms"))message+=" · "+tr("剩余 ")+format(state.optDouble("session_left_ms")/1000)+tr(" 秒");return message;}
+    String outdoorSummary(JSONObject state){JSONObject guard=runtime==null?null:runtime.optJSONObject("outdoor_node_guard");if(guard!=null&&guard.optBoolean("running")&&guard.optBoolean("held"))return tr("节点增强中 · nit 仅为系统换算");String message=tr(state.optString("text","未取得"));if(state.has("blocking_condition"))message+=" · "+tr(OutdoorController.description(state.optString("blocking_condition")));if(state.has("session_left_ms"))message+=" · "+tr("剩余 ")+format(state.optDouble("session_left_ms")/1000)+tr(" 秒");return message;}
     String outdoorDetails(JSONObject state){StringBuilder out=new StringBuilder(outdoorSummary(state));
         String[][] fields={{"normal_max","HBM 亮度分界"},{"native_range_max","系统原范围上限"},{"effective_range_max","当前范围上限"},{"dynamic_native_max","照度动态范围原上限"},{"dynamic_effective_max","照度动态范围现上限"},{"device_mapping_max","设备映射上限"},{"display_range_max","显示范围上限"},{"clamper_max","最终限亮器上限"},{"requested_brightness","户外请求目标"},{"actual_brightness","当前屏幕亮度"}};
         for(String[] field:fields)if(state.has(field[0]))out.append("\n").append(tr(field[1])).append(": ").append(format(state.optDouble(field[0])*100)).append("%");
@@ -397,9 +408,9 @@ public final class MainActivity extends Activity {
         b.addView(text("保持进入时的亮度；照度明显升高后恢复自动。息屏或重新开启自动亮度即退出。你主动关闭的自动亮度不会被重新开启。",12,MUTED));
         b.addView(text("需要主辅光感共同确认暗处；任一侧持续变亮可退出。锁定期间低频监听光感，温控和应用指定亮度仍生效。",12,MUTED));
         controlStatus=text("等待读取暗光锁定状态",12,BLUE);b.addView(controlStatus);
-        darkManualHoldSwitch=new Switch(this);darkManualHoldSwitch.setText(tr("手动调整后继续锁定"));darkManualHoldSwitch.setTextSize(14);darkManualHoldSwitch.setMinimumHeight(dp(48));b.addView(darkManualHoldSwitch,new LinearLayout.LayoutParams(-1,-2));
-        darkManualHoldDescription=text("",12,MUTED);b.addView(darkManualHoldDescription);
-        darkManualHoldSwitch.setOnCheckedChangeListener((v,on)->{if(controls.manualHold!=on){controls.manualHold=on;dirty=true;drawCurve();}});
+        darkManualExitSwitch=new Switch(this);darkManualExitSwitch.setText(tr("手动调整后退出锁定"));darkManualExitSwitch.setTextSize(14);darkManualExitSwitch.setMinimumHeight(dp(48));b.addView(darkManualExitSwitch,new LinearLayout.LayoutParams(-1,-2));
+        darkManualExitDescription=text("",12,MUTED);b.addView(darkManualExitDescription);
+        darkManualExitSwitch.setOnCheckedChangeListener((v,on)->{if(controls.manualExit!=on){controls.manualExit=on;dirty=true;drawCurve();}});
         LinearLayout details=settingsDetails(b,"dark_lock");
         int[] maximums={29,29,99,29},initial={4,4,5,4};for(int i=0;i<4;i++){final int key=i;controlLabels[i]=text("",13,INK);details.addView(controlLabels[i]);controlSliders[i]=parameter(details,maximums[i],initial[i],n->{if(key==0){controls.enterLux=1+n;controls.exitLux=Math.max(controls.exitLux,controls.enterLux+5);}else if(key==1)controls.minutes=1+n;else if(key==2)controls.exitLux=Math.max(controls.enterLux+5,5+n*5);else controls.exitSeconds=1+n;});}
     }
@@ -412,16 +423,29 @@ public final class MainActivity extends Activity {
         button("打开主屏亮度面板",this::showManualPanel,b);button("添加控制中心磁贴",this::addBrightnessTile,b);
     }
     void drawControls(){if(darkLockSwitch==null||manualPanelSwitch==null)return;boolean supported=runtime!=null&&runtime.optBoolean("dark_lock_supported");darkLockSwitch.setChecked(controls.darkLock);darkLockSwitch.setEnabled(supported||controls.darkLock);manualPanelSwitch.setChecked(controls.manualPanel);manualPanelSwitch.setEnabled(runtime!=null&&runtime.optBoolean("manual_panel_supported"));
-        if(darkManualHoldSwitch!=null){darkManualHoldSwitch.setChecked(controls.manualHold);darkManualHoldSwitch.setEnabled(supported||controls.manualHold);darkManualHoldDescription.setText(controls.manualHold?"当前方案：保留新亮度并继续锁定；任一光感持续达到退出阈值后恢复自动亮度。":"当前方案：手动调整即结束锁定，保持手动亮度；环境变亮后也不自动开启。");}
+        if(darkManualExitSwitch!=null){darkManualExitSwitch.setChecked(controls.manualExit);darkManualExitSwitch.setEnabled(supported||controls.manualExit);darkManualExitDescription.setText(controls.manualExit?"当前方案：手动调整即结束锁定，保持手动亮度；环境变亮后也不自动开启。":"当前方案：保留新亮度并继续锁定；任一光感持续达到退出阈值后恢复自动亮度。");}
         String[] labels={"进入照度："+format(controls.enterLux)+" lux","等待时间："+controls.minutes+" 分钟","退出照度："+format(controls.exitLux)+" lux","退出确认："+controls.exitSeconds+" 秒"};int[] p={Math.round(controls.enterLux)-1,controls.minutes-1,Math.round((controls.exitLux-5)/5),controls.exitSeconds-1};for(int i=0;i<4;i++){controlSliders[i].setProgress(p[i]);controlLabels[i].setText(labels[i]);enableParameter(controlSliders[i],controlLabels[i],supported&&controls.darkLock);}
         JSONObject c=runtime==null?null:runtime.optJSONObject("brightness_control");String reason=c==null?"":c.optString("reason");String state=reason.equals("locked")?"已保持当前亮度":reason.equals("countdown")?"暗光计时中":reason.equals("watching")?"等待持续暗光":reason.equals("waiting_sensor_data")?"等待光感读数":reason.equals("user_manual")?"用户手动模式，不自动恢复":reason.equals("manual_panel")?"主屏手动面板控制中":reason.equals("error")?"接口异常，已退出":"未锁定";controlStatus.setText(state+(c!=null&&reason.equals("countdown")?" · "+Math.round(c.optLong("countdown_left_ms")/1000.0)+" 秒":""));
     }
     void showManualPanel(){startActivity(new Intent(this,BrightnessPanelActivity.class));}
     void addBrightnessTile(){try{android.app.StatusBarManager manager=getSystemService(android.app.StatusBarManager.class);manager.requestAddTileService(new ComponentName(this,BrightnessTileService.class),tr("主屏亮度"),android.graphics.drawable.Icon.createWithResource(this,getResources().getIdentifier("brightness_tile","drawable",getPackageName())),getMainExecutor(),result->show(result==android.app.StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ADDED||result==android.app.StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ALREADY_ADDED?"磁贴已添加":"可在控制中心编辑磁贴时添加 HyperLux 主屏亮度"));}catch(Throwable unavailable){show("可在控制中心编辑磁贴时添加 HyperLux 主屏亮度");}}
     @Override protected void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);if(intent.getBooleanExtra("manual_brightness_panel",false)){openManualPanel=true;if(runtime!=null){openManualPanel=false;showManualPanel();}else if(!busy)run("inspect",null);}}
+    boolean showSelfCheck;
     void makeRefreshSettings(){
-        LinearLayout b=card(settingsTarget);b.addView(text("界面",18,INK));refreshLabel=text("",13,INK);b.addView(refreshLabel);refreshSlider=parameter(b,4,refreshSeconds-1,value->{refreshSeconds=value+1;getPreferences(0).edit().putInt("refresh_seconds",refreshSeconds).apply();});
+        LinearLayout b=card(settingsTarget);b.addView(text("功能自检",18,INK));b.addView(text("引擎启动和打开 APP 时逐项核验实际接口。单项不可用不影响其他功能；系统版本仅用于诊断。自检不拉动亮度、不切换自动模式。",12,MUTED));button("重新自检并查看结果",()->{if(!busy){showSelfCheck=true;run("self-check",null);}},b);b=card(settingsTarget);b.addView(text("界面",18,INK));refreshLabel=text("",13,INK);b.addView(refreshLabel);refreshSlider=parameter(b,4,refreshSeconds-1,value->{refreshSeconds=value+1;getPreferences(0).edit().putInt("refresh_seconds",refreshSeconds).apply();});
         b.addView(text("只影响状态显示，不改变亮度调节频率。",12,MUTED));
+    }
+    JSONObject appFeatureReport=new JSONObject();
+    void checkAppFeatures(){
+        FeatureSelfCheck app=new FeatureSelfCheck();app.check("launcher","桌面图标显示设置",null,false,()->{getPackageManager().getComponentEnabledSetting(LauncherVisibility.component(this));return true;});app.check("preferences","本地设置与用户须知记录",null,false,()->{getPreferences(0).getAll();return true;});app.check("app_files","本地文件导入导出",null,true,()->getFilesDir().isDirectory()&&getFilesDir().canWrite());
+        try{appFeatureReport=app.report(android.os.SystemClock.elapsedRealtime(),"app-open");}catch(JSONException impossible){}
+    }
+    void showFeatureChecks(){
+        JSONObject report=runtime==null?null:runtime.optJSONObject("feature_self_check");JSONArray entries=report==null?null:report.optJSONArray("features");if(entries==null){show("尚未取得功能自检结果");return;}
+        JSONArray combined=new JSONArray();for(int i=0;i<entries.length();i++)combined.put(entries.opt(i));JSONObject root=lastAnswer==null?null:lastAnswer.optJSONObject("root_feature_self_check");JSONArray roots=root==null?null:root.optJSONArray("features");if(roots!=null)for(int i=0;i<roots.length();i++)combined.put(roots.opt(i));
+        try{JSONArray items=appFeatureReport.getJSONArray("features");for(int i=0;i<items.length();i++)combined.put(items.opt(i));}catch(JSONException impossible){}
+        LinearLayout body=column();body.addView(text("检查接口与就绪状态，不通过试调亮度验证效果。联网服务在实际请求时检查连接。",12,MUTED));for(int i=0;i<combined.length();i++){JSONObject entry=combined.optJSONObject(i);if(entry==null)continue;String state=entry.optString("state");LinearLayout item=card(body);item.addView(text(entry.optString("name")+" · "+tr(state.equals("available")?"可用":state.equals("pending")?"等待就绪":"接口不支持"),14,INK));if(!state.equals("available"))item.addView(text(entry.optString("detail"),12,MUTED));}
+        ScrollView scroll=new ScrollView(this);scroll.addView(body);AlertDialog d=dialog("功能自检",scroll);d.show();dialogButton(d,"关闭",null,true);
     }
     void makeAdvancedSettings(int g){makeAdvancedSettings(g,null);}
     void makeAdvancedSettings(int g,LinearLayout existing){
@@ -672,15 +696,11 @@ public final class MainActivity extends Activity {
     void run(String command,String payload){
         if(busy||destroyed)return;busy=true;apply.setEnabled(false);stop.setEnabled(false);drawDraftState();
         if(command.equals("promote-memory")){curveSaveProgress=dialog("保存为基础曲线",text("正在保存手动记忆曲线…",14,MUTED));curveSaveProgress.setCancelable(false);curveSaveProgress.setCanceledOnTouchOutside(false);curveSaveProgress.show();}
-        if(!command.equals("inspect"))show(command.equals("apply")?"正在应用曲线和温控选项…":command.equals("stop")?"正在恢复官方策略…":command.equals("reset-memory")?"正在清除手动记忆…":command.equals("promote-memory")?"正在保存手动记忆曲线…":command.equals("export-config")?"正在导出配置…":"正在导出分析包…");
+        if(!(command.equals("inspect")||command.equals("self-check")))show(command.equals("apply")?"正在应用曲线和温控选项…":command.equals("stop")?"正在恢复官方策略…":command.equals("reset-memory")?"正在清除手动记忆…":command.equals("promote-memory")?"正在保存手动记忆曲线…":command.equals("export-config")?"正在导出配置…":"正在导出分析包…");
         worker.execute(()->{
             try{
-                if(command.equals("inspect")){SystemVersion.Result platform=SystemVersion.read();if(platform.unsupported()){
-                    JSONObject unsupported=new JSONObject().put("ok",true).put("connected",false);platform.put(unsupported);
-                    ui.post(()->{if(destroyed)return;busy=false;render(unsupported);drawDraftState();});return;
-                }}
                 JSONObject result=request(command,payload);if(!result.optBoolean("ok"))throw new IOException(result.optString("message"));
-                if(command.equals("inspect")&&!legacyChecked&&!getPreferences(0).getBoolean("legacy_imported",false)){
+                if((command.equals("inspect")||command.equals("self-check"))&&!legacyChecked&&!getPreferences(0).getBoolean("legacy_imported",false)){
                     legacyChecked=true;
                     try{JSONObject old=request("legacy-preferences",null);if(old.optBoolean("ok")){
                         android.content.SharedPreferences.Editor prefs=getPreferences(0).edit();
@@ -688,14 +708,14 @@ public final class MainActivity extends Activity {
                         prefs.putBoolean("legacy_imported",true).apply();
                     }}catch(Exception ignored){}
                 }
-                JSONObject state=command.equals("inspect")?result:(command.equals("apply")||command.equals("promote-memory")||command.equals("stop")||command.equals("reset-memory"))?request("inspect",null):null;
+                JSONObject state=(command.equals("inspect")||command.equals("self-check"))?result:(command.equals("apply")||command.equals("promote-memory")||command.equals("stop")||command.equals("reset-memory"))?request("inspect",null):null;
                 ui.post(()->{if(destroyed)return;finishCurveSaveProgress();busy=false;stop.setEnabled(true);if(command.equals("apply")||command.equals("promote-memory")){dirty=!draftStillMatches(payload);}
-                    if(state!=null)render(state);else apply.setEnabled(runtime!=null&&factoryLux!=null);drawDraftState();offerLegacyModules();offerUpdate();
+                    if(state!=null)render(state);else apply.setEnabled(runtime!=null&&factoryLux!=null);drawDraftState();offerLegacyModules();offerUpdate();if(showSelfCheck){showSelfCheck=false;showFeatureChecks();}
                     if(rereadPending){rereadPending=false;ui.post(()->run("inspect",null));}
-                    if(!command.equals("inspect")){String message=result.optString("message",result.has("path")?"已导出："+result.optString("path"):"操作完成");show(message);
+                    if(!(command.equals("inspect")||command.equals("self-check"))){String message=result.optString("message",result.has("path")?"已导出："+result.optString("path"):"操作完成");show(message);
                         if(result.has("path")){boolean configFile=command.equals("export-config");AlertDialog d=dialog(configFile?"配置已导出":"分析包已导出",text(result.optString("path")+"\n\n"+(configFile?"文件位于设备存储根目录。包含当前设置，可在后续版本导入。":"包含设备与显示信息，请按需分享。"),14,MUTED));d.show();dialogButton(d,"知道了",null,true);}}
                 });
-            }catch(Throwable error){closeBridge();ui.post(()->{if(destroyed)return;finishCurveSaveProgress();busy=false;stop.setEnabled(true);if(command.equals("inspect")){runtime=null;factoryLux=factoryNit=null;badge.setText("连接中断");stateTitle.setText("等待连接");thermalSwitch.setEnabled(false);memorySwitch.setEnabled(false);permissionPrompt("root","需要 Root 授权","请在 Root 管理器中允许 HyperLux 获得 Root 权限，再点击重新检测。\nRoot 可用后才会继续检查 LSPosed。");}apply.setEnabled(runtime!=null&&factoryLux!=null);drawDraftState();operationFailure(command,error);if(rereadPending){rereadPending=false;ui.post(()->run("inspect",null));}});}
+            }catch(Throwable error){closeBridge();ui.post(()->{if(destroyed)return;finishCurveSaveProgress();busy=false;stop.setEnabled(true);if((command.equals("inspect")||command.equals("self-check"))&&!(command.equals("self-check")&&runtime!=null)){runtime=null;factoryLux=factoryNit=null;badge.setText("连接中断");stateTitle.setText("等待连接");thermalSwitch.setEnabled(false);memorySwitch.setEnabled(false);permissionPrompt("root","需要 Root 授权","请在 Root 管理器中允许 HyperLux 获得 Root 权限，再点击重新检测。\nRoot 可用后才会继续检查 LSPosed。");}apply.setEnabled(runtime!=null&&factoryLux!=null);drawDraftState();operationFailure(command,error);if(rereadPending){rereadPending=false;ui.post(()->run("inspect",null));}});}
             finally{if(!visible)closeBridge();}
         });
     }
@@ -704,14 +724,6 @@ public final class MainActivity extends Activity {
     void render(JSONObject answer){
         lastAnswer=answer;rememberLegacy(answer);
         try{
-            if(answer.optString("hook_issue").equals("system_version_unknown")){
-                runtime=null;factoryLux=factoryNit=null;badge.setText("版本未识别");stateTitle.setText("未能识别系统版本");compatibility.setText(tr("未能识别 HyperOS 版本；请核对系统设置中的版本号。"));apply.setEnabled(false);stop.setEnabled(false);thermalSwitch.setEnabled(false);memorySwitch.setEnabled(false);stateGraph.invalidate();pipeline.invalidate();permissionPrompt("os","未能识别系统版本","未能识别 HyperOS 版本；请核对系统设置中的版本号。");return;
-            }
-            if(answer.optString("system_compatibility").equals("unsupported")||answer.optString("hook_issue").equals("unsupported_system")){
-                runtime=null;factoryLux=factoryNit=null;badge.setText("系统不支持");stateTitle.setText("当前仅支持 HyperOS 4");
-                String message=tr("检测到系统版本：")+answer.optString("system_version",tr("未能识别"))+"\n\n"+tr("HyperLux 当前仅支持 HyperOS 4。HyperOS 3 等版本无法使用，授权 Root、启用 LSPosed 或重启不能解决此兼容问题。");
-                compatibility.setText(message);apply.setEnabled(false);stop.setEnabled(false);thermalSwitch.setEnabled(false);memorySwitch.setEnabled(false);drawAdvanced();drawOutdoor();drawControls();stateGraph.invalidate();pipeline.invalidate();permissionPrompt("os","系统版本不支持",message);return;
-            }
             if(!answer.optBoolean("connected")){runtime=null;drawAdvanced();drawOutdoor();drawControls();factoryLux=factoryNit=null;lowLightSwitch.setEnabled(false);badge.setText("未连接");stateTitle.setText("尚未连接系统曲线");luxReading.setText("— nit");nitReading.setText("— nit");compatibility.setText("✓ Root 授权已通过\n○ 系统框架连接未建立\n请核对 LSPosed 作用域和是否重启");apply.setEnabled(false);thermalSwitch.setEnabled(false);memorySwitch.setEnabled(false);stateGraph.invalidate();pipeline.invalidate();
                 if(answer.optString("system_compatibility").equals("unknown"))compatibility.append("\n"+tr("未能识别 HyperOS 版本；请核对系统设置中的版本号。"));
                 if(answer.optBoolean("lsp_loaded")){badge.setText("已加载");compatibility.setText("✓ Root 授权已通过\n✓ LSPosed 已加载\n○ 设备曲线尚未连接");if(!answer.optString("hook_issue").equals("curve_incompatible")){permissionBlocked=false;permissionNotice="";show(answer.optString("hook_message"));return;}permissionPrompt("abi","设备曲线尚未连接",answer.optString("hook_message","等待读取设备本地曲线；如持续未连接，请导出分析包。"));return;}
@@ -721,9 +733,10 @@ public final class MainActivity extends Activity {
             String baseline=runtime.optString("baseline_id");
             if(!baseline.equals(loadedBaseline)){loadedBaseline=baseline;dirty=false;curveFloor=0;savedBase=null;factors=new float[]{1,1,1,1};if(baseline.equals(getPreferences(0).getString("draft_baseline","")))try{factors=CurvePlan.factors(getPreferences(0).getString("draft","1,1,1,1"));curveFloor=getPreferences(0).getFloat("draft_floor",0);}catch(Exception ignored){}}
             JSONObject config=answer.optJSONObject("config");
-            if(config!=null&&(!Build.FINGERPRINT.equals(config.optString("fingerprint"))||!runtime.optString("curve_backend").equals(config.optString("curve_backend",runtime.optString("curve_backend").equals("refactor")?"refactor":""))||(config.has("baseline_id")&&!baseline.equals(config.optString("baseline_id")))))config=null;
+            if(config!=null&&!ConfigurationCompatibility.canReuse(config,runtime,Build.FINGERPRINT))config=null;
             if(restoredUi!=null){Bundle previousUi=restoredUi;restoredUi=null;if(previousUi.getBoolean("dirty")&&baseline.equals(previousUi.getString("baseline"))){try{loadOptions(new JSONObject(previousUi.getString("draft_options")));dirty=true;}catch(Exception invalid){show("未保存的设置无法恢复，请重新检查");}}int group=previousUi.getInt("settings_group",-1);if(page==1&&group>=0&&group<settingGroups.length)showSettingsGroup(group);}
             if(!dirty&&config!=null&&config.optBoolean("enabled"))loadOptions(config);else if(dirty&&savedBase!=null)factoryNit=savedBase.controls(factoryLux);else if(!dirty)savedBase=null;
+            if(!dirty)memoryOptions=MemoryOptions.forDisplay(config,runtime);
             if(!dirty)outdoorOptions=config!=null&&config.optBoolean("enabled")?OutdoorOptions.parse(config):new OutdoorOptions();
             if(!dirty)controls=config!=null&&config.optBoolean("enabled")?BrightnessControlOptions.parseStored(config):new BrightnessControlOptions();
             if(!dirty){advanced=config!=null&&config.optBoolean("enabled")?AdvancedOptions.parse(config):new AdvancedOptions();sceneOptions=config!=null&&config.optBoolean("enabled")?SceneOptions.parse(config):new SceneOptions();}
@@ -753,7 +766,7 @@ public final class MainActivity extends Activity {
         }catch(Exception error){runtime=null;factoryLux=factoryNit=null;apply.setEnabled(false);stateGraph.invalidate();pipeline.invalidate();drawDraftState();show("状态格式不兼容："+error);}
     }
     static String severity(int level){String[] names={"正常","轻微","中等","严重","危急","紧急","关机"};return level>=0&&level<names.length?names[level]:"未知";}
-    @Override public void onResume(){super.onResume();visible=true;permissionNotice="";permissionBlocked=false;syncLauncherSetting();settingsNotice.resume();run("inspect",null);ui.removeCallbacks(tick);ui.postDelayed(tick,refreshSeconds*1000);checkUpdate(false);if(page==3)refreshThanks();offerLegacyModules();offerUpdate();}
+    @Override public void onResume(){super.onResume();visible=true;permissionNotice="";permissionBlocked=false;checkAppFeatures();syncLauncherSetting();settingsNotice.resume();run("self-check",null);ui.removeCallbacks(tick);ui.postDelayed(tick,refreshSeconds*1000);checkUpdate(false);if(page==3)refreshThanks();offerLegacyModules();offerUpdate();}
     @Override public void onPause(){visible=false;settingsNotice.pause();if(manualPanel!=null)manualPanel.close();finishPageTransition();ui.removeCallbacks(tick);getPreferences(0).edit().putString("draft",CurvePlan.encode(factors)).putString("draft_baseline",loadedBaseline).putFloat("draft_floor",curveFloor).apply();if(!busy)worker.execute(this::closeBridge);super.onPause();}
     @Override public void onSaveInstanceState(Bundle saved){rememberSettingsHome();saved.putInt("settings_home_y",settingsHomeY);saved.putInt("page",page);saved.putInt("settings_group",settingsGroup);saved.putBoolean("dirty",dirty);saved.putString("baseline",loadedBaseline);if(dirty&&factoryLux!=null)try{saved.putString("draft_options",configuration(false).toString());}catch(Exception ignored){}super.onSaveInstanceState(saved);}
     @Override public void onDestroy(){destroyed=true;for(AlertDialog d:new ArrayList<>(openDialogs))d.dismiss();if(manualPanel!=null)manualPanel.close();if(!busy)closeBridge();worker.shutdown();network.shutdownNow();super.onDestroy();}
@@ -839,7 +852,7 @@ public final class MainActivity extends Activity {
             }
             RectF fused=boxes[2];
             float thresholdY=(fused.bottom+boxes[3].top)/2+dp(3),thresholdGap=dp(6);if(!paused){labelEnd(c,runtime!=null&&runtime.has("darkening_lux_threshold")?"变暗 < "+format(runtime.optDouble("darkening_lux_threshold"))+" lux":"变暗 —",middle-thresholdGap,thresholdY,10,MUTED,w/2-dp(12));labelStart(c,runtime!=null&&runtime.has("brightening_lux_threshold")?"变亮 > "+format(runtime.optDouble("brightening_lux_threshold"))+" lux":"变亮 —",middle+thresholdGap,thresholdY,10,MUTED,w/2-dp(12));}
-            readingText(readingValues[2],reading("actual_nit"," nit"));if(animate)postInvalidateDelayed(100);
+            JSONObject nodeGuard=runtime==null?null:runtime.optJSONObject("outdoor_node_guard");boolean nodeHeld=nodeGuard!=null&&nodeGuard.optBoolean("running")&&nodeGuard.optBoolean("held");readingText(readingTitles[2],tr(nodeHeld?"系统换算亮度（节点未标定）":"当前屏幕亮度"));readingText(readingValues[2],reading("actual_nit"," nit"));if(animate)postInvalidateDelayed(100);
         }
         void readingText(TextView view,String value){if(!value.contentEquals(view.getText()))view.setText(value);}
     }

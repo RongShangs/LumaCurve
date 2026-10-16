@@ -170,7 +170,9 @@ static int escape_freezer(void){
  return exists?-1:0;
 }
 static int startup_fail(int code,const char *stage){fprintf(stderr,"NATIVE_START_FAIL stage=%s exit=%d errno=%d (%s)\n",stage,code,errno,strerror(errno));return code;}
+#include "outdoor_node.h"
 int main(int argc,char **argv){
+ if(argc==4&&!strcmp(argv[1],"--outdoor")&&!strcmp(argv[2],"--node")){if(geteuid()!=0)return 2;return outdoor_run(argv[3]);}
  if(geteuid()!=0||private_lock())return startup_fail(2,"root_private_lock");
  if(load_boot())return startup_fail(3,"boot_identity");
  if(restore_record())return startup_fail(3,"restore_permissions");

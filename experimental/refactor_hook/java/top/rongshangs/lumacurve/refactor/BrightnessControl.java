@@ -72,7 +72,7 @@ final class BrightnessControl implements SensorEventListener {
     final Runnable manualUpdate=()->acceptManualBrightness();
     void acceptManualBrightness(){
         if(s.closed||!owner.equals("dark"))return;
-        try{if(auto())return;if(!options.manualHold){relinquish("user_brightness",false);return;}
+        try{if(auto())return;if(options.manualExit){relinquish("user_brightness",false);return;}
             float value=(float)display.read().getDouble("value");
             if(!Float.isFinite(value)||value<0||value>1)throw new IllegalStateException("手动亮度读数无效");
             held=value;brightnessSnapshot=brightnessValues();policy.brightSince=-1;reason="locked";
@@ -80,7 +80,7 @@ final class BrightnessControl implements SensorEventListener {
         }catch(Throwable failure){fail(failure);}
     }
     void manualBrightnessChanged(){
-        if(!options.manualHold){relinquish("user_brightness",false);return;}
+        if(options.manualExit){relinquish("user_brightness",false);return;}
         s.handler.removeCallbacks(manualUpdate);s.handler.postDelayed(manualUpdate,150);
     }
     final ContentObserver modeObserver,commandObserver,brightnessObserver;
@@ -184,7 +184,7 @@ final class BrightnessControl implements SensorEventListener {
     void setAuto(boolean on)throws Exception{boolean previous=busy;busy=true;try{mode(on);}finally{busy=previous;}}
     void mark(String value)throws Exception{if(!Settings.Global.putString(s.context.getContentResolver(),OWNER,value))throw new IllegalStateException("亮度控制状态保存失败");}
     void claim(String kind,String token,float value)throws Exception{
-        boolean wasAuto=auto();if((kind.equals("dark")||kind.equals("app"))&&!wasAuto)throw new IllegalStateException("用户已关闭自动亮度");busy=true;try{
+        s.outdoorNode.release();boolean wasAuto=auto();if((kind.equals("dark")||kind.equals("app"))&&!wasAuto)throw new IllegalStateException("用户已关闭自动亮度");busy=true;try{
             // Persist intent before switching mode, so a process restart can recover dark locks.
             mark(new JSONObject().put("owner",kind).put("fingerprint",s.fingerprint).put("user",0).put("was_auto",wasAuto).put("session",token).toString());
             owner=kind;session=token;held=value;mode(false);held=display.write(value);
@@ -291,7 +291,7 @@ final class BrightnessControl implements SensorEventListener {
         // A dark lock paused automatic mode on the user's behalf. Preserve that
         // ownership before relinquishing it, so a failed raw transaction can recover.
         boolean wasAuto=owner.equals("raw_panel")?rawWasAuto:owner.equals("dark")||owner.equals("app")||auto();
-        if(!owner.equals("raw_panel"))relinquish("raw_panel",false);
+        s.outdoorNode.release();if(!owner.equals("raw_panel"))relinquish("raw_panel",false);
         busy=true;
         try{
             mark(new JSONObject().put("owner","raw_panel").put("user",0).put("was_auto",wasAuto).put("session",token).toString());

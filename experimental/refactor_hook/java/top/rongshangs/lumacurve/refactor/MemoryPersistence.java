@@ -5,7 +5,7 @@ import org.json.*;
 
 /** Display-handler state. One debounced save and one bounded wake restore per handover. */
 final class MemoryPersistence {
- final HookRuntime state;MemoryOptions options=new MemoryOptions(true,30);
+ final HookRuntime state;MemoryOptions options=new MemoryOptions(false,30);
  boolean replaying,pendingRestore,asleep,wakeRestore,archiveLoaded,modelSynced;String pendingWrite,cachedRecord,status="尚无已保存的手动记忆",restoreCause="";
  int savedPoints;long restored,wakeReadyAt,restoreDeadline;float closeLux=Float.NaN,acceptedLux=Float.NaN;
  boolean restoreQueued,resetQueued;

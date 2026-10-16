@@ -49,6 +49,8 @@ final class ConfigurationFile {
         for(int i=0;i<AdvancedOptions.GROUPS.length;i++)out.put(AdvancedOptions.GROUPS[i],flag(source,AdvancedOptions.GROUPS[i]));
         for(int i=0;i<AdvancedOptions.KEYS.length;i++)out.put(AdvancedOptions.KEYS[i],number(source,AdvancedOptions.KEYS[i],AdvancedOptions.DEFAULT[i],AdvancedOptions.MIN[i],AdvancedOptions.MAX[i],notes));
         for(String k:OutdoorOptions.FLAGS)out.put(k,flag(source,k));
+        boolean node=flag(source,"outdoor_node_boost");if(node&&!runtime.optBoolean("outdoor_node_supported")){node=false;notes.add("节点高亮兼容未核验，已关闭");}out.put("outdoor_node_boost",node);
+        int nodeTarget=OutdoorNodeTarget.parse(source),nodeMaximum=runtime.optInt("outdoor_node_maximum");if(OutdoorNodeTarget.known(nodeMaximum)){if(nodeTarget>nodeMaximum)notes.add("增强目标节点已按本机真实上限调整");nodeTarget=OutdoorNodeTarget.stored(nodeTarget,nodeMaximum);}out.put(OutdoorNodeTarget.KEY,nodeTarget);
         for(int i=0;i<OutdoorOptions.KEYS.length;i++)out.put(OutdoorOptions.KEYS[i],number(source,OutdoorOptions.KEYS[i],OutdoorOptions.DEFAULT[i],OutdoorOptions.MIN[i],OutdoorOptions.MAX[i],notes));
         if(out.getDouble("outdoor_full_lux")<=out.getDouble("outdoor_enter_lux")){out.put("outdoor_full_lux",Math.min(100000,out.getDouble("outdoor_enter_lux")+2000));notes.add("已调整全强度照度");}
         if(!out.getBoolean("outdoor_enabled")){out.put("outdoor_hbm_tuning",false).put("outdoor_range_unlock",false).put("outdoor_opr_relax",false);}
@@ -66,6 +68,7 @@ final class ConfigurationFile {
         for(String group:AdvancedOptions.GROUPS)disable(out,group,runtime.optBoolean(group+"_supported"),notes);
         if(!out.getBoolean("outdoor_enabled")){out.put("outdoor_hbm_tuning",false).put("outdoor_range_unlock",false).put("outdoor_opr_relax",false);}
         if(!out.getBoolean("outdoor_range_unlock"))disable(out,"outdoor_opr_relax",false,notes);
+        if(!out.getBoolean("outdoor_enabled")||!out.getBoolean("outdoor_range_unlock")||!out.getBoolean("outdoor_opr_relax")||out.getDouble("outdoor_max_nit")!=0){if(out.getBoolean("outdoor_node_boost"))notes.add("节点高亮前置条件不满足，已关闭");out.put("outdoor_node_boost",false);}
         SceneOptions scenes=SceneOptions.parse(source);
         for(int i=0;i<SceneOptions.IDS.length;i++)if(!runtime.optBoolean("scene_"+SceneOptions.IDS[i]+"_supported")&&!scenes.entries[i].mode.equals("system")){scenes.entries[i]=new SceneOptions.Entry(new JSONObject());notes.add("本机场景接口未就绪，已恢复系统："+SceneOptions.NAMES[i]);}
         if(source.optJSONObject("scene_options")!=null&&source.optJSONObject("scene_options").optJSONArray("rules")!=null&&source.optJSONObject("scene_options").optJSONArray("rules").length()>0)notes.add("已移除旧版自定义场景，保留现有场景设置");
@@ -73,7 +76,7 @@ final class ConfigurationFile {
         AdvancedOptions.parse(out).verify(runtime);OutdoorOptions.parse(out).verify(runtime);
         ThermalPolicy.validate((float)out.getDouble("thermal_ceiling"));ThermalPolicy.validateCooling((float)out.getDouble("thermal_cooling"));MemoryPolicy.validate((float)out.getDouble("memory_strength"));MemoryPolicy.validateGrouping(out.getLong("memory_window"),(float)out.getDouble("memory_lux_range"));
         DelayPolicy.validate(out.getLong("brighten_delay"),out.getLong("darken_delay"));DelayPolicy.validateSmall(out.getLong("small_brighten_delay"));LowLightPolicy.validate((float)out.getDouble("low_light_limit"),out.getLong("low_light_brighten"),out.getLong("low_light_darken"));
-        Set<String> known=new HashSet<>();out.keys().forEachRemaining(known::add);Collections.addAll(known,"schema","enabled","revision","fingerprint","user_serial","curve_backend","baseline_id","reset_anchors");int unknown=0;Iterator<String> keys=source.keys();while(keys.hasNext())if(!known.contains(keys.next()))unknown++;if(unknown>0)notes.add("已忽略当前版本不认识的设置："+unknown);
+        Set<String> known=new HashSet<>();out.keys().forEachRemaining(known::add);Collections.addAll(known,"dark_lock_manual_hold","schema","enabled","revision","fingerprint","user_serial","curve_backend","baseline_id","reset_anchors");int unknown=0;Iterator<String> keys=source.keys();while(keys.hasNext())if(!known.contains(keys.next()))unknown++;if(unknown>0)notes.add("已忽略当前版本不认识的设置："+unknown);
         JSONObject ui=new JSONObject(),rawUi=file.optJSONObject("interface");if(rawUi!=null){ui.put("refresh_seconds",number(rawUi,"refresh_seconds",2,1,5,notes));if(ui.getDouble("refresh_seconds")!=ui.getLong("refresh_seconds"))throw new IllegalArgumentException("刷新时间必须是整数");if(rawUi.has("log_auto_scroll"))ui.put("log_auto_scroll",flag(rawUi,"log_auto_scroll"));}
         return new Imported(out,notes,ui);
     }

@@ -18,7 +18,7 @@ public final class RootControl implements AutoCloseable {
     static final String CONFIG="lumacurve_refactor_config_v1",STATUS="lumacurve_refactor_status_v1",REFRESH="lumacurve_refactor_refresh_v1",ACK="lumacurve_refactor_ack_v1",BUILD=AppBuild.BUILD;
     static final File DATA=new File("/data/adb/luma_curve_refactor_test"),PAUSE_OWNED=new File(DATA,"old-pause-owned");
     static final String OLD="/data/adb/modules/luma_curve/luma_curvectl.sh";
-    final RootSettings settings;
+    final RootSettings settings;boolean selfCheckNext;
     RootControl()throws Exception {
         settings=new RootSettings();
     }
@@ -57,9 +57,9 @@ public final class RootControl implements AutoCloseable {
         JSONObject state=live();
         if(state!=null){
             long before=state.optLong("elapsed_ms");boolean received=false;
-            settings.put(REFRESH,UUID.randomUUID().toString());
-            for(int i=0;i<(requireFresh?40:10);i++){JSONObject newer=live();if(newer!=null&&newer.optLong("elapsed_ms")>before){state=newer;received=true;break;}Thread.sleep(requireFresh?50:30);}
-            if(requireFresh&&!received)throw new IOException("曲线状态尚未刷新，请稍后重试；当前手动记忆没有改动");
+            String request=(selfCheckNext?"self-check:":"")+UUID.randomUUID().toString();settings.put(REFRESH,request);
+            for(int i=0;i<(requireFresh||selfCheckNext?40:10);i++){JSONObject newer=live();if(newer!=null&&newer.optLong("elapsed_ms")>before&&(!selfCheckNext||newer.optJSONObject("feature_self_check")!=null&&request.equals(newer.getJSONObject("feature_self_check").optString("request")))){state=newer;received=true;break;}Thread.sleep(requireFresh||selfCheckNext?50:30);}
+            if((requireFresh||selfCheckNext)&&!received)throw new IOException(selfCheckNext?"功能自检尚未返回，请稍后重试":"曲线状态尚未刷新，请稍后重试；当前手动记忆没有改动");
         }
         return state;
     }
@@ -77,6 +77,8 @@ public final class RootControl implements AutoCloseable {
                     out.put("hook_issue","restart_required");
             }catch(Exception ignored){}
         }
+        try{OutdoorNodeRoot.reconcile(state,raw);}catch(Exception nodeFailure){if(state!=null)state.put("outdoor_node_detail",nodeFailure.toString());}OutdoorNodeRoot.annotate(state);
+        if(selfCheckNext)out.put("root_feature_self_check",RootFeatureChecks.run(state,raw));
         if(state!=null)out.put("runtime",state).put("state_age_ms",Math.max(0,android.os.SystemClock.elapsedRealtime()-state.optLong("elapsed_ms")));
         if(raw!=null)try{out.put("config",new JSONObject(raw));}catch(JSONException ignored){}
         return out;
@@ -140,10 +142,10 @@ public final class RootControl implements AutoCloseable {
         String decoded=new String(Base64.getDecoder().decode(encoded),StandardCharsets.UTF_8);
         JSONObject options=decoded.startsWith("{")?new JSONObject(decoded):new JSONObject().put("factors",decoded);
         String factors=options.getString("factors");
-        BrightnessControlOptions controls=BrightnessControlOptions.parseStored(options);controls.verify(state);
+        OutdoorNodeRoot.annotate(state);BrightnessControlOptions controls=BrightnessControlOptions.parseStored(options);controls.verify(state);
         SceneOptions sceneOptions=SceneOptions.parse(options);sceneOptions.verify(state);
         AdvancedOptions advanced=AdvancedOptions.parse(options);advanced.verify(state);
-        OutdoorOptions outdoor=OutdoorOptions.parse(options);outdoor.verify(state);
+        OutdoorOptions outdoor=OutdoorOptions.parse(options);if(outdoor.nodeBoost)outdoor.nodeTarget=OutdoorNodeTarget.stored(outdoor.nodeTarget,state.optInt("outdoor_node_maximum"));outdoor.verify(state);
         boolean thermal=options.optBoolean("thermal_relax",false);float ceiling=(float)options.optDouble("thermal_ceiling",43);ThermalPolicy.validate(ceiling);
         float memory=(float)options.optDouble("memory_strength",1);MemoryPolicy.validate(memory);
         long memoryMs=options.optLong("memory_window",1500);float memoryRange=(float)options.optDouble("memory_lux_range",.3);MemoryPolicy.validateGrouping(memoryMs,memoryRange);
@@ -187,6 +189,7 @@ public final class RootControl implements AutoCloseable {
             progress("提交小米基础曲线并等待系统确认…");
             if(!settings.put(CONFIG,config.toString()))throw new IOException("配置提交失败");
             if(!waitFor(revision,true))throw new IOException("系统未在 6 秒内确认本次配置。\n"+confirmationDetail());
+            OutdoorNodeRoot.reconcile(live(),config.toString());
             return new JSONObject().put("ok",true).put("message","已接入小米曲线。系统手动保持仍可能影响当前输出。");
         }catch(Exception failure){
             String rollbackMessage="未能确认恢复此前配置，请导出分析包；不要连续点击保存。";
@@ -195,7 +198,7 @@ public final class RootControl implements AutoCloseable {
                 String previousRevision=previous==null?"":new JSONObject(previous).optString("revision","");
                 if(waitFor(previousRevision,wasActive)){
                     rollbackMessage="已恢复此前配置；你在界面中的修改仍保留，尚未保存。";
-                    if(!wasActive)resumeOld();
+                    OutdoorNodeRoot.reconcile(live(),previous);if(!wasActive)resumeOld();
                 }
             }catch(Exception rollback){failure.addSuppressed(rollback);}
             String detail=failure.getMessage()+"\n\n"+rollbackMessage;
@@ -204,7 +207,7 @@ public final class RootControl implements AutoCloseable {
         }
     }
     JSONObject stop()throws Exception {
-        NativePanelRoot.stop();boolean connected=live()!=null;
+        OutdoorNodeRoot.stop();NativePanelRoot.stop();boolean connected=live()!=null;
         if(!connected){String marker=settings.get("hyperlux_brightness_owner_v1");if(marker!=null){JSONObject ownership=new JSONObject(marker);
             if(("dark".equals(ownership.optString("owner"))||"app".equals(ownership.optString("owner"))||"raw_panel".equals(ownership.optString("owner")))&&ownership.optInt("user",-1)==0&&ownership.optBoolean("was_auto")&&"0".equals(settings.getSystem("screen_brightness_mode")))
                 if(!settings.putSystem("screen_brightness_mode","1"))throw new IOException("未能恢复此前的自动亮度");
@@ -332,6 +335,7 @@ public final class RootControl implements AutoCloseable {
     }
     JSONObject execute(String command,String payload)throws Exception{
         if(command.equals("inspect"))return inspect();
+        if(command.equals("self-check")){selfCheckNext=true;try{return inspect();}finally{selfCheckNext=false;}}
         if(command.equals("raw-panel")&&payload!=null)return rawPanel(payload);
         if(command.equals("brightness")&&payload!=null)return brightness(payload);
         if(command.equals("export-config")&&payload!=null){byte[] raw=Base64.getDecoder().decode(payload);if(raw.length>ConfigurationFile.LIMIT)throw new IOException("配置文件过大");JSONObject document=new JSONObject(new String(raw,StandardCharsets.UTF_8));if(!ConfigurationFile.FORMAT.equals(document.optString("format"))||document.getInt("schema")!=2||!document.has("options"))throw new IOException("不是兼容的 HyperLux 配置文件");byte[] bytes=document.toString(2).getBytes(StandardCharsets.UTF_8);if(bytes.length>ConfigurationFile.LIMIT)throw new IOException("配置文件过大");File file=new File("/sdcard","HyperLux-config-"+new SimpleDateFormat("yyyyMMdd-HHmmss",Locale.ROOT).format(new Date())+"-"+UUID.randomUUID().toString().substring(0,8)+".json");Files.createFile(file.toPath());try(FileOutputStream output=new FileOutputStream(file)){output.write(bytes);output.getFD().sync();}catch(Exception failure){file.delete();throw failure;}return new JSONObject().put("ok",true).put("path",file.getAbsolutePath());}

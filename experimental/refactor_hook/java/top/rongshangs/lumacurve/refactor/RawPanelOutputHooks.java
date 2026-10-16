@@ -26,7 +26,7 @@ final class RawPanelOutputHooks {
     for(String name:new String[]{"setScreenBrightness","setSdrScreenBrightness"}){
      Method m=power.getDeclaredMethod(name,float.class);if(m.getReturnType()!=void.class)throw new IllegalStateException("raw output ABI");
      hooks.add(XposedBridge.hookMethod(m,new XC_MethodHook(){protected void beforeHookedMethod(MethodHookParam p){
-      HookRuntime s=state(p.thisObject);if(s!=null&&s.brightnessControl.rawOutputBlocked((Float)p.args[0]))try{
+      HookRuntime s=state(p.thisObject);if(s!=null)s.outdoorNode.frame((Float)p.args[0]);if(s!=null&&s.brightnessControl.rawOutputBlocked((Float)p.args[0]))try{
        // Leave the first positive frame after a zero/unset brightness to the system.
        float current=(Float)brightness.invoke(p.thisObject);
        if(Float.isFinite(current)&&current>0){s.brightnessControl.rawBlockedWrites++;p.setResult(null);}
@@ -35,7 +35,7 @@ final class RawPanelOutputHooks {
     }
     Method off=power.getDeclaredMethod("setScreenState",int.class,int.class);if(off.getReturnType()!=void.class)throw new IllegalStateException("raw screen ABI");
     hooks.add(XposedBridge.hookMethod(off,new XC_MethodHook(){protected void beforeHookedMethod(MethodHookParam p){
-     HookRuntime s=state(p.thisObject);if(s!=null&&((Integer)p.args[0])!=2)s.brightnessControl.screenChanging();
+     HookRuntime s=state(p.thisObject);if(s!=null&&((Integer)p.args[0])!=2){s.outdoorNode.release();s.brightnessControl.screenChanging();}
     }}));
     powerStates.add(power);
    }

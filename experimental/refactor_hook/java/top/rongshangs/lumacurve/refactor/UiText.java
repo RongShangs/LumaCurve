@@ -26,10 +26,16 @@ public final class UiText {
         WORDS.put("应用名单最多 64 项","Select up to 64 apps");
         WORDS.put("应用包名无效","Invalid package name");
         WORDS.put("本机前台应用事件接口尚未兼容","Foreground app events are not supported on this firmware");
-        WORDS.put("手动调整后继续锁定","Keep low-light lock after manual adjustments");
+        WORDS.put("手动调整后退出锁定","Exit low-light lock after manual adjustments");
         WORDS.put("当前方案：保留新亮度并继续锁定；任一光感持续达到退出阈值后恢复自动亮度。","Current behavior: hold the newly selected brightness and keep monitoring; restore auto after either sensor continuously reaches the exit threshold.");
         WORDS.put("当前方案：手动调整即结束锁定，保持手动亮度；环境变亮后也不自动开启。","Current behavior: a manual adjustment ends the lock and retains manual mode, even when the environment brightens.");
         WORDS.put("保持进入时的亮度；照度明显升高后恢复自动。息屏或重新开启自动亮度即退出。你主动关闭的自动亮度不会被重新开启。","Hold brightness at entry and restore auto when the environment brightens. Screen off or enabling auto ends the lock. Auto mode you disabled yourself is not restored.");
+        WORDS.put("强制达到节点上限","Force backlight node target");
+        WORDS.put("增强目标节点：","Boost node target: ");
+        WORDS.put("等待读取主屏节点上限","Waiting for the primary backlight node limit");
+        WORDS.put("达到全强度照度且系统输出到顶后，提高到设定节点。默认使用设备上限，时长跟随户外增强；需开启高亮范围、画面放宽，并取消 nit 上限。","At full outdoor illuminance and maximum automatic output, raise the node to the selected target. Defaults to the device limit and follows the outdoor session duration. Requires range unlocking, content-limit relaxation and no nit cap.");
+        WORDS.put("节点值不是 nit。目标低于系统当前节点时沿用系统输出，系统下调时退让。启用时使用 Root 守护，关闭后停止。","Node values are not nits. Keep the system output when it exceeds the target, and yield to system reductions. An optional root guard runs while this feature is enabled.");
+        WORDS.put("增强幅度只调整常规户外亮度；节点目标由上方滑动杆独立设置。","Boost strength changes ordinary outdoor brightness. Set the raw node target independently with the slider above.");
         WORDS.put("将当前绿色曲线保存为基础曲线","Save the current learned curve as the baseline");
         WORDS.put("恢复设备原始基础曲线","Restore the original device baseline");
         WORDS.put("保存为基础曲线","Save as baseline");

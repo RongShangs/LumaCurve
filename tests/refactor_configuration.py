@@ -33,7 +33,12 @@ public class ConfigHostTest{
   bad=clone(file);bad.getJSONObject("options").put("thermal_relax",1);bad(bad,s,c);bad=clone(file);bad.getJSONObject("options").put("memory_window",1000.5);bad(bad,s,c);bad=clone(file);bad.getJSONObject("options").put("curve_floor_nit",21);bad(bad,s,c);
   bad=clone(file);bad.getJSONObject("interface").put("refresh_seconds",1.5);bad(bad,s,c);bad=clone(file);bad.put("oversized",String.join("",Collections.nCopies(32769,"x")));bad(bad,s,c);
   check(c.getDouble("curve_floor_nit")==10&&s.getString("baseline_id").equals("basis"));
-  check(r.options.getBoolean("memory_persist"));check(r.options.getInt("memory_retention_days")==30);check(r.options.getInt("memory_max_points")==0);
+  check(!r.options.getBoolean("memory_persist"));check(r.options.getInt("memory_retention_days")==30);check(r.options.getInt("memory_max_points")==0);
+  JSONObject enabledMemory=clone(file);enabledMemory.getJSONObject("options").put("memory_persist",true).put("memory_restore_unlock",true);r=ConfigurationFile.read(enabledMemory.toString(),s,c);check(r.options.getBoolean("memory_persist")&&r.options.getBoolean("memory_restore_unlock"));
+  r=ConfigurationFile.read(old.toString(),s,c);check(!r.options.getBoolean("memory_persist")&&!r.options.getBoolean("memory_restore_unlock"));
+  JSONObject rawNodeFile=clone(file);rawNodeFile.getJSONObject("options").put("outdoor_node_target",3000);JSONObject rawNodeCaps=clone(s).put("outdoor_node_maximum",4095);ConfigurationFile.Imported rawNodeRead=ConfigurationFile.read(rawNodeFile.toString(),rawNodeCaps,c);check(rawNodeRead.options.getInt("outdoor_node_target")==3000&&rawNodeRead.notes.isEmpty());
+  rawNodeCaps.put("outdoor_node_maximum",2047);rawNodeRead=ConfigurationFile.read(rawNodeFile.toString(),rawNodeCaps,c);check(rawNodeRead.options.getInt("outdoor_node_target")==0&&rawNodeRead.notes.size()==1);
+  for(Object target:new Object[]{9,65536,10.5,"3000",JSONObject.NULL}){JSONObject invalidNode=clone(file);invalidNode.getJSONObject("options").put("outdoor_node_target",target);bad(invalidNode,s,c);}
   JSONObject tuned=clone(file);tuned.getJSONObject("options").put("memory_persist",false).put("memory_retention_days",90).put("memory_max_points",7);
   JSONObject traditional=clone(s).put("memory_point_capacity",1);r=ConfigurationFile.read(tuned.toString(),traditional,c);check(!r.options.getBoolean("memory_persist"));check(r.options.getInt("memory_retention_days")==90);check(r.options.getInt("memory_max_points")==1);check(r.notes.size()==1);
   for(String key:new String[]{"memory_retention_days","memory_max_points"}){bad=clone(file);bad.getJSONObject("options").put(key,1.5);bad(bad,s,c);bad=clone(file);bad.getJSONObject("options").put(key,"1");bad(bad,s,c);}
@@ -120,13 +125,14 @@ public class ConfigHostTest{
   JSONObject differentBase=clone(learnedFile).put("baseline_id","another");learnedRead=ConfigurationFile.read(differentBase.toString(),s,learnedOptions);check(SavedCurve.same(learnedBase,SavedCurve.parse(learnedRead.options)));check(learnedRead.notes.size()==1);
   JSONObject brokenBase=clone(learnedFile);brokenBase.getJSONObject("options").getJSONObject(SavedCurve.KEY).put("nit",new JSONArray("[0,1]"));bad(brokenBase,s,c);
   JSONObject appsFile=clone(learnedFile);appsFile.getJSONObject("options").put("dark_lock_manual_hold",true).put("manual_brightness_apps",new JSONArray().put("com.example.game"));JSONObject appCaps=clone(s).put("app_auto_supported",true);
-  learnedRead=ConfigurationFile.read(appsFile.toString(),appCaps,c);check(learnedRead.options.getBoolean("dark_lock_manual_hold"));check(learnedRead.options.getJSONArray("manual_brightness_apps").getString(0).equals("com.example.game"));check(learnedRead.notes.isEmpty());
-  learnedRead=ConfigurationFile.read(appsFile.toString(),s,c);check(learnedRead.options.getJSONArray("manual_brightness_apps").length()==0);check(learnedRead.notes.size()==1);check(learnedRead.options.getBoolean("dark_lock_manual_hold"));
+  learnedRead=ConfigurationFile.read(appsFile.toString(),appCaps,c);check(!learnedRead.options.getBoolean("dark_lock_manual_exit")&&!learnedRead.options.has("dark_lock_manual_hold"));check(learnedRead.options.getJSONArray("manual_brightness_apps").getString(0).equals("com.example.game"));check(learnedRead.notes.isEmpty());
+  JSONObject exitFile=clone(appsFile);exitFile.getJSONObject("options").put("dark_lock_manual_exit",true);ConfigurationFile.Imported exitRead=ConfigurationFile.read(exitFile.toString(),appCaps,c);check(exitRead.options.getBoolean("dark_lock_manual_exit")&&!exitRead.options.has("dark_lock_manual_hold"));
+  learnedRead=ConfigurationFile.read(appsFile.toString(),s,c);check(learnedRead.options.getJSONArray("manual_brightness_apps").length()==0);check(learnedRead.notes.size()==1);check(!learnedRead.options.getBoolean("dark_lock_manual_exit")&&!learnedRead.options.has("dark_lock_manual_hold"));
   appsFile.getJSONObject("options").put("manual_brightness_apps",new JSONArray().put("com.example;bad"));bad(appsFile,appCaps,c);
   System.out.println("Configuration migration: "+cases+" cases PASS; cross-version settings and curve identity, Android not tested");
  }
 }''',encoding='utf-8')
 classes=O/'classes';classes.mkdir(exist_ok=True)
-names=['SceneOptions','BrightnessControlOptions','ConfigurationFile','SavedCurve','CurvePlan','AdvancedOptions','AdvancedPolicy','OutdoorOptions','ThermalPolicy','MemoryPolicy','MemoryOptions','DelayPolicy','LowLightPolicy','LowLightThresholds','LowLightAssistGate','SettingsPresets','AppBuild']
+names=['SceneOptions','BrightnessControlOptions','ConfigurationFile','SavedCurve','CurvePlan','AdvancedOptions','AdvancedPolicy','OutdoorNodeTarget','OutdoorOptions','ThermalPolicy','MemoryPolicy','MemoryOptions','DelayPolicy','LowLightPolicy','LowLightThresholds','LowLightAssistGate','SettingsPresets','AppBuild']
 subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(J),'-d',str(classes),*[str(S/(n+'.java')) for n in names],str(package/'RootControl.java'),str(package/'ConfigHostTest.java')],check=True)
 subprocess.run(['java','-cp',str(classes)+';'+str(J),'top.rongshangs.lumacurve.refactor.ConfigHostTest'],check=True)

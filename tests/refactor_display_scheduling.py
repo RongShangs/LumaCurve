@@ -35,7 +35,7 @@ files = {
         return o.getClass().getField(field).get(o);}}''',
     'top/rongshangs/lumacurve/refactor/HookRuntime.java': '''package top.rongshangs.lumacurve.refactor;
 import android.os.*;import java.util.*;import de.robv.android.xposed.XposedBridge;
-public class HookRuntime{
+public class HookRuntime{final Node outdoorNode=new Node();static class Node{void changed(){}}
  boolean closed,publishQueued,controlPublishQueued,recalculationQueued,recalculating,thread=true;
  long consumed,lastPublish,viewUntil;float lastLux=Float.NaN,lastNit=Float.NaN;
  int publications;final Kernel kernel=new Kernel();final Queue handler=new Queue();
