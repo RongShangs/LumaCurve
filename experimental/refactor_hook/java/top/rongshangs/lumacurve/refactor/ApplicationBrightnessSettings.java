@@ -13,7 +13,7 @@ final class ApplicationBrightnessSettings {
     final Map<String,String> labels=new HashMap<>();
     ApplicationBrightnessSettings(MainActivity host,LinearLayout parent){
         h=host;LinearLayout card=h.card(parent);card.addView(h.text("应用内暂停自动亮度",18,h.INK));
-        card.addView(h.text("名单应用在主屏前台时暂停自动亮度，切到其他应用后恢复。进入前已是手动模式时不接管；你主动开启自动亮度后，本次应用停留期间不再关闭。",12,h.MUTED));
+        card.addView(h.text("名单应用在主屏可见时暂停自动亮度，小窗或分屏切换焦点不恢复；所有名单应用离开可见区域后恢复。进入前已是手动模式时不接管；你主动开启自动亮度后，该名单应用仍可见期间不再关闭。",12,h.MUTED));
         card.addView(h.text("使用系统前台切换事件，不增加常驻进程，不定时扫描应用。保存并应用后生效。",12,h.MUTED));
         status=h.text("尚未选择应用",13,h.BLUE);card.addView(status);
         h.button("选择应用",this::picker,card);h.button("按包名添加",this::addPackage,card);
@@ -22,8 +22,10 @@ final class ApplicationBrightnessSettings {
     String label(String pkg){String value=labels.get(pkg);if(value!=null)return value;try{value=h.getPackageManager().getApplicationLabel(h.getPackageManager().getApplicationInfo(pkg,0)).toString();}catch(Exception absent){value=pkg;}labels.put(pkg,value);return value;}
     void refresh(){
         boolean supported=h.runtime!=null&&h.runtime.optBoolean("app_auto_supported");
-        String next=supported+":"+h.controls.manualApps.toString();if(next.equals(signature))return;signature=next;
+        org.json.JSONObject state=h.runtime==null?null:h.runtime.optJSONObject("brightness_control");boolean focusOnly=supported&&state!=null&&state.has("app_multiwindow_supported")&&!state.optBoolean("app_multiwindow_supported");
+        String next=supported+":"+focusOnly+":"+h.controls.manualApps.toString();if(next.equals(signature))return;signature=next;
         status.setText(h.tr(supported?"已选择 ":"前台接口尚未就绪 · 已选择 ")+h.controls.manualApps.size()+h.tr(" 个应用"));selected.removeAllViews();
+        if(focusOnly)status.append("\n"+h.tr("本机暂按焦点判断，小窗切换可能恢复自动亮度"));
         for(String pkg:new ArrayList<>(h.controls.manualApps)){LinearLayout row=h.row(selected);TextView name=h.text(label(pkg)+"\n"+pkg,13,h.INK);row.addView(name,new LinearLayout.LayoutParams(0,-2,1));h.compact("移除",()->{h.controls.manualApps.remove(pkg);h.dirty=true;h.drawCurve();},row);}
     }
     void picker(){

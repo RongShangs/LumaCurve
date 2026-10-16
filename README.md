@@ -2,15 +2,15 @@
 
 **适配 HyperOS 4 的自动亮度工具。** 在系统亮度链路内调整曲线与手动偏好记忆，继续使用系统的双侧感光、场景判定和过渡动画；也可按需调整显示层温控与变化确认时间。
 
-**3.1.0 正式版 / 31000** · Root + LSPosed · GPL-3.0 · 完全开源免费
+**3.1.1 正式版 / 31100** · Root + LSPosed · GPL-3.0 · 完全开源免费
 
 已修复息屏清理、诊断和亮度重算中的风险，保留曲线、场景与已有配置。修复部分红米机型唤醒、解锁时偶发卡死与系统重启的问题。
 
 [官网](https://lc.rongshangs.top) · [下载安装](https://github.com/RongShangs/LumaCurve/releases/latest) · [作者博客](https://rongshangs.top) · [酷安@戎Shangs](https://www.coolapk.com/u/3261403)
 
-应用名称为 **HyperLux**，安装包为 `HyperLux-3.1.0.apk`。包名 `top.rongshangs.lumacurve`、蓝色曲线图标、官网及 `RongShangs/LumaCurve` 仓库继续沿用；源码与恢复包沿用 `LumaCurve-` 文件名。
+应用名称为 **HyperLux**，安装包为 `HyperLux-3.1.1.apk`。包名 `top.rongshangs.lumacurve`、蓝色曲线图标、官网及 `RongShangs/LumaCurve` 仓库继续沿用；源码与恢复包沿用 `LumaCurve-` 文件名。
 
-相较 3.0.0 的完整变更见 [3.1.0 更新日志](docs/releases/3.1.0.md)。GitHub、LSPosed 与官网下载使用同一 APK。
+相较 3.0.0 的完整变更见 [3.1.1 更新日志](docs/releases/3.1.1.md)。GitHub、LSPosed 与官网下载使用同一 APK。
 
 ## 界面预览 / Screenshots
 
@@ -32,6 +32,17 @@
 用户提供的强光手电演示，仅展示特定设备与设置下的效果，不代表日常亮度或所有机型的亮度上限。实际输出取决于本机映射、配置和系统保护。
 
 <p><img src="docs/screenshots/3.0.0/user-strong-light-demo.jpg" alt="用户提供的强光手电演示，实际亮度因设备和设置而异" width="640"></p>
+
+## 3.1.1 正式版
+
+当前构建 release-3.1.1 / 31100，可覆盖 3.1.0 正式版与 Beta；安装后重启一次。
+
+- 应用名单按主屏可见应用判断，小窗、分屏切换焦点不再误恢复自动亮度，全部名单应用不可见后恢复。
+- 完善多个名单应用及首次异步查询期间的主动自动亮度优先权。
+- 异步有界窗口查询与超时恢复，不阻塞显示线程，不新增轮询或常驻进程。
+- 完整复审监听锁范围、查询竞态与主副屏隔离；保留已有曲线、记忆、户外与保护设置。
+
+详见 [完整日志](docs/releases/3.1.1.md)与 [复审记录](docs/review-3.1.1.md)。已完成主机回归及固件静态核对，尚无本版真机或功耗实测。
 
 ## 3.1.0 正式版
 

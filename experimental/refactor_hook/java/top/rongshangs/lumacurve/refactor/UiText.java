@@ -13,6 +13,8 @@ public final class UiText {
         WORDS.put("应用暂停自动亮度","Automatic brightness paused for this app");
         WORDS.put("当前应用在暂停名单中；退出后恢复自动亮度。","This app is on the pause list. Automatic brightness will be restored on exit.");
         WORDS.put("名单应用在主屏前台时暂停自动亮度，切到其他应用后恢复。进入前已是手动模式时不接管；你主动开启自动亮度后，本次应用停留期间不再关闭。","Pause automatic brightness while a selected app is foreground on the main display, then restore on exit. Existing manual mode is retained. Enabling auto yourself overrides the rule until you leave this app.");
+        WORDS.put("名单应用在主屏可见时暂停自动亮度，小窗或分屏切换焦点不恢复；所有名单应用离开可见区域后恢复。进入前已是手动模式时不接管；你主动开启自动亮度后，该名单应用仍可见期间不再关闭。","Pause automatic brightness while a selected app is visible on the main display, including floating windows and split screen. Restore when no selected app remains visible. Existing manual mode is retained; enabling auto yourself overrides the rule while that selected app remains visible.");
+        WORDS.put("本机暂按焦点判断，小窗切换可能恢复自动亮度","This device currently uses focus only; floating-window focus changes may restore automatic brightness.");
         WORDS.put("使用系统前台切换事件，不增加常驻进程，不定时扫描应用。保存并应用后生效。","Uses system foreground events without another resident process or periodic app scans. Save and apply to enable changes.");
         WORDS.put("尚未选择应用","No apps selected");
         WORDS.put("已选择 ","Selected: ");

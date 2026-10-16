@@ -7,6 +7,7 @@ import android.hardware.display.DisplayManager;
 import android.os.SystemClock;
 import android.provider.Settings;
 import org.json.*;
+import java.util.*;
 
 /** Event-driven mode owner inside system_server; raw output uses an optional native guard. */
 final class BrightnessControl implements SensorEventListener {
@@ -34,40 +35,71 @@ final class BrightnessControl implements SensorEventListener {
     float mainLux=Float.NaN,assistLux=Float.NaN,held=Float.NaN,mainScale=1,assistScale=1;long mainAt=-1,assistAt=-1,ignoreBrightnessUntil,lastAutoEnabledAt=-1;
     String brightnessSnapshot="";
     volatile ForegroundApps.Snapshot foreground=ForegroundApps.Snapshot.unknown();
-    String appSuppressed="";boolean foregroundQueued;long foregroundGeneration;
+    String appSuppressed="";boolean foregroundQueued,foregroundPending,foregroundQuerying;long foregroundGeneration,foregroundQueryGeneration;
+    final Set<String> appExemptions=new LinkedHashSet<>();boolean appSuppressionPending;
+    ForegroundApps.Snapshot foregroundHint=ForegroundApps.Snapshot.unknown();
     final Runnable foregroundUpdate=this::runForegroundUpdate;
     final Runnable foregroundQuery=this::queryForeground;
-    void runForegroundUpdate(){synchronized(this){foregroundQueued=false;}if(!s.closed)tick();}
+    Runnable foregroundTimeout;
+    void runForegroundUpdate(){synchronized(this){foregroundQueued=false;}queryForeground();}
     void queryForeground(){
-        long generation;synchronized(this){if(s.closed||options.manualApps.isEmpty())return;generation=foregroundGeneration;}
-        try{ForegroundApps.Snapshot value=ForegroundApps.query();synchronized(this){
-            // A WM event or detach received during the service query is newer evidence.
-            if(generation==foregroundGeneration&&!s.closed&&!options.manualApps.isEmpty())enqueueForeground(value);
-        }}catch(Throwable unavailable){synchronized(this){if(generation==foregroundGeneration&&!s.closed&&!options.manualApps.isEmpty()){
-            enqueueForeground(ForegroundApps.Snapshot.unknown());error="前台应用读取失败："+unavailable;
-        }}}
+        final long generation;synchronized(this){
+            if(s.closed||options.manualApps.isEmpty()||foregroundQuerying)return;
+            generation=foregroundGeneration;foregroundQueryGeneration=generation;foregroundQuerying=true;
+            foregroundTimeout=()->timeoutForegroundQuery(generation);s.handler.postDelayed(foregroundTimeout,3000);
+        }
+        try{ForegroundApps.query(this,generation);}catch(Throwable rejected){finishForegroundQuery(generation,ForegroundApps.Snapshot.unknown(),"前台应用读取失败："+rejected);}
     }
-    void suppressApplication(){if(options.manualApps.contains(foreground.pkg))appSuppressed=foreground.pkg;}
+    void finishForegroundQuery(long generation,ForegroundApps.Snapshot value,String detail){
+        boolean accepted=false;synchronized(this){
+            if(!foregroundQuerying||generation!=foregroundQueryGeneration)return;
+            if(foregroundTimeout!=null)s.handler.removeCallbacks(foregroundTimeout);foregroundTimeout=null;foregroundQuerying=false;
+            // A WM event or detach received during the query is newer evidence.
+            if(generation==foregroundGeneration&&!s.closed&&!options.manualApps.isEmpty()){acceptForeground(value);if(!detail.isEmpty())error=detail;else if(error.startsWith("前台应用读取"))error="";accepted=true;}
+            else if(foregroundPending&&!s.closed&&!options.manualApps.isEmpty())queueForeground();
+        }
+        if(accepted&&!s.closed)tick();
+    }
+    void timeoutForegroundQuery(long generation){
+        synchronized(this){if(!foregroundQuerying||generation!=foregroundQueryGeneration)return;foregroundQuerying=false;foregroundTimeout=null;foregroundGeneration++;acceptForeground(ForegroundApps.Snapshot.unknown());error="前台应用读取超时，已释放应用接管";}
+        if(!s.closed)tick();
+    }
+    void acceptForeground(ForegroundApps.Snapshot value){
+        foreground=value;foregroundHint=value;foregroundPending=false;s.handler.removeCallbacks(foregroundUpdate);foregroundQueued=false;
+        if(appSuppressionPending&&(value.visibilityKnown||!value.pkg.isEmpty())){for(String pkg:options.manualApps)if(value.contains(pkg))appExemptions.add(pkg);appSuppressionPending=false;syncApplicationSuppression();}
+    }
+    void syncApplicationSuppression(){appSuppressed=appExemptions.isEmpty()?"":appExemptions.iterator().next();}
+    void suppressApplication(){
+        for(String pkg:options.manualApps)if(foreground.contains(pkg))appExemptions.add(pkg);
+        if(!options.manualApps.isEmpty()&&(foregroundPending||foregroundQuerying||!foreground.visibilityKnown&&foreground.pkg.isEmpty()))appSuppressionPending=true;
+        syncApplicationSuppression();
+    }
     synchronized void enqueueForeground(ForegroundApps.Snapshot value){
         foregroundGeneration++;
-        ForegroundApps.Snapshot previous=foreground;
-        if(previous.pkg.equals(value.pkg)&&previous.user==value.user&&previous.display==value.display)return;
-        foreground=value;if(s.closed)return;s.handler.removeCallbacks(foregroundUpdate);foregroundQueued=true;
-        if(!s.handler.postDelayed(foregroundUpdate,150))foregroundQueued=false;
+        ForegroundApps.Snapshot previous=foregroundHint;foregroundHint=value;
+        if(previous.pkg.equals(value.pkg)&&previous.user==value.user&&previous.display==value.display&&!foregroundPending&&!foregroundQuerying)return;
+        queueForeground();
     }
-    synchronized void cancelForeground(){foregroundGeneration++;s.handler.removeCallbacks(foregroundUpdate);s.handler.removeCallbacks(foregroundQuery);foregroundQueued=false;foreground=ForegroundApps.Snapshot.unknown();}
+    synchronized void invalidateForeground(){foregroundGeneration++;queueForeground();}
+    void queueForeground(){if(s.closed)return;foregroundPending=true;if(foregroundQueued)return;foregroundQueued=true;if(!s.handler.postDelayed(foregroundUpdate,150))foregroundQueued=foregroundPending=false;}
+    synchronized void cancelForeground(){foregroundGeneration++;s.handler.removeCallbacks(foregroundUpdate);s.handler.removeCallbacks(foregroundQuery);if(foregroundTimeout!=null)s.handler.removeCallbacks(foregroundTimeout);foregroundTimeout=null;foregroundQuerying=false;foregroundQueued=foregroundPending=false;foreground=foregroundHint=ForegroundApps.Snapshot.unknown();}
     boolean applicationMode()throws Exception {
         ForegroundApps.Snapshot top=foreground;
-        boolean match=!options.manualApps.isEmpty()&&top.user==0&&top.display==0&&options.manualApps.contains(top.pkg)&&enabled()&&mainDisplay()&&awake()&&unlocked();
-        if(!appSuppressed.isEmpty()&&(!options.manualApps.contains(appSuppressed)||!top.pkg.isEmpty()&&!appSuppressed.equals(top.pkg)))appSuppressed="";
+        boolean eligible=!options.manualApps.isEmpty()&&enabled()&&mainDisplay()&&awake()&&unlocked();
+        // Retain a current session while a coalesced visibility refresh is pending.
+        // Screen, user and keyguard checks still release it immediately.
+        if(eligible&&foregroundPending)return owner.equals("app");
+        String selected=top.selected(options.manualApps);boolean match=eligible&&!selected.isEmpty();
+        for(Iterator<String> i=appExemptions.iterator();i.hasNext();){String pkg=i.next();if(!options.manualApps.contains(pkg)||(top.visibilityKnown||!top.pkg.isEmpty())&&!top.contains(pkg))i.remove();}
+        syncApplicationSuppression();
         if(!match){if(owner.equals("app"))relinquish("app_left",true);return false;}
         if(owner.equals("app"))return true;
-        if(owner.equals("panel")||owner.equals("raw_panel")||top.pkg.equals(appSuppressed))return false;
+        if(owner.equals("panel")||owner.equals("raw_panel")||!appSuppressed.isEmpty())return false;
         if(owner.equals("dark"))relinquish("app_entered",true);
         if(!auto())return false; // Never own/restore an automatic mode the user had disabled.
         if(!available())return false;
         float value=(float)display.read().getDouble("actual");if(!Float.isFinite(value)||value<0||value>1)return false;
-        claim("app",java.util.UUID.randomUUID().toString(),value);reason="app_manual";s.log("应用暂停自动亮度："+top.pkg);s.queueControlPublish();return true;
+        claim("app",java.util.UUID.randomUUID().toString(),value);reason="app_manual";s.log("应用暂停自动亮度："+selected);s.queueControlPublish();return true;
     }
     final Runnable manualUpdate=()->acceptManualBrightness();
     void acceptManualBrightness(){
@@ -177,6 +209,7 @@ final class BrightnessControl implements SensorEventListener {
     }
     void configure(BrightnessControlOptions next){
         if(!options.same(next))relinquish("settings_changed",true);
+        if(next.manualApps.isEmpty()){appExemptions.clear();appSuppressionPending=false;syncApplicationSuppression();}
         options=next;failed=false;error="";if(!registered)start();tick();
         if(options.manualApps.isEmpty())ForegroundApps.detach(this);else ForegroundApps.attach(this);
     }
@@ -200,7 +233,7 @@ final class BrightnessControl implements SensorEventListener {
         if(!previous.equals("none")){s.log(previous.equals("dark")?"暗光锁定退出："+why:previous.equals("app")?"应用亮度接管结束："+why:"主屏手动面板已退让："+why);s.queueControlPublish();}
     }
     void screenOff(){ForegroundApps.detach(this);s.handler.removeCallbacks(screenCleanup);screenCleanupQueued=false;if(owner.equals("raw_panel")){rawScreenOff=true;pauseRaw();}else relinquish("screen_off",true);unlisten();s.handler.removeCallbacks(timer);s.handler.removeCallbacks(retry);failed=false;}
-    void stop(){ForegroundApps.detach(this);appSuppressed="";s.handler.removeCallbacks(screenCleanup);screenCleanupQueued=false;relinquish("disabled",true);unlisten();s.handler.removeCallbacks(timer);s.handler.removeCallbacks(retry);options=new BrightnessControlOptions();}
+    void stop(){ForegroundApps.detach(this);appExemptions.clear();appSuppressionPending=false;syncApplicationSuppression();s.handler.removeCallbacks(screenCleanup);screenCleanupQueued=false;relinquish("disabled",true);unlisten();s.handler.removeCallbacks(timer);s.handler.removeCallbacks(retry);options=new BrightnessControlOptions();}
     void close(){stop();unregisterObservers();}
     void unregisterObservers(){
         try{if(displayEvents!=null)displayEvents.unregisterDisplayListener(displayListener);}catch(Throwable failure){error=failure.toString();}
@@ -253,6 +286,8 @@ final class BrightnessControl implements SensorEventListener {
     JSONObject status()throws JSONException{
         JSONObject j=new JSONObject();options.put(j);boolean supported=supported();j.put("elapsed_ms",SystemClock.elapsedRealtime()).put("manual_panel_supported",mainDisplay()&&RawPanelOutputHooks.supports(s.owner.getClass())).put("dark_lock_supported",supported&&bindSensors()).put("owner",owner).put("reason",reason).put("error",error).put("auto",auto()).put("listening",listening).put("session",session).put("raw_target",rawTarget).put("raw_paused",rawPaused).put("raw_confirmed",rawConfirmed).put("raw_blocked_output_calls",rawBlockedWrites);
         j.put("app_auto_supported",ForegroundApps.install(s.owner.getClass().getClassLoader())).put("foreground_package",foreground.pkg).put("foreground_auto_suppressed",!appSuppressed.isEmpty());
+        j.put("app_multiwindow_supported",ForegroundApps.multiWindowSupported).put("foreground_visibility_known",foreground.visibilityKnown).put("foreground_visible_packages",new JSONArray(foreground.visible)).put("foreground_matched_package",foreground.selected(options.manualApps)).put("foreground_visibility_pending",foregroundPending);
+        j.put("foreground_auto_exemptions",new JSONArray(appExemptions)).put("foreground_auto_override_pending",appSuppressionPending);
         if(!ForegroundApps.error.isEmpty())j.put("app_auto_detail",ForegroundApps.error);
         if(DarkLockPolicy.valid(mainLux))j.put("watch_main_lux",mainLux);if(DarkLockPolicy.valid(assistLux))j.put("watch_assist_lux",assistLux);
         j.put("watch_main_samples",mainSamples).put("watch_assist_samples",assistSamples).put("watch_unmatched_samples",unmatchedSamples).put("watch_evaluations",sensorEvaluations).put("watch_requested_period_us",1000000).put("watch_main_age_ms",mainAt<0?-1:SystemClock.uptimeMillis()-mainAt).put("watch_assist_age_ms",assistAt<0?-1:SystemClock.uptimeMillis()-assistAt);
