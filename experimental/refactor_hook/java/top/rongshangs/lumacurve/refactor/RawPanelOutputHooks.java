@@ -1,7 +1,7 @@
 package top.rongshangs.lumacurve.refactor;
 import java.lang.reflect.*;
 import java.util.*;
-import de.robv.android.xposed.*;
+import top.rongshangs.lumacurve.refactor.hooking.*;
 /** Isolates only positive brightness frames on the owned, unlocked main display. */
 final class RawPanelOutputHooks {
  static final Set<Class<?>> owners=new HashSet<>(),powerStates=new HashSet<>();

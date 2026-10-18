@@ -2,7 +2,7 @@ package top.rongshangs.lumacurve.refactor;
 
 import java.lang.reflect.Method;
 import java.util.*;
-import de.robv.android.xposed.*;
+import top.rongshangs.lumacurve.refactor.hooking.*;
 
 /** Optional SDR-only relaxation of the content/grayscale cap, before thermal and animation.
  * No OEM fields, curves, mode settings or panel nodes are written here.

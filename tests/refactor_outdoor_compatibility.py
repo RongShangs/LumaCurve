@@ -21,7 +21,7 @@ legacy=r'''
  private boolean isGrayScaleLegal(float gray){return grayLegal&&gray>=0&&gray<=255;}
 '''
 test=r'''package top.rongshangs.lumacurve.refactor;
-import org.json.*;import com.android.server.display.*;import com.android.server.display.brightness.*;import de.robv.android.xposed.*;import android.os.*;
+import org.json.*;import com.android.server.display.*;import com.android.server.display.brightness.*;import top.rongshangs.lumacurve.refactor.hooking.*;import android.os.*;
 public class OutdoorCompatibilityTest {
  static int cases;static void check(boolean b){if(!b)throw new AssertionError("case "+cases);cases++;}
  static void eq(float a,float b){check(Math.abs(a-b)<.00001f);}
@@ -102,13 +102,13 @@ for scenario in ['modern','modern_dual','legacy','unknown_privacy','unknown_layo
     sources[key]=owner
     sources['com/android/server/display/DisplayDeviceConfig.java']='package com.android.server.display;public class DisplayDeviceConfig{}'
     sources['top/rongshangs/lumacurve/refactor/OutdoorCompatibilityTest.java']=test
-    bridge='de/robv/android/xposed/XposedBridge.java'
+    bridge='top/rongshangs/lumacurve/refactor/hooking/XposedBridge.java'
     sources[bridge]=sources[bridge].replace('public static void log(String s){}','public static void log(String s){}public static int hookCount(){int n=0;for(java.util.List<XC_MethodHook> list:hooks.values())n+=list.size();return n;}')
     out=ROOT/'build/refactor-outdoor-compatibility-tests'/scenario;out.mkdir(parents=True,exist_ok=True)
     for name,text in sources.items():
         dest=out/name;dest.parent.mkdir(parents=True,exist_ok=True);dest.write_text(text,encoding='utf-8')
     classes=out/'classes';classes.mkdir(exist_ok=True)
-    production=[SRC/(n+'.java') for n in ['OutdoorNodeTarget','OutdoorOptions','OutdoorPolicy','HbmAccess','OutdoorController','OutdoorTuning','OutdoorOpr','OutdoorSdrScope','ThermalPolicy','AdvancedPolicy','LiveLimitEvidence','NitBrightnessLimit']]
+    production=[SRC/'hooking/HookTransaction.java']+[SRC/(n+'.java') for n in ['OutdoorNodeTarget','OutdoorOptions','OutdoorPolicy','HbmAccess','OutdoorController','OutdoorTuning','OutdoorOpr','OutdoorSdrScope','ThermalPolicy','AdvancedPolicy','LiveLimitEvidence','NitBrightnessLimit']]
     subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(JSON),'-d',str(classes),*map(str,production),*[str(out/n) for n in sources]],check=True)
     result=subprocess.run(['java','-cp',str(classes)+';'+str(JSON),'top.rongshangs.lumacurve.refactor.OutdoorCompatibilityTest',scenario],check=True,capture_output=True,text=True)
     print(result.stdout,end='');total+=int(re.search(r'(\d+) cases PASS',result.stdout).group(1))

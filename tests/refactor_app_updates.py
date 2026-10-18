@@ -14,10 +14,10 @@ class AlertDialog{Consumer<AlertDialog> dismissed;boolean visible;void setOnDism
 class Queue{final ArrayDeque<Runnable> tasks=new ArrayDeque<>();void execute(Runnable r){tasks.add(r);}void post(Runnable r){tasks.add(r);}void drain(){while(!tasks.isEmpty())tasks.remove().run();}}
 class Preferences{Map<String,String> values=new HashMap<>();String getString(String k,String fallback){return values.getOrDefault(k,fallback);}Preferences edit(){return this;}Preferences putString(String k,String v){values.put(k,v);return this;}void apply(){}}
 class UpdateChecker{static final String WEBSITE="https://lc.rongshangs.top";static JSONObject reply;static boolean fail;static int calls;static JSONObject check()throws Exception{calls++;if(fail)throw new Exception("offline");return new JSONObject(reply.toString());}}
-class SettingsNotice{boolean visible;boolean showing(){return visible;}}
+class WelcomeGuide{boolean visible;boolean showing(){return visible;}}
 class MainActivity{
- final SettingsNotice settingsNotice=new SettingsNotice();
- boolean updateBusy,updateChecked,destroyed,visible=true,permissionDialogVisible,legacyDialogVisible;Object pendingLegacy;JSONObject pendingUpdate;AlertDialog updateDialog;
+ final WelcomeGuide welcome=new WelcomeGuide();
+ int page=3;boolean updateBusy,updateChecked,destroyed,visible=true,permissionDialogVisible,legacyDialogVisible;Object pendingLegacy;JSONObject pendingUpdate;AlertDialog updateDialog;
  final Queue network=new Queue(),ui=new Queue();final TextView updateLabel=new TextView();final Preferences prefs;final Map<String,Runnable> buttons=new LinkedHashMap<>();String opened="",notice="";int dialogs;
  MainActivity(Preferences p){prefs=p;}Preferences getPreferences(int mode){return prefs;}String tr(String s){return s;}int dp(int n){return n;}void show(String s){notice=s;}void open(String url){opened=url;}
  LinearLayout column(){return new LinearLayout();}TextView text(String s,int size,int color){TextView t=new TextView();t.setText(s);return t;}int BLUE,MUTED;
@@ -43,12 +43,16 @@ public class UpdateTest{
   a.buttons.get("忽略此版本").run();check(prefs.getString("ignored_update_version","").equals("2.5.1"));
   // A deferred automatic offer must recheck the preference before showing.
   release("2.6.0");a=new MainActivity(prefs);a.visible=false;a.checkUpdate(false);a.complete();check(a.pendingUpdate!=null&&a.dialogs==0);prefs.putString("ignored_update_version","2.6.0");a.visible=true;a.offerUpdate();check(a.updateDialog==null&&a.pendingUpdate==null);
-  release("2.6.1");a=new MainActivity(prefs);a.settingsNotice.visible=true;a.checkUpdate(false);a.complete();check(a.pendingUpdate!=null&&a.updateDialog==null);a.settingsNotice.visible=false;a.offerUpdate();check(a.updateDialog.visible);a.buttons.get("稍后").run();
+  release("2.6.1");a=new MainActivity(prefs);a.welcome.visible=true;a.checkUpdate(false);a.complete();check(a.pendingUpdate!=null&&a.updateDialog==null);a.welcome.visible=false;a.offerUpdate();check(a.updateDialog.visible);a.buttons.get("稍后").run();
   // Explicit checks can survive deferred permission/legacy dialogs.
   a.visible=false;a.checkUpdate(true);a.complete();a.visible=true;a.offerUpdate();check(a.updateDialog.visible);a.buttons.get("稍后").run();
   a=new MainActivity(new Preferences());a.checkUpdate(false);a.network.drain();a.destroyed=true;a.ui.drain();check(a.dialogs==0&&a.pendingUpdate==null);
   a=new MainActivity(new Preferences());UpdateChecker.fail=true;a.checkUpdate(true);a.complete();check(!a.updateBusy&&a.updateDialog==null&&!a.notice.isEmpty());
   UpdateChecker.fail=false;UpdateChecker.reply=new JSONObject().put("newer",false);a.checkUpdate(true);a.complete();check(!a.updateBusy&&a.pendingUpdate==null&&a.updateDialog==null);
+  // Updates are offered only on About, including completion after navigation away.
+  release("2.7.0");a=new MainActivity(new Preferences());a.page=0;int before=UpdateChecker.calls;a.checkUpdate(false);a.complete();check(UpdateChecker.calls==before&&a.dialogs==0);
+  a.page=3;a.checkUpdate(false);a.network.drain();a.page=1;a.ui.drain();check(a.dialogs==0&&a.pendingUpdate!=null);a.offerUpdate();check(a.dialogs==0);
+  a.page=3;a.offerUpdate();check(a.updateDialog!=null&&a.updateDialog.visible);a.buttons.get("稍后").run();
   check(ReleasePolicy.trustedApk("2.5.0","HyperLux-2.5.0.apk","https://github.com/RongShangs/LumaCurve/releases/download/v2.5.0/HyperLux-2.5.0.apk"));
   check(!ReleasePolicy.trustedApk("2.5.0","HyperLux-2.5.0.apk","https://example.invalid/HyperLux-2.5.0.apk"));
   System.out.println("App update dialog: "+cases+" cases PASS; production UI methods with service doubles, Android not tested");

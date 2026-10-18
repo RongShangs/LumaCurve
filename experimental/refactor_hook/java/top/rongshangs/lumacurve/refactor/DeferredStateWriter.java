@@ -19,11 +19,11 @@ final class DeferredStateWriter {
     DeferredStateWriter(Writer writer,Consumer<Throwable> errors){this(IO,writer,errors);}
     DeferredStateWriter(Executor executor,Writer writer,Consumer<Throwable> errors){this.executor=executor;this.writer=writer;this.errors=errors;}
     void submit(String group,Map<String,String> values){
-        if(!group.equals("ack")&&!group.equals("state"))throw new IllegalArgumentException("Unknown state group");
+        if(!group.equals("ack")&&!group.equals("state")&&!group.equals("slider_tables"))throw new IllegalArgumentException("Unknown state group");
         LinkedHashMap<String,String> copy=new LinkedHashMap<>(values);
         synchronized(this){
             if(closed)return;
-            // At most one pending acknowledgement and one complete state snapshot.
+            // At most one acknowledgement, one complete state and one calibration snapshot.
             // Replace the entire snapshot: merging chunks would mix snapshot identities.
             pending.put(group,copy);if(running)return;running=true;
         }

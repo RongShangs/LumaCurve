@@ -12,7 +12,7 @@ final class RuntimeFeatureChecks {
     boolean outdoor()throws Exception{return OutdoorTuning.owners.contains(s.owner.getClass())&&hbm()!=null;}
     boolean range()throws Exception{return outdoor()&&OutdoorTuning.ranges.contains(hbm().controller.getClass())&&OutdoorTuning.peaks.contains(s.owner.getClass());}
     Object abc()throws Exception{return HookEntry.get(HookEntry.get(s.owner,"mAutomaticBrightnessControllerImpl"),"mAutomaticBrightnessController");}
-    boolean sensor(boolean assist)throws Exception{Object abc=abc();Object value=assist?HookEntry.get(HookEntry.get(HookEntry.get(s.owner,"mAutomaticBrightnessControllerImpl"),"mDualSensorPolicy"),"mAssistLightSensor"):HookEntry.get(abc,"mLightSensor");if(value==null)return false;Sensor sensor=(Sensor)value;return assist?(sensor.getType()==Sensor.TYPE_LIGHT||sensor.getType()==33171055):sensor.getType()==Sensor.TYPE_LIGHT;}
+    boolean sensor(boolean assist)throws Exception{Object abc=abc();Object value=assist?HookEntry.get(HookEntry.get(HookEntry.get(s.owner,"mAutomaticBrightnessControllerImpl"),"mDualSensorPolicy"),"mAssistLightSensor"):HookEntry.get(abc,"mLightSensor");if(value==null)return false;Sensor sensor=(Sensor)value;return assist?AuxiliarySensorIdentity.accepted(sensor):sensor.getType()==Sensor.TYPE_LIGHT;}
     boolean darkSensors()throws Exception{
         if(!sensor(false)||HookEntry.get(abc(),"mSensorManager")==null)return false;
         Object impl=HookEntry.get(s.owner,"mAutomaticBrightnessControllerImpl"),dual;
@@ -30,11 +30,14 @@ final class RuntimeFeatureChecks {
         f.check("manual_memory","手动记忆",null,false,()->s.kernel.manualPointCapacity()>0);
         f.check("saved_curve","记忆转基础曲线",null,false,()->s.kernel.name().equals("refactor")||s.kernel.name().equals("physical_mapping"));
         f.check("persistent_memory","记忆持久化","persistent_memory_supported",false,()->s.kernel.persistentMemorySupported());
+        f.check("memory_mode","跨开关保持记忆","memory_mode_supported",false,()->s.memoryLifecycle.modeSupported);
+        f.check("memory_forever","永久保持记忆","memory_forever_supported",false,()->s.memoryLifecycle.foreverSupported);
         f.check("memory_reset","记忆重置条件","memory_reset_supported",false,()->s.memoryLifecycle.resetSupported);
         f.check("memory_timeout","记忆超时","memory_timeout_supported",false,()->s.memoryLifecycle.timeoutSupported);
         f.check("dark_lock","暗光锁定","dark_lock_supported",true,()->s.receiverRegistered&&s.brightnessControl.available()&&darkSensors());
         f.check("manual_panel","主屏手动亮度","manual_panel_supported",true,()->s.receiverRegistered&&RawPanelOutputHooks.supports(s.owner.getClass()));
-        f.check("apps","应用自动亮度名单","app_auto_supported",true,()->s.receiverRegistered&&ForegroundApps.install(s.owner.getClass().getClassLoader()));
+        f.check("control_center_slider","控制中心节点映射","control_center_slider_supported",true,()->s.receiverRegistered&&s.controlCenter.supported());
+        f.check("apps","暂停自动亮度名单","app_auto_supported",true,()->s.receiverRegistered&&ForegroundApps.supported());
         f.check("thermal","温控调整","thermal_supported",true,()->s.receiverRegistered&&s.thermalRegistered&&HookEntry.thermalSupported.contains(s.owner.getClass()));
         f.check("response","变化确认","response_supported",false,()->ResponseTuning.supported(s.owner));
         f.check("small_response","微小变亮确认","small_response_supported",false,()->ResponseTuning.smallSupported(s.owner));
@@ -43,9 +46,10 @@ final class RuntimeFeatureChecks {
         f.check("assist_gate","辅助光感闸门","low_light_assist_gate_supported",false,()->LowLightAssistEvidence.supported(s));
         String[] advanced={"光感变化阈值","辅助光感确认","亮度过渡","阳光模式条件","触摸遮挡"};
         for(int i=0;i<AdvancedOptions.GROUPS.length;i++){final int group=i;f.check(AdvancedOptions.GROUPS[i],advanced[i],AdvancedOptions.GROUPS[i]+"_supported",false,()->AdvancedTuning.supported(group,s));}
-        for(int i=0;i<SceneOptions.IDS.length;i++){final int group=i;final String id=SceneOptions.IDS[i];f.check("scene_"+id,SceneOptions.NAMES[i],"scene_"+id+"_supported",false,()->SceneTuning.supported(s,group));}
+        for(int i=0;i<SceneOptions.IDS.length;i++){final int group=i;final String id=SceneOptions.IDS[i];String inactive=SceneTuning.inactiveReason(s,group);if(!inactive.isEmpty())f.inactive("scene_"+id,SceneOptions.NAMES[i],"scene_"+id+"_supported",inactive);else f.check("scene_"+id,SceneOptions.NAMES[i],"scene_"+id+"_supported",false,()->SceneTuning.supported(s,group));}
         f.check("outdoor","户外增强","outdoor_supported",true,()->s.receiverRegistered&&outdoor());
         f.check("hbm","HBM 触发与预算","outdoor_hbm_supported",false,()->hbm().tunable());
+        if(checkedHbm!=null&&checkedHbm.tunable()&&!checkedHbm.budgetTunable())f.explain("hbm","照度门槛可调；本机未启用 HBM 时间预算，保留系统的零计时配置。增强时长仍由户外会话设置控制。");
         f.check("outdoor_range","高亮范围","outdoor_range_supported",false,()->range());
         f.check("opr","画面限亮放宽","outdoor_opr_supported",false,()->range()&&OutdoorOpr.owners.contains(s.owner.getClass()));
         f.check("nit_limit","户外 nit 上限","outdoor_nit_limit_supported",true,()->OutdoorTuning.nitCaps.contains(s.owner.getClass())&&OutdoorPolicy.valid(new NitBrightnessLimit(s.owner).resolve(0,HookRuntime.optionalNumber(hbm().controller,"mBrightnessMin"),hbm().max())));

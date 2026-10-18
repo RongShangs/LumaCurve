@@ -23,14 +23,14 @@ class SettingsActivity extends Activity{SettingsActivity(String alias){super(ali
 public class StablePreferencesTest{
  static int cases;static void check(boolean c){if(!c)throw new AssertionError("case "+cases);cases++;}
  public static void main(String[] args){
-  String ack=SettingsNotice.ACK_KEY;Activity oldDesktop=new Activity("Launcher"),oldLsp=new Activity("refactor.MainActivity");oldDesktop.getPreferences(0).edit().putBoolean(ack,true).putInt("refresh_seconds",3).apply();
+  String ack=UiPreferences.LEGACY_NOTICE_ACK;Activity oldDesktop=new Activity("Launcher"),oldLsp=new Activity("refactor.MainActivity");oldDesktop.getPreferences(0).edit().putBoolean(ack,true).putInt("refresh_seconds",3).apply();
   check(!oldLsp.getPreferences(0).getBoolean(ack,false)); // Reproduce the old repeat prompt.
   oldLsp.getPreferences(0).edit().putInt("refresh_seconds",4).putString("presets","keep").apply();
   SharedPreferences alias=oldDesktop.getPreferences(0);alias.edit().putBoolean("detail_outdoor",true).putString("draft","learned").putLong("counter",12L).putFloat("draft_floor",.25f).putStringSet("set",new HashSet<>(Arrays.asList("a","b"))).apply();
   SettingsActivity desktop=new SettingsActivity("Launcher"),lsp=new SettingsActivity("refactor.MainActivity");SharedPreferences stable=desktop.getPreferences(0);
   check(stable==lsp.getPreferences(0));check(stable.getBoolean(ack,false));check(stable.getInt("refresh_seconds",0)==4);check(stable.values.get("presets").equals("keep"));check(stable.getBoolean("detail_outdoor",false));check(stable.values.get("draft").equals("learned"));check(stable.values.get("counter").equals(12L));check(stable.values.get("draft_floor").equals(.25f));check(stable.values.get("set").equals(new HashSet<>(Arrays.asList("a","b"))));
-  stable.edit().putBoolean("detail_outdoor",false).putInt("refresh_seconds",2).apply();int writes=stable.writes;
-  for(int i=0;i<30;i++){SettingsActivity restarted=new SettingsActivity(i%2==0?"Launcher":"refactor.MainActivity");check(restarted.getPreferences(0)==stable);check(restarted.getPreferences(0).getBoolean(ack,false));check(restarted.getPreferences(0).getInt("refresh_seconds",0)==2);check(!restarted.getPreferences(0).getBoolean("detail_outdoor",true));}
+  stable.edit().putBoolean("detail_outdoor",false).putInt("refresh_seconds",2).putBoolean("welcome_completed_v1",true).apply();int writes=stable.writes;
+  for(int i=0;i<30;i++){SettingsActivity restarted=new SettingsActivity(i%2==0?"Launcher":"refactor.MainActivity");check(restarted.getPreferences(0)==stable);check(restarted.getPreferences(0).getBoolean(ack,false));check(restarted.getPreferences(0).getInt("refresh_seconds",0)==2);check(!restarted.getPreferences(0).getBoolean("detail_outdoor",true));check(restarted.getPreferences(0).getBoolean("welcome_completed_v1",false));}
   check(stable.writes==writes);check(alias.getBoolean(ack,false));
   // Existing acknowledgement from either route wins over an old false value.
   for(String route:new String[]{"Launcher","refactor.MainActivity","top.rongshangs.lumacurve.Launcher","top.rongshangs.lumacurve.refactor.MainActivity"}){

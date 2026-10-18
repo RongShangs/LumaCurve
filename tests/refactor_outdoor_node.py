@@ -59,7 +59,7 @@ sources={
 'android/os/SystemClock.java':'package android.os;public class SystemClock{public static long now=1000;public static long uptimeMillis(){return now;}}',
 'android/os/Process.java':'package android.os;public class Process{public static int myPid(){return 123;}}',
 'android/system/Os.java':'package android.system;public class Os{public static void chmod(String s,int m){}public static void rename(String a,String b){throw new AssertionError("Host must use test sink");}}',
-'de/robv/android/xposed/XposedBridge.java':'package de.robv.android.xposed;public class XposedBridge{public static void log(String s){}}',
+'top/rongshangs/lumacurve/refactor/hooking/XposedBridge.java':'package top.rongshangs.lumacurve.refactor.hooking;public class XposedBridge{public static void log(String s){}}',
 'top/rongshangs/lumacurve/refactor/HookEntry.java':'''package top.rongshangs.lumacurve.refactor;class HookEntry{static Object get(Object o,String n)throws Exception{java.lang.reflect.Field f=o.getClass().getField(n);return f.get(o);}}''',
 'top/rongshangs/lumacurve/refactor/RawPanelOutputHooks.java':'package top.rongshangs.lumacurve.refactor;class RawPanelOutputHooks{static boolean ok=true;static boolean supports(Class<?> c){return ok;}}',
 'top/rongshangs/lumacurve/refactor/OutdoorSdrScope.java':'''package top.rongshangs.lumacurve.refactor;class OutdoorSdrScope{static OutdoorSdrScope instance=new OutdoorSdrScope();java.lang.reflect.Method privacy;boolean allow=true;static OutdoorSdrScope resolve(Class<?> c){return instance;}boolean allows(Object o){return allow;}}''',

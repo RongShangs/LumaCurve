@@ -2,7 +2,7 @@ package top.rongshangs.lumacurve.refactor;
 
 import java.lang.reflect.*;
 import java.util.*;
-import de.robv.android.xposed.*;
+import top.rongshangs.lumacurve.refactor.hooking.*;
 
 /** Verified OEM consumers only. Hooks cannot enable a scene or alter final safety clamps. */
 final class SceneTuning {
@@ -37,6 +37,13 @@ final class SceneTuning {
         if(cap==null){cap=new HashSet<>();capabilities.put(cls,cap);}cap.add(group);
     }catch(Throwable missing){for(XC_MethodHook.Unhook h:added)h.unhook();XposedBridge.log("HyperLux scene option "+group+" unavailable: "+missing);}}
     static boolean hasSharedSceneConsumer(Class<?> cls){Set<Integer> cap=capabilities.get(cls);return cap!=null&&cap.contains(4);}
+    static String inactiveReason(HookRuntime s,int group){
+        if(group!=3)return "";
+        try{Object impl=object(s,"impl");Set<Integer> cap=capabilities.get(impl.getClass());
+            if(cap==null||!cap.contains(3)||!Boolean.FALSE.equals(HookRuntime.optionalBoolean(impl,"mUseProximityEnabled")))return "";
+            return supported(s,4)?"系统未启用普通距离策略，当前使用流式距离遮挡；请在流式距离遮挡中设置。":"系统未启用普通距离策略，沿用系统；不强制启动传感器。";
+        }catch(Throwable unknown){return "";}
+    }
     static XC_MethodHook hook(int group,String name){return new XC_MethodHook(){
         protected void beforeHookedMethod(MethodHookParam p){String kind=group==1||group==6?"abc":group==2?"touch":group==3||group==8?"impl":group==7?"sun":"scene";HookRuntime s=state(p.thisObject,kind,false);if(s==null||s.probingScenes)return;
             SceneController c=s.scenes;boolean denied=c.blocked(group);try{

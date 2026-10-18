@@ -12,12 +12,13 @@ public class SystemVersionTest {
  static SystemVersion.Result read(String name,String incremental){return SystemVersion.inspect(key->key.equals(SystemVersion.NAME)?name:incremental);}
  public static void main(String[] args)throws Exception{
   for(String value:new String[]{"OS4","OS4.0.0.41.XBLCNXM","OS4.0.0.28.XPACNXM","4.0.0.41","HyperOS 4"," os4.0.0.41 "}){check(SystemVersion.major(value)==4);check(read(value,"").status.equals("supported"));}
-  for(String value:new String[]{"OS3","OS3.0.0.1","OS2.0.0.23","OS5.0.0.1","OS40"}){check(SystemVersion.major(value)!=4);check(read(value,"").unsupported());}
+  for(String value:new String[]{"OS2.0.0.23","OS5.0.0.1","OS40"}){check(SystemVersion.major(value)!=4);check(read(value,"").unsupported());}
   for(String value:new String[]{"","V14","Android 16","Android 17","OS","OS4beta","garbage OS4",null}){check(SystemVersion.major(value)==-1);check(!read(value,"").unsupported());check(read(value,"").status.equals("unknown"));}
-  check(read("","OS3.0.0.1").unsupported());check(read(null,"OS4.0.0.41").major==4);check(read("OS4","OS4.0.0.41").major==4);
+  for(String value:new String[]{"OS3","OS3.0.303.0.WMCCNXM","HyperOS 3"}){check(SystemVersion.major(value)==3);check(read(value,"").status.equals("supported"));check(!read(value,"").unsupported());}
+  check(!read("","OS3.0.0.1").unsupported());check(read(null,"OS4.0.0.41").major==4);check(read("OS4","OS4.0.0.41").major==4);
   check(read("OS4","OS3.0.0.41").status.equals("unknown"));check(!read("OS4","OS3.0.0.41").unsupported());
   check(SystemVersion.inspect(key->{throw new java.io.IOException();}).status.equals("unknown"));
-  JSONObject j=new JSONObject();read("OS3.0.0.1","").put(j);check(j.getString("system_compatibility").equals("unsupported"));check(j.getInt("system_major")==3);check(j.getString("system_version").equals("OS3.0.0.1"));
+  JSONObject j=new JSONObject();read("OS3.0.0.1","").put(j);check(j.getString("system_compatibility").equals("supported"));check(j.getInt("system_major")==3);check(j.getString("system_version").equals("OS3.0.0.1"));
   System.out.println("HyperOS platform preflight: "+cases+" cases PASS; parsing only, Android properties not tested");
  }
 }''',encoding='utf-8')

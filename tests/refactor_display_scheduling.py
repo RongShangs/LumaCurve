@@ -28,13 +28,13 @@ methods = '\n'.join(method(s) for s in [
 files = {
     'android/os/SystemClock.java': '''package android.os;public class SystemClock{
         public static long now=20000;public static long elapsedRealtime(){return now;}}''',
-    'de/robv/android/xposed/XposedBridge.java': '''package de.robv.android.xposed;
+    'top/rongshangs/lumacurve/refactor/hooking/XposedBridge.java': '''package top.rongshangs.lumacurve.refactor.hooking;
         public class XposedBridge{public static void log(String message){}}''',
     'top/rongshangs/lumacurve/refactor/HookEntry.java': '''package top.rongshangs.lumacurve.refactor;
         public class HookEntry{static Object get(Object o,String field)throws Exception{
         return o.getClass().getField(field).get(o);}}''',
     'top/rongshangs/lumacurve/refactor/HookRuntime.java': '''package top.rongshangs.lumacurve.refactor;
-import android.os.*;import java.util.*;import de.robv.android.xposed.XposedBridge;
+import android.os.*;import java.util.*;import top.rongshangs.lumacurve.refactor.hooking.XposedBridge;
 public class HookRuntime{final Node outdoorNode=new Node();static class Node{void changed(){}}
  boolean closed,publishQueued,controlPublishQueued,recalculationQueued,recalculating,thread=true;
  long consumed,lastPublish,viewUntil;float lastLux=Float.NaN,lastNit=Float.NaN;

@@ -13,7 +13,7 @@ final class SystemVersion {
     interface Reader {String get(String key)throws Exception;}
     static final class Result {
         final int major;final String version,status;
-        Result(int major,String version){this.major=major;this.version=version;status=major<0?"unknown":major==4?"supported":"unsupported";}
+        Result(int major,String version){this.major=major;this.version=version;status=major<0?"unknown":major==3||major==4?"supported":"unsupported";}
         boolean unsupported(){return status.equals("unsupported");}
         void put(JSONObject j)throws JSONException{j.put("system_version",version).put("system_major",major).put("system_compatibility",status).put("system_version_diagnostic_only",true);}
     }

@@ -14,5 +14,7 @@ public final class FeatureSelfCheck {
         try{entries.put(new JSONObject().put("id",id).put("name",name).put("state",state).put("detail",detail));if(capability!=null)caps.put(capability,state.equals("available")).put(capability+"_state",state);}catch(JSONException impossible){throw new IllegalStateException(impossible);}
     }
     public JSONObject capabilities(){return caps;}
-    public JSONObject report(long elapsed,String request)throws JSONException{return new JSONObject().put("checked_elapsed_ms",elapsed).put("request",request).put("mode","actual_interfaces").put("features",entries);}
+    public void inactive(String id,String name,String capability,String detail){try{entries.put(new JSONObject().put("id",id).put("name",name).put("state","inactive").put("detail",detail));if(capability!=null)caps.put(capability,false).put(capability+"_state","inactive");}catch(JSONException impossible){throw new IllegalStateException(impossible);}}
+    public void explain(String id,String detail){try{for(int i=0;i<entries.length();i++){JSONObject entry=entries.getJSONObject(i);if(id.equals(entry.optString("id"))){entry.put("detail",detail);return;}}}catch(JSONException impossible){throw new IllegalStateException(impossible);}}
+    public JSONObject report(long elapsed,String request)throws JSONException{return new JSONObject().put("checked_elapsed_ms",elapsed).put("checked_unix_ms",System.currentTimeMillis()).put("request",request).put("mode","actual_interfaces").put("features",entries);}
 }

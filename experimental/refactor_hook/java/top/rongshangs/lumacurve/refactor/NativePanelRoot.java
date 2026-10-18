@@ -32,7 +32,7 @@ final class NativePanelRoot {
   try{StructStat opened=Os.fstat(fd);if(!OsConstants.S_ISREG(opened.st_mode)||expected.st_dev!=opened.st_dev||expected.st_ino!=opened.st_ino||!node.toPath().toRealPath().toString().equals(selected.getString("canonical_path")))throw new IOException("主屏节点在权限检查期间发生变化");}
   finally{Os.close(fd);}
  }
- static boolean matches(JSONObject node,JSONObject guard){return guard.optBoolean("ok")&&"raw07-openprobe".equals(guard.optString("native_build"))&&node.optString("path").equals(guard.optString("path"))&&node.optString("canonical_path").equals(guard.optString("canonical_path"))&&node.optInt("maximum",-1)==guard.optInt("maximum",-2);}
+ static boolean matches(JSONObject node,JSONObject guard){return guard.optBoolean("ok")&&"raw08-slider".equals(guard.optString("native_build"))&&node.optString("path").equals(guard.optString("path"))&&node.optString("canonical_path").equals(guard.optString("canonical_path"))&&node.optInt("maximum",-1)==guard.optInt("maximum",-2);}
  static void install()throws Exception{
   Os.chmod(RootControl.DATA.toString(),0700);
   String source=System.getenv("CLASSPATH");if(source==null||source.isEmpty())throw new IOException("未取得主屏守护所在的 APK 路径");
@@ -48,19 +48,21 @@ final class NativePanelRoot {
    File temp=new File(RootControl.DATA,"hyperlux-main-panel.new");Files.write(temp.toPath(),bytes);Os.chmod(temp.toString(),0700);Files.move(temp.toPath(),BIN.toPath(),StandardCopyOption.REPLACE_EXISTING,StandardCopyOption.ATOMIC_MOVE);
   }
  }
- static void start(JSONObject selected)throws Exception{
+ static void start(JSONObject selected)throws Exception{start(selected,false,0);}
+ static void start(JSONObject selected,boolean follow,int enginePid)throws Exception{
   JSONObject current=PanelNodeDiscovery.discover(new File("/sys"));
   if(!current.optBoolean("supported")||!selected.optString("path").equals(current.optString("path"))||!selected.optString("canonical_path").equals(current.optString("canonical_path"))||selected.optInt("maximum",-1)!=current.optInt("maximum",-2))throw new IOException("主屏节点已变化，请重新打开面板");
    install();
    current=PanelNodeDiscovery.discover(new File("/sys"));
    if(!current.optBoolean("supported")||!selected.optString("path").equals(current.optString("path"))||!selected.optString("canonical_path").equals(current.optString("canonical_path"))||selected.optInt("maximum",-1)!=current.optInt("maximum",-2))throw new IOException("主屏节点已变化，请重新打开面板");
   JSONObject existing=null;try{existing=NativePanelClient.call("STATUS");}catch(Exception ignored){}
-  if(existing!=null){if(matches(current,existing))return;throw new IOException("已有守护使用其他节点，请先恢复自动亮度");}
+  if(existing!=null){if(matches(current,existing)&&(!follow||existing.optBoolean("control_center_listener")&&existing.optInt("control_center_pid")==enginePid))return;if(matches(current,existing)){stop();existing=null;}else throw new IOException("已有守护使用其他节点，请先恢复自动亮度");}
   File log=new File(RootControl.DATA,"main-panel.log");
-  Process guard=new ProcessBuilder(BIN.toString(),"--daemon","--node",current.getString("path")).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.to(log)).start();
+  java.util.List<String> command=new java.util.ArrayList<>(java.util.Arrays.asList(BIN.toString(),"--daemon","--node",current.getString("path")));if(follow){if(enginePid<=1)throw new IOException("系统进程身份无效");command.add("--control-center="+enginePid);}
+  Process guard=new ProcessBuilder(command).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.to(log)).start();
   String lastProbe="未取得就绪响应";long deadline=System.nanoTime()+1500000000L;
   while(System.nanoTime()<deadline){
-   try{JSONObject reply=NativePanelClient.call("STATUS");if(matches(current,reply))return;lastProbe=reply.toString();}catch(Exception unavailable){lastProbe=unavailable.toString();}
+   try{JSONObject reply=NativePanelClient.call("STATUS");if(matches(current,reply)&&(!follow||reply.optBoolean("control_center_listener")&&reply.optInt("control_center_pid")==enginePid))return;lastProbe=reply.toString();}catch(Exception unavailable){lastProbe=unavailable.toString();}
    if(!guard.isAlive())throw startFailure(log,"exit="+guard.exitValue()+"；就绪查询："+lastProbe);
    if(System.nanoTime()<deadline)Thread.sleep(50);
   }

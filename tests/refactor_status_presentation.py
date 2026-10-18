@@ -15,7 +15,7 @@ test=O/'StatusPresentationTest.java'
 test.write_text(r'''package top.rongshangs.lumacurve.refactor;
 import org.json.*;import java.util.*;import java.lang.reflect.*;
 class HookEntry{static Field field(Object o,String name)throws Exception{Class<?> c=o instanceof Class?(Class<?>)o:o.getClass();Field f=c.getDeclaredField(name);f.setAccessible(true);return f;}static Object get(Object o,String name)throws Exception{return field(o,name).get(o);}}
-class Collector{Object owner;boolean probingScenes;Collector(Object o){owner=o;}String outputStrategy(Object d){return null;}
+class Collector{final Assist assistCompat=new Assist();static class Assist{void put(JSONObject j){}}Object owner;boolean probingScenes;Collector(Object o){owner=o;}String outputStrategy(Object d){return null;}
 '''+collector+r'''}
 public class StatusPresentationTest{
  static int cases;static void check(boolean b){if(!b)throw new AssertionError("case "+cases);cases++;}

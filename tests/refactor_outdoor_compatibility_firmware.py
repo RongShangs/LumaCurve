@@ -43,4 +43,20 @@ for bundle,profile in [('analysis-20261013-110952-ba70da','legacy_opr'),('analys
         check(len(nits)==len(levels)+1)
         check(all(a<b for a,b in zip(levels,levels[1:])))
         check(all(a>=b>0 for a,b in zip(nits,nits[1:])))
-print(f'Outdoor compatibility firmware: {cases} checks PASS on 2 private actual user firmware collections; device not tested')
+# Optional evidence for the added native ambient-only HBM path; private input stays local.
+latest=ROOT/'build/compat-20261018-8ba0bd'
+if (latest/'state.json').exists():
+    import json
+    runtime=json.loads((latest/'state.json').read_bytes())['runtime'];outdoor=runtime['outdoor']
+    check(all(outdoor[k]==0 for k in ['original_time_window_ms','original_time_max_ms','original_time_min_ms']))
+    check(outdoor['original_minimum_lux']==4475 and outdoor['mIsTimeAvailable'] is True)
+    check(runtime['system_scene']['proximity_policy_enabled'] is False)
+    hbm=(latest/'disassembly/com.android.server.display.HighBrightnessModeController.txt').read_text(encoding='utf-8')
+    check('->minimumLux F' in method(hbm,'onAmbientLuxChange'))
+    timer=method(hbm,'recalculateTimeAllowance')
+    check('->timeMinMillis J' in timer and '->mIsTimeAvailable Z' in timer and 'if-ltz' in timer)
+    impl=(latest/'disassembly/com.android.server.display.AutomaticBrightnessControllerImpl.txt').read_text(encoding='utf-8')
+    drop=method(impl,'dropAmbientLuxIfNeeded');check(drop.index('->isTouchCoverProtectionActive()Z')<drop.index('->mUseProximityEnabled Z'))
+    check('->mProximityPositive Z' in drop)
+    init=method(impl,'initialize');check(init.index('->mUseProximityEnabled Z')<init.index('->getDefaultSensor(I)'))
+print(f'Outdoor compatibility firmware: {cases} checks PASS on private actual user firmware collections; device not tested')

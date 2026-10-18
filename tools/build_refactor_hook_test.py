@@ -2,7 +2,7 @@
 from pathlib import Path
 import argparse, hashlib, json, shutil, subprocess, urllib.request, zipfile, re, xml.etree.ElementTree as ET
 
-parser=argparse.ArgumentParser();parser.add_argument('--skip-device-fixtures',action='store_true',help='Rebuild without locally supplied proprietary firmware disassembly');args=parser.parse_args()
+parser=argparse.ArgumentParser();parser.add_argument('--skip-device-fixtures',action='store_true',help='Rebuild without locally supplied proprietary firmware disassembly');parser.add_argument('--verify-only',action='store_true',help='Compile and run all checks without replacing APK/source/site deliverables');args=parser.parse_args()
 
 ROOT=Path(__file__).resolve().parents[1]
 SRC=ROOT/'experimental/refactor_hook'
@@ -23,7 +23,7 @@ assert manifest.get('{http://schemas.android.com/apk/res/android}versionName')==
 VERSION_CODE=int(manifest.get('{http://schemas.android.com/apk/res/android}versionCode'))
 OUT=ROOT/'build/refactor-hook'
 KEY=OUT/'test-signing.p12'
-if not IS_TEST:validate_release_signing(KEY)
+if not IS_TEST and not args.verify_only:validate_release_signing(KEY)
 SDK=Path('D:/App/SDK'); BT=SDK/'build-tools/37.0.0'; ANDROID=SDK/'platforms/android-37.0/android.jar'
 OUT.mkdir(parents=True,exist_ok=True)
 # The web feed is updated independently; preserve the bundled offline fallback.
@@ -36,7 +36,11 @@ API_SHA='f48c635f1c7469fdec0e00ad2ea0b7a6b2f5b55065784a35b7ca3a84615e8e25'
 if not DEP.exists():
     with urllib.request.urlopen(API_URL,timeout=30) as response:DEP.write_bytes(response.read())
 assert hashlib.sha256(DEP.read_bytes()).hexdigest()==API_SHA,'compile dependency changed'
+
 def run(args):subprocess.run([str(a) for a in args],check=True)
+def maintenance_hashes():
+    names=['compatibility-manifest.json','compatibility-baseline.json','source-map.json','compatibility-index.md','compatibility-policy.md']
+    return {name:hashlib.sha256((ROOT/'docs/architecture'/name).read_bytes()).hexdigest() for name in names}
 def checked_test(path,pattern,*parameters):
     result=subprocess.run(['python',str(path),*[str(p) for p in parameters]],capture_output=True,text=True,encoding='utf-8',errors='replace')
     print(result.stdout,end='')
@@ -44,11 +48,24 @@ def checked_test(path,pattern,*parameters):
     result.check_returncode();matched=re.search(pattern,result.stdout)
     assert matched,'test result count missing'
     return int(matched.group(1))
+run(['python',ROOT/'tools/verify_compatibility.py'])
+compatibility_contract_cases=checked_test(ROOT/'tests/refactor_compatibility_contract.py',r'Compatibility contract regression: (\d+) cases PASS')
 diagnostic_cases=checked_test(ROOT/'tests/refactor_diagnostics.py',r'(\d+) host cases PASS')
 display_scheduling_cases=checked_test(ROOT/'tests/refactor_display_scheduling.py',r'(\d+) cases PASS')
 outdoor_node_cases=checked_test(ROOT/'tests/refactor_outdoor_node.py',r'Outdoor node compatibility: (\d+) cases PASS')
 outdoor_node_settings_cases=checked_test(ROOT/'tests/refactor_outdoor_node_settings.py',r'Outdoor node settings: (\d+) cases PASS')
+legacy_api_cases=checked_test(ROOT/'tests/refactor_legacy_api.py',r'(\d+) cases PASS')
+hook_transaction_cases=checked_test(ROOT/'tests/refactor_hook_transactions.py',r'Hook installation isolation: (\d+) cases PASS')
+assist_compat_firmware_cases=checked_test(ROOT/'tests/refactor_assist_compat_firmware.py',r'Assist compatibility firmware: (\d+) checks PASS')
+assist_compat_cases=checked_test(ROOT/'tests/refactor_assist_compat.py',r'Assist sensor compatibility: (\d+) cases PASS')
+curve_integrity_cases=checked_test(ROOT/'tests/refactor_curve_integrity.py',r'Refactor curve integrity: (\d+) cases PASS')
+control_center_cases=checked_test(ROOT/'tests/refactor_control_center.py',r'Control center total: (\d+) cases PASS')
+session_tools_cases=checked_test(ROOT/'tests/refactor_session_tools.py',r'(\d+) cases PASS')
 feature_self_check_cases=checked_test(ROOT/'tests/refactor_feature_self_check.py',r'Independent feature self-check: (\d+) cases PASS')
+feature_compatibility_cases=checked_test(ROOT/'tests/refactor_feature_compatibility.py',r'Feature compatibility catalogue: (\d+) cases PASS')
+feature_page_cases=checked_test(ROOT/'tests/refactor_feature_page.py',r'Feature check page: (\d+) cases PASS')
+welcome_cases=checked_test(ROOT/'tests/refactor_welcome.py',r'Welcome and tutorial: (\d+) cases PASS')
+os3_compatibility_cases=checked_test(ROOT/'tests/refactor_os3_compatibility.py',r'OS3 compatibility: (\d+) cases PASS')
 firmware_revalidation_cases=checked_test(ROOT/'tests/refactor_firmware_revalidation.py',r'Firmware revalidation: (\d+) cases PASS')
 state_writer_cases=checked_test(ROOT/'tests/refactor_state_writer.py',r'(\d+) cases PASS')
 device_observer_cases=checked_test(ROOT/'tests/device_runtime_observer.py',r'(\d+) cases PASS')
@@ -112,6 +129,14 @@ scene_cases=checked_test(ROOT/'tests/refactor_scenes.py',r'(\d+) cases PASS')
 scene_hook_cases=checked_test(ROOT/'tests/refactor_scene_hooks.py',r'(\d+) cases PASS')
 scene_firmware_cases=0
 if not args.skip_device_fixtures:scene_firmware_cases=checked_test(ROOT/'tests/refactor_scene_firmware.py',r'(\d+) checks PASS')
+if args.verify_only:
+    verification={'build':BUILD,'version':VERSION,'version_code':VERSION_CODE,'mode':'verification_only','device_fixtures':not args.skip_device_fixtures,'compatibility_contract_sha256':maintenance_hashes(),
+                  'cases':{key:value for key,value in list(locals().items()) if key.endswith('_cases') and isinstance(value,int)},
+                  'source_sha256':{p.relative_to(SRC).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted((SRC/'java').rglob('*.java'))},
+                  'apk_replaced':False,'published':False,'device_tested':False}
+    (OUT/'verification-only.json').write_text(json.dumps(verification,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+    print('Verification-only complete; existing APK, source, bundle and website artifacts retained')
+    raise SystemExit(0)
 NATIVE=SRC/'assets/hyperlux-main-panel'
 NDK=SDK/'ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/bin/clang.exe'
 run([NDK,'--target=aarch64-linux-android34','-Wl,--strip-all','-std=c11','-Os','-static','-Wall','-Wextra','-Werror','-Wno-misleading-indentation','-o',NATIVE,SRC/'native/main_panel.c'])
@@ -121,10 +146,12 @@ run([BT/'aapt2.exe','link','-I',ANDROID,'--manifest',SRC/'AndroidManifest.xml','
 DEX=OUT/'dex';DEX.mkdir(exist_ok=True)
 inputs=[p for p in CLASSES.rglob('*.class') if not p.name.startswith('RefactorTest')]
 run(['java','-cp',BT/'lib/d8.jar','com.android.tools.r8.D8','--min-api','34','--lib',ANDROID,'--lib',DEP,'--output',DEX,*inputs])
-with zipfile.ZipFile(UNSIGNED,'a',zipfile.ZIP_DEFLATED) as z:z.write(DEX/'classes.dex','classes.dex')
+with zipfile.ZipFile(UNSIGNED,'a',zipfile.ZIP_DEFLATED) as z:
+    z.write(DEX/'classes.dex','classes.dex')
 ALIGNED=OUT/'aligned.apk';run([BT/'zipalign.exe','-f','-p','4',UNSIGNED,ALIGNED])
 if not KEY.exists():run(['keytool','-genkeypair','-keystore',KEY,'-storepass','androidtest','-keypass','androidtest','-alias','lumacurve-experimental','-dname','CN=LumaCurve Experimental,O=RongShangs','-keyalg','RSA','-keysize','3072','-validity','3650'])
-DIST=ROOT/'dist'/('HyperLux-'+ARTIFACT_VERSION) if IS_TEST else ROOT/'dist';DIST.mkdir(parents=True,exist_ok=True)
+revision=re.fullmatch(r'release-'+re.escape(VERSION)+r'(-r[1-9][0-9]*)',BUILD)
+DIST=ROOT/'dist'/('HyperLux-'+ARTIFACT_VERSION+(revision.group(1) if revision else '')) if IS_TEST or IS_BETA or revision else ROOT/'dist';DIST.mkdir(parents=True,exist_ok=True)
 APK=DIST/('HyperLux-'+ARTIFACT_VERSION+'.apk')
 run(['java','-jar',BT/'lib/apksigner.jar','sign','--ks',KEY,'--ks-pass','pass:androidtest','--ks-key-alias','lumacurve-experimental','--out',APK,ALIGNED])
 run(['java','-jar',BT/'lib/apksigner.jar','verify','--verbose',APK])
@@ -132,11 +159,11 @@ run([BT/'zipalign.exe','-c','4',APK])
 native_asset_cases=checked_test(ROOT/'tests/refactor_native_asset.py',r'(\d+) cases PASS',APK)
 # Root recovery does not load any Xposed classes, and works if the app is uninstalled.
 HELPER=DIST/'luma-refactor-helper.jar'
-names={'OutdoorNodeTarget.class','RootFeatureChecks.class','FeatureSelfCheck.class','FeatureSelfCheck$Probe.class','OutdoorNodeRoot.class','OutdoorNodeProfile.class','ConfigurationCompatibility.class','PanelNodeDiscovery.class','SystemVersion.class','SystemVersion$Reader.class','SystemVersion$Result.class','NativePanelAsset.class','NativePanelClient.class','NativePanelRoot.class','BrightnessControlOptions.class','RootControl.class','RootSettings.class','ForegroundUser.class','CurvePlan.class','SavedCurve.class','CurveIdentity.class','TraditionalCurve.class','ThermalPolicy.class','MemoryPolicy.class','MemoryOptions.class','MemoryScene.class','LowLightThresholds.class','LowLightAssistGate.class','PersistentMemory.class','DelayPolicy.class','LegacyModules.class','AppBuild.class','LowLightPolicy.class','DiagnosticCollector.class','AdvancedOptions.class','AdvancedPolicy.class','OutdoorOptions.class','OutdoorPolicy.class','ConfigurationFile.class','ConfigurationFile$Imported.class','StatusTransport.class','StatusTransport$Reader.class'}
+names={'ControlCenterRoot.class','ControlCenterMapping.class','OutdoorNodeTarget.class','RootFeatureChecks.class','FeatureSelfCheck.class','FeatureSelfCheck$Probe.class','OutdoorNodeRoot.class','OutdoorNodeProfile.class','ConfigurationCompatibility.class','PanelNodeDiscovery.class','SystemVersion.class','SystemVersion$Reader.class','SystemVersion$Result.class','NativePanelAsset.class','NativePanelClient.class','NativePanelRoot.class','BrightnessControlOptions.class','RootControl.class','RootSettings.class','ForegroundUser.class','CurvePlan.class','SavedCurve.class','CurveIdentity.class','TraditionalCurve.class','ThermalPolicy.class','MemoryPolicy.class','MemoryOptions.class','MemoryScene.class','LowLightThresholds.class','LowLightAssistGate.class','PersistentMemory.class','DelayPolicy.class','LegacyModules.class','AppBuild.class','LowLightPolicy.class','DiagnosticCollector.class','AdvancedOptions.class','AdvancedPolicy.class','OutdoorOptions.class','OutdoorPolicy.class','ConfigurationFile.class','ConfigurationFile$Imported.class','StatusTransport.class','StatusTransport$Reader.class'}
 run(['java','-cp',BT/'lib/d8.jar','com.android.tools.r8.D8','--min-api','34','--lib',ANDROID,'--output',HELPER,*[p for p in inputs if p.name in names or p.name.startswith('DiagnosticCollector$')]])
 run(['C:/msys64/usr/bin/bash.exe','-n',SRC/'restore_refactor_hook_android.sh'])
-meta={'ui_preferences_cases':ui_preferences_cases,'ui_preferences_alias_independent':True,'app_preferences_cases':app_preferences_cases,'launcher_icon_toggle':True,'launcher_settings_entry_retained':True,'settings_notice_first_visit':True,'settings_notice_countdown_ms':10000,'settings_notice_local_acknowledgement':True,'outdoor_nit_ceiling':True,'outdoor_nit_ceiling_default':0,'outdoor_nit_ceiling_mapping':'primary_display_physical_nit','outdoor_nit_ceiling_preserved_by_presets':True,'sensor_callback_bursts_coalesced':True,'sensor_confirmation_interruptions_preserved':True,'dark_lock_requested_period_us':1000000,'disabled_output_paths_skip_service_checks':True,'device_observer_cases':device_observer_cases,'display_scheduling_cases':display_scheduling_cases,'screen_hook_deferred_cleanup':True,'unowned_screen_off_provider_writes':False,'oem_recalculation_queued':True,'sample_diagnostics_queued':True,'scene_settings_cases':scene_settings_cases,'scene_settings_inline':True,'scene_entry_exit_confirmation_separate':True,'scene_effect_controls':['touch_release_seconds','sunlight_enter','sunlight_exit'],'status_reading_gap_dp':8,'status_sensor_and_screen_row_dp':80,'status_fusion_row_dp':88,'status_fusion_inner_inset_dp':12,'status_fusion_value_gap_dp':4,'status_fusion_scene_gap_dp':2,'status_scene_separate_container':False,'status_thermal_limiting_text_red':False,'status_thermal_temperature_alert_red':True,'status_thermal_temperature_alert_scope':'thermal_output_limit_or_outdoor_temperature_block','status_fusion_rows_share_available_height':True,'outdoor_range_controls_in_main_settings':True,'status_protection_row_dp':108,'status_lux_clickable':False,'scene_cases':scene_cases,'scene_hook_cases':scene_hook_cases,'scene_custom_rules_max':0,'scene_legacy_rules_ignored':True,'scene_controls':9,'scene_catalog_entries':17,'scene_defaults_follow_oem':True,'scene_rules_only_restrict_entry':True,'scene_rules_confirm_entry_and_exit':True,'scene_rules_missing_facts_follow_oem':True,'status_curve_footer_single_line':True,'status_scene_entry_in_fusion':True,'status_output_protection_columns':3,'status_presentation_cases':status_presentation_cases,'scene_firmware_cases':scene_firmware_cases,'status_curve_guidance_matches_live_kind':True,'status_curve_guidance_in_blue_container':True,'status_modes_visible':True,'branch_report_sections':7,'build':BUILD,'version':ARTIFACT_VERSION,'version_code':VERSION_CODE,'test_build':IS_TEST,'internal_test_build':IS_INTERNAL,'release_channel':'internal' if IS_INTERNAL else 'compatibility_test' if IS_TEST else 'release','app_name':'HyperLux','architecture':'oem_active_curve_backend_hook','status_layout_cases':status_layout_cases,'status_page_uniform_spacing':False,'status_page_regular_gap_dp':16,'status_page_threshold_gap_dp':32,'status_page_horizontal_inset_dp':18,'status_protection_inner_inset_dp':12,'status_protection_cell_gap_dp':8,'status_protection_centered_cells':True,'status_protection_temperature_source':'battery','settings_home_scroll_restored':True,'scene_existing_conditions_editable':True,'status_page_short_viewport_scroll':True,'advice_text_cases':advice_text_cases,'status_advice_inline_guidance':True,'status_advice_guidance_in_all_states':True,'status_advice_height_changes_with_state':False,'app_update_cases':app_update_cases,'app_update_ignore_per_version':True,'app_update_downloads':['website','github_apk'],'ui_navigation_cases':ui_navigation_cases,'release_packaging_cases':release_packaging_cases,'formal_release_certificate_sha256':EXPECTED_RELEASE_CERT,'memory_pending_model_scope_checked':True,'live_limit_evidence_reset_on_config':True,'brightness_observer_cleanup_isolated':True,'status_advice_cases':status_advice_cases,'recovery_path_cases':recovery_path_cases,'status_advice_read_only':True,'status_limit_evidence_max_age_ms':5000,'settings_apply_in_navigation':True,'dark_lock_sensor_manager':'automatic_brightness_controller','dark_lock_sensor_matching':'type_and_handle','protected_hbm_threshold_access_fixed':True,'confirmed_night_driving_low_light_guard':True,'oem_night_debounce_budget_preserved':True,'low_light_threshold_value_diagnostics':True,'valid_zero_assist_bounded_confirmation':True,'manual_panel_backend':'raw_main_node','framework_output_bridge':False,'primary_node_auto_discovery':True,'node_discovery_cases':node_discovery_cases,'primary_node_permissions_bound_to_identity':True,'system_version_preflight':True,'system_version_cases':system_version_cases,'thermal_ceiling_range':[38,50],'outdoor_maximum_preset':True,'panel_interaction_cases':panel_interaction_cases,'raw_output_cases':raw_output_cases,'raw_panel_unlock_restore':True,'raw_panel_pauses_during_keyguard_and_aod':True,'raw_panel_relative_gesture':True,'raw_panel_positive_output_isolation':True,
-      'device_verified':False,'state_writer_cases':state_writer_cases,'state_writes_off_display_thread':True,'state_writer_pending_groups_max':2,'state_writer_chunk_order_preserved':True,'panel_access_cases':panel_access_cases,'primary_node_access_open_probe':True,'primary_node_probe_no_brightness_write':True,'native_build':'raw07-openprobe','draft_health_cases':draft_health_cases,'draft_changes_during_save_preserved':True,'native_health_monotonic_heartbeat_ms':2000,'native_health_max_age_ms':5000,'raw_dark_handover_auto_recovery':True,'raw_lost_ack_session_rollback':True,'memory_firmware_checks':memory_firmware_cases,'compile_api':82,'compile_api_sha256':API_SHA,
+meta={'ui_preferences_cases':ui_preferences_cases,'ui_preferences_alias_independent':True,'app_preferences_cases':app_preferences_cases,'launcher_icon_toggle':True,'launcher_settings_entry_retained':True,'settings_notice_first_visit':False,'settings_notice_countdown_ms':0,'settings_notice_local_acknowledgement':False,'outdoor_nit_ceiling':True,'outdoor_nit_ceiling_default':0,'outdoor_nit_ceiling_mapping':'primary_display_physical_nit','outdoor_nit_ceiling_preserved_by_presets':True,'sensor_callback_bursts_coalesced':True,'sensor_confirmation_interruptions_preserved':True,'dark_lock_requested_period_us':1000000,'disabled_output_paths_skip_service_checks':True,'device_observer_cases':device_observer_cases,'display_scheduling_cases':display_scheduling_cases,'screen_hook_deferred_cleanup':True,'unowned_screen_off_provider_writes':False,'oem_recalculation_queued':True,'sample_diagnostics_queued':True,'scene_settings_cases':scene_settings_cases,'scene_settings_inline':True,'scene_entry_exit_confirmation_separate':True,'scene_effect_controls':['touch_release_seconds','sunlight_enter','sunlight_exit'],'status_reading_gap_dp':8,'status_sensor_and_screen_row_dp':80,'status_fusion_row_dp':88,'status_fusion_inner_inset_dp':12,'status_fusion_value_gap_dp':4,'status_fusion_scene_gap_dp':2,'status_scene_separate_container':False,'status_thermal_limiting_text_red':False,'status_thermal_temperature_alert_red':True,'status_thermal_temperature_alert_scope':'thermal_output_limit_or_outdoor_temperature_block','status_fusion_rows_share_available_height':True,'outdoor_range_controls_in_main_settings':True,'status_protection_row_dp':108,'status_lux_clickable':False,'scene_cases':scene_cases,'scene_hook_cases':scene_hook_cases,'scene_custom_rules_max':0,'scene_legacy_rules_ignored':True,'scene_controls':9,'scene_catalog_entries':17,'scene_defaults_follow_oem':True,'scene_rules_only_restrict_entry':True,'scene_rules_confirm_entry_and_exit':True,'scene_rules_missing_facts_follow_oem':True,'status_curve_footer_single_line':True,'status_scene_entry_in_fusion':True,'status_output_protection_columns':3,'status_presentation_cases':status_presentation_cases,'scene_firmware_cases':scene_firmware_cases,'status_curve_guidance_matches_live_kind':True,'status_curve_guidance_in_blue_container':True,'status_modes_visible':True,'branch_report_sections':7,'build':BUILD,'version':ARTIFACT_VERSION,'version_code':VERSION_CODE,'test_build':IS_TEST,'internal_test_build':IS_INTERNAL,'release_channel':'internal' if IS_INTERNAL else 'compatibility_test' if IS_TEST else 'release','app_name':'HyperLux','architecture':'oem_active_curve_backend_hook','status_layout_cases':status_layout_cases,'status_page_uniform_spacing':False,'status_page_regular_gap_dp':16,'status_page_threshold_gap_dp':32,'status_page_horizontal_inset_dp':18,'status_protection_inner_inset_dp':12,'status_protection_cell_gap_dp':8,'status_protection_centered_cells':True,'status_protection_temperature_source':'battery','settings_home_scroll_restored':True,'scene_existing_conditions_editable':True,'status_page_short_viewport_scroll':True,'advice_text_cases':advice_text_cases,'status_advice_inline_guidance':True,'status_advice_guidance_in_all_states':True,'status_advice_height_changes_with_state':False,'app_update_cases':app_update_cases,'app_update_ignore_per_version':True,'app_update_downloads':['website','github_apk'],'ui_navigation_cases':ui_navigation_cases,'release_packaging_cases':release_packaging_cases,'formal_release_certificate_sha256':EXPECTED_RELEASE_CERT,'memory_pending_model_scope_checked':True,'live_limit_evidence_reset_on_config':True,'brightness_observer_cleanup_isolated':True,'status_advice_cases':status_advice_cases,'recovery_path_cases':recovery_path_cases,'status_advice_read_only':True,'status_limit_evidence_max_age_ms':5000,'settings_apply_in_navigation':True,'dark_lock_sensor_manager':'automatic_brightness_controller','dark_lock_sensor_matching':'type_and_handle','protected_hbm_threshold_access_fixed':True,'confirmed_night_driving_low_light_guard':True,'oem_night_debounce_budget_preserved':True,'low_light_threshold_value_diagnostics':True,'valid_zero_assist_bounded_confirmation':True,'manual_panel_backend':'raw_main_node','framework_output_bridge':False,'primary_node_auto_discovery':True,'node_discovery_cases':node_discovery_cases,'primary_node_permissions_bound_to_identity':True,'system_version_preflight':True,'system_version_cases':system_version_cases,'thermal_ceiling_range':[38,50],'outdoor_maximum_preset':True,'panel_interaction_cases':panel_interaction_cases,'raw_output_cases':raw_output_cases,'raw_panel_unlock_restore':True,'raw_panel_pauses_during_keyguard_and_aod':True,'raw_panel_relative_gesture':True,'raw_panel_positive_output_isolation':True,
+      'device_verified':False,'state_writer_cases':state_writer_cases,'state_writes_off_display_thread':True,'state_writer_pending_groups_max':3,'state_writer_chunk_order_preserved':True,'panel_access_cases':panel_access_cases,'primary_node_access_open_probe':True,'primary_node_probe_no_brightness_write':True,'native_build':'raw08-slider','draft_health_cases':draft_health_cases,'draft_changes_during_save_preserved':True,'native_health_monotonic_heartbeat_ms':2000,'native_health_max_age_ms':5000,'raw_dark_handover_auto_recovery':True,'raw_lost_ack_session_rollback':True,'memory_firmware_checks':memory_firmware_cases,'compile_api':82,'legacy_compile_api':82,'compile_api_sha256':API_SHA,
       'sdk_compile':37,'sdk_min':34,'separate_output_daemon':True,'raw_main_panel_native_guard':True,'native_source_sha256':{p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in (SRC/'native').glob('*') if p.is_file()},'native_guard_sha256':hashlib.sha256(NATIVE.read_bytes()).hexdigest(),
       'firmware_static_checks':not args.skip_device_fixtures,'host_cases':host_cases,
       'package':'top.rongshangs.lumacurve','languages':['zh','en'],'direct_point_editor':True,'system_light_change_delays_optional':True,'apk_update_repo':'RongShangs/LumaCurve',
@@ -148,30 +175,45 @@ meta={'ui_preferences_cases':ui_preferences_cases,'ui_preferences_alias_independ
       'persistent_manual_memory':True,'persistent_memory_default':False,'persistent_memory_cases':memory_cases,'memory_lifecycle_cases':memory_lifecycle_cases,'persistent_memory_record_limit':8192,'persistent_memory_retention_days':[1,90],'persistent_memory_capacity':'backend_native','memory_lifecycle_observed':True,'memory_wake_same_scene_default':True,'memory_native_reset_override_default':False,'dark_mode':'system','editable_base_points':4,'module_long_term_learning':False,'oem_anchor_memory_adjustable':True,'thermal_display_relaxation':True,'source_sha256':{p.relative_to(SRC).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in (SRC/'java').rglob('*.java')},
       'apk_sha256':hashlib.sha256(APK.read_bytes()).hexdigest()}
 # A smoke report belongs to one exact APK; a rebuild must not inherit old device claims.
-meta.update({'beta_build':IS_BETA,'release_channel':'beta' if IS_BETA else meta['release_channel'],
+meta.update({'feature_compatibility_cases':feature_compatibility_cases,'feature_page_cases':feature_page_cases,'feature_check_page':'logs_secondary','feature_check_routes_expandable':True,'feature_check_unused_routes_explained':True,'feature_check_no_brightness_probe':True,'compatibility_additive_required':True,'upgrade_preserves_preferences_required':True,'hbm_tuning_profiles':['timed_budget','ambient_only'],'hbm_zero_timers_preserved':True,'ordinary_proximity_disabled_explained':True,'control_center_mapping_entry_visible':False,'memory_keep_ranges':['mode_switch','screen_off','reboot'],'memory_keep_ranges_independent':True,'memory_keep_mode_default':False,'memory_keep_forever_default':False,'memory_session_only_without_disk':True,'memory_mode_change_uses_existing_observer':True,'memory_keep_group':'保持记忆','curve_integrity_cases':curve_integrity_cases,'curve_baseline_readback':True,'curve_repair_scope':'reset_drag_handover_known_baselines','curve_integrity_device_tested':False,'assist_compat_firmware_cases':assist_compat_firmware_cases,'assist_compat_cases':assist_compat_cases,'assist_sensor_compatibility':'missing_oem_slot_and_constructor_cache','assist_sensor_extra_listener':False,'assist_sensor_device_tested':False,'control_center_cases':control_center_cases,'legacy_api_cases':legacy_api_cases,'session_tools_cases':session_tools_cases,'modern_api':None,'hook_interface':'legacy_api_82','modern_api_packaged':False,'hot_reload_enabled':False,'update_popup_page':'about_only','control_center_node_modes':['off','manual_only','manual_and_auto'],'control_center_mapping':'bidirectional_device_coordinates_v2','control_center_auto_kept_enabled':True,'control_center_raw_writer':False,'control_center_calibration_off_display_thread':True,'control_center_device_tested':False,'temporary_screen_on_scope':'until_screen_off_or_disable','beta_build':IS_BETA,'release_channel':'beta' if IS_BETA else meta['release_channel'],
     'feature_self_check_cases':feature_self_check_cases,'feature_checks_every_start':True,'os_version_gate':False,'feature_check_readiness_retry_ms':[1000,5000,15000],'outdoor_node_settings_cases':outdoor_node_settings_cases,'outdoor_node_cases':outdoor_node_cases,'outdoor_node_opt_in':True,'outdoor_node_model_allowlist':False,'outdoor_node_max_burst_ms':None,'outdoor_node_duration_policy':'outdoor_session','outdoor_node_target_kind':'raw_node','outdoor_node_target_default':'device_maximum','outdoor_node_target_independent_of_strength':True,'outdoor_node_target_maximum_source':'primary_node_max_brightness','outdoor_node_lease_ms':1500,'outdoor_node_system_override_yields':True,'firmware_revalidation_cases':firmware_revalidation_cases,'ota_matching_baseline_revalidated':True,'saved_curve_cases':saved_curve_cases,'learned_curve_to_baseline':True,'dark_lock_manual_behavior_selectable':True,'dark_lock_manual_exit_default':False,'dark_lock_manual_default_continues':True,'memory_restore_unlock_default':False,
     'saved_curve_transaction_cases':saved_curve_transaction_cases,'learned_curve_save_requires_fresh_snapshot':True,
     'application_auto_brightness_list':True,'foreground_source':'system_focus_and_visibility_events','foreground_settle_ms':150,'foreground_polling':False,'foreground_multiwindow_visible_tasks':True,'foreground_service_queries_off_display_thread':True,'foreground_query_timeout_ms':3000,'foreground_query_worker_idle_seconds':10,'foreground_query_queue_limit':8,'foreground_task_query_limit':128,'foreground_fallback':'focus_only_with_notice','additional_resident_process':False,'additional_resident_process_scope':'foreground_application_list','outdoor_node_additional_process_when_enabled':True,
     'foreground_firmware_cases':foreground_firmware_cases,
     'outdoor_compatibility_cases':outdoor_compatibility_cases,'outdoor_compatibility_firmware_cases':outdoor_compatibility_firmware_cases,
-    'outdoor_sdr_profiles':['privacy_aware','legacy_opr'],'outdoor_sdr_profiles_mutually_exclusive':True})
+    'outdoor_sdr_profiles':['privacy_aware','legacy_opr'],'outdoor_sdr_profiles_mutually_exclusive':True,
+    'os3_compatibility_cases':os3_compatibility_cases,'os3_device_tested':False,
+    'response_scene_profiles':['native_driving','native_without_driving'],
+    'hbm_controller_profiles':['enabled_field','native_support_method'],
+    'outdoor_target_profiles':['override_target','legacy_custom_target'],
+    'feature_check_page_open_rechecks':False,'feature_check_resume_rechecks':False,
+    'feature_check_timestamp':'fixed_wall_time_with_elapsed_fallback','feature_check_compact_rows':True,
+    'welcome_cases':welcome_cases,'first_run_welcome':True,'tutorial_pages':5,'tutorial_replay_separate_card':True,'tutorial_page_transitions':True,'tutorial_feedback_page':True,'tutorial_feedback_github':False,
+    'tutorial_replay_entry':'运行状态与界面','tutorial_replay_includes_welcome':True,'welcome_optional_tutorial':False,'welcome_logo_float':True,
+    'welcome_logo_float_duration_ms':3600,'welcome_logo_float_amplitude_dp':4,'welcome_first_run_completion':'after_page_5',
+    'welcome_header_visible':False,'welcome_secondary_description':False,'welcome_brand_highlight':True,'tutorial_replay_hint_pages':[1,2,3,4,5],
+    'welcome_before_root_request':True,'legacy_notice_record_preserved':True})
 device_report=ROOT/'build'/('device-smoke-'+BUILD+'.json')
 if device_report.is_file() and device_report.stat().st_size<=16384:
     report=json.loads(device_report.read_text(encoding='utf-8'))
     if report.get('build')==BUILD and report.get('apk_sha256')==meta['apk_sha256']:
         meta['device_smoke']=report
+meta.update({'compatibility_contract_cases':compatibility_contract_cases,'hook_transaction_cases':hook_transaction_cases,'compatibility_contract_sha256':maintenance_hashes()})
 (OUT/'verification.json').write_text(json.dumps(meta,ensure_ascii=False,indent=2),encoding='utf-8')
 with zipfile.ZipFile(APK) as z:
     assert z.testzip() is None
-    assert z.read('assets/xposed_init').strip()==b'top.rongshangs.lumacurve.refactor.HookEntry'
+    assert z.read('assets/xposed_init').strip()==b'top.rongshangs.lumacurve.refactor.LegacyEntry'
     assert 'classes.dex' in z.namelist()
-    assert b'Lde/robv/android/xposed/XposedBridge;' in z.read('classes.dex')
+    assert not any(name.startswith('META-INF/xposed/') for name in z.namelist()),'unexpected modern entry metadata'
+    assert b'Lio/github/libxposed/' not in z.read('classes.dex'),'unexpected modern API runtime reference'
     assert not any(name.endswith('.jar') or 'firmware' in name for name in z.namelist());assert 'assets/hyperlux-main-panel' in z.namelist()
 archive_prefix='HyperLux' if IS_TEST else 'LumaCurve'
 source=DIST/(archive_prefix+'-'+ARTIFACT_VERSION+'-source.zip')
 with zipfile.ZipFile(source,'w',zipfile.ZIP_DEFLATED) as z:
-    for n in ['refactor_outdoor_node_settings.py','refactor_feature_self_check.py','refactor_outdoor_node.py','refactor_firmware_revalidation.py']:z.write(ROOT/'tests'/n,'tests/'+n)
+    for n in ['refactor_assist_compat.py','refactor_assist_compat_firmware.py','refactor_control_center.py','refactor_control_center_root.py','refactor_legacy_api.py','refactor_session_tools.py','refactor_outdoor_node_settings.py','refactor_feature_self_check.py','refactor_outdoor_node.py','refactor_firmware_revalidation.py']:z.write(ROOT/'tests'/n,'tests/'+n)
     z.write(ROOT/'tests/refactor_saved_curve.py','tests/refactor_saved_curve.py')
+    z.write(ROOT/'tests/refactor_curve_integrity.py','tests/refactor_curve_integrity.py')
+    for name in ['refactor_feature_compatibility.py','refactor_feature_page.py','refactor_os3_compatibility.py','refactor_welcome.py']:z.write(ROOT/'tests'/name,'tests/'+name)
     z.write(ROOT/'tests/refactor_saved_curve_transaction.py','tests/refactor_saved_curve_transaction.py')
     z.write(ROOT/'tests/refactor_foreground_firmware.py','tests/refactor_foreground_firmware.py')
     for name in ['refactor_outdoor_compatibility.py','refactor_outdoor_compatibility_firmware.py']:z.write(ROOT/'tests'/name,'tests/'+name)
@@ -181,11 +223,15 @@ with zipfile.ZipFile(source,'w',zipfile.ZIP_DEFLATED) as z:
         if p.is_file():z.write(p,p.relative_to(ROOT))
     z.write(ROOT/'LICENSE','LICENSE');z.write(ROOT/'README.md','README.md');z.write(ROOT/'CHANGELOG.md','CHANGELOG.md');z.write(Path(__file__),'tools/build_refactor_hook_test.py');z.write(ROOT/'tests/refactor_hook_firmware.py','tests/refactor_hook_firmware.py');z.write(ROOT/'tests/refactor_diagnostics.py','tests/refactor_diagnostics.py')
     for name in ['device_runtime_observer.py','refactor_display_scheduling.py','refactor_panel_access.py','refactor_draft_and_health.py','refactor_panel_nodes.py','refactor_curve_comparison.py','refactor_panel_interaction.py','refactor_raw_output.py','refactor_native_transport.py','refactor_native_asset.py','refactor_raw_panel_transaction.py','refactor_native_panel.py','refactor_brightness_control.py','refactor_advanced_hooks.py','refactor_advanced_firmware.py','refactor_traditional.py','refactor_traditional_firmware.py','refactor_user_identity.py','refactor_system_version.py','refactor_outdoor.py','refactor_outdoor_firmware.py','refactor_configuration.py','refactor_status_transport.py','refactor_persistent_memory.py','refactor_memory_lifecycle.py','refactor_memory_firmware.py']:z.write(ROOT/'tests'/name,'tests/'+name)
-    for p in sorted((ROOT/'docs/releases').glob('*.md')):z.write(p,p.relative_to(ROOT))
-    for p in sorted((ROOT/'docs/reviews').glob('*.md')):z.write(p,p.relative_to(ROOT))
+    for folder in ['docs/releases','docs/reviews','docs/guides','docs/archive','docs/architecture']:
+        for p in sorted((ROOT/folder).rglob('*.md')):z.write(p,p.relative_to(ROOT))
+    for p in sorted((ROOT/'docs/architecture').glob('*.json')):z.write(p,p.relative_to(ROOT))
+    for p in sorted((ROOT/'.github/workflows').glob('*.yml')):z.write(p,p.relative_to(ROOT))
+    z.write(ROOT/'tools/verify_compatibility.py','tools/verify_compatibility.py')
+    for name in ['refactor_hook_transactions.py','refactor_compatibility_contract.py']:z.write(ROOT/'tests'/name,'tests/'+name)
+    for name in ['AGENTS.md','PROJECT.md','PROJECT_SCOPE.md','docs/README.md','docs/来源与许可证.md']:z.write(ROOT/name,name)
+    z.write(ROOT/'tools/sync_project_document.py','tools/sync_project_document.py')
     z.write(ROOT/'docs/release-policy.md','docs/release-policy.md')
-    review=ROOT/'docs'/('review-'+VERSION+'.md')
-    if review.is_file():z.write(review,review.relative_to(ROOT))
     handoff=ROOT/'AGENT_HANDOFF.md'
     if handoff.is_file():z.write(handoff,'AGENT_HANDOFF.md')
     z.write(OUT/'verification.json','build-info.json')

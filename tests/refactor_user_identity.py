@@ -22,7 +22,7 @@ sources={
 'android/content/Context.java':'''package android.content;public class Context {public static final String USER_SERVICE="user";public Object users;public Object getSystemService(String service){if(!USER_SERVICE.equals(service))throw new AssertionError();return users;}}''',
 'top/rongshangs/lumacurve/refactor/HookEntry.java':'''package top.rongshangs.lumacurve.refactor;import android.os.*;class HookEntry {static final ForegroundUser currentUser=new ForegroundUser();'''+method('HookEntry.java','static void refreshCurrentUser(')+'}',
 'top/rongshangs/lumacurve/refactor/RootControl.java':'''package top.rongshangs.lumacurve.refactor;import java.util.*;import java.io.IOException;import org.json.*;class RootControl {
- boolean selfCheckNext;static final String REFRESH="refresh";JSONObject state;android.content.Context context;boolean deliver=true;Settings settings=new Settings();
+ boolean selfCheckNext;String selfCheckReason="manual";static final String REFRESH="refresh";JSONObject state;android.content.Context context;boolean deliver=true;Settings settings=new Settings();
  JSONObject live(){return state;}class Settings{void put(String k,String v)throws Exception{if(!REFRESH.equals(k))throw new AssertionError();if(deliver){HookEntry.refreshCurrentUser(context);state=new JSONObject().put("elapsed_ms",state.getLong("elapsed_ms")+1).put("user_serial",HookEntry.currentUser.serial());}}}
 '''+method('RootControl.java','JSONObject refreshedLive()')+method('RootControl.java','JSONObject refreshedLive(boolean')+'}',
 'top/rongshangs/lumacurve/refactor/UserIdentityTest.java':'''package top.rongshangs.lumacurve.refactor;import android.os.*;import android.app.ActivityManager;import android.content.Context;import org.json.*;

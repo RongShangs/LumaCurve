@@ -18,6 +18,7 @@
 #include <stddef.h>
 #include <limits.h>
 #include "panel_policy.h"
+#include "control_center_policy.h"
 #include "panel_node.h"
 #define DIR "/data/adb/luma_curve_refactor_test"
 #define RECORD DIR "/main-panel-permissions"
@@ -31,6 +32,7 @@ static volatile sig_atomic_t stopping;
 static int64_t due;
 static int corrections;
 static int64_t last_correction_log;
+static int control_center_listener,control_center_pid;
 static int read_lease(struct panel_lease *lease);
 static int64_t clock_ms(void){struct timespec t;clock_gettime(CLOCK_MONOTONIC,&t);return (int64_t)t.tv_sec*1000+t.tv_nsec/1000000;}
 static void signal_stop(int sig){(void)sig;stopping=1;}
@@ -118,7 +120,7 @@ static int private_lock(void){
  return 0;
 }
 static void response(int c,int ok,const char *reason){
- char out[2048];int n=snprintf(out,sizeof(out),"{\"ok\":%s,\"reason\":\"%s\",\"backend\":\"raw_main_node\",\"native_build\":\"raw07-openprobe\",\"path\":\"%s\",\"canonical_path\":\"%s\",\"target\":%d,\"actual\":%d,\"maximum\":%d,\"armed\":%s,\"paused\":%s,\"session\":\"%s\",\"write_attempts\":%d,\"write_successes\":%d,\"corrections\":%d,\"errno\":%d}\n",ok?"true":"false",reason,node,real_node,state.target,number(node),maximum,state.armed?"true":"false",state.paused?"true":"false",state.token,attempts,successes,corrections,last_error);
+ char out[2048];int n=snprintf(out,sizeof(out),"{\"ok\":%s,\"reason\":\"%s\",\"backend\":\"raw_main_node\",\"native_build\":\"raw08-slider\",\"path\":\"%s\",\"canonical_path\":\"%s\",\"control_center_listener\":%s,\"control_center_pid\":%d,\"target\":%d,\"actual\":%d,\"maximum\":%d,\"armed\":%s,\"paused\":%s,\"session\":\"%s\",\"write_attempts\":%d,\"write_successes\":%d,\"corrections\":%d,\"errno\":%d}\n",ok?"true":"false",reason,node,real_node,control_center_listener?"true":"false",control_center_pid,state.target,number(node),maximum,state.armed?"true":"false",state.paused?"true":"false",state.token,attempts,successes,corrections,last_error);
  if(n>0&&(size_t)n<sizeof(out))send(c,out,(size_t)n,MSG_NOSIGNAL);
 }
 static int read_lease(struct panel_lease *lease){
@@ -177,14 +179,15 @@ int main(int argc,char **argv){
  if(load_boot())return startup_fail(3,"boot_identity");
  if(restore_record())return startup_fail(3,"restore_permissions");
  if(argc==2&&!strcmp(argv[1],"--recover"))return 0;
- if(argc!=4||strcmp(argv[1],"--daemon")||strcmp(argv[2],"--node"))return 2;
+ if((argc!=4&&argc!=5)||strcmp(argv[1],"--daemon")||strcmp(argv[2],"--node"))return 2;
+ control_center_listener=argc==5&&!strncmp(argv[4],"--control-center=",17);if(argc==5&&!control_center_listener)return 2;if(control_center_listener){char end; if(sscanf(argv[4]+17,"%d%c",&control_center_pid,&end)!=1||control_center_pid<=1)return 2;}
  if(resolve_node(argv[3]))return startup_fail(4,"primary_node_identity");
  setsid();if(escape_freezer())return startup_fail(6,"escape_app_freezer");
  maximum=number(max_node);int current=number(node);if(maximum<=10||maximum>65535||current<0||current>maximum)return startup_fail(4,"main_panel_range");
  // Open-only check before Java asks the system to disable automatic brightness.
  int probe=open_output();if(probe<0)return startup_fail(4,"primary_node_open");close(probe);
  int server=bind_server();if(server<0)return startup_fail(5,"control_socket");
- fprintf(stderr,"NATIVE_READY build=raw07-openprobe pid=%d maximum=%d path=%s real=%s\n",getpid(),maximum,node,real_node);
+ fprintf(stderr,"NATIVE_READY build=raw08-slider pid=%d maximum=%d path=%s real=%s\n",getpid(),maximum,node,real_node);
  signal(SIGTERM,signal_stop);signal(SIGINT,signal_stop);signal(SIGHUP,signal_stop);signal(SIGPIPE,SIG_IGN);panel_clear(&state);
  // Lease rename wakes the guard immediately on screen-off/DOZE or automatic mode.
  int events=inotify_init1(IN_NONBLOCK|IN_CLOEXEC);
@@ -192,22 +195,26 @@ int main(int argc,char **argv){
  int64_t idle=clock_ms()+10000;
  while(!stopping){
   int64_t now=clock_ms();
+  if(control_center_listener&&kill(control_center_pid,0))break;
   if(state.armed){struct panel_lease lease;
-   if(!read_lease(&lease)||lease.pid!=state.pid||kill(state.pid,0))break;
+   if(!read_lease(&lease)||lease.pid!=state.pid||kill(state.pid,0)){if(!control_center_listener)break;if(release_output())break;panel_clear(&state);health(0);continue;}
    int changed=strcmp(lease.token,state.token)||state.paused==lease.active;
    strcpy(state.token,lease.token);state.expires=lease.expires;state.target=lease.target;state.paused=!lease.active;
    if(state.paused){if(output>=0&&release_output())break;}
    if(changed){due=now;if(health(1))break;fprintf(stderr,"NATIVE_%s target=%d\n",state.paused?"PAUSED":"RESUMED",state.target);}
   }
   if(state.armed&&now-health_at>=2000&&health(1))break;
-  if(!state.armed&&now>=idle)break;
+  if(!state.armed&&control_center_listener){struct panel_lease candidate;
+   if(read_lease(&candidate)&&control_center_admit(&candidate,control_center_pid,maximum,now)&&!kill(candidate.pid,0)&&panel_arm(&state,candidate.token,candidate.pid,now)){state.expires=candidate.expires;state.target=candidate.target;state.paused=0;due=now;if(health(1))break;}
+  }
+  if(!state.armed&&!control_center_listener&&now>=idle)break;
   if(state.armed&&!state.paused&&state.target>=10&&now>=due){
    if(!same_node()){last_error=ESTALE;break;}
    int current=number(node);if(current<0){last_error=EIO;break;}
    if(panel_output_live(current)&&current!=state.target){int result=write_output(state.target);if(result<0)break;if(!result){corrections++;if(corrections<=8||now-last_correction_log>=30000){last_correction_log=now;fprintf(stderr,"NATIVE_CORRECTION actual=%d target=%d count=%d\n",current,state.target,corrections);}}}
    due=now+250;
   }
-  int64_t deadline=state.armed?state.expires:idle;if(state.armed&&!state.paused&&state.target>=10&&due<deadline)deadline=due;
+  int64_t deadline=state.armed?state.expires:control_center_listener?now+60000:idle;if(state.armed&&!state.paused&&state.target>=10&&due<deadline)deadline=due;
   if(state.armed&&health_at+2000<deadline)deadline=health_at+2000;
   int ms=(int)(deadline-now);if(ms<0)ms=0;if(events<0&&ms>250)ms=250;
   struct pollfd p[2]={{.fd=server,.events=POLLIN},{.fd=events,.events=POLLIN}};int ready=poll(p,events>=0?2:1,ms);

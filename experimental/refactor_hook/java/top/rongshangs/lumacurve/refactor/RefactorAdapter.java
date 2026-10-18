@@ -8,9 +8,11 @@ public final class RefactorAdapter extends CurveBackend {
     private final Object target;
     private final Map<String,Field> fields=new HashMap<>();
     private final Method reset;
+    private final CurvePlan factoryPlan;
     private volatile CurvePlan active;
     private float[] activeFactors;
     private float activeFloor;
+    private long repairs;
     private static final String[] ARRAYS={"mAnchorLux","mAnchorNit","mAnchorOrder","mAnchorIsUserDrag",
         "mGoodAnchorLux","mGoodAnchorNit","mGoodAnchorOrder","mGoodAnchorIsUserDrag"};
     private static final String[] BASE={"mDefNit0","mDefNit30","mDefNitMidHigh"};
@@ -25,7 +27,7 @@ public final class RefactorAdapter extends CurveBackend {
         if(field("mIsHaveGoodCurve").getType()!=boolean.class)throw new IllegalArgumentException("曲线状态类型已变化");
         factoryLux=new float[]{0,number("mLuxSeg0"),number("mLuxSeg1"),number("mLuxMax")};
         factoryNit=new float[]{number("mDefNit0"),number("mDefNit30"),number("mDefNitMidHigh"),max};
-        new CurvePlan(factoryLux,factoryNit,min,max,new float[]{1,1,1,1});
+        factoryPlan=new CurvePlan(factoryLux,factoryNit,min,max,new float[]{1,1,1,1});
         for(String name:ARRAYS) {
             Object array=get(name);
             Class<?> required=name.endsWith("Order")?int[].class:name.endsWith("Drag")?boolean[].class:float[].class;
@@ -66,7 +68,7 @@ public final class RefactorAdapter extends CurveBackend {
         for(String name:ARRAYS){Object array=get(name),copy=Array.newInstance(array.getClass().getComponentType(),Array.getLength(array));System.arraycopy(array,0,copy,0,Array.getLength(array));before.put(name,copy);}
         for(String name:SCALARS)before.put(name,get(name));
         try{if(replace){reset.invoke(target);afterReset();}Method method=target.getClass().getDeclaredMethod("updateLogicalCurve",float.class,float.class);method.setAccessible(true);
-            for(int i=0;i<points.length();i++){org.json.JSONObject p=points.getJSONObject(i);method.invoke(target,(float)p.getDouble("lux"),(float)p.getDouble("value"));}
+            for(int i=0;i<points.length();i++){org.json.JSONObject p=points.getJSONObject(i);method.invoke(target,(float)p.getDouble("lux"),(float)p.getDouble("value"));reconcile();}
         }catch(Throwable error){for(String name:ARRAYS){Object copy=before.get(name);System.arraycopy(copy,0,get(name),0,Array.getLength(copy));}for(String name:SCALARS)set(name,before.get(name));throw new IllegalStateException("手动记忆恢复失败，已回滚",error);}
     }
     public void clearMemory()throws Exception{configure(activeFactors,activeFloor);}
@@ -95,6 +97,7 @@ public final class RefactorAdapter extends CurveBackend {
             // This works even if private interpolation helpers were inlined by ART.
             for(int i=0;i<3;i++)set(BASE[i],desired[i]);
             reset.invoke(target);afterReset();
+            if(next!=null&&!baselineMatches(next))throw new IllegalStateException("基础曲线字段读回不一致");
             activeFactors=factors==null?null:factors.clone();
             activeFloor=factors==null?0:floor;
         }
@@ -117,5 +120,69 @@ public final class RefactorAdapter extends CurveBackend {
             System.arraycopy(y,0,get(prefix+"Nit"),0,y.length);
         }
         set("mAnchorCount",x.length);set("mGoodAnchorCount",x.length);
+        writeBaseline(plan);
+    }
+    private void writeBaseline(CurvePlan p)throws Exception{for(int i=0;i<BASE.length;i++)set(BASE[i],p.at(factoryLux[i]));}
+    private boolean baselineMatches(CurvePlan p)throws Exception{for(int i=0;i<BASE.length;i++)if(!close(number(BASE[i]),p.at(factoryLux[i])))return false;return true;}
+    private static boolean close(float a,float b){return Float.isFinite(a)&&Float.isFinite(b)&&Math.abs(a-b)<=Math.max(.0001f,Math.abs(b)*.000001f);}
+    // Same OEM segment-local preference rule, using the selected base instead of a
+    // possibly cached factory default. OEM still owns insertion, eviction and order.
+    private float blended(CurvePlan p,float lux,float dragLux,float dragNit){
+        float base=p.at(lux),start=dragLux<factoryLux[1]?factoryLux[0]:dragLux<factoryLux[2]?factoryLux[1]:factoryLux[2];
+        float end=dragLux<factoryLux[1]?factoryLux[1]:dragLux<factoryLux[2]?factoryLux[2]:factoryLux[3];
+        if(Math.abs(dragLux-start)<.5f||Math.abs(dragLux-end)<.5f||Math.abs(lux-start)>=.5f&&Math.abs(lux-end)>=.5f)return base;
+        float weight=((end-start)-Math.abs(lux-dragLux))/(end-start);
+        return Math.max(min,Math.min(max,base+(dragNit-p.at(dragLux))*weight));
+    }
+    private float[] corrected(String prefix,CurvePlan p)throws Exception{
+        int count=integer(prefix+"Count");float[] x=(float[])get(prefix+"Lux"),y=(float[])get(prefix+"Nit");boolean[] flags=(boolean[])get(prefix+"IsUserDrag");int[] order=(int[])get(prefix+"Order");
+        if(count<2||count>x.length||count>y.length||count>flags.length||count>order.length)throw new IllegalStateException("系统锚点数量异常");
+        float[] next=y.clone();int newest=-1;
+        for(int i=0;i<count;i++){
+            if(!Float.isFinite(x[i])||x[i]<0||x[i]>factoryLux[3]||i>0&&x[i]<=x[i-1]||!Float.isFinite(y[i])||y[i]<min||y[i]>max)throw new IllegalStateException("系统锚点坐标异常");
+            if(flags[i]&&(newest<0||order[i]>order[newest]))newest=i;
+        }
+        if(newest<0){for(int i=0;i<count;i++)next[i]=p.at(x[i]);return next;}
+        float dragLux=x[newest],dragNit=y[newest];
+        for(int i=newest-1;i>=0;i--)next[i]=Math.min(flags[i]?next[i]:blended(p,x[i],dragLux,dragNit),next[i+1]);
+        for(int i=newest+1;i<count;i++)next[i]=Math.max(flags[i]?next[i]:blended(p,x[i],dragLux,dragNit),next[i-1]);
+        return next;
+    }
+    /** Event-only repair after reset, drag or OEM good-curve handover; never on a sensor timer. */
+    public boolean reconcile()throws Exception{
+        CurvePlan p=active;if(p==null)return false;
+        if(p.lux().length!=4&&nativeReset("mAnchor",p)&&nativeReset("mGoodAnchor",p)){
+            // A saved curve can have extra knots. Do not merely sample it back to
+            // the four OEM defaults when an inlined reset erased those knots.
+            Map<String,Object> before=new HashMap<>();for(String name:ARRAYS){Object a=get(name),copy=Array.newInstance(a.getClass().getComponentType(),Array.getLength(a));System.arraycopy(a,0,copy,0,Array.getLength(a));before.put(name,copy);}for(String name:SCALARS)before.put(name,get(name));
+            try{afterReset();repairs++;return true;}
+            catch(Exception failure){for(String name:ARRAYS){Object a=before.get(name);System.arraycopy(a,0,get(name),0,Array.getLength(a));}for(String name:SCALARS)set(name,before.get(name));throw failure;}
+        }
+        float[] current=(float[])get("mAnchorNit"),good=(float[])get("mGoodAnchorNit"),next=corrected("mAnchor",p),nextGood=corrected("mGoodAnchor",p);
+        // Only recognize a proven return to factory/sampled baseline semantics.
+        // An unknown OEM learning algorithm must not be overwritten by our model.
+        CurvePlan sampled=null;try{sampled=new CurvePlan(factoryLux,new float[]{number(BASE[0]),number(BASE[1]),number(BASE[2]),max},min,max,new float[]{1,1,1,1});}catch(IllegalArgumentException unknown){}
+        if(!sameCurve(current,next)&&!sameCurve(current,corrected("mAnchor",factoryPlan))&&(sampled==null||!sameCurve(current,corrected("mAnchor",sampled))))next=current;
+        if(!sameCurve(good,nextGood)&&!sameCurve(good,corrected("mGoodAnchor",factoryPlan))&&(sampled==null||!sameCurve(good,corrected("mGoodAnchor",sampled))))nextGood=good;
+        boolean changed=!baselineMatches(p);
+        for(int i=0;i<current.length;i++)changed|=!close(current[i],next[i]);
+        for(int i=0;i<good.length;i++)changed|=!close(good[i],nextGood[i]);
+        if(!changed)return false;
+        float[] before=current.clone(),beforeGood=good.clone(),base=new float[BASE.length];for(int i=0;i<base.length;i++)base[i]=number(BASE[i]);
+        try{writeBaseline(p);System.arraycopy(next,0,current,0,current.length);System.arraycopy(nextGood,0,good,0,good.length);if(!baselineMatches(p))throw new IllegalStateException("基础字段读回不一致");repairs++;return true;}
+        catch(Exception failure){System.arraycopy(before,0,current,0,current.length);System.arraycopy(beforeGood,0,good,0,good.length);for(int i=0;i<base.length;i++)set(BASE[i],base[i]);throw failure;}
+    }
+    private boolean nativeReset(String prefix,CurvePlan p)throws Exception{
+        if(integer(prefix+"Count")!=4)return false;
+        float[] x=(float[])get(prefix+"Lux"),y=(float[])get(prefix+"Nit");boolean[] flags=(boolean[])get(prefix+"IsUserDrag");boolean factory=true,sampled=true;
+        for(int i=0;i<4;i++){if(flags[i]||!close(x[i],factoryLux[i]))return false;factory&=close(y[i],factoryNit[i]);sampled&=close(y[i],i<3?number(BASE[i]):max);}
+        return factory||sampled;
+    }
+    private static boolean sameCurve(float[] a,float[] b){if(a.length!=b.length)return false;for(int i=0;i<a.length;i++)if(!close(a[i],b[i]))return false;return true;}
+    public void putVerification(org.json.JSONObject status)throws Exception{
+        float[] actual=new float[BASE.length];for(int i=0;i<actual.length;i++)actual[i]=number(BASE[i]);
+        org.json.JSONObject check=new org.json.JSONObject().put("actual_base_nit",new org.json.JSONArray(actual)).put("repair_count",repairs).put("scope","reset_drag_handover");
+        if(active!=null){check.put("baseline_fields_match",baselineMatches(active));float[] expected=corrected("mAnchor",active),actualCurve=(float[])get("mAnchorNit");boolean matches=true;for(int i=0;i<integer("mAnchorCount");i++)matches&=close(actualCurve[i],expected[i]);check.put("current_basis_verified",matches);}
+        status.put("refactor_curve_verification",check);
     }
 }

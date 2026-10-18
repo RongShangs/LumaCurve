@@ -1,11 +1,11 @@
 """Assert the hook's targeted ABI and consumer semantics against supplied OEM DEX."""
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
-collection=Path('D:/IOS/reverse-engineering/device-collections/official-test-20261001-100823/disassembly')
+collection=Path('D:/IOS/archives/reverse-engineering/device-collections/official-test-20261001-100823/disassembly')
 owner=(ROOT/'build/device-reports/framework02/disassembly/com.android.server.display.DisplayPowerControllerImpl.txt').read_text(encoding='utf-8')
 ref=(collection/'com.android.server.display.RefactorNitController.txt').read_text(encoding='utf-8')
 util=(collection/'com.android.server.display.RefactorBrightnessUtil.txt').read_text(encoding='utf-8')
-abc=Path('D:/IOS/reverse-engineering/device-collections/official-curve-20261001-084148/curve-disassembly/com.android.server.display.AutomaticBrightnessController.txt').read_text(encoding='utf-8')
+abc=Path('D:/IOS/archives/reverse-engineering/device-collections/official-curve-20261001-084148/curve-disassembly/com.android.server.display.AutomaticBrightnessController.txt').read_text(encoding='utf-8')
 assert 'METHOD getRefactorBrightness (F F Z Z)F' in owner
 assert 'METHOD updateAutoBrightness ()V' in owner
 for name,kind in [('mContext','Landroid/content/Context;'),('mDisplayId','I'),('mRefactorNitController','Lcom/android/server/display/RefactorNitController;')]:assert f'FIELD {name} {kind}' in owner
@@ -55,7 +55,7 @@ assert 'FIELD mAutomaticBrightnessController Lcom/android/server/display/Automat
 print('Refactor firmware: target ABI, actual consumer, OEM drag/coordinate/constraint and debounce chain PASS; static analysis only')
 
 # The optional stability hook covers the distinct assist buffer, not only ABC.
-ring=Path('D:/IOS/reverse-engineering/device-collections/dark-cycle-20261001-010613/official-sensor-disassembly/com.android.server.display.AmbientLightRingBuffer.txt').read_text(encoding='utf-8')
+ring=Path('D:/IOS/archives/reverse-engineering/device-collections/dark-cycle-20261001-010613/official-sensor-disassembly/com.android.server.display.AmbientLightRingBuffer.txt').read_text(encoding='utf-8')
 for signature in ['nextAmbientLightBrighteningTransition (J F)J','nextAmbientLightBrighteningTransition (J F F F)J','nextAmbientLightDarkeningTransition (J F)J']:
     body=ring.split('METHOD '+signature)[1].split('\nMETHOD ')[0]
     assert '->getTime(I)J' in body and 'add-long' in body

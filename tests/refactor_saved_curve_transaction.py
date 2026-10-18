@@ -8,7 +8,7 @@ p=O/'SavedTransactionTest.java'
 p.write_text(r'''package top.rongshangs.lumacurve.refactor;
 import org.json.*;import java.util.*;import java.io.*;import java.nio.charset.StandardCharsets;
 class RootControl {
- boolean selfCheckNext;static final String CONFIG="config",REFRESH="refresh";JSONObject before,after,applied;boolean respond=true,requested;int applies;
+ boolean selfCheckNext;String selfCheckReason="manual";static final String CONFIG="config",REFRESH="refresh";JSONObject before,after,applied;boolean respond=true,requested;int applies;
  final Store settings=new Store();class Store {String config;String get(String key){return config;}boolean put(String k,String v){if(k.equals(REFRESH))requested=true;return true;}}
  JSONObject live(){return requested&&respond?after:before;}
  JSONObject apply(String payload)throws Exception{applies++;applied=new JSONObject(new String(Base64.getDecoder().decode(payload),StandardCharsets.UTF_8));return new JSONObject().put("ok",true);}

@@ -3,7 +3,7 @@ package top.rongshangs.lumacurve.refactor;
 import android.os.*;
 import java.lang.reflect.*;
 import java.util.*;
-import de.robv.android.xposed.*;
+import top.rongshangs.lumacurve.refactor.hooking.*;
 
 /** Read-only probes; an optional ABI failure never disables the curve hook. */
 final class PipelineHooks {

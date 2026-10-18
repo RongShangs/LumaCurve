@@ -1,0 +1,848 @@
+{
+  "schema": 1,
+  "selection_authority": "production adapters only; catalogue is explanatory",
+  "invariants": [
+    "preserve_existing_routes",
+    "preserve_saved_preferences",
+    "actual_capabilities_not_os_or_model",
+    "reject_partial_modern_abi",
+    "no_runtime_failure_downgrade",
+    "main_display_and_user_ownership",
+    "bounded_event_driven_work",
+    "transactional_required_hook_installation",
+    "independent_optional_features",
+    "evidence_absence_is_unknown",
+    "website_sync_on_explicit_publication"
+  ],
+  "families": [
+    {
+      "id": "curve",
+      "name": "曲线与手动记忆",
+      "features": [
+        "curve",
+        "manual_memory",
+        "saved_curve",
+        "persistent_memory",
+        "memory_mode",
+        "memory_forever",
+        "memory_reset",
+        "memory_timeout"
+      ],
+      "routes": [
+        "refactor",
+        "miui_physical",
+        "aosp_physical"
+      ],
+      "owners": [
+        "BackendSelection.java",
+        "CurveBackend.java",
+        "RefactorAdapter.java",
+        "TraditionalAdapter.java",
+        "TraditionalHooks.java",
+        "MemoryLifecycle.java",
+        "PersistentMemory.java",
+        "MemoryPersistence.java",
+        "SavedCurve.java"
+      ],
+      "selector": "ABC 活动策略为准；Refactor 未就绪不得因物理映射对象存在而抢用，未知活动标记才按已验证对象选择。",
+      "evidence": [
+        "curve_backend",
+        "physical_mapper_class",
+        "baseline_id",
+        "user_serial"
+      ],
+      "cleanup": "关闭 / 故障 / OTA 基准或用户变化恢复本次应用的曲线；只按所选保持范围恢复匹配记忆。",
+      "tests": [
+        "tests/refactor_traditional.py",
+        "tests/refactor_curve_integrity.py",
+        "tests/refactor_configuration.py",
+        "tests/refactor_saved_curve_transaction.py",
+        "tests/refactor_persistent_memory.py",
+        "tests/refactor_memory_lifecycle.py"
+      ],
+      "composition": "exclusive"
+    },
+    {
+      "id": "main_input",
+      "name": "主光感",
+      "features": [
+        "main_sensor"
+      ],
+      "routes": [
+        "oem_main"
+      ],
+      "owners": [
+        "RuntimeFeatureChecks.java",
+        "HookRuntime.java",
+        "SensorState.java"
+      ],
+      "selector": "读取实际 ABC TYPE_LIGHT；无新增监听。",
+      "evidence": [
+        "sensor_status",
+        "sensor_sampling_enabled",
+        "ambient_lux_valid",
+        "main_fast_lux"
+      ],
+      "cleanup": "只读观察，不拥有 OEM 监听。",
+      "tests": [
+        "tests/refactor_feature_self_check.py",
+        "tests/refactor_status_presentation.py"
+      ],
+      "composition": "exclusive"
+    },
+    {
+      "id": "assist_input",
+      "name": "辅助光感",
+      "features": [
+        "assist_sensor"
+      ],
+      "routes": [
+        "native_auxiliary",
+        "ported_auxiliary"
+      ],
+      "owners": [
+        "AssistSensorCompat.java",
+        "AuxiliarySensorIdentity.java"
+      ],
+      "selector": "原生有效槽优先；空槽才考虑唯一且类型 / 单位 / 权限 / 线程 / 主屏均合格的移植候选，并同步当前 ABC 构造缓存。",
+      "evidence": [
+        "assist_compatibility.binding_kind",
+        "assist_compatibility.state",
+        "assist_compatibility.sensor_string_type"
+      ],
+      "cleanup": "补位失败回滚传感器槽、启用状态和本次能力缓存；其他所有者已替换时不覆盖。",
+      "tests": [
+        "tests/refactor_assist_compat.py",
+        "tests/refactor_assist_compat_firmware.py"
+      ],
+      "composition": "exclusive"
+    },
+    {
+      "id": "response",
+      "name": "主辅确认与暗光策略",
+      "features": [
+        "response",
+        "small_response",
+        "low_light",
+        "low_threshold",
+        "threshold_override",
+        "assist_gate",
+        "assist_override"
+      ],
+      "routes": [
+        "native_driving",
+        "native_without_driving"
+      ],
+      "owners": [
+        "ResponseTuning.java",
+        "LowLightTuning.java",
+        "AdvancedTuning.java",
+        "LowLightAssistEvidence.java"
+      ],
+      "selector": "完整驾驶接口优先；没有任何驾驶残片且完整旧场景 ABI 才允许无驾驶路径；残缺 / 类型错误 / 调用失败不降级。",
+      "evidence": [
+        "response_scene_profile"
+      ],
+      "cleanup": "只改变已验证期限 / 阈值；停用释放闸门、恢复本次缓存及动画参数，不重置 OEM 环形缓冲。",
+      "tests": [
+        "tests/refactor_advanced_hooks.py",
+        "tests/refactor_os3_compatibility.py",
+        "tests/refactor_advanced_firmware.py"
+      ],
+      "composition": "exclusive"
+    },
+    {
+      "id": "animation",
+      "name": "原生亮度过渡",
+      "features": [
+        "animation_override"
+      ],
+      "routes": [
+        "oem_animation"
+      ],
+      "owners": [
+        "AdvancedTuning.java"
+      ],
+      "selector": "验证双动画对象、字段及原生 updatePerceptualDuration；保留 HDR、主屏与用户资格。",
+      "evidence": [
+        "animation_override_supported"
+      ],
+      "cleanup": "只恢复本次仍由模块拥有的时长，不覆盖系统已改写的值。",
+      "tests": [
+        "tests/refactor_advanced_hooks.py"
+      ],
+      "composition": "exclusive"
+    },
+    {
+      "id": "sunlight",
+      "name": "手动阳光屏",
+      "features": [
+        "sunlight_override"
+      ],
+      "routes": [
+        "manual_sunlight"
+      ],
+      "owners": [
+        "AdvancedTuning.java"
+      ],
+      "selector": "完整 SunlightController 及已验证时间语义，仅手动模式阳光屏；不与自动 HBM 混用。",
+      "evidence": [
+        "sunlight_override_supported"
+      ],
+      "cleanup": "返回原生期限；不写传感器数据。",
+      "tests": [
+        "tests/refactor_advanced_hooks.py",
+        "tests/refactor_scene_hooks.py"
+      ],
+      "composition": "exclusive"
+    },
+    {
+      "id": "touch",
+      "name": "触摸遮挡释放",
+      "features": [
+        "touch_override"
+      ],
+      "routes": [
+        "touch_release"
+      ],
+      "owners": [
+        "AdvancedTuning.java"
+      ],
+      "selector": "核验触摸保护消费者及 debounce 字段；保留普通资格和遮挡保护。",
+      "evidence": [
+        "touch_override_supported"
+      ],
+      "cleanup": "每次调用后恢复临时字段，包括原生异常。",
+      "tests": [
+        "tests/refactor_advanced_hooks.py"
+      ],
+      "composition": "exclusive"
+    },
+    {
+      "id": "scenes",
+      "name": "原生场景参与",
+      "features": [
+        "scene_night_driving",
+        "scene_step",
+        "scene_touch",
+        "scene_proximity",
+        "scene_stream_proximity",
+        "scene_reflection",
+        "scene_night_wake",
+        "scene_manual_sunlight",
+        "scene_game"
+      ],
+      "routes": [
+        "oem_night_driving",
+        "oem_step",
+        "oem_touch",
+        "oem_proximity",
+        "oem_stream_proximity",
+        "oem_reflection",
+        "oem_night_wake",
+        "oem_manual_sunlight",
+        "oem_game"
+      ],
+      "owners": [
+        "SceneTuning.java",
+        "SceneController.java",
+        "SceneCatalog.java"
+      ],
+      "selector": "各场景独立实际消费者；普通 / 流式距离分别检测。OEM 未启用普通距离时报告 inactive，不强开传感器；只能约束现有场景。",
+      "evidence": [
+        "system_scene",
+        "scene_options",
+        "feature_self_check"
+      ],
+      "cleanup": "临时场景字段按调用恢复；停止取消本次确认，恢复自己的步行 / 夜间设置。",
+      "tests": [
+        "tests/refactor_scenes.py",
+        "tests/refactor_scene_hooks.py",
+        "tests/refactor_scene_settings.py",
+        "tests/refactor_scene_firmware.py"
+      ],
+      "composition": "per_feature"
+    },
+    {
+      "id": "dark_lock",
+      "name": "暗光锁定",
+      "features": [
+        "dark_lock"
+      ],
+      "routes": [
+        "abc_sensor_manager"
+      ],
+      "owners": [
+        "BrightnessControl.java",
+        "DarkLockPolicy.java"
+      ],
+      "selector": "ABC SensorManager / 实际句柄识别；退出低频确认独立于 OEM 辅助采样；需接管 / 恢复模式权限。",
+      "evidence": [
+        "brightness_control.owner",
+        "brightness_control.watch_main_lux",
+        "brightness_control.watch_assist_lux"
+      ],
+      "cleanup": "锁屏 / 熄屏 / 切用户 / 停用注销模块监听，只有模块取得的自动状态可恢复。",
+      "tests": [
+        "tests/refactor_brightness_control.py",
+        "tests/refactor_display_scheduling.py"
+      ],
+      "composition": "exclusive"
+    },
+    {
+      "id": "applications",
+      "name": "暂停自动亮度名单",
+      "features": [
+        "apps"
+      ],
+      "routes": [
+        "visible_tasks",
+        "focus_fallback"
+      ],
+      "owners": [
+        "ForegroundApps.java",
+        "BrightnessControl.java",
+        "ApplicationBrightnessSettings.java"
+      ],
+      "selector": "完整可见任务接口优先；原生焦点事件为必要前提，不支持多窗口时明确焦点回退；禁止把运行进程当可见任务。",
+      "evidence": [
+        "brightness_control.app_multiwindow_supported"
+      ],
+      "cleanup": "按代次丢弃过期查询；停用 / 熄屏解除订阅，惰性线程空闲退出，名单设置保留。",
+      "tests": [
+        "tests/refactor_brightness_control.py",
+        "tests/refactor_foreground_firmware.py"
+      ],
+      "composition": "exclusive"
+    },
+    {
+      "id": "hbm",
+      "name": "HBM 控制器与计时",
+      "features": [
+        "hbm"
+      ],
+      "routes": [
+        "enabled_field",
+        "native_support_method",
+        "timed_budget",
+        "ambient_only"
+      ],
+      "owners": [
+        "HbmAccess.java",
+        "OutdoorController.java"
+      ],
+      "selector": "控制器与计时为两个独立维度：启用字段优先；缺字段且完整旧结构才用原生能力方法。合法有限计时 / 三零计时互斥；不能制造预算。",
+      "evidence": [
+        "outdoor.hbm_controller_profile",
+        "outdoor.hbm_tuning_profile"
+      ],
+      "cleanup": "克隆 HBM 数据，不改共享配置；只在字段仍指向本次 clone 时恢复原对象，系统替换优先。",
+      "tests": [
+        "tests/refactor_outdoor.py",
+        "tests/refactor_os3_compatibility.py"
+      ],
+      "composition": "two_dimensions",
+      "dimensions": [
+        [
+          "enabled_field",
+          "native_support_method"
+        ],
+        [
+          "timed_budget",
+          "ambient_only"
+        ]
+      ]
+    },
+    {
+      "id": "outdoor",
+      "name": "户外增强目标",
+      "features": [
+        "outdoor"
+      ],
+      "routes": [
+        "override_target",
+        "legacy_custom_target"
+      ],
+      "owners": [
+        "OutdoorTuning.java",
+        "OutdoorController.java"
+      ],
+      "selector": "覆盖目标入口优先；明确缺入口且旧调用所有权完整时走传统自定义目标，残缺覆盖接口不回退。",
+      "evidence": [
+        "outdoor.target_compatibility_profile"
+      ],
+      "cleanup": "必需 Hook 成组事务安装，失败整组撤销；可选范围 / 跟踪失败独立，不撤销已经提交的核心。",
+      "tests": [
+        "tests/refactor_outdoor.py",
+        "tests/refactor_os3_compatibility.py",
+        "tests/refactor_hook_transactions.py"
+      ],
+      "composition": "exclusive"
+    },
+    {
+      "id": "range",
+      "name": "高亮范围",
+      "features": [
+        "outdoor_range"
+      ],
+      "routes": [
+        "hbm_range",
+        "dynamic_range"
+      ],
+      "owners": [
+        "OutdoorTuning.java",
+        "OutdoorController.java"
+      ],
+      "selector": "HBM getter 与峰值基础范围；只有本机实际启用的动态范围对象才补充，不同时添加第二个目标增强器。",
+      "evidence": [
+        "outdoor.dynamic_range_supported",
+        "outdoor.dynamic_range_enabled"
+      ],
+      "cleanup": "按本次增强会话退出，范围 getter 恢复原生返回；下游保护仍有效。",
+      "tests": [
+        "tests/refactor_outdoor.py",
+        "tests/refactor_hook_transactions.py"
+      ],
+      "composition": "additive"
+    },
+    {
+      "id": "sdr",
+      "name": "灰阶放宽与物理 nit 限制",
+      "features": [
+        "opr",
+        "nit_limit"
+      ],
+      "routes": [
+        "privacy_aware",
+        "legacy_opr"
+      ],
+      "owners": [
+        "OutdoorSdrScope.java",
+        "OutdoorOpr.java",
+        "NitBrightnessLimit.java"
+      ],
+      "selector": "完整隐私判断优先；完全没有隐私 / UHBM 残片且旧 OPR 完整才用传统路径。实际物理换算用于 nit 上限。调用失败不降级。",
+      "evidence": [
+        "outdoor.sdr_compatibility_profile",
+        "outdoor.sdr_compatibility_detail"
+      ],
+      "cleanup": "ThreadLocal 帧按调用恢复；只移除本次引入的 OPR 原因位；温控、电量、HDR 与系统接管继续优先。",
+      "tests": [
+        "tests/refactor_outdoor_compatibility.py",
+        "tests/refactor_outdoor_compatibility_firmware.py"
+      ],
+      "composition": "exclusive"
+    },
+    {
+      "id": "thermal",
+      "name": "显示层温控",
+      "features": [
+        "thermal"
+      ],
+      "routes": [
+        "display_thermal"
+      ],
+      "owners": [
+        "HookEntry.java",
+        "ThermalPolicy.java",
+        "HookRuntime.java"
+      ],
+      "selector": "显示层 HDR / SDR 消费者完整，严重温控与电池门槛继续有效；不改 SoC / 充电温控。",
+      "evidence": [
+        "thermal_supported",
+        "thermal_skipped"
+      ],
+      "cleanup": "每次调用恢复暂存显示限亮字段，停止恢复系统控制。",
+      "tests": [
+        "tests/refactor_advanced_hooks.py",
+        "tests/refactor_hook_firmware.py"
+      ],
+      "composition": "exclusive"
+    },
+    {
+      "id": "raw_output",
+      "name": "主屏输出隔离",
+      "features": [
+        "manual_panel",
+        "node_output"
+      ],
+      "routes": [
+        "raw_primary_output"
+      ],
+      "owners": [
+        "RawPanelOutputHooks.java",
+        "BrightnessControl.java",
+        "OutdoorNodeBridge.java",
+        "RawPanelLease.java"
+      ],
+      "selector": "主屏输出 / 电源状态对象完整；租约、解锁、模式、屏幕状态均通过才隔离正亮度帧，第一帧留给系统。",
+      "evidence": [
+        "brightness_control.owner",
+        "outdoor_node_supported"
+      ],
+      "cleanup": "熄屏先撤销控制权，租约失联自动归还，系统改写优先。",
+      "tests": [
+        "tests/refactor_raw_output.py",
+        "tests/refactor_raw_panel_transaction.py",
+        "tests/refactor_outdoor_node.py"
+      ],
+      "composition": "exclusive"
+    },
+    {
+      "id": "node",
+      "name": "真实主屏节点",
+      "features": [
+        "main_panel_node"
+      ],
+      "routes": [
+        "backlight_node",
+        "display_led_node"
+      ],
+      "owners": [
+        "PanelNodeDiscovery.java",
+        "NativePanelRoot.java"
+      ],
+      "selector": "backlight 或明确标识显示的 leds；真实 sysfs 路径与上限配对且唯一主屏，不按机型写死上限。",
+      "evidence": [
+        "main_panel_node.node_class",
+        "main_panel_node.node_path",
+        "main_panel_node.node_maximum"
+      ],
+      "cleanup": "发现与权限检查只读，不启动写入器；实际租约写入另由原生事务负责，拒绝副屏 / 指示灯 / 手电。",
+      "tests": [
+        "tests/refactor_panel_nodes.py",
+        "tests/refactor_panel_access.py"
+      ],
+      "composition": "exclusive"
+    },
+    {
+      "id": "root_tools",
+      "name": "Root 存储与原生工具",
+      "features": [
+        "root_storage",
+        "stored_config",
+        "outdoor_node_device",
+        "native_payload"
+      ],
+      "routes": [
+        "root_private_storage",
+        "stored_json",
+        "primary_node_profile",
+        "apk_native_asset"
+      ],
+      "owners": [
+        "RootControl.java",
+        "RootFeatureChecks.java",
+        "NativePanelAsset.java",
+        "OutdoorNodeRoot.java"
+      ],
+      "selector": "逐项检查私有存储、原始配置、当前 APK 资产和组合接口；不试写亮度，不擅自启动服务。",
+      "evidence": [
+        "feature_self_check",
+        "root_feature_self_check"
+      ],
+      "cleanup": "短命 Root 桥和有界 IPC；诊断不写回用户配置，失败只禁本项。",
+      "tests": [
+        "tests/refactor_feature_self_check.py",
+        "tests/refactor_native_asset.py",
+        "tests/refactor_outdoor_node_settings.py"
+      ],
+      "composition": "per_feature"
+    },
+    {
+      "id": "app_tools",
+      "name": "APP 本地工具",
+      "features": [
+        "launcher",
+        "preferences",
+        "app_files"
+      ],
+      "routes": [
+        "launcher_alias",
+        "app_preferences",
+        "app_files"
+      ],
+      "owners": [
+        "MainActivity.java",
+        "LauncherVisibility.java",
+        "UiPreferences.java"
+      ],
+      "selector": "独立 Launcher alias / 原偏好存储 / 私有文件权限；不使用启动组件名重新建立偏好。",
+      "evidence": [
+        "APP.appFeatureReport"
+      ],
+      "cleanup": "别名切换保留设置、欢迎记录；APP 销毁取消 UI 回调。",
+      "tests": [
+        "tests/refactor_ui_preferences.py",
+        "tests/refactor_app_preferences.py",
+        "tests/refactor_welcome.py"
+      ],
+      "composition": "per_feature"
+    },
+    {
+      "id": "control_center",
+      "name": "控制中心节点映射（入口隐藏）",
+      "features": [
+        "control_center_slider"
+      ],
+      "routes": [
+        "coordinate_v2"
+      ],
+      "owners": [
+        "ControlCenterCalibration.java",
+        "ControlCenterEngine.java",
+        "ControlCenterHooks.java",
+        "ControlCenterRoot.java"
+      ],
+      "selector": "实际双向单调转换、进程代次、显示身份与对应 UI ABI 同时通过；本版不展示入口，保留原选择。",
+      "evidence": [
+        "control_center_slider.kind",
+        "control_center_slider.error"
+      ],
+      "cleanup": "进程 / 用户 / 模式 / 失联变化丢弃旧 profile，不借映射改变系统自动模式。",
+      "tests": [
+        "tests/refactor_control_center.py",
+        "tests/refactor_control_center_root.py"
+      ],
+      "composition": "exclusive"
+    }
+  ],
+  "abi_variants": [
+    {
+      "id": "active_backend",
+      "owner": "BackendSelection.java",
+      "alternatives": [
+        "known_refactor",
+        "known_physical",
+        "unknown_flag"
+      ],
+      "rule": "已知活动标记只等待对应路径；缺标记时按实际就绪对象选择，不按类名存在抢占。",
+      "test": "tests/refactor_traditional.py"
+    },
+    {
+      "id": "mapper_memory_coordinates",
+      "owner": "TraditionalAdapter.java",
+      "alternatives": [
+        "mShortTermModelUserLux",
+        "mUserLux_with_adjusted_spline"
+      ],
+      "rule": "仅匹配两类已知映射器；AOSP 手动点为修正背光坐标，不能当作物理 nit。",
+      "test": "tests/refactor_traditional.py"
+    },
+    {
+      "id": "mapper_drag_signature",
+      "owner": "TraditionalHooks.java",
+      "alternatives": [
+        "addUserDataPoint(float,float,String)",
+        "addUserDataPoint(float,float)"
+      ],
+      "rule": "完整三参数签名缺失才用二参数，返回值必须 void。",
+      "test": "tests/refactor_traditional.py"
+    },
+    {
+      "id": "inherited_mapper_members",
+      "owner": "TraditionalAdapter.java",
+      "alternatives": [
+        "declared_member",
+        "superclass_member"
+      ],
+      "rule": "只沿同一对象真实继承链查找相同签名，非任意别名猜测。",
+      "test": "tests/refactor_traditional.py"
+    },
+    {
+      "id": "sensor_identity",
+      "owner": "BrightnessControl.java",
+      "alternatives": [
+        "same_object",
+        "same_type_and_native_handle"
+      ],
+      "rule": "对象一致优先；包装对象只允许同类型同系统句柄，缺句柄不按名称猜配。",
+      "test": "tests/refactor_brightness_control.py"
+    },
+    {
+      "id": "sensor_freshness",
+      "owner": "BrightnessControl.java",
+      "alternatives": [
+        "on_change",
+        "continuous_timeout"
+      ],
+      "rule": "on-change 保留最近值，连续采样超过窗口无效；0 lux 是有效值，不伪装等待。",
+      "test": "tests/refactor_brightness_control.py"
+    },
+    {
+      "id": "dark_primary_only",
+      "owner": "RuntimeFeatureChecks.java",
+      "alternatives": [
+        "dual_policy_present",
+        "dual_policy_absent"
+      ],
+      "rule": "没有双光感策略可用主光感；存在但缩放或传感器格式异常不伪造双光感。",
+      "test": "tests/refactor_feature_self_check.py"
+    },
+    {
+      "id": "foreground_user_field",
+      "owner": "ForegroundApps.java",
+      "alternatives": [
+        "mUserId",
+        "userId"
+      ],
+      "rule": "只在旧字段缺失时选择另一字段，类型必须为非静态 int。",
+      "test": "tests/refactor_brightness_control.py"
+    },
+    {
+      "id": "task_visibility_field",
+      "owner": "ForegroundApps.java",
+      "alternatives": [
+        "isVisibleRequested",
+        "isVisible"
+      ],
+      "rule": "已请求可见优先；字段缺失才用旧可见字段，均需非静态 boolean。",
+      "test": "tests/refactor_brightness_control.py"
+    },
+    {
+      "id": "control_center_feedback",
+      "owner": "ControlCenterHooks.java",
+      "alternatives": [
+        "synthetic_updateSlider",
+        "direct_updateSlider"
+      ],
+      "rule": "匹配合成 / 直接回显签名，两者属于同一坐标映射，不替换系统自动亮度策略；入口隐藏。",
+      "test": "tests/refactor_control_center.py"
+    },
+    {
+      "id": "control_center_minimum",
+      "owner": "ControlCenterHooks.java",
+      "alternatives": [
+        "getMin",
+        "zero_minimum"
+      ],
+      "rule": "未暴露 getMin 时使用该滑块的零起点 ABI，其他量程仍从实际 getMax 读取。",
+      "test": "tests/refactor_control_center.py"
+    },
+    {
+      "id": "control_center_conversion",
+      "owner": "ControlCenterCalibration.java",
+      "alternatives": [
+        "standard",
+        "oem_v1"
+      ],
+      "rule": "标准物理转换必需，V1 为单独校准；单调且可逆才用，不以通用曲线冒充设备曲线。",
+      "test": "tests/refactor_control_center.py"
+    },
+    {
+      "id": "root_attribution",
+      "owner": "RootSettings.java",
+      "alternatives": [
+        "explicit_pid",
+        "builder_default_pid"
+      ],
+      "rule": "仅 setPid 方法缺失可沿用 Builder 默认；授权 / provider 错误不降级为未校验读写。",
+      "test": "tests/refactor_configuration.py"
+    },
+    {
+      "id": "state_protocol",
+      "owner": "StatusTransport.java",
+      "alternatives": [
+        "legacy_inline",
+        "schema1_chunks"
+      ],
+      "rule": "旧单段状态继续可读；分片必须同一 snapshot，缺段只标缺失，不跨快照补齐。",
+      "test": "tests/refactor_status_transport.py"
+    },
+    {
+      "id": "ui_preferences_migration",
+      "owner": "UiPreferences.java",
+      "alternatives": [
+        "stable_store",
+        "legacy_alias_merge_once"
+      ],
+      "rule": "原存储优先，别名只迁移一次；保留配置、须知旧键及独立欢迎标记。",
+      "test": "tests/refactor_ui_preferences.py"
+    },
+    {
+      "id": "platform_description",
+      "owner": "SystemVersion.java",
+      "alternatives": [
+        "system_properties",
+        "bounded_getprop"
+      ],
+      "rule": "仅诊断版本描述；超时受限，不用版本状态阻止功能。",
+      "test": "tests/refactor_system_version.py"
+    },
+    {
+      "id": "module_loader_discovery",
+      "owner": "HookEntry.java",
+      "alternatives": [
+        "initial_loader",
+        "bounded_startup_loader_watch"
+      ],
+      "rule": "启动找不到显示类才监听加载，找到后撤销，45 秒封顶；不轮询亮度。",
+      "test": "tests/refactor_hook_firmware.py"
+    },
+    {
+      "id": "native_payload_refresh",
+      "owner": "NativePanelRoot.java",
+      "alternatives": [
+        "same_asset_hash",
+        "atomic_asset_replace"
+      ],
+      "rule": "相同程序仅验证；显式节点使用时才停止旧租约并原子换程序，不因自检启动输出器。",
+      "test": "tests/refactor_native_asset.py"
+    }
+  ],
+  "native_variants": [
+    {
+      "id": "native_output_modes",
+      "owner": "main_panel.c",
+      "alternatives": [
+        "manual_guard",
+        "outdoor_cooperative"
+      ],
+      "rule": "共用主屏锁，手动程序需要短租约和明确所有权；户外只协作提高且系统改写即退出，不互相争用。",
+      "test": "tests/refactor_native_panel.py"
+    },
+    {
+      "id": "outdoor_lease_protocol",
+      "owner": "outdoor_node_policy.h",
+      "alternatives": [
+        "v1_fraction",
+        "v2_raw_target"
+      ],
+      "rule": "保留旧百分比租约与当前真实节点目标；均限制 PID、1500 ms 有效期和设备最大值。",
+      "test": "tests/refactor_outdoor_node.py"
+    },
+    {
+      "id": "freezer_startup",
+      "owner": "main_panel.c",
+      "alternatives": [
+        "root_cgroup",
+        "uid_0_cgroup",
+        "dev_freezer",
+        "legacy_freezer",
+        "no_freezer_path"
+      ],
+      "rule": "只在显式启动原生工具时尝试现有路径；发现但均无法迁出时拒绝启动，不把错误吞成就绪。",
+      "test": "tests/refactor_native_asset.py"
+    },
+    {
+      "id": "native_primary_node",
+      "owner": "panel_node.h",
+      "alternatives": [
+        "backlight",
+        "display_labelled_leds"
+      ],
+      "rule": "真实路径与上限配对，拒绝副屏 / 手电 / 通知灯，不能仅因 Java 曾发现就省略原生复核。",
+      "test": "tests/refactor_panel_nodes.py"
+    },
+    {
+      "id": "native_slider_listener",
+      "owner": "control_center_policy.h",
+      "alternatives": [
+        "ordinary_manual_lease",
+        "explicit_control_center_pid"
+      ],
+      "rule": "控制中心监听必须 Root 明确启用、匹配现有框架 PID 和 cc_ 会话；普通手动租约不自动获得监听权限。",
+      "test": "tests/refactor_control_center.py"
+    }
+  ]
+}

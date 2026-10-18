@@ -2,7 +2,7 @@ package top.rongshangs.lumacurve.refactor;
 import android.os.*;
 import java.lang.reflect.*;
 import java.util.*;
-import de.robv.android.xposed.*;
+import top.rongshangs.lumacurve.refactor.hooking.*;
 
 /** Actual default mapper only; no sysfs writes or second output controller. */
 final class TraditionalHooks {

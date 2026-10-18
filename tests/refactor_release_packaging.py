@@ -86,6 +86,15 @@ with tempfile.TemporaryDirectory(prefix='hyperlux-release-') as temporary:
         check(z.testzip() is None)
         check(z.read('downloads/'+downloads[0])==(root/'dist'/downloads[0]).read_bytes())
         check(z.read('update.json')==(out/'update.json').read_bytes())
+    # Local website previews can be packaged without replacing the saved web directory.
+    preview=base/'private-website-preview';shutil.copytree(out,preview)
+    result=subprocess.run([sys.executable,str(root/'tools/package_website.py'),'--site',str(preview)],capture_output=True)
+    check(result.returncode==0);check(snapshot(out)==snapshot(preview))
+    check(json.loads((preview/'update.json').read_text())['requires']==['Root','LSPosed','HyperOS'])
+    original_archive=archive.read_bytes()
+    result=subprocess.run([sys.executable,str(root/'tools/package_website.py'),'--site',str(base/'missing-preview')],capture_output=True)
+    check(result.returncode!=0)
+    check(archive.read_bytes()==original_archive)
     good=snapshot(out)
     def changed_metadata(key,value):
         data=json.loads((out/'update.json').read_text());data[key]=value

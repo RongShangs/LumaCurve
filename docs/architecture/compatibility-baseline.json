@@ -1,0 +1,183 @@
+{
+  "schema": 1,
+  "baseline": "4.0.0 local 40000 before architecture review; preserve every route",
+  "features": {
+    "curve": [
+      "refactor",
+      "miui_physical",
+      "aosp_physical"
+    ],
+    "manual_memory": [
+      "refactor",
+      "miui_physical",
+      "aosp_physical"
+    ],
+    "saved_curve": [
+      "refactor",
+      "miui_physical",
+      "aosp_physical"
+    ],
+    "persistent_memory": [
+      "refactor",
+      "miui_physical",
+      "aosp_physical"
+    ],
+    "memory_mode": [
+      "refactor",
+      "miui_physical",
+      "aosp_physical"
+    ],
+    "memory_forever": [
+      "refactor",
+      "miui_physical",
+      "aosp_physical"
+    ],
+    "memory_reset": [
+      "refactor",
+      "miui_physical",
+      "aosp_physical"
+    ],
+    "memory_timeout": [
+      "refactor",
+      "miui_physical",
+      "aosp_physical"
+    ],
+    "main_sensor": [
+      "oem_main"
+    ],
+    "assist_sensor": [
+      "native_auxiliary",
+      "ported_auxiliary"
+    ],
+    "response": [
+      "native_driving",
+      "native_without_driving"
+    ],
+    "small_response": [
+      "native_driving",
+      "native_without_driving"
+    ],
+    "low_light": [
+      "native_driving",
+      "native_without_driving"
+    ],
+    "low_threshold": [
+      "native_driving",
+      "native_without_driving"
+    ],
+    "threshold_override": [
+      "native_driving",
+      "native_without_driving"
+    ],
+    "assist_gate": [
+      "native_driving",
+      "native_without_driving"
+    ],
+    "assist_override": [
+      "native_driving",
+      "native_without_driving"
+    ],
+    "animation_override": [
+      "oem_animation"
+    ],
+    "sunlight_override": [
+      "manual_sunlight"
+    ],
+    "touch_override": [
+      "touch_release"
+    ],
+    "scene_night_driving": [
+      "oem_night_driving"
+    ],
+    "scene_step": [
+      "oem_step"
+    ],
+    "scene_touch": [
+      "oem_touch"
+    ],
+    "scene_proximity": [
+      "oem_proximity"
+    ],
+    "scene_stream_proximity": [
+      "oem_stream_proximity"
+    ],
+    "scene_reflection": [
+      "oem_reflection"
+    ],
+    "scene_night_wake": [
+      "oem_night_wake"
+    ],
+    "scene_manual_sunlight": [
+      "oem_manual_sunlight"
+    ],
+    "scene_game": [
+      "oem_game"
+    ],
+    "dark_lock": [
+      "abc_sensor_manager"
+    ],
+    "manual_panel": [
+      "raw_primary_output"
+    ],
+    "control_center_slider": [
+      "coordinate_v2"
+    ],
+    "apps": [
+      "visible_tasks",
+      "focus_fallback"
+    ],
+    "thermal": [
+      "display_thermal"
+    ],
+    "outdoor": [
+      "override_target",
+      "legacy_custom_target"
+    ],
+    "hbm": [
+      "timed_budget",
+      "ambient_only",
+      "enabled_field",
+      "native_support_method"
+    ],
+    "outdoor_range": [
+      "hbm_range",
+      "dynamic_range"
+    ],
+    "opr": [
+      "privacy_aware",
+      "legacy_opr"
+    ],
+    "nit_limit": [
+      "privacy_aware",
+      "legacy_opr"
+    ],
+    "node_output": [
+      "raw_primary_output"
+    ],
+    "main_panel_node": [
+      "backlight_node",
+      "display_led_node"
+    ],
+    "root_storage": [
+      "root_private_storage"
+    ],
+    "stored_config": [
+      "stored_json"
+    ],
+    "outdoor_node_device": [
+      "primary_node_profile"
+    ],
+    "native_payload": [
+      "apk_native_asset"
+    ],
+    "launcher": [
+      "launcher_alias"
+    ],
+    "preferences": [
+      "app_preferences"
+    ],
+    "app_files": [
+      "app_files"
+    ]
+  }
+}

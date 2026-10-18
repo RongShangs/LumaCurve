@@ -52,7 +52,7 @@ final class OutdoorNodeBridge {
         if(writing)return;writing=true;try{executor.execute(this::drain);}catch(RuntimeException rejected){writing=false;}
     }
     void drain(){while(true){String value;synchronized(this){value=pending;pending=null;if(value==null){writing=false;return;}}
-        try{sink.write(value);}catch(Throwable unavailable){if(!failed)de.robv.android.xposed.XposedBridge.log("HyperLux outdoor lease unavailable: "+unavailable);failed=true;}
+        try{sink.write(value);}catch(Throwable unavailable){if(!failed)top.rongshangs.lumacurve.refactor.hooking.XposedBridge.log("HyperLux outdoor lease unavailable: "+unavailable);failed=true;}
     }}
     static void writeLease(String value)throws Exception{
         File temp=new File(LEASE+".new");try{try(FileOutputStream out=new FileOutputStream(temp)){out.write(value.getBytes(StandardCharsets.US_ASCII));}Os.chmod(temp.toString(),0600);Os.rename(temp.toString(),LEASE);}finally{temp.delete();}

@@ -19,6 +19,7 @@ public class StateWriterTest{
   check(written.isEmpty()&&queue.tasks.size()==1);queue.drain();check(written.equals(Arrays.asList("chunk=first","core=first")));
   written.clear();for(int i=0;i<10000;i++){writer.submit("state",snapshot("v"+i));writer.submit("ack",Collections.singletonMap("ack","v"+i));}
   check(queue.tasks.size()==1&&written.isEmpty());queue.drain();check(written.equals(Arrays.asList("chunk=v9999","core=v9999","ack=v9999")));
+  written.clear();writer.submit("state",snapshot("live"));writer.submit("ack",Collections.singletonMap("ack","done"));for(int i=0;i<10000;i++)writer.submit("slider_tables",Collections.singletonMap("table","v"+i));check(queue.tasks.size()==1);queue.drain();check(written.equals(Arrays.asList("chunk=live","core=live","ack=done","table=v9999")));
   // Replacing a long snapshot with a short one must not leave queued old chunks.
   written.clear();Map<String,String> many=snapshot("old");many.put("obsolete","old");writer.submit("state",many);writer.submit("state",snapshot("new"));queue.drain();check(!written.contains("obsolete=old")&&written.size()==2);
   writer.submit("state",snapshot("cancelled"));writer.close();queue.drain();check(written.size()==2);writer.submit("ack",Collections.singletonMap("ack","closed"));check(queue.tasks.isEmpty());

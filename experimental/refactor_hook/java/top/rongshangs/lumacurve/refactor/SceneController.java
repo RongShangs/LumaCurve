@@ -21,7 +21,7 @@ final class SceneController {
         if(s.screenOn()&&Boolean.TRUE.equals(HookRuntime.optionalBoolean(impl,"mProximitySensorEnabled")))HookRuntime.readBoolean(f,"proximity_near",impl,"mProximityPositive");
         // Stream proximity is a latched classifier; require its live acquisition state.
         if(s.screenOn()&&HookRuntime.optionalNumber(scene,"mProxState")==8)HookRuntime.readBoolean(f,"stream_near",scene,"mProximityStatus");
-        Object touch=HookEntry.get(impl,"mTouchAreaHelper");if(!s.screenOn()||!Boolean.TRUE.equals(HookRuntime.optionalBoolean(touch,"mTouchTrackingEnabled")))return f;Method m=touch.getClass().getDeclaredMethod("isTouchCoverProtectionActive");m.setAccessible(true);Object active=de.robv.android.xposed.XposedBridge.invokeOriginalMethod(m,touch,new Object[0]);if(active instanceof Boolean)f.put("touch",active);
+        Object touch=HookEntry.get(impl,"mTouchAreaHelper");if(!s.screenOn()||!Boolean.TRUE.equals(HookRuntime.optionalBoolean(touch,"mTouchTrackingEnabled")))return f;Method m=touch.getClass().getDeclaredMethod("isTouchCoverProtectionActive");m.setAccessible(true);Object active=top.rongshangs.lumacurve.refactor.hooking.XposedBridge.invokeOriginalMethod(m,touch,new Object[0]);if(active instanceof Boolean)f.put("touch",active);
     }catch(Throwable unavailable){}return f;}
     static void putNumber(JSONObject f,String key,Object object,String field){HookRuntime.readNumber(f,key,object,field);}
     void refresh(){if(!enabled||evaluating||!s.onDisplayThread())return;evaluating=true;try{

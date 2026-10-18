@@ -2,7 +2,7 @@ package top.rongshangs.lumacurve.refactor;
 
 import java.lang.reflect.*;
 import java.util.*;
-import de.robv.android.xposed.*;
+import top.rongshangs.lumacurve.refactor.hooking.*;
 
 /** Optional, object-scoped hooks; no periodic worker, sensor substitution or driver writes. */
 final class AdvancedTuning {

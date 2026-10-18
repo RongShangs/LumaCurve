@@ -15,7 +15,7 @@ final class RawBrightnessPanel {
  final Activity host;final Runnable dismiss;final FrameLayout root;final LinearLayout card;
  final Handler ui=new Handler(Looper.getMainLooper());final ExecutorService worker=Executors.newSingleThreadExecutor();
  final RootPanelBridge bridge;final boolean dark,en,landscape;final int ink,muted,blue,bg,surface;
- TextView state,current,target,range,fault;TextView inputAction,maxAction;String lastFault="";NodeSlider slider;
+ TextView state,current,target,range,fault;TextView inputAction,maxAction,keepAwakeAction;boolean keepingAwake;String lastFault="";NodeSlider slider;
  AlertDialog activeDialog;
  volatile boolean closed;boolean sending,dragging,claimed;Integer pending;String session=UUID.randomUUID().toString();int generation,maximum=10;long gesture;
  final Runnable poll,flush;
@@ -40,6 +40,8 @@ final class RawBrightnessPanel {
   slider=new NodeSlider();LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(dp(72),-1);sp.leftMargin=dp(12);row.addView(slider,sp);
   LinearLayout actions=new LinearLayout(host);actions.setOrientation(landscape?LinearLayout.VERTICAL:LinearLayout.HORIZONTAL);actions.setBaselineAligned(false);LinearLayout.LayoutParams ap=landscape?new LinearLayout.LayoutParams(dp(152),height):new LinearLayout.LayoutParams(-1,-2);if(landscape)ap.leftMargin=dp(12);else ap.topMargin=dp(12);body.addView(actions,ap);
   inputAction=action("输入数值",this::number,actions,false);maxAction=action("节点最大值",()->begin(maximum),actions,true);action("恢复自动",this::restore,actions,true);inputAction.setEnabled(false);maxAction.setEnabled(false);
+  LinearLayout extra=new LinearLayout(host);extra.setBaselineAligned(false);LinearLayout.LayoutParams extraLayout=new LinearLayout.LayoutParams(-1,-2);extraLayout.topMargin=dp(8);card.addView(extra,extraLayout);
+  keepAwakeAction=action("临时常亮",this::toggleKeepAwake,extra,false);keepAwakeAction.setMinHeight(dp(48));
   fault=text("",12,dark?0xffff9696:0xffb33535);fault.setVisibility(View.GONE);fault.setOnClickListener(v->showFault());card.addView(fault);
   poll=new Runnable(){public void run(){if(closed)return;if(!sending&&!dragging)submit(new JSONObjectRequest("status"),false);ui.postDelayed(this,1000);}};flush=()->flush();
  }
@@ -67,6 +69,7 @@ final class RawBrightnessPanel {
   maximum=node.optInt("maximum",10);int actual=node.optInt("actual",-1);JSONObject guard=node.optJSONObject("guard");
   boolean auto=runtime==null||runtime.optBoolean("auto_mode");JSONObject owner=runtime==null?null:runtime.optJSONObject("brightness_control");
   BrightnessTileService.publish(runtime);
+  keepingAwake=owner!=null&&owner.optBoolean("temporary_screen_on");keepAwakeAction.setText(tr(keepingAwake?"取消临时常亮":"临时常亮"));keepAwakeAction.setEnabled(runtime!=null&&"active".equals(runtime.optString("phase")));
   if(claimed&&(auto||owner==null||!session.equals(owner.optString("session"))||!"raw_panel".equals(owner.optString("owner")))){generation++;claimed=false;pending=null;dragging=false;state.setText(tr("已退让；再次滑动才会关闭自动亮度"));}
   else state.setText(tr(auto?"自动亮度中；滑动切换为手动":guard!=null&&guard.optBoolean("paused")?"解锁后恢复":guard!=null&&guard.optBoolean("armed")&&guard.optInt("target",-1)>=10?"节点亮度保持中":"手动模式；滑动接管节点"));
   slider.ready=runtime!=null&&"active".equals(runtime.optString("phase"))&&owner!=null&&owner.optBoolean("manual_panel_enabled")&&owner.optBoolean("manual_panel_supported");
@@ -84,6 +87,7 @@ final class RawBrightnessPanel {
   worker.execute(()->{JSONObject answer=null;Throwable error=null;try{answer=bridge.request(command);}catch(Throwable failure){error=failure;}final JSONObject result=answer;final Throwable failure=error;
    ui.post(()->{if(closed)return;sending=false;if(epoch!=generation){flush();return;}if(failure!=null){claimed=false;pending=null;lastFault=String.valueOf(failure.getMessage());fault.setText(lastFault);fault.setVisibility(View.VISIBLE);if(!"status".equals(command.optString("action")))showFault();return;}if(begin)claimed=true;show(result);flush();});});
  }
+ void toggleKeepAwake(){if(closed||sending)return;clearFault();JSONObject command=command("keep_awake",0);try{command.put("enabled",!keepingAwake);}catch(JSONException impossible){}submit(command,false);}
  void restore(){clearFault();generation++;claimed=false;pending=null;dragging=false;submit(command("restore",0),false);}
  void clearFault(){lastFault="";fault.setText("");fault.setVisibility(View.GONE);}
  void showFault(){

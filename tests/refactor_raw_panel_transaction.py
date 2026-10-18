@@ -9,9 +9,10 @@ files={
 'android/app/ActivityManager.java':'package android.app;public class ActivityManager{public static int getCurrentUser(){return 0;}}',
 'top/rongshangs/lumacurve/refactor/RootControl.java':r'''package top.rongshangs.lumacurve.refactor;
 import org.json.*;import java.util.*;import java.io.*;import java.nio.file.*;import java.nio.charset.StandardCharsets;
-class RootControl{
+class ControlCenterRoot{static void reconcile(Object settings,JSONObject runtime,String raw){}}
+class RootControl{static final String CONFIG="config";
 static final File DATA=new File("build/raw-panel-transaction-tests");Settings settings=new Settings();boolean reject,failMode,failHook,loseBeginAck;String session="";int hookCalls,aborts;List<String> calls=new ArrayList<>();
-class Settings{String mode="1";String getSystem(String key){return mode;}boolean putSystem(String key,String value){mode=value;return true;}}
+class Settings{String get(String key){return null;}String mode="1";String getSystem(String key){return mode;}boolean putSystem(String key,String value){mode=value;return true;}}
 JSONObject live()throws Exception{return new JSONObject().put("pid",123).put("phase","active");}
 JSONObject refreshedLive()throws Exception{return live();}
 JSONObject brightness(String encoded)throws Exception{hookCalls++;JSONObject request=new JSONObject(new String(Base64.getDecoder().decode(encoded),StandardCharsets.UTF_8));String action=request.getString("action");calls.add(action);

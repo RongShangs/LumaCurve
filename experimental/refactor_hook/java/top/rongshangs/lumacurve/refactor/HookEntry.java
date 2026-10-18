@@ -3,10 +3,14 @@ package top.rongshangs.lumacurve.refactor;
 import android.os.*;
 import java.lang.reflect.*;
 import java.util.*;
-import de.robv.android.xposed.*;
-import de.robv.android.xposed.callbacks.XC_LoadPackage;
+import top.rongshangs.lumacurve.refactor.hooking.*;
 
-public final class HookEntry implements IXposedHookLoadPackage {
+
+public final class HookEntry {
+    static final class LoadParam {
+        final String packageName,processName;final ClassLoader classLoader;
+        LoadParam(String pkg,String proc,ClassLoader loader){packageName=pkg;processName=proc;classLoader=loader;}
+    }
     static final String OWNER="com.android.server.display.DisplayPowerControllerImpl";
     static final String REFACTOR="com.android.server.display.RefactorNitController";
     static final Map<Object,HookRuntime> states=Collections.synchronizedMap(new IdentityHashMap<>());
@@ -40,7 +44,7 @@ public final class HookEntry implements IXposedHookLoadPackage {
     }
     static Object get(Object obj,String name)throws Exception{return field(obj.getClass(),name).get(obj);}
     static String os()throws Exception{return (String)Class.forName("android.os.SystemProperties").getMethod("get",String.class).invoke(null,"ro.mi.os.version.name");}
-    public void handleLoadPackage(XC_LoadPackage.LoadPackageParam p)throws Throwable {
+    public static void handleLoadPackage(LoadParam p)throws Throwable {
         if(android.os.Process.myUid()!=1000 || !(p.packageName.equals("android")||p.packageName.equals("system")) ||
                 !(p.processName.equals("android")||p.processName.equals("system")||p.processName.equals("system_server")))return;
         // Compatibility is determined independently from actual display interfaces.
@@ -76,13 +80,13 @@ public final class HookEntry implements IXposedHookLoadPackage {
                 LowLightTuning.install(owner.getClassLoader());SceneTuning.install(owner.getClassLoader());
                 PipelineHooks.install(owner);OutdoorTuning.install(owner);RawPanelOutputHooks.install(owner);
                 ForegroundApps.install(owner.getClassLoader());
-                try {
+                try (HookTransaction refactorHooks=new HookTransaction()) {
                 Class<?> ref=Class.forName(REFACTOR,false,owner.getClassLoader());
                 Method output=ref.getDeclaredMethod("getCurrentNit",float.class,float.class,boolean.class);
                 if(output.getReturnType()!=float.class)throw new IllegalStateException("Refactor output ABI");
                 Method memory=ref.getDeclaredMethod("updateLogicalCurve",float.class,float.class);
                 if(memory.getReturnType()!=void.class)throw new IllegalStateException("manual memory ABI");
-                added.add(XposedBridge.hookMethod(memory,new XC_MethodHook(){
+                refactorHooks.add(XposedBridge.hookMethod(memory,new XC_MethodHook(){
                     protected void beforeHookedMethod(MethodHookParam p){
                         HookRuntime state=states.get(p.thisObject);
                         if(state==null||state.closed||state.changing||state.persistentMemory.replaying||!state.phase.equals("active")||!state.appliesToUser()||Looper.myLooper()!=state.handler.getLooper())return;
@@ -97,19 +101,23 @@ public final class HookEntry implements IXposedHookLoadPackage {
                             p.args[1]=applied;p.setObjectExtra("hyperlux.manual",Boolean.TRUE);state.memoryEvent(lux,desired,applied);
                         }catch(Throwable error){XposedBridge.log("LumaCurve memory left official: "+error);}
                     }
-                    protected void afterHookedMethod(MethodHookParam p){HookRuntime state=states.get(p.thisObject);if(state!=null&&!p.hasThrowable()){if(Boolean.TRUE.equals(p.getObjectExtra("hyperlux.manual")))state.persistentMemory.manualApplied();state.queuePublish();}}
+                    protected void afterHookedMethod(MethodHookParam p){HookRuntime state=states.get(p.thisObject);if(state!=null&&!p.hasThrowable()){
+                        if(reconcile(state)&&Boolean.TRUE.equals(p.getObjectExtra("hyperlux.manual")))state.persistentMemory.manualApplied();state.queuePublish();}}
                 }));
-                // The adapter changes baseline fields, not private return values.
-                // OEM reset/interpolation code continues to run even when inlined.
-                added.add(XposedBridge.hookMethod(ref.getDeclaredMethod("resetDefaultSpline"),new XC_MethodHook(){protected void afterHookedMethod(MethodHookParam p){HookRuntime state=states.get(p.thisObject);if(state!=null&&state.onDisplayThread()&&!state.changing&&!p.hasThrowable()){
-                    if(state.kernel.savedBase!=null&&state.phase.equals("active")&&state.appliesToUser())try{((RefactorAdapter)state.kernel).afterReset();}catch(Throwable failure){state.handler.post(()->state.fault(failure));}
+                // Keep ordinary edited and saved bases through OEM reset/learning.
+                // Public handovers below also cover inlined private default helpers.
+                refactorHooks.add(XposedBridge.hookMethod(ref.getDeclaredMethod("resetDefaultSpline"),new XC_MethodHook(){protected void afterHookedMethod(MethodHookParam p){HookRuntime state=states.get(p.thisObject);if(state!=null&&state.onDisplayThread()&&!state.changing&&!p.hasThrowable()){
+                    if(state.kernel.plan()!=null&&state.phase.equals("active")&&state.appliesToUser())try{((RefactorAdapter)state.kernel).afterReset();}catch(Throwable failure){state.handler.post(()->state.fault(failure));}
                     state.persistentMemory.requestAfterReset();}}}));
-                added.add(XposedBridge.hookMethod(ref.getDeclaredMethod("defaultAtLux",float.class),new XC_MethodHook(){protected void afterHookedMethod(MethodHookParam p){HookRuntime state=states.get(p.thisObject);if(state!=null&&!p.hasThrowable()&&state.onDisplayThread()&&state.kernel.savedBase!=null&&state.kernel.plan()!=null&&state.phase.equals("active")&&state.appliesToUser()){float lux=(Float)p.args[0];if(Float.isFinite(lux)&&lux>=0)p.setResult(state.kernel.plan().at(lux));}}}));
-                added.add(XposedBridge.hookMethod(output,new XC_MethodHook(){protected void beforeHookedMethod(MethodHookParam param){HookRuntime state=states.get(param.thisObject);if(state!=null&&state.onDisplayThread()&&Float.isNaN((Float)param.args[1])&&!((Boolean)param.args[2]))state.persistentMemory.requestRestore();}protected void afterHookedMethod(MethodHookParam param){
+                refactorHooks.add(XposedBridge.hookMethod(ref.getDeclaredMethod("defaultAtLux",float.class),new XC_MethodHook(){protected void afterHookedMethod(MethodHookParam p){HookRuntime state=states.get(p.thisObject);if(state!=null&&!p.hasThrowable()&&state.onDisplayThread()&&state.kernel.plan()!=null&&state.phase.equals("active")&&state.appliesToUser()){float lux=(Float)p.args[0];if(Float.isFinite(lux)&&lux>=0)p.setResult(state.kernel.plan().at(lux));}}}));
+                // Public handovers remain observable even if an OEM inlines reset/default helpers.
+                for(String name:new String[]{"setAutoBrightnessState","shouldUseGoodCurve"})refactorHooks.addAll(XposedBridge.hookAllMethods(ref,name,new XC_MethodHook(){protected void afterHookedMethod(MethodHookParam p){if(!p.hasThrowable())reconcile(states.get(p.thisObject));}}));
+                refactorHooks.add(XposedBridge.hookMethod(output,new XC_MethodHook(){protected void beforeHookedMethod(MethodHookParam param){HookRuntime state=states.get(param.thisObject);if(state!=null&&state.onDisplayThread()&&Float.isNaN((Float)param.args[1])&&!((Boolean)param.args[2]))state.persistentMemory.requestRestore();}protected void afterHookedMethod(MethodHookParam param){
                     HookRuntime state=states.get(param.thisObject);if(state==null||param.hasThrowable())return;
                     if(Float.isNaN((Float)param.args[1]) && !((Boolean)param.args[2]))
                         state.sample((Float)param.args[0],(Float)param.getResult());
                 }}));
+                refactorHooks.commitTo(added);
                 }catch(Throwable optional){XposedBridge.log("HyperLux Refactor hooks unavailable; will inspect physical mapper: "+optional);}
                 XC_MethodHook attachHook=new XC_MethodHook(){protected void afterHookedMethod(MethodHookParam p){if(!p.hasThrowable())attach(p.thisObject);}};
                 added.addAll(XposedBridge.hookAllMethods(owner,"init",attachHook));
@@ -129,6 +137,11 @@ public final class HookEntry implements IXposedHookLoadPackage {
         }catch(ClassNotFoundException absent){return false;}
         catch(Throwable error){XposedBridge.log("LumaCurve incompatible Refactor interface: "+error);return false;}
         finally{discovering=false;}
+    }
+    static boolean reconcile(HookRuntime state){
+        if(state==null||!state.onDisplayThread()||state.changing||!state.phase.equals("active")||!state.appliesToUser()||!(state.kernel instanceof RefactorAdapter)||state.kernel.plan()==null)return false;
+        try{if(((RefactorAdapter)state.kernel).reconcile())state.log("已校正系统重建后的基础曲线，保留手动节点");return true;}
+        catch(Throwable failure){state.handler.post(()->state.fault(failure));return false;}
     }
     static void installThermal(Class<?> owner){
         if(thermalSupported.contains(owner))return;

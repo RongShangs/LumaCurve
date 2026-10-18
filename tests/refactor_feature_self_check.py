@@ -5,22 +5,24 @@ R=Path(__file__).resolve().parents[1];S=R/'experimental/refactor_hook/java/top/r
 O=R/'build/feature-self-check-tests';O.mkdir(exist_ok=True);J=R/'build/refactor-diagnostics/json-20240303.jar'
 sources={
 'android/os/SystemClock.java':'package android.os;public class SystemClock{public static long elapsedRealtime(){return 1234;}}',
-'android/hardware/Sensor.java':'package android.hardware;public class Sensor{public static final int TYPE_LIGHT=5;public int getType(){return TYPE_LIGHT;}}',
+'android/hardware/Sensor.java':'package android.hardware;public class Sensor{public static final int TYPE_DEVICE_PRIVATE_BASE=65536,REPORTING_MODE_ON_CHANGE=1;public String getStringType(){return "";}public boolean isWakeUpSensor(){return false;}public int getReportingMode(){return 1;}public String getRequiredPermission(){return "";}public float getMaximumRange(){return 100000;}public float getResolution(){return 1;}public static final int TYPE_LIGHT=5;public int getType(){return TYPE_LIGHT;}}',
 'top/rongshangs/lumacurve/refactor/Doubles.java':r'''package top.rongshangs.lumacurve.refactor;
 import org.json.*;import java.util.*;
 class HookRuntime{
- Object owner=new Object();Kernel kernel=new Kernel();Control brightnessControl=new Control();Memory memoryLifecycle=new Memory();Outdoor outdoor=new Outdoor();Scenes scenes=new Scenes();boolean closed,configProcessed=true,receiverRegistered=true,thermalRegistered=true;long selfCheckGeneration;String selfCheckRequest="",phase="active";int reloads,publishes;Handler handler=new Handler();
+ Object owner=new Object();Kernel kernel=new Kernel();Control brightnessControl=new Control();Slider controlCenter=new Slider();Assist assistCompat=new Assist();Memory memoryLifecycle=new Memory();Outdoor outdoor=new Outdoor();Scenes scenes=new Scenes();boolean closed,configProcessed=true,receiverRegistered=true,thermalRegistered=true;long selfCheckGeneration;String selfCheckRequest="",phase="active";int reloads,publishes;Handler handler=new Handler();
  RuntimeFeatureChecks featureChecks=new RuntimeFeatureChecks(this);void log(String s){}void reload(){reloads++;}void publish(){publishes++;}static float optionalNumber(Object o,String name){return .01f;}
  class Handler{List<Runnable> jobs=new ArrayList<>();List<Long> delays=new ArrayList<>();void postDelayed(Runnable r,long ms){jobs.add(r);delays.add(ms);}void drain(){List<Runnable> copy=new ArrayList<>(jobs);jobs.clear();for(Runnable r:copy)r.run();}}
  // Production lifecycle methods are inserted by the test driver below.
  LIFECYCLE
 }
 class Kernel{float[] factoryLux={0,100},factoryNit={2,500};float min=1,max=500;int manualPointCapacity(){return 7;}String name(){return "physical_mapping";}boolean persistentMemorySupported(){return true;}}
-class Control{boolean available(){return true;}}class Memory{boolean resetSupported=true,timeoutSupported=true;}
+class Assist{int refreshes;void refresh(){refreshes++;}}
+class Slider{boolean ready=true;boolean supported(){return ready;}}
+class Control{boolean available(){return true;}}class Memory{boolean resetSupported=true,timeoutSupported=true,modeSupported=true,foreverSupported=true;}
 class HookEntry{static Set<Class<?>> thermalSupported=new HashSet<>(Arrays.asList(Object.class));static boolean ready=true;static String fail="";static Object get(Object o,String k)throws Exception{if(k.equals(fail))throw new NoSuchFieldException(k);if(k.equals("mLightSensor")||k.equals("mAssistLightSensor"))return ready?new android.hardware.Sensor():null;if(k.contains("AmplifyFactor"))return 1f;return new Object();}}
 class CurvePlan{CurvePlan(float[] a,float[] b,float c,float d,float[] e){}}
 class RawPanelOutputHooks{static boolean supports(Class<?> c){return true;}}
-class ForegroundApps{static boolean install(ClassLoader c){return true;}}
+class ForegroundApps{static boolean supported(){return true;}static boolean install(ClassLoader c){throw new AssertionError("read-only self-check installed hooks");}}
 class ResponseTuning{static boolean supported(Object o){return true;}static boolean smallSupported(Object o){return true;}}
 class LowLightTuning{static boolean supported(Object o){return true;}}
 class LowLightAssistEvidence{static boolean supported(Object o){return true;}}
@@ -29,11 +31,11 @@ class AdvancedTuning{static int fail=-1;static boolean supported(int i,Object o)
 class SceneOptions{static String[] IDS={"night_driving","step","touch","proximity","stream_proximity","reflection","night_wake","manual_sunlight","game"},NAMES=IDS;}
 class Scenes{void put(JSONObject j)throws JSONException{for(String id:SceneOptions.IDS)j.put("scene_"+id+"_supported",true);}}
 class Outdoor{boolean supported(){return true;}HbmAccess binding(){return new HbmAccess();}boolean rangeSupported(){return true;}boolean oprSupported(){return true;}float nitCeiling(int ignored){return 500;}}
-class HbmAccess{Object controller=new Object();HbmAccess(){}HbmAccess(Object c){controller=c;}boolean tunable(){return true;}float max(){return 1;}}
+class HbmAccess{Object controller=new Object();HbmAccess(){}HbmAccess(Object c){controller=c;}static boolean timed=true;boolean budgetTunable(){return timed;}boolean tunable(){return true;}float max(){return 1;}}
 class OutdoorTuning{static Set<Class<?>> owners=new HashSet<>(Arrays.asList(Object.class)),ranges=owners,peaks=owners,nitCaps=owners;}
 class OutdoorOpr{static Set<Class<?>> owners=OutdoorTuning.owners;}
 class NitBrightnessLimit{NitBrightnessLimit(Object o){}float resolve(double n,float min,float max){return max;}}
-class SceneTuning{static boolean supported(HookRuntime s,int group){return true;}}
+class SceneTuning{static boolean dormant;static String inactiveReason(HookRuntime s,int group){return dormant&&group==3?"OEM disabled; use stream proximity":"";}static boolean supported(HookRuntime s,int group){return !(dormant&&group==3);}}
 class OutdoorPolicy{static boolean valid(float n){return Float.isFinite(n)&&n>0;}}
 class OutdoorNodeProfile{static boolean matches(String b,double n,int m,boolean output,boolean range){return output&&range;}}
 class OutdoorNodeBridge{static boolean interfaces(HookRuntime s,boolean range){return true;}}
@@ -49,17 +51,29 @@ public class SelfCheckTest{
   FeatureSelfCheck f=new FeatureSelfCheck();f.check("wait","wait","wait",true,()->false);f.check("absent","absent","absent",false,()->false);check(f.capabilities().getString("wait_state").equals("pending"));check(f.capabilities().getString("absent_state").equals("unsupported"));
   f.check("long","long",null,false,()->{throw new Exception(new String(new char[900]).replace('\0','x'));});check(find(f.report(7,"x").getJSONArray("features"),"long").getString("detail").length()==160);
   HookRuntime s=new HookRuntime();s.featureChecks.run("first");JSONArray entries=s.featureChecks.report.getJSONArray("features");check(entries.length()>=36);Set<String> ids=new HashSet<>();for(int i=0;i<entries.length();i++){JSONObject e=entries.getJSONObject(i);check(ids.add(e.getString("id")));check(e.getString("state").equals("available"));}check(!s.featureChecks.pending());
+  SceneTuning.dormant=true;HbmAccess.timed=false;s.featureChecks.run("native-inactive-and-zero-budget");
+  JSONObject inactive=find(s.featureChecks.report.getJSONArray("features"),"scene_proximity");check(inactive.getString("state").equals("inactive"));check(inactive.getString("detail").contains("stream proximity"));check(!s.featureChecks.caps.getBoolean("scene_proximity_supported"));check(s.featureChecks.caps.getBoolean("scene_stream_proximity_supported"));check(s.featureChecks.caps.getBoolean("outdoor_hbm_supported"));check(find(s.featureChecks.report.getJSONArray("features"),"hbm").getString("detail").contains("零计时"));check(!s.featureChecks.pending());
+  SceneTuning.dormant=false;HbmAccess.timed=true;s.featureChecks.run("native-path-restored");check(s.featureChecks.caps.getBoolean("scene_proximity_supported"));check(find(s.featureChecks.report.getJSONArray("features"),"hbm").getString("detail").equals("实际接口检查通过"));s.featureChecks.runs=1;
+  s.controlCenter.ready=false;s.featureChecks.run("slider-pending");check(!s.featureChecks.caps.getBoolean("control_center_slider_supported"));check(s.featureChecks.caps.getBoolean("manual_panel_supported"));s.controlCenter.ready=true;s.featureChecks.runs=1;
   AdvancedTuning.fail=2;s.featureChecks.run("second");check(find(s.featureChecks.report.getJSONArray("features"),"animation_override").getString("state").equals("pending"));check(s.featureChecks.caps.getBoolean("outdoor_opr_supported"));check(s.featureChecks.caps.getBoolean("scene_game_supported"));check(s.featureChecks.report.getLong("runs")==2);AdvancedTuning.fail=-1;
   HookEntry.ready=false;s.featureChecks.run("boot");check(s.featureChecks.pending());check(!s.featureChecks.caps.getBoolean("dark_lock_supported"));s.scheduleReadinessChecks();check(s.handler.delays.equals(Arrays.asList(1000L,5000L,15000L)));HookEntry.ready=true;s.handler.drain();check(!s.featureChecks.pending());check(s.reloads==1);check(s.handler.jobs.size()==0);
-  int before=s.reloads;s.checkFeatures("unchanged");check(s.reloads==before);check(s.featureChecks.report.getString("request").equals("unchanged"));
+  int before=s.reloads,refreshes=s.assistCompat.refreshes;s.checkFeatures("unchanged");check(s.assistCompat.refreshes==refreshes+1);check(s.reloads==before);check(s.featureChecks.report.getString("request").equals("unchanged"));
   s.thermalRegistered=false;s.featureChecks.run("thermal-event-failure");check(!s.featureChecks.caps.getBoolean("thermal_supported"));check(s.featureChecks.caps.getBoolean("outdoor_supported"));check(s.featureChecks.caps.getBoolean("response_supported"));s.thermalRegistered=true;
   s.receiverRegistered=false;s.featureChecks.run("screen-event-failure");check(!s.featureChecks.caps.getBoolean("dark_lock_supported"));check(!s.featureChecks.caps.getBoolean("outdoor_supported"));check(s.featureChecks.caps.getBoolean("low_light_supported"));s.receiverRegistered=true;
   HookEntry.fail="mAssistLightSensor";s.featureChecks.run("broken-assist");check(find(s.featureChecks.report.getJSONArray("features"),"assist_sensor").getString("state").equals("unsupported"));check(s.featureChecks.caps.getBoolean("response_supported"));HookEntry.fail="";
   HookEntry.ready=false;s.featureChecks.run("wait");s.scheduleReadinessChecks();s.closed=true;long count=s.featureChecks.runs;s.handler.drain();check(s.featureChecks.runs==count);
   String[][] flags={{"thermal_relax","thermal_supported"},{"response_override","response_supported"},{"memory_persist","persistent_memory_supported"},{"dark_lock_enabled","dark_lock_supported"},{"manual_panel_enabled","manual_panel_supported"},{"low_light_stability","low_light_supported"},{"animation_override","animation_override_supported"}};
   for(String[] failed:flags){JSONObject original=new JSONObject(),caps=new JSONObject();for(String[] pair:flags){original.put(pair[0],true);caps.put(pair[1],!pair[0].equals(failed[0]));}JSONArray paused=new JSONArray();JSONObject fitted=ConfigurationCompatibility.fit(original,caps,paused);check(paused.length()==1);for(String[] pair:flags){check(original.getBoolean(pair[0]));check(fitted.getBoolean(pair[0])!=pair[0].equals(failed[0]));}}
+  JSONObject nodeOriginal=new JSONObject().put("control_center_node_mode",2);JSONArray nodePaused=new JSONArray();JSONObject nodeFit=ConfigurationCompatibility.fit(nodeOriginal,new JSONObject().put("control_center_slider_supported",false),nodePaused);check(nodeFit.getInt("control_center_node_mode")==0&&nodeOriginal.getInt("control_center_node_mode")==2&&nodePaused.length()==1);
+  JSONObject allKeep=new JSONObject().put("memory_hold_forever",true);JSONArray keepPaused=new JSONArray();JSONObject keepFit=ConfigurationCompatibility.fit(allKeep,new JSONObject().put("persistent_memory_supported",true).put("memory_mode_supported",false),keepPaused);check(!keepFit.getBoolean("memory_hold_forever")&&!keepFit.getBoolean("memory_hold_switch"));check(keepFit.getBoolean("memory_persist")&&keepFit.getBoolean("memory_restore_unlock")&&allKeep.getBoolean("memory_hold_forever"));check(keepPaused.length()==1);
   JSONObject original=new JSONObject().put("outdoor_enabled",true).put("outdoor_range_unlock",true).put("outdoor_opr_relax",true).put("outdoor_node_boost",true).put("manual_brightness_apps",new JSONArray().put("a.b")).put("scene_options",new JSONObject().put("policies",new JSONObject().put("touch",new JSONObject()).put("game",new JSONObject())));
   JSONArray paused=new JSONArray();JSONObject fitted=ConfigurationCompatibility.fit(original,new JSONObject().put("outdoor_range_supported",false).put("app_auto_supported",false).put("scene_touch_supported",false),paused);check(fitted.getBoolean("outdoor_enabled"));check(!fitted.getBoolean("outdoor_opr_relax"));check(!fitted.getBoolean("outdoor_node_boost"));check(fitted.getJSONArray("manual_brightness_apps").length()==0);check(fitted.getJSONObject("scene_options").getJSONObject("policies").has("game"));check(!fitted.getJSONObject("scene_options").getJSONObject("policies").has("touch"));check(original.getJSONObject("scene_options").getJSONObject("policies").has("touch"));
+  // Capability pauses must not overwrite the stored choices, including nested lists/curves.
+  JSONObject desired=new JSONObject().put("memory_hold_schema",1).put("memory_hold_forever",true).put("memory_persist",true).put("memory_restore_unlock",true).put("memory_hold_switch",true).put("outdoor_enabled",true).put("outdoor_hbm_tuning",true).put("outdoor_hbm_budget_factor",1.7).put("outdoor_hbm_lux_factor",.5).put("control_center_node_mode",2).put("manual_brightness_apps",new JSONArray().put("a.b")).put("factors","1.0,0.8,1.2,1.0").put("scene_options",new JSONObject().put("policies",new JSONObject().put("proximity",new JSONObject().put("mode","block"))));
+  String stored=desired.toString();JSONObject recoveredCaps=new JSONObject().put("persistent_memory_supported",true).put("memory_mode_supported",true).put("memory_forever_supported",true).put("outdoor_supported",true).put("outdoor_hbm_supported",true).put("scene_proximity_supported",true).put("app_auto_supported",true).put("control_center_slider_supported",true);
+  for(String key:new String[]{"persistent_memory_supported","memory_mode_supported","memory_forever_supported","outdoor_supported","outdoor_hbm_supported","scene_proximity_supported","app_auto_supported","control_center_slider_supported"}){
+   JSONObject transientCaps=new JSONObject(recoveredCaps.toString()).put(key,false);ConfigurationCompatibility.fit(desired,transientCaps,new JSONArray());check(stored.equals(desired.toString()));JSONObject restored=ConfigurationCompatibility.fit(desired,recoveredCaps,new JSONArray());check(restored.getBoolean("outdoor_hbm_tuning")&&restored.getBoolean("memory_hold_forever"));check(restored.getInt("control_center_node_mode")==2);check(restored.getJSONArray("manual_brightness_apps").length()==1);check(restored.getJSONObject("scene_options").getJSONObject("policies").getJSONObject("proximity").getString("mode").equals("block"));check(restored.getDouble("outdoor_hbm_budget_factor")==1.7);check(restored.getString("factors").equals("1.0,0.8,1.2,1.0"));
+  }
   System.out.println("Independent feature self-check: "+cases+" cases PASS; production probes with service doubles, Android not tested");
  }
 }'''}
@@ -72,9 +86,10 @@ paths=[]
 for name,body in sources.items():
     p=O/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_text(body,encoding='utf-8');paths.append(p)
 C=O/'classes';C.mkdir(exist_ok=True)
-subprocess.run(['javac','--release','8','-encoding','UTF-8','-cp',str(J),'-d',str(C),*[str(p) for p in paths],*[str(S/n) for n in ['FeatureSelfCheck.java','ConfigurationCompatibility.java','RuntimeFeatureChecks.java']]],check=True)
+subprocess.run(['javac','--release','8','-encoding','UTF-8','-cp',str(J),'-d',str(C),*[str(p) for p in paths],*[str(S/n) for n in ['MemoryOptions.java','AuxiliarySensorIdentity.java','FeatureSelfCheck.java','ConfigurationCompatibility.java','RuntimeFeatureChecks.java']]],check=True)
 subprocess.run(['java','-cp',str(C)+';'+str(J),'top.rongshangs.lumacurve.refactor.SelfCheckTest'],check=True)
 hook=(S/'HookEntry.java').read_text(encoding='utf-8');ui=(S/'MainActivity.java').read_text(encoding='utf-8')
 assert 'major!=4' not in hook and 'SystemVersion.read().unsupported()' not in ui
-assert 'run("self-check",null)' in ui[ui.index('@Override public void onResume()'):]
+assert 'run("self-check","app-start")' in ui[ui.index('void resumeRuntime()'):]
+assert 'if(!startupFeatureCheckRequested)' in ui
 print('Startup entry points: actual-interface checks, no OS-major gate PASS')

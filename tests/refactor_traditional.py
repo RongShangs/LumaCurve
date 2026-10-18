@@ -10,9 +10,9 @@ O=R/'build/refactor-traditional-tests';O.mkdir(exist_ok=True)
 # Reuse only the callback engine fixture, with early-result behavior exercised here.
 tree=ast.parse((R/'tests/refactor_advanced_hooks.py').read_text(encoding='utf-8'))
 all_sources=ast.literal_eval(next(n.value for n in tree.body if isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id=='sources' for t in n.targets)))
-sources={k:all_sources[k] for k in ['de/robv/android/xposed/XC_MethodHook.java','de/robv/android/xposed/XposedBridge.java']}
-sources['de/robv/android/xposed/XC_MethodHook.java']=sources['de/robv/android/xposed/XC_MethodHook.java'].replace('Object result;Throwable','boolean early;Object result;Throwable').replace('setResult(Object r){result=r;}','setResult(Object r){result=r;early=true;}')
-sources['de/robv/android/xposed/XposedBridge.java']=sources['de/robv/android/xposed/XposedBridge.java'].replace('try{p.result=m.invoke(o,args);}','try{if(!p.early)p.result=m.invoke(o,args);}')
+sources={k:all_sources[k] for k in ['top/rongshangs/lumacurve/refactor/hooking/XC_MethodHook.java','top/rongshangs/lumacurve/refactor/hooking/XposedBridge.java']}
+sources['top/rongshangs/lumacurve/refactor/hooking/XC_MethodHook.java']=sources['top/rongshangs/lumacurve/refactor/hooking/XC_MethodHook.java'].replace('Object result;Throwable','boolean early;Object result;Throwable').replace('setResult(Object r){result=r;}','setResult(Object r){result=r;early=true;}')
+sources['top/rongshangs/lumacurve/refactor/hooking/XposedBridge.java']=sources['top/rongshangs/lumacurve/refactor/hooking/XposedBridge.java'].replace('try{p.result=m.invoke(o,args);}','try{if(!p.early)p.result=m.invoke(o,args);}')
 sources.update({
 'android/os/SystemClock.java':'''package android.os;public class SystemClock {public static long time=1000;public static long uptimeMillis(){return time;}public static long elapsedRealtime(){return time;}}''',
 'android/os/Handler.java':'''package android.os;public class Handler {public void post(Runnable r){pending=r;}public Runnable pending;}''',
@@ -25,7 +25,7 @@ public class BrightnessConfiguration {
  public boolean equals(Object o){if(!(o instanceof BrightnessConfiguration))return false;BrightnessConfiguration b=(BrightnessConfiguration)o;return Arrays.equals(mLux,b.mLux)&&Arrays.equals(mNits,b.mNits)&&mCorrectionsByPackageName.equals(b.mCorrectionsByPackageName)&&mCorrectionsByCategory.equals(b.mCorrectionsByCategory)&&Objects.equals(mDescription,b.mDescription)&&mShouldCollectColorSamples==b.mShouldCollectColorSamples&&mShortTermModelTimeout==b.mShortTermModelTimeout&&mShortTermModelLowerLuxMultiplier==b.mShortTermModelLowerLuxMultiplier&&mShortTermModelUpperLuxMultiplier==b.mShortTermModelUpperLuxMultiplier;}
 }''',
 'com/android/server/display/MiuiPhysicalBrightnessMappingStrategy.java':'''package com.android.server.display;
-import android.hardware.display.BrightnessConfiguration;import java.util.*;import de.robv.android.xposed.XposedBridge;
+import android.hardware.display.BrightnessConfiguration;import java.util.*;import top.rongshangs.lumacurve.refactor.hooking.XposedBridge;
 public class MiuiPhysicalBrightnessMappingStrategy {
  public float[] mNits={1,100,1000};public BrightnessConfiguration mConfig,mDefaultConfig;public Spline mBrightnessSpline;
  public float mShortTermModelUserLux=-1,mShortTermModelUserBrightness=-1,mAutoBrightnessAdjustment;
@@ -49,7 +49,7 @@ class HookRuntime {CurveBackend kernel;Object owner;boolean closed,changing,faul
  boolean onDisplayThread(){return onThread&&!closed;}boolean appliesToUser(){return userMatches;}void memoryEvent(float l,float d,float r){events++;remembered=r;}void queuePublish(){}void sample(float l,float n){samples++;lastNit=n;}void fault(Throwable e){faultPending=true;}}
 ''',
 'top/rongshangs/lumacurve/refactor/TraditionalHostTest.java':'''package top.rongshangs.lumacurve.refactor;
-import java.util.*;import android.hardware.display.BrightnessConfiguration;import com.android.server.display.MiuiPhysicalBrightnessMappingStrategy;import de.robv.android.xposed.XposedBridge;
+import java.util.*;import android.hardware.display.BrightnessConfiguration;import com.android.server.display.MiuiPhysicalBrightnessMappingStrategy;import top.rongshangs.lumacurve.refactor.hooking.XposedBridge;
 public class TraditionalHostTest {
  static int cases;static void check(boolean value){if(!value)throw new AssertionError("case "+cases);cases++;}
  static void near(float a,float b){check(Math.abs(a-b)<.001f);}static void bad(Runnable r){try{r.run();throw new AssertionError("invalid accepted");}catch(IllegalArgumentException e){cases++;}}

@@ -26,7 +26,7 @@ index=(site/'index.html').read_text(encoding='utf-8')
 assert f'id="latest-version">{version}</span>' in index,'Update the website release heading before syncing'
 assert all(f'downloads/{name}' in index for name in files),'Website download links must match this release'
 assert f'{version} / {code}' in index,'Website version code mismatch'
-metadata={'name':'HyperLux','version':version,'versionCode':code,'distribution':'apk','requires':['Root','LSPosed','HyperOS 4'],
+metadata={'name':'HyperLux','version':version,'versionCode':code,'distribution':'apk','requires':['Root','LSPosed','HyperOS'],
           'apkUrl':f'https://lc.rongshangs.top/downloads/{files[0]}','sourceUrl':f'https://lc.rongshangs.top/downloads/{files[1]}',
           'bundleUrl':f'https://lc.rongshangs.top/downloads/{files[2]}','releaseUrl':f'https://github.com/RongShangs/LumaCurve/releases/tag/v{version}',
           'sha256':checks[0].split()[0],'changelog':notes}

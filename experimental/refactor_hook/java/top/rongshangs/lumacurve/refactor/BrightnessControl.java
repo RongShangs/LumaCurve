@@ -145,7 +145,7 @@ final class BrightnessControl implements SensorEventListener {
             brightnessSnapshot=brightnessValues();
         }catch(Throwable failure){fail(failure);}
         };retry=()->{if(s.closed)return;if(!registered){start();if(!registered)return;}failed=false;tick();};
-        modeObserver=new ContentObserver(s.handler){public void onChange(boolean self){try{if(busy||s.closed)return;if(auto()){lastAutoEnabledAt=SystemClock.elapsedRealtime();suppressApplication();if(!owner.equals("none"))relinquish("user_auto",false);else tick();}else tick();}catch(Throwable failure){fail(failure);}}};
+        modeObserver=new ContentObserver(s.handler){public void onChange(boolean self){try{if(s.closed)return;boolean automatic=auto();s.memorySettingChanged(automatic);if(busy)return;if(automatic){lastAutoEnabledAt=SystemClock.elapsedRealtime();suppressApplication();if(!owner.equals("none"))relinquish("user_auto",false);else tick();}else tick();}catch(Throwable failure){fail(failure);}}};
         brightnessObserver=new ContentObserver(s.handler){public void onChange(boolean self){try{if(!s.closed&&!busy&&owner.equals("dark")&&SystemClock.uptimeMillis()>ignoreBrightnessUntil&&!brightnessSnapshot.equals(brightnessValues()))manualBrightnessChanged();}catch(Throwable failure){fail(failure);}}};
         commandObserver=new ContentObserver(s.handler){public void onChange(boolean self){command();}};
     }
@@ -167,8 +167,8 @@ final class BrightnessControl implements SensorEventListener {
             float selectedMainScale=1,selectedAssistScale=1;Sensor selectedAssist=null;
             if(dual!=null){selectedAssist=(Sensor)HookEntry.get(dual,"mAssistLightSensor");selectedMainScale=((Number)HookEntry.get(dual,"mFovAmplifyFactor")).floatValue();selectedAssistScale=((Number)HookEntry.get(dual,"mAssistFovAmplifyFactor")).floatValue();
                 if(!Float.isFinite(selectedMainScale)||!Float.isFinite(selectedAssistScale)||selectedMainScale<=0||selectedAssistScale<=0||selectedMainScale>100||selectedAssistScale>100)return false;}
-            // Xiaomi's native auxiliary ALS uses vendor type 33171055; its consumer reads lux at values[0].
-            if(selectedAssist!=null&&((selectedAssist.getType()!=Sensor.TYPE_LIGHT&&selectedAssist.getType()!=33171055)||sameSensor(selectedAssist,selectedMain)))return false;
+            // Accept verified scalar-lux identities, including a rebound port-ROM source.
+            if(selectedAssist!=null&&(!AuxiliarySensorIdentity.accepted(selectedAssist)||sameSensor(selectedAssist,selectedMain)))return false;
             // SensorEvent.sensor belongs to its registering manager's handle map.
             // The display service uses a separately constructed SensorManager.
             SensorManager selectedManager=(SensorManager)HookEntry.get(abc,"mSensorManager");
@@ -210,7 +210,7 @@ final class BrightnessControl implements SensorEventListener {
     void configure(BrightnessControlOptions next){
         if(!options.same(next))relinquish("settings_changed",true);
         if(next.manualApps.isEmpty()){appExemptions.clear();appSuppressionPending=false;syncApplicationSuppression();}
-        options=next;failed=false;error="";if(!registered)start();tick();
+        options=next;failed=false;error="";if(!registered)start();try{s.memoryModeKnown(auto());}catch(Throwable unavailable){s.log("记忆保持等待模式状态就绪");}tick();
         if(options.manualApps.isEmpty())ForegroundApps.detach(this);else ForegroundApps.attach(this);
     }
     void mode(boolean on)throws Exception{if(!Settings.System.putInt(s.context.getContentResolver(),Settings.System.SCREEN_BRIGHTNESS_MODE,on?1:0)||auto()!=on)throw new IllegalStateException("系统未确认自动亮度模式");}
@@ -232,8 +232,8 @@ final class BrightnessControl implements SensorEventListener {
         if(previous.equals("raw_panel"))s.handler.postDelayed(()->{if(awake())s.requestRecalculation();},400);
         if(!previous.equals("none")){s.log(previous.equals("dark")?"暗光锁定退出："+why:previous.equals("app")?"应用亮度接管结束："+why:"主屏手动面板已退让："+why);s.queueControlPublish();}
     }
-    void screenOff(){ForegroundApps.detach(this);s.handler.removeCallbacks(screenCleanup);screenCleanupQueued=false;if(owner.equals("raw_panel")){rawScreenOff=true;pauseRaw();}else relinquish("screen_off",true);unlisten();s.handler.removeCallbacks(timer);s.handler.removeCallbacks(retry);failed=false;}
-    void stop(){ForegroundApps.detach(this);appExemptions.clear();appSuppressionPending=false;syncApplicationSuppression();s.handler.removeCallbacks(screenCleanup);screenCleanupQueued=false;relinquish("disabled",true);unlisten();s.handler.removeCallbacks(timer);s.handler.removeCallbacks(retry);options=new BrightnessControlOptions();}
+    void screenOff(){TemporaryScreenOn.clear();ForegroundApps.detach(this);s.handler.removeCallbacks(screenCleanup);screenCleanupQueued=false;if(owner.equals("raw_panel")){rawScreenOff=true;pauseRaw();}else relinquish("screen_off",true);unlisten();s.handler.removeCallbacks(timer);s.handler.removeCallbacks(retry);failed=false;}
+    void stop(){TemporaryScreenOn.clear();ForegroundApps.detach(this);appExemptions.clear();appSuppressionPending=false;syncApplicationSuppression();s.handler.removeCallbacks(screenCleanup);screenCleanupQueued=false;relinquish("disabled",true);unlisten();s.handler.removeCallbacks(timer);s.handler.removeCallbacks(retry);options=new BrightnessControlOptions();}
     void close(){stop();unregisterObservers();}
     void unregisterObservers(){
         try{if(displayEvents!=null)displayEvents.unregisterDisplayListener(displayListener);}catch(Throwable failure){error=failure.toString();}
@@ -285,7 +285,7 @@ final class BrightnessControl implements SensorEventListener {
     void fail(Throwable failure){error=failure.toString();failed=true;relinquish("error",true);unlisten();s.handler.removeCallbacks(timer);s.handler.removeCallbacks(retry);if((options.darkLock||!options.manualApps.isEmpty()||options.manualPanel&&!registered)&&!s.closed&&s.phase.equals("active")&&s.screenOn())s.handler.postDelayed(retry,30000);s.log("主屏亮度控制退出："+error);s.queuePublish();}
     JSONObject status()throws JSONException{
         JSONObject j=new JSONObject();options.put(j);boolean supported=supported();j.put("elapsed_ms",SystemClock.elapsedRealtime()).put("manual_panel_supported",mainDisplay()&&RawPanelOutputHooks.supports(s.owner.getClass())).put("dark_lock_supported",supported&&bindSensors()).put("owner",owner).put("reason",reason).put("error",error).put("auto",auto()).put("listening",listening).put("session",session).put("raw_target",rawTarget).put("raw_paused",rawPaused).put("raw_confirmed",rawConfirmed).put("raw_blocked_output_calls",rawBlockedWrites);
-        j.put("app_auto_supported",ForegroundApps.install(s.owner.getClass().getClassLoader())).put("foreground_package",foreground.pkg).put("foreground_auto_suppressed",!appSuppressed.isEmpty());
+        j.put("app_auto_supported",ForegroundApps.supported()).put("foreground_package",foreground.pkg).put("foreground_auto_suppressed",!appSuppressed.isEmpty());
         j.put("app_multiwindow_supported",ForegroundApps.multiWindowSupported).put("foreground_visibility_known",foreground.visibilityKnown).put("foreground_visible_packages",new JSONArray(foreground.visible)).put("foreground_matched_package",foreground.selected(options.manualApps)).put("foreground_visibility_pending",foregroundPending);
         j.put("foreground_auto_exemptions",new JSONArray(appExemptions)).put("foreground_auto_override_pending",appSuppressionPending);
         if(!ForegroundApps.error.isEmpty())j.put("app_auto_detail",ForegroundApps.error);
@@ -293,7 +293,7 @@ final class BrightnessControl implements SensorEventListener {
         j.put("watch_main_samples",mainSamples).put("watch_assist_samples",assistSamples).put("watch_unmatched_samples",unmatchedSamples).put("watch_evaluations",sensorEvaluations).put("watch_requested_period_us",1000000).put("watch_main_age_ms",mainAt<0?-1:SystemClock.uptimeMillis()-mainAt).put("watch_assist_age_ms",assistAt<0?-1:SystemClock.uptimeMillis()-assistAt);
         if(main!=null)j.put("watch_main_sensor",main.getName()).put("watch_main_type",main.getType());if(assist!=null)j.put("watch_assist_sensor",assist.getName()).put("watch_assist_type",assist.getType());
         j.put("countdown_left_ms",policy.darkSince<0?0:Math.max(0,policy.darkSince+options.minutes*60000L-SystemClock.uptimeMillis()));
-        if(Float.isFinite(held))j.put("held",held);try{if(supported)j.put("range",display.read());}catch(Throwable ignored){}return j;
+        j.put("temporary_screen_on",TemporaryScreenOn.active());if(Float.isFinite(held))j.put("held",held);try{if(supported)j.put("range",display.read());}catch(Throwable ignored){}return j;
     }
     void stopRaw(){
         s.handler.removeCallbacks(rawRenew);
@@ -321,7 +321,7 @@ final class BrightnessControl implements SensorEventListener {
         }catch(Throwable failure){boolean restore=rawWasAuto;relinquish("raw_guard_error",false);if(restore)try{setAuto(true);}catch(Throwable ignored){}s.log("主屏节点守护续约失败，已退让");s.queuePublish();}
     }
     void armRaw(String token,int target)throws Exception{
-        if(!options.manualPanel)throw new IllegalStateException("主屏手动面板已关闭");
+        if(!options.manualPanel&&!token.startsWith("cc_"))throw new IllegalStateException("主屏手动面板已关闭");
         if(!RawPanelOutputHooks.supports(s.owner.getClass()))throw new IllegalStateException("当前系统尚未接入主屏输出隔离");
         // A dark lock paused automatic mode on the user's behalf. Preserve that
         // ownership before relinquishing it, so a failed raw transaction can recover.
@@ -349,9 +349,10 @@ final class BrightnessControl implements SensorEventListener {
             if(!enabled()||!awake()||!mainDisplay())throw new IllegalStateException("请先启用引擎并保持主屏亮起");
             // Raw control only needs main-display ownership and mode acknowledgement.
             // HBM's float range and temporarily missing BrightnessInfo are irrelevant to sysfs.
-            if(!action.startsWith("raw_")&&!available())throw new IllegalStateException("主屏框架亮度接口尚未就绪");
+            if(!action.startsWith("raw_")&&!action.equals("keep_awake")&&!available())throw new IllegalStateException("主屏框架亮度接口尚未就绪");
             if(!token.matches("[A-Za-z0-9_-]{1,80}"))throw new IllegalArgumentException("面板会话无效");
-            if(action.equals("raw_begin")){
+            if(action.equals("keep_awake")){if(!unlocked())throw new IllegalStateException("请先解锁");TemporaryScreenOn.set(s.context,request.getBoolean("enabled"));}
+            else if(action.equals("raw_begin")){
                 long gesture=request.getLong("gesture_elapsed"),age=SystemClock.elapsedRealtime()-gesture;
                 if(age<0||age>3000||lastAutoEnabledAt>gesture)throw new IllegalStateException("系统模式已改变，请再次滑动");
                 int target=request.getInt("value");if(request.getDouble("value")!=target||target<10||target>65535||!unlocked())throw new IllegalStateException("请解锁并选择有效的主屏节点值");armRaw(token,target);

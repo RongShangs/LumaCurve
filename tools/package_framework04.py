@@ -16,8 +16,8 @@ files={
  'tools/probe_temporary_runtime.sh':'probe_temporary_runtime.sh',
  'tools/probe_temporary_watchdog.sh':'probe_temporary_watchdog.sh',
  'module/process_scope.sh':'process_scope.sh',
- 'docs/framework04持续保持测试.md':'README.md',
- 'docs/framework03实机结果.md':'PREVIOUS-RESULT.md',
+ 'docs/archive/legacy-ksu/framework04持续保持测试.md':'README.md',
+ 'docs/archive/legacy-ksu/framework03实机结果.md':'PREVIOUS-RESULT.md',
  'build/framework-probe/verification.json':'host-verification.json',
 }
 for f in (ROOT/'tools/framework_probe').glob('LumaFrameworkProbe*.java'):

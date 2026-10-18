@@ -3,7 +3,7 @@ package top.rongshangs.lumacurve.refactor;
 import java.lang.reflect.*;
 import java.util.*;
 import java.util.concurrent.*;
-import de.robv.android.xposed.*;
+import top.rongshangs.lumacurve.refactor.hooking.*;
 
 /** Event source only. Never calls Settings/providers/services while WM holds its lock. */
 final class ForegroundApps {
@@ -30,6 +30,7 @@ final class ForegroundApps {
         String selected(Set<String> apps){if(contains(pkg)&&apps.contains(pkg))return pkg;for(String p:visible)if(apps.contains(p))return p;return "";}
         static Snapshot unknown(){return new Snapshot("",-1,-1);}
     }
+    static synchronized boolean supported(){return installed;}
     static synchronized boolean install(ClassLoader loader){
         if(attempted)return installed;attempted=true;
         try{

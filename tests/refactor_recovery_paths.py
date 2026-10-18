@@ -17,6 +17,7 @@ test=O/'edges/ReviewEdges.java';test.parent.mkdir(exist_ok=True)
 test.write_text(r'''package top.rongshangs.lumacurve.refactor;
 import java.io.*;import java.util.*;import org.json.*;
 class OutdoorNodeRoot{static void stop(){}}
+class ControlCenterRoot{static final String PROFILE="control_center_profile";}
 class RootControl{
  static final File DATA=new File("build/refactor-recovery-tests/edges");static final String CONFIG="config";
  final Store settings=new Store();boolean connected,confirm=true;int resumes;
@@ -41,7 +42,7 @@ class AssetLoader{int width,height;List<AssetStream> streams=new ArrayList<>();I
 class ImageCandidate{final AssetLoader loader=new AssetLoader();int density=1;int dp(int v){return v*density;}AssetLoader getAssets(){return loader;}
 '''+decode+r'''}
 class RuntimeCandidate{
- boolean closed,receiverRegistered=true,thermalRegistered=true;final Part outdoorNode=new Part(),persistentMemory=new Part(),brightnessControl=new Part(),memoryLifecycle=new Part(),kernel=new Part(),stateWriter=new Part();
+ boolean closed,receiverRegistered=true,thermalRegistered=true;final Part outdoorNode=new Part(),persistentMemory=new Part(),brightnessControl=new Part(),memoryLifecycle=new Part(),kernel=new Part(),stateWriter=new Part(),controlCenter=new Part();
  final Object observer=new Object(),refresh=new Object(),batteryListener=new Object(),thermalListener=new Object();final ContextDouble context=new ContextDouble(observer);final Part power=new Part();int disabled;
  void disableOverrides(){disabled++;}
  static class Part{int closes,configures,removed;void close(){closes++;}Object plan(){return new Object();}void configure(Object p){configures++;}void removeThermalStatusListener(Object p){removed++;}}
@@ -51,7 +52,7 @@ public class ReviewEdges{
  static int cases;static void check(boolean b){if(!b)throw new AssertionError("case "+cases);cases++;}
  static RootControl owner(String kind,boolean wasAuto,int user)throws Exception{NativePanelRoot.stops=0;RootControl c=new RootControl();c.settings.put("hyperlux_brightness_owner_v1",new JSONObject().put("owner",kind).put("was_auto",wasAuto).put("user",user).put("session","session").toString());return c;}
  static JSONObject node()throws Exception{return new JSONObject().put("supported",true).put("path","/sys/class/backlight/panel0-backlight/brightness").put("canonical_path","/sys/devices/panel0/brightness").put("maximum",16383);}
- static void nodes()throws Exception{PanelNodeDiscovery.value=node();PanelNodeDiscovery.scans=NativePanelClient.probes=NativePanelRoot.installs=0;NativePanelRoot.changeDuringInstall=false;NativePanelClient.reply=node().put("ok",true).put("native_build","raw07-openprobe");}
+ static void nodes()throws Exception{PanelNodeDiscovery.value=node();PanelNodeDiscovery.scans=NativePanelClient.probes=NativePanelRoot.installs=0;NativePanelRoot.changeDuringInstall=false;NativePanelClient.reply=node().put("ok",true).put("native_build","raw08-slider");}
  public static void main(String[] args)throws Exception{
   for(String kind:new String[]{"dark","app","raw_panel"}){RootControl c=owner(kind,true,0);check(c.stop().getBoolean("ok"));check(c.settings.mode.equals("1")&&c.settings.modeWrites==1);check(c.settings.get("hyperlux_brightness_owner_v1")==null);check(!new JSONObject(c.settings.get("config")).getBoolean("enabled"));check(NativePanelRoot.stops==1&&c.resumes==0);}
   for(String kind:new String[]{"dark","app","raw_panel","panel","unknown"}){RootControl c=owner(kind,false,0);c.stop();check(c.settings.mode.equals("0")&&c.settings.modeWrites==0);}

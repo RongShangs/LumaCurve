@@ -5,7 +5,7 @@ R=Path(__file__).resolve().parents[1];S=R/'experimental/refactor_hook/java/top/r
 O=R/'build/refactor-scene-hook-tests';O.mkdir(exist_ok=True);J=R/'build/refactor-diagnostics/json-20240303.jar'
 tree=ast.parse((R/'tests/refactor_advanced_hooks.py').read_text(encoding='utf-8'))
 common=ast.literal_eval(next(n.value for n in tree.body if isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id=='sources' for t in n.targets)))
-sources={k:common[k] for k in ['de/robv/android/xposed/XC_MethodHook.java','de/robv/android/xposed/XposedBridge.java','top/rongshangs/lumacurve/refactor/HookEntry.java']}
+sources={k:common[k] for k in ['top/rongshangs/lumacurve/refactor/hooking/XC_MethodHook.java','top/rongshangs/lumacurve/refactor/hooking/XposedBridge.java','top/rongshangs/lumacurve/refactor/HookEntry.java']}
 sources.update({
 'android/os/SystemClock.java':'package android.os;public class SystemClock{public static long now=1000;public static long uptimeMillis(){return now;}}',
 'android/os/Handler.java':'''package android.os;import java.util.*;public class Handler{public final Map<Runnable,Long> pending=new IdentityHashMap<>();public boolean post(Runnable r){pending.put(r,0L);return true;}public boolean postDelayed(Runnable r,long delay){pending.put(r,delay);return true;}public void removeCallbacks(Runnable r){pending.remove(r);}}''',
@@ -15,7 +15,7 @@ sources.update({
  static float optionalNumber(Object o,String f){try{return ((Number)HookEntry.get(o,f)).floatValue();}catch(Exception e){return Float.NaN;}}static Boolean optionalBoolean(Object o,String f){try{return (Boolean)HookEntry.get(o,f);}catch(Exception e){return null;}}
  static void readBoolean(JSONObject j,String key,Object o,String f){try{Boolean b=optionalBoolean(o,f);if(b!=null)j.put(key,b);}catch(Exception e){}}static void readNumber(JSONObject j,String key,Object o,String f){try{float v=optionalNumber(o,f);if(Float.isFinite(v)&&v>=0)j.put(key,v);}catch(Exception e){}}
 }''',
-'com/android/server/display/SceneDetector.java':'''package com.android.server.display;import de.robv.android.xposed.*;public class SceneDetector{
+'com/android/server/display/SceneDetector.java':'''package com.android.server.display;import top.rongshangs.lumacurve.refactor.hooking.*;public class SceneDetector{
  public boolean mUseDrivingModeForBrt=true,mTransientProximityEnabled=true,mUseAonFlareEnabled=true,mNeedCheckProximitySensor=true,mNeedCheckAonFlare=true,mIsNightDrivingMode=true,mProximityStatus=true,throwing;
  public int mProxState=8;public float mMinAonFlareEnableLux=17,mMaxAonFlareEnableLux=200;public boolean sawRear,sawAon;public int applies;
  private boolean isNightTime(){return true;}private void applyNightDrivingBrightness(){applies++;mIsNightDrivingMode=(Boolean)XposedBridge.call(this,"isNightTime",new Class<?>[0]);}
@@ -31,7 +31,7 @@ for name,code in sources.items():
  p=O/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_text(code,encoding='utf-8');files.append(p)
 p=O/'SceneHookTest.java'
 p.write_text(r'''package top.rongshangs.lumacurve.refactor;
-import org.json.*;import com.android.server.display.*;import de.robv.android.xposed.*;import android.os.*;
+import org.json.*;import com.android.server.display.*;import top.rongshangs.lumacurve.refactor.hooking.*;import android.os.*;
 class Calendar extends java.util.GregorianCalendar{static int seconds,millis;public static Calendar getInstance(){Calendar c=new Calendar();c.set(SECOND,seconds);c.set(MILLISECOND,millis);return c;}}
 public class SceneHookTest{
  static int cases;static void check(boolean b){if(!b)throw new AssertionError("case "+cases);cases++;}
@@ -64,6 +64,10 @@ public class SceneHookTest{
   abc.mAmbientLuxValid=false;s.scenes.refresh();check(!s.scenes.denied[2]);abc.mAmbientLuxValid=true;abc.mAmbientLux=20;SystemClock.now=2300;s.scenes.refresh();check(s.scenes.denied[2]&&scheduled(s,2600));
   SystemClock.now=2600;s.scenes.timer.run();impl.mTouchAreaHelper.active=false;check(!(Boolean)call(impl.mTouchAreaHelper,"isTouchCoverProtectionActive",new Class<?>[0]));impl.mTouchAreaHelper.active=true;s.scenes.stop();SystemClock.now=1000;check(!s.handler.pending.containsKey(s.scenes.timer));
   }
+  check(SceneTuning.inactiveReason(s,3).isEmpty());impl.mUseProximityEnabled=false;
+  check(!SceneTuning.supported(s,3));check(SceneTuning.supported(s,4));check(SceneTuning.inactiveReason(s,3).contains("流式距离"));
+  block(s,4);scene.mNeedCheckProximitySensor=true;scene.mNeedCheckAonFlare=false;check(!(Boolean)call(scene,"isNeedSkipBrightnessChange",new Class<?>[0]));scene.mNeedCheckAonFlare=true;s.scenes.stop();
+  check(!impl.mUseProximityEnabled);impl.mUseProximityEnabled=true;check(SceneTuning.supported(s,3));check(SceneTuning.inactiveReason(s,3).isEmpty());
   System.out.println("Scene hooks/lifecycle: "+cases+" cases PASS; actual callbacks with OEM and Looper doubles, Android not tested");
  }
 }''',encoding='utf-8')

@@ -3,7 +3,7 @@ package top.rongshangs.lumacurve.refactor;
 import android.os.Looper;
 import java.lang.reflect.*;
 import java.util.*;
-import de.robv.android.xposed.*;
+import top.rongshangs.lumacurve.refactor.hooking.*;
 
 /** The assist sensor has its own ring buffer, independently of the ABC main deadlines. */
 final class LowLightTuning {

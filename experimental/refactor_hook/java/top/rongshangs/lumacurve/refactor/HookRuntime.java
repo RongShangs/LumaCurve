@@ -5,12 +5,13 @@ import android.database.ContentObserver;
 import android.os.*;
 import android.provider.Settings;
 import org.json.*;
-import de.robv.android.xposed.XposedBridge;
+import top.rongshangs.lumacurve.refactor.hooking.XposedBridge;
 import java.io.*;
 import java.util.*;
 import java.text.SimpleDateFormat;
 
 final class HookRuntime {
+    final ControlCenterEngine controlCenter;
     static final String BUILD=AppBuild.BUILD,CONFIG="lumacurve_refactor_config_v1",STATUS="lumacurve_refactor_status_v1",REFRESH="lumacurve_refactor_refresh_v1";
     final Object owner; final CurveBackend kernel; final Handler handler; final Context context;
     final String fingerprint,baselineIdentity; final ContentObserver observer,refresh;
@@ -49,7 +50,7 @@ final class HookRuntime {
     java.lang.reflect.Method hdrProbe;
     java.lang.reflect.Method strategyProbe;Object strategyController;
     HookRuntime(Object owner,Object ref,Handler handler)throws Exception {
-        this.owner=owner;this.handler=handler;context=(Context)HookEntry.get(owner,"mContext");fingerprint=Build.FINGERPRINT;brightnessControl=new BrightnessControl(this);
+        this.owner=owner;this.handler=handler;context=(Context)HookEntry.get(owner,"mContext");controlCenter=new ControlCenterEngine(this);fingerprint=Build.FINGERPRINT;brightnessControl=new BrightnessControl(this);
         stateWriter=new DeferredStateWriter((key,value)->Settings.Global.putString(context.getContentResolver(),key,value),
             failure->XposedBridge.log("HyperLux deferred state: "+failure));
         if(ref.getClass().getName().equals(HookEntry.REFACTOR)){
@@ -78,9 +79,10 @@ final class HookRuntime {
         if(logs.size()>=160)logs.removeFirst();logs.addLast(line);
         XposedBridge.log("LumaCurve "+value);
     }
+    final AssistSensorCompat assistCompat=new AssistSensorCompat(this);
     void start(){
         try{
-            refreshUserIdentity();memoryLifecycle.attach();brightnessControl.start();
+            refreshUserIdentity();memoryLifecycle.attach();brightnessControl.start();controlCenter.start();
             lastReset=Settings.Global.getString(context.getContentResolver(),"lumacurve_manual_memory_reset_v1");if(lastReset==null)lastReset="";
             context.getContentResolver().registerContentObserver(Settings.Global.getUriFor(CONFIG),false,observer);
             context.getContentResolver().registerContentObserver(Settings.Global.getUriFor(REFRESH),false,refresh);
@@ -93,7 +95,7 @@ final class HookRuntime {
     }
     void close(){
         if(closed)return;
-        stateWriter.close();
+        stateWriter.close();controlCenter.close();
         outdoorNode.close();persistentMemory.close();brightnessControl.close();
         closed=true;memoryLifecycle.close();
         try{context.getContentResolver().unregisterContentObserver(observer);}catch(Throwable ignored){}
@@ -154,6 +156,7 @@ final class HookRuntime {
         }catch(Throwable error){XposedBridge.log("HyperLux configuration acknowledgement: "+error);}
     }
     void checkFeatures(String request){
+        assistCompat.refresh();
         String before=featureChecks.caps.toString();featureChecks.run(request);
         if(!before.equals(featureChecks.caps.toString())){selfCheckRequest=request;configProcessed=false;reload();}else publish();
     }
@@ -218,9 +221,12 @@ final class HookRuntime {
                     lowThresholds=nextLowThresholds;
                     assistGate.configure(config);
                     if(lowLightEnabled&&!LowLightTuning.supported(this))throw new IllegalArgumentException("暗光稳定接口尚未完整兼容");
-                    phase="active";scenes.configure(proposedScenes);brightnessControl.configure(controls);outdoor.configure(outdoorOptions);message=firmwareRevalidated?"系统更新后的曲线与接口已重新核验，原设置继续生效":"自定义曲线已接入，官方光感和过渡动画继续运行";
+                    controlCenter.configure(config);phase="active";assistCompat.refresh();scenes.configure(proposedScenes);brightnessControl.configure(controls);outdoor.configure(outdoorOptions);message=firmwareRevalidated?"系统更新后的曲线与接口已重新核验，原设置继续生效":"自定义曲线已接入，官方光感和过渡动画继续运行";
+                    // Configuration can itself switch auto brightness while callbacks
+                    // are transaction-suppressed. Verify the curve before acknowledging.
+                    if(kernel instanceof RefactorAdapter)((RefactorAdapter)kernel).reconcile();
                     if(compatibilityPaused.length()>0)message+="；已暂停不可用选项："+compatibilityPaused.toString();
-                    persistentMemory.configure(memoryOptions,curveChanged||!persistentMemory.options.persist&&memoryOptions.persist);
+                    persistentMemory.configure(memoryOptions,curveChanged);
                     log(curveChanged?"曲线已应用，重新建立基础锚点":"设置已更新，保留当前手动锚点");
                 }else{
                     if(kernel.plan()!=null)kernel.configure(null);disableOverrides();memoryStrength=1;phase="attached";message="已恢复官方曲线与温控策略";log(message);
@@ -262,14 +268,16 @@ final class HookRuntime {
         handler.post(()->{if(closed)return;try{kernel.configure(null);}catch(Throwable ignored){}
             phase="error";message="接入异常，已尝试恢复官方："+error;log(message);publish();faultPending=false;});
     }
-    void disableOverrides(){outdoorNode.release();scenes.stop();brightnessControl.stop();assistGate.reset();outdoor.stop();thermalEnabled=false;responseEnabled=false;smallResponseEnabled=false;lowLightEnabled=false;memoryStrength=1;advanced=new AdvancedOptions();AdvancedTuning.restoreAnimation(this);AdvancedTuning.refreshThresholds(this);}
+    void disableOverrides(){outdoorNode.release();scenes.stop();brightnessControl.stop();assistCompat.restore();assistGate.reset();outdoor.stop();thermalEnabled=false;responseEnabled=false;smallResponseEnabled=false;lowLightEnabled=false;memoryStrength=1;advanced=new AdvancedOptions();AdvancedTuning.restoreAnimation(this);AdvancedTuning.refreshThresholds(this);}
+    void memorySettingChanged(boolean automatic){persistentMemory.modeSettingChanged(automatic);}
+    void memoryModeKnown(boolean automatic){persistentMemory.modeSettingKnown(automatic);}
     boolean onDisplayThread(){return !closed&&Looper.myLooper()==handler.getLooper();}
     boolean normalTuningAllowed(Object abc,Object impl){
         if(closed||!phase.equals("active")||!appliesToUser())return false;
         try{java.lang.reflect.Method idle=abc.getClass().getDeclaredMethod("isInIdleMode");idle.setAccessible(true);return Boolean.TRUE.equals(optionalBoolean(abc,"mAmbientLuxValid"))&&
             LowLightPolicy.applies(true,(Boolean)kernel.get("mUseAutoBrightness"),screenOn(),
                 (Boolean)idle.invoke(abc),
-                (Boolean)impl.getClass().getMethod("getDrivingStatus").invoke(impl),!Boolean.FALSE.equals(hdrActive()),
+                ResponseTuning.driving(impl),!Boolean.FALSE.equals(hdrActive()),
                 optionalNumber(abc,"mAmbientLux"),0,Float.MAX_VALUE);
         }catch(Throwable unavailable){return false;}
     }
@@ -301,7 +309,8 @@ final class HookRuntime {
                 .put("factory_lux",array(kernel.factoryLux)).put("factory_logical_nit",array(kernel.factoryNit)).put("min_logical_nit",kernel.min).put("max_logical_nit",kernel.max)
                 .put("thermal_supported",HookEntry.thermalSupported.contains(owner.getClass())).put("thermal_relax",thermalEnabled)
                 .put("thermal_permitted",relaxThermal()).put("thermal_ceiling",thermalCeiling).put("thermal_severity",thermalSeverity)
-                .put("thermal_skipped",thermalSkipped).put("logs",new JSONArray(logs)).put("feature_self_check",featureChecks.report).put("compatibility_paused",compatibilityPaused);
+                .put("thermal_skipped",thermalSkipped).put("logs",new JSONArray(logs)).put("feature_self_check",featureChecks.report).put("compatibility_paused",compatibilityPaused)
+                .put("response_scene_profile",ResponseTuning.sceneProfile(owner));
             AdvancedTuning.capabilities((key,value)->status.put(key,value),this);JSONObject settings=new JSONObject();advanced.put(settings);status.put("advanced_options",settings)
                 .put("threshold_adjustments",thresholdAdjustments).put("assist_adjustments",assistAdjustments).put("animation_adjustments",animationAdjustments).put("sunlight_adjustments",sunlightAdjustments).put("touch_adjustments",touchAdjustments).put("delay_window_clamps",delayWindowClamps);
             if(lastAnimationSeconds>0)status.put("last_animation_seconds",lastAnimationSeconds);
@@ -329,8 +338,9 @@ final class HookRuntime {
             Boolean hdr=hdrActive();if(hdr!=null)status.put("hdr_active",hdr);
             status.put("current_anchors_lux",array(kernel.currentLux())).put("current_anchors_nit",array(kernel.currentNit()));
             if(kernel.name().equals("refactor")){int count=kernel.integer("mAnchorCount");JSONArray flags=new JSONArray();boolean[] user=(boolean[])kernel.get("mAnchorIsUserDrag");for(int i=0;i<count;i++)flags.put(user[i]);status.put("manual_anchor_flags",flags);}
-            else status.put("physical_mapping_active",HookEntry.get(((TraditionalAdapter)kernel).abc,"mCurrentBrightnessMapper")==((TraditionalAdapter)kernel).mapper);
-            JSONObject controls=brightnessControl.status();status.put("brightness_control",controls).put("dark_lock_supported",controls.optBoolean("dark_lock_supported")).put("manual_panel_supported",controls.optBoolean("manual_panel_supported"));
+            else {TraditionalAdapter physical=(TraditionalAdapter)kernel;status.put("physical_mapping_active",HookEntry.get(physical.abc,"mCurrentBrightnessMapper")==physical.mapper).put("physical_mapper_class",physical.mapper.getClass().getName()).put("physical_user_lux_field",physical.userLuxField);}
+            status.put("curve_adapter_class",kernel.getClass().getName());
+            status.put("control_center_slider",controlCenter.status());JSONObject controls=brightnessControl.status();status.put("brightness_control",controls).put("dark_lock_supported",controls.optBoolean("dark_lock_supported")).put("manual_panel_supported",controls.optBoolean("manual_panel_supported"));
             status.put("app_auto_supported",controls.optBoolean("app_auto_supported"));
             collectOfficial(status);scenes.refresh();scenes.put(status);JSONObject outdoorState=outdoor.status();status.put("outdoor",outdoorState).put("outdoor_supported",outdoorState.optBoolean("supported")).put("outdoor_hbm_supported",outdoorState.optBoolean("hbm_tuning_supported")).put("outdoor_range_supported",outdoorState.optBoolean("range_supported")).put("outdoor_opr_supported",outdoorState.optBoolean("opr_supported")).put("outdoor_nit_limit_supported",outdoorState.optBoolean("nit_limit_supported"));
             if(Float.isFinite(batteryTemperature))status.put("battery_temperature",batteryTemperature);
@@ -346,6 +356,7 @@ final class HookRuntime {
                 status.put("screen_state",display.getClass().getMethod("getScreenState").invoke(display));
             }catch(Throwable unavailable){}
             CurvePlan plan=kernel.plan();if(plan!=null){float[] handles=new float[4];for(int i=0;i<4;i++)handles[i]=plan.at(kernel.factoryLux[i]);status.put("active_logical_nit",array(handles)).put("applied_base_lux",array(kernel.baselineLux())).put("applied_base_nit",array(kernel.baselineNit()));}
+            if(kernel instanceof RefactorAdapter)try{((RefactorAdapter)kernel).putVerification(status);}catch(Exception unavailable){status.put("refactor_curve_verification_error",unavailable.toString());}
             for(Iterator<String> keys=featureChecks.caps.keys();keys.hasNext();){String key=keys.next();status.put(key,featureChecks.caps.get(key));}
             stateWriter.submit("state",StatusTransport.encode(status));
         }catch(Throwable error){XposedBridge.log("LumaCurve status: "+error);}
@@ -363,10 +374,12 @@ final class HookRuntime {
             Object impl=HookEntry.get(owner,"mAutomaticBrightnessControllerImpl"),abc=HookEntry.get(impl,"mAutomaticBrightnessController");
             Boolean auto=status.has("auto_mode")?status.getBoolean("auto_mode"):null;
             Boolean sampling=optionalBoolean(abc,"mLightSensorEnabled"),valid=optionalBoolean(abc,"mAmbientLuxValid");
+            readBoolean(status,"dual_policy_supported",abc,"mSupportDualSensorPolicy");
             status.put("sensor_status",SensorState.resolve(auto,sampling,valid));readBoolean(status,"sensor_sampling_enabled",abc,"mLightSensorEnabled");readBoolean(status,"ambient_lux_valid",abc,"mAmbientLuxValid");
             boolean usable=SensorState.usable(auto,sampling,valid);
             if(usable){readNumber(status,"official_effective_lux",abc,"mAmbientLux");readNumber(status,"official_observed_lux",abc,"mLastObservedLux");
                 readNumber(status,"brightening_lux_threshold",abc,"mAmbientBrighteningThreshold");readNumber(status,"darkening_lux_threshold",abc,"mAmbientDarkeningThreshold");}
+            assistCompat.put(status);
             Object dual=HookEntry.get(impl,"mDualSensorPolicy");if(dual!=null){
                 if(usable)readNumber(status,"main_fast_lux",dual,"mMainFastAmbientLux");
                 boolean assist=usable&&Boolean.TRUE.equals(optionalBoolean(dual,"mAssistAmbientLuxValid"));status.put("assist_valid",assist);
@@ -431,7 +444,7 @@ final class HookRuntime {
             int screen=((Number)display.getClass().getMethod("getScreenState").invoke(display)).intValue();
             java.lang.reflect.Method idle=abc.getClass().getDeclaredMethod("isInIdleMode");idle.setAccessible(true);
             return LowLightPolicy.appliesInScene(true,(Boolean)kernel.get("mUseAutoBrightness"),screen==2,
-                (Boolean)idle.invoke(abc),(Boolean)impl.getClass().getMethod("getDrivingStatus").invoke(impl),nightDrivingConfirmed(impl),hdr,
+                (Boolean)idle.invoke(abc),ResponseTuning.driving(impl),nightDrivingConfirmed(impl),hdr,
                 ((Number)HookEntry.get(abc,"mAmbientLux")).floatValue(),candidateLux,lowLightLimit);
         }catch(Throwable absent){return false;}
     }

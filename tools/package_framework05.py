@@ -12,8 +12,8 @@ files={
  'tools/probe_framework05_android.sh':'probe_framework05_android.sh',
  'tools/probe_settings_runtime.sh':'probe_settings_runtime.sh',
  'module/process_scope.sh':'process_scope.sh',
- 'docs/framework05模式与单位读取.md':'README.md',
- 'docs/framework04实机结果与核心适配.md':'PREVIOUS-RESULT.md',
+ 'docs/archive/legacy-ksu/framework05模式与单位读取.md':'README.md',
+ 'docs/archive/legacy-ksu/framework04实机结果与核心适配.md':'PREVIOUS-RESULT.md',
  'build/framework-probe/verification.json':'host-verification.json',
 }
 for f in list((ROOT/'tools/framework_probe').glob('LumaFrameworkProbe*.java'))+list((ROOT/'experimental/framework_output').glob('*.java')):

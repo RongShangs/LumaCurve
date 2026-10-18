@@ -1,6 +1,12 @@
 /build/
 /dist/
 /update.json
-/.github/workflows/
+/.github/workflows/*
+!/.github/workflows/compatibility.yml
 __pycache__/
 *.pyc
+
+# Generated local assets and mirrored downloads; checksum metadata stays tracked.
+/output/
+/website/downloads/*.apk
+/website/downloads/*.zip

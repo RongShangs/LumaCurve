@@ -24,7 +24,7 @@ final class OutdoorOptions {
     }
     void put(JSONObject json)throws JSONException{for(int i=0;i<FLAGS.length;i++)json.put(FLAGS[i],flags[i]);for(int i=0;i<KEYS.length;i++)json.put(KEYS[i],values[i]);json.put("outdoor_node_boost",nodeBoost).put(OutdoorNodeTarget.KEY,nodeTarget);}
     void verify(JSONObject status){if(flags[0]&&!status.optBoolean("outdoor_supported"))throw new IllegalArgumentException("此固件的户外增强接口尚未兼容");
-        if(flags[1]&&!status.optBoolean("outdoor_hbm_supported"))throw new IllegalArgumentException("此设备未使用可调整的 HBM 时间控制器");
+        if(flags[1]&&!status.optBoolean("outdoor_hbm_supported"))throw new IllegalArgumentException("此设备的 HBM 触发接口尚未兼容");
         if(flags[2]&&!status.optBoolean("outdoor_range_supported"))throw new IllegalArgumentException("此固件的高亮范围接口尚未兼容");
         if(flags[0]&&values[MAX_NIT]>0&&!status.optBoolean("outdoor_nit_limit_supported"))throw new IllegalArgumentException("此固件无法可靠设置 nit 亮度上限");
         if(flags[3]&&!status.optBoolean("outdoor_opr_supported"))throw new IllegalArgumentException("此固件的画面限亮接口尚未兼容");

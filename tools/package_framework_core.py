@@ -24,7 +24,7 @@ files={
  'tools/probe_temporary_runtime.sh':'probe_temporary_runtime.sh',
  'tools/test_framework_core_android.sh':'test_framework_core_android.sh',
  'tools/framework_core_runtime.sh':'framework_core_runtime.sh','tools/framework_core_watchdog.sh':'framework_core_watchdog.sh',
- 'docs/framework-core-test04使用说明.md':'README.md','docs/framework-core-test03实机结果.md':'PREVIOUS-RESULT.md',
+ 'docs/archive/legacy-ksu/framework-core-test04使用说明.md':'README.md','docs/archive/legacy-ksu/framework-core-test03实机结果.md':'PREVIOUS-RESULT.md',
  'LICENSE':'LICENSE','docs/来源与许可证.md':'PROVENANCE.md',
  'build/framework-core-test04/build.json':'native-build.json','build/framework-probe/verification.json':'java-verification.json',
  'build/framework-core-test04/selection-verification.json':'selection-verification.json',

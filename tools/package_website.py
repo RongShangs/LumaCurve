@@ -1,7 +1,8 @@
 """Package the standalone HyperLux website, including local downloads."""
 from pathlib import Path
-import hashlib,json,zipfile,xml.etree.ElementTree as ET
-ROOT=Path(__file__).resolve().parents[1];site=ROOT.parent/'web'
+import argparse,hashlib,json,zipfile,xml.etree.ElementTree as ET
+ROOT=Path(__file__).resolve().parents[1]
+parser=argparse.ArgumentParser();parser.add_argument('--site',type=Path,default=ROOT.parent/'web');args=parser.parse_args();site=args.site
 manifest=ET.parse(ROOT/'experimental/refactor_hook/AndroidManifest.xml').getroot()
 version=manifest.attrib['{http://schemas.android.com/apk/res/android}versionName']
 code=int(manifest.attrib['{http://schemas.android.com/apk/res/android}versionCode'])

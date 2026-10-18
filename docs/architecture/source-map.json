@@ -1,0 +1,637 @@
+{
+  "schema": 1,
+  "source_root": "experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor",
+  "files": [
+    {
+      "file": "AdvancedOptions.java",
+      "layer": "configuration",
+      "purpose": "配置、保持与迁移"
+    },
+    {
+      "file": "AdvancedPolicy.java",
+      "layer": "policy",
+      "purpose": "策略与算子"
+    },
+    {
+      "file": "AdvancedTuning.java",
+      "layer": "adapters",
+      "purpose": "设备接口与所有权"
+    },
+    {
+      "file": "AppBuild.java",
+      "layer": "bootstrap",
+      "purpose": "入口与代次"
+    },
+    {
+      "file": "ApplicationBrightnessSettings.java",
+      "layer": "presentation",
+      "purpose": "界面与只读说明"
+    },
+    {
+      "file": "AssistSensorCompat.java",
+      "layer": "adapters",
+      "purpose": "设备接口与所有权"
+    },
+    {
+      "file": "AuxiliarySensorIdentity.java",
+      "layer": "policy",
+      "purpose": "策略与算子"
+    },
+    {
+      "file": "BackendSelection.java",
+      "layer": "policy",
+      "purpose": "策略与算子"
+    },
+    {
+      "file": "BranchReport.java",
+      "layer": "presentation",
+      "purpose": "界面与只读说明"
+    },
+    {
+      "file": "BrightnessControl.java",
+      "layer": "orchestration",
+      "purpose": "显示运行协调"
+    },
+    {
+      "file": "BrightnessControlOptions.java",
+      "layer": "configuration",
+      "purpose": "配置、保持与迁移"
+    },
+    {
+      "file": "BrightnessPanelActivity.java",
+      "layer": "presentation",
+      "purpose": "界面与只读说明"
+    },
+    {
+      "file": "BrightnessTileService.java",
+      "layer": "presentation",
+      "purpose": "界面与只读说明"
+    },
+    {
+      "file": "CompatibilityCatalog.java",
+      "layer": "policy",
+      "purpose": "策略与算子"
+    },
+    {
+      "file": "ConfigurationCompatibility.java",
+      "layer": "configuration",
+      "purpose": "配置、保持与迁移"
+    },
+    {
+      "file": "ConfigurationFile.java",
+      "layer": "configuration",
+      "purpose": "配置、保持与迁移"
+    },
+    {
+      "file": "ControlCenterCalibration.java",
+      "layer": "adapters",
+      "purpose": "设备接口与所有权"
+    },
+    {
+      "file": "ControlCenterCurve.java",
+      "layer": "policy",
+      "purpose": "策略与算子"
+    },
+    {
+      "file": "ControlCenterEngine.java",
+      "layer": "bridge",
+      "purpose": "Root 与原生程序桥"
+    },
+    {
+      "file": "ControlCenterHooks.java",
+      "layer": "adapters",
+      "purpose": "设备接口与所有权"
+    },
+    {
+      "file": "ControlCenterMapping.java",
+      "layer": "policy",
+      "purpose": "策略与算子"
+    },
+    {
+      "file": "ControlCenterRoot.java",
+      "layer": "bridge",
+      "purpose": "Root 与原生程序桥"
+    },
+    {
+      "file": "CurveBackend.java",
+      "layer": "policy",
+      "purpose": "策略与算子"
+    },
+    {
+      "file": "CurveComparison.java",
+      "layer": "policy",
+      "purpose": "策略与算子"
+    },
+    {
+      "file": "CurveEditor.java",
+      "layer": "presentation",
+      "purpose": "界面与只读说明"
+    },
+    {
+      "file": "CurveIdentity.java",
+      "layer": "policy",
+      "purpose": "策略与算子"
+    },
+    {
+      "file": "CurvePlan.java",
+      "layer": "policy",
+      "purpose": "策略与算子"
+    },
+    {
+      "file": "DarkLockPolicy.java",
+      "layer": "policy",
+      "purpose": "策略与算子"
+    },
+    {
+      "file": "DeferredStateWriter.java",
+      "layer": "diagnostics",
+      "purpose": "只读证据与诊断"
+    },
+    {
+      "file": "DelayPolicy.java",
+      "layer": "policy",
+      "purpose": "策略与算子"
+    },
+    {
+      "file": "DiagnosticCollector.java",
+      "layer": "diagnostics",
+      "purpose": "只读证据与诊断"
+    },
+    {
+      "file": "FeatureCheckPage.java",
+      "layer": "presentation",
+      "purpose": "界面与只读说明"
+    },
+    {
+      "file": "FeatureCompatibility.java",
+      "layer": "presentation",
+      "purpose": "界面与只读说明"
+    },
+    {
+      "file": "FeatureSelfCheck.java",
+      "layer": "diagnostics",
+      "purpose": "只读证据与诊断"
+    },
+    {
+      "file": "ForegroundApps.java",
+      "layer": "adapters",
+      "purpose": "设备接口与所有权"
+    },
+    {
+      "file": "ForegroundUser.java",
+      "layer": "policy",
+      "purpose": "策略与算子"
+    },
+    {
+      "file": "FrameworkBrightness.java",
+      "layer": "adapters",
+      "purpose": "设备接口与所有权"
+    },
+    {
+      "file": "HbmAccess.java",
+      "layer": "adapters",
+      "purpose": "设备接口与所有权"
+    },
+    {
+      "file": "HookEntry.java",
+      "layer": "bootstrap",
+      "purpose": "入口与代次"
+    },
+    {
+      "file": "HookRuntime.java",
+      "layer": "orchestration",
+      "purpose": "显示运行协调"
+    },
+    {
+      "file": "InjectionStatus.java",
+      "layer": "diagnostics",
+      "purpose": "只读证据与诊断"
+    },
+    {
+      "file": "LauncherVisibility.java",
+      "layer": "bridge",
+      "purpose": "Root 与原生程序桥"
+    },
+    {
+      "file": "LegacyEntry.java",
+      "layer": "bootstrap",
+      "purpose": "入口与代次"
+    },
+    {
+      "file": "LegacyModules.java",
+      "layer": "bridge",
+      "purpose": "Root 与原生程序桥"
+    },
+    {
+      "file": "LiveLimitEvidence.java",
+      "layer": "diagnostics",
+      "purpose": "只读证据与诊断"
+    },
+    {
+      "file": "LowLightAssistEvidence.java",
+      "layer": "policy",
+      "purpose": "策略与算子"
+    },
+    {
+      "file": "LowLightAssistGate.java",
+      "layer": "policy",
+      "purpose": "策略与算子"
+    },
+    {
+      "file": "LowLightPolicy.java",
+      "layer": "policy",
+      "purpose": "策略与算子"
+    },
+    {
+      "file": "LowLightThresholds.java",
+      "layer": "policy",
+      "purpose": "策略与算子"
+    },
+    {
+      "file": "LowLightTuning.java",
+      "layer": "adapters",
+      "purpose": "设备接口与所有权"
+    },
+    {
+      "file": "MainActivity.java",
+      "layer": "presentation",
+      "purpose": "界面与只读说明"
+    },
+    {
+      "file": "ManualBrightnessPanel.java",
+      "layer": "presentation",
+      "purpose": "界面与只读说明"
+    },
+    {
+      "file": "MemoryLifecycle.java",
+      "layer": "orchestration",
+      "purpose": "显示运行协调"
+    },
+    {
+      "file": "MemoryOptions.java",
+      "layer": "configuration",
+      "purpose": "配置、保持与迁移"
+    },
+    {
+      "file": "MemoryPersistence.java",
+      "layer": "configuration",
+      "purpose": "配置、保持与迁移"
+    },
+    {
+      "file": "MemoryPolicy.java",
+      "layer": "policy",
+      "purpose": "策略与算子"
+    },
+    {
+      "file": "MemoryScene.java",
+      "layer": "policy",
+      "purpose": "策略与算子"
+    },
+    {
+      "file": "NativePanelAsset.java",
+      "layer": "bridge",
+      "purpose": "Root 与原生程序桥"
+    },
+    {
+      "file": "NativePanelClient.java",
+      "layer": "bridge",
+      "purpose": "Root 与原生程序桥"
+    },
+    {
+      "file": "NativePanelRoot.java",
+      "layer": "bridge",
+      "purpose": "Root 与原生程序桥"
+    },
+    {
+      "file": "NitBrightnessLimit.java",
+      "layer": "policy",
+      "purpose": "策略与算子"
+    },
+    {
+      "file": "OutdoorController.java",
+      "layer": "orchestration",
+      "purpose": "显示运行协调"
+    },
+    {
+      "file": "OutdoorNodeBridge.java",
+      "layer": "bridge",
+      "purpose": "Root 与原生程序桥"
+    },
+    {
+      "file": "OutdoorNodeProfile.java",
+      "layer": "policy",
+      "purpose": "策略与算子"
+    },
+    {
+      "file": "OutdoorNodeRoot.java",
+      "layer": "bridge",
+      "purpose": "Root 与原生程序桥"
+    },
+    {
+      "file": "OutdoorNodeTarget.java",
+      "layer": "policy",
+      "purpose": "策略与算子"
+    },
+    {
+      "file": "OutdoorOpr.java",
+      "layer": "adapters",
+      "purpose": "设备接口与所有权"
+    },
+    {
+      "file": "OutdoorOptions.java",
+      "layer": "configuration",
+      "purpose": "配置、保持与迁移"
+    },
+    {
+      "file": "OutdoorPolicy.java",
+      "layer": "policy",
+      "purpose": "策略与算子"
+    },
+    {
+      "file": "OutdoorSdrScope.java",
+      "layer": "adapters",
+      "purpose": "设备接口与所有权"
+    },
+    {
+      "file": "OutdoorTuning.java",
+      "layer": "adapters",
+      "purpose": "设备接口与所有权"
+    },
+    {
+      "file": "OutputProtection.java",
+      "layer": "policy",
+      "purpose": "策略与算子"
+    },
+    {
+      "file": "PanelNodeDiscovery.java",
+      "layer": "bridge",
+      "purpose": "Root 与原生程序桥"
+    },
+    {
+      "file": "PersistentMemory.java",
+      "layer": "orchestration",
+      "purpose": "显示运行协调"
+    },
+    {
+      "file": "PipelineHistory.java",
+      "layer": "diagnostics",
+      "purpose": "只读证据与诊断"
+    },
+    {
+      "file": "PipelineHooks.java",
+      "layer": "adapters",
+      "purpose": "设备接口与所有权"
+    },
+    {
+      "file": "RawBrightnessPanel.java",
+      "layer": "presentation",
+      "purpose": "界面与只读说明"
+    },
+    {
+      "file": "RawPanelLease.java",
+      "layer": "policy",
+      "purpose": "策略与算子"
+    },
+    {
+      "file": "RawPanelOutputHooks.java",
+      "layer": "adapters",
+      "purpose": "设备接口与所有权"
+    },
+    {
+      "file": "RawPanelTilePolicy.java",
+      "layer": "policy",
+      "purpose": "策略与算子"
+    },
+    {
+      "file": "RefactorAdapter.java",
+      "layer": "adapters",
+      "purpose": "设备接口与所有权"
+    },
+    {
+      "file": "RelativeNodeGesture.java",
+      "layer": "policy",
+      "purpose": "策略与算子"
+    },
+    {
+      "file": "ReleasePolicy.java",
+      "layer": "policy",
+      "purpose": "策略与算子"
+    },
+    {
+      "file": "ResponseTuning.java",
+      "layer": "adapters",
+      "purpose": "设备接口与所有权"
+    },
+    {
+      "file": "ResponsiveDialog.java",
+      "layer": "presentation",
+      "purpose": "界面与只读说明"
+    },
+    {
+      "file": "RootControl.java",
+      "layer": "bridge",
+      "purpose": "Root 与原生程序桥"
+    },
+    {
+      "file": "RootFeatureChecks.java",
+      "layer": "diagnostics",
+      "purpose": "只读证据与诊断"
+    },
+    {
+      "file": "RootPanelBridge.java",
+      "layer": "bridge",
+      "purpose": "Root 与原生程序桥"
+    },
+    {
+      "file": "RootSettings.java",
+      "layer": "bridge",
+      "purpose": "Root 与原生程序桥"
+    },
+    {
+      "file": "RuntimeFeatureChecks.java",
+      "layer": "diagnostics",
+      "purpose": "只读证据与诊断"
+    },
+    {
+      "file": "SavedCurve.java",
+      "layer": "configuration",
+      "purpose": "配置、保持与迁移"
+    },
+    {
+      "file": "SceneCatalog.java",
+      "layer": "presentation",
+      "purpose": "界面与只读说明"
+    },
+    {
+      "file": "SceneController.java",
+      "layer": "orchestration",
+      "purpose": "显示运行协调"
+    },
+    {
+      "file": "SceneDescriptions.java",
+      "layer": "presentation",
+      "purpose": "界面与只读说明"
+    },
+    {
+      "file": "SceneOptions.java",
+      "layer": "configuration",
+      "purpose": "配置、保持与迁移"
+    },
+    {
+      "file": "ScenePolicy.java",
+      "layer": "policy",
+      "purpose": "策略与算子"
+    },
+    {
+      "file": "SceneSettings.java",
+      "layer": "presentation",
+      "purpose": "界面与只读说明"
+    },
+    {
+      "file": "SceneTuning.java",
+      "layer": "adapters",
+      "purpose": "设备接口与所有权"
+    },
+    {
+      "file": "SensorState.java",
+      "layer": "diagnostics",
+      "purpose": "只读证据与诊断"
+    },
+    {
+      "file": "SettingsPresets.java",
+      "layer": "presentation",
+      "purpose": "界面与只读说明"
+    },
+    {
+      "file": "StatusAdvice.java",
+      "layer": "presentation",
+      "purpose": "界面与只读说明"
+    },
+    {
+      "file": "StatusLimits.java",
+      "layer": "presentation",
+      "purpose": "界面与只读说明"
+    },
+    {
+      "file": "StatusPageLayout.java",
+      "layer": "presentation",
+      "purpose": "界面与只读说明"
+    },
+    {
+      "file": "StatusPresentation.java",
+      "layer": "presentation",
+      "purpose": "界面与只读说明"
+    },
+    {
+      "file": "StatusTransport.java",
+      "layer": "diagnostics",
+      "purpose": "只读证据与诊断"
+    },
+    {
+      "file": "SystemVersion.java",
+      "layer": "diagnostics",
+      "purpose": "只读证据与诊断"
+    },
+    {
+      "file": "TemporaryScreenOn.java",
+      "layer": "bridge",
+      "purpose": "Root 与原生程序桥"
+    },
+    {
+      "file": "ThanksFeed.java",
+      "layer": "network",
+      "purpose": "更新与名单网络客户端"
+    },
+    {
+      "file": "ThemePalette.java",
+      "layer": "presentation",
+      "purpose": "界面与只读说明"
+    },
+    {
+      "file": "ThermalPolicy.java",
+      "layer": "policy",
+      "purpose": "策略与算子"
+    },
+    {
+      "file": "TraditionalAdapter.java",
+      "layer": "adapters",
+      "purpose": "设备接口与所有权"
+    },
+    {
+      "file": "TraditionalCurve.java",
+      "layer": "policy",
+      "purpose": "策略与算子"
+    },
+    {
+      "file": "TraditionalHooks.java",
+      "layer": "adapters",
+      "purpose": "设备接口与所有权"
+    },
+    {
+      "file": "TutorialContent.java",
+      "layer": "presentation",
+      "purpose": "界面与只读说明"
+    },
+    {
+      "file": "UiPreferences.java",
+      "layer": "configuration",
+      "purpose": "配置、保持与迁移"
+    },
+    {
+      "file": "UiText.java",
+      "layer": "presentation",
+      "purpose": "界面与只读说明"
+    },
+    {
+      "file": "UpdateChecker.java",
+      "layer": "network",
+      "purpose": "更新与名单网络客户端"
+    },
+    {
+      "file": "WelcomeGuide.java",
+      "layer": "presentation",
+      "purpose": "界面与只读说明"
+    },
+    {
+      "file": "hooking/HookTransaction.java",
+      "layer": "hook_backend",
+      "purpose": "框架桥与安装事务"
+    },
+    {
+      "file": "hooking/XC_MethodHook.java",
+      "layer": "hook_backend",
+      "purpose": "框架桥与安装事务"
+    },
+    {
+      "file": "hooking/XposedBridge.java",
+      "layer": "hook_backend",
+      "purpose": "框架桥与安装事务"
+    }
+  ],
+  "native_files": [
+    {
+      "file": "main_panel.c",
+      "purpose": "主屏 IPC、进程身份、权限恢复和手动租约输出"
+    },
+    {
+      "file": "panel_node.h",
+      "purpose": "真实主屏节点、路径和权限恢复记录"
+    },
+    {
+      "file": "panel_policy.h",
+      "purpose": "主屏手动租约协议与范围"
+    },
+    {
+      "file": "outdoor_node.h",
+      "purpose": "户外协作输出、锁和健康状态"
+    },
+    {
+      "file": "outdoor_node_policy.h",
+      "purpose": "户外 v1 / v2 租约和系统改写退让"
+    },
+    {
+      "file": "control_center_policy.h",
+      "purpose": "隐藏映射监听的进程与租约许可"
+    }
+  ]
+}
