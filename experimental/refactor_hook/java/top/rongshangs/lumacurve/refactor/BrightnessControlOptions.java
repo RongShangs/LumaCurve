@@ -4,7 +4,7 @@ import org.json.*;
 
 /** Optional mode ownership, independent of curve learning and ordinary low-light tuning. */
 final class BrightnessControlOptions {
-    boolean darkLock=true,manualPanel=true,manualExit;int nodeSliderMode;
+    boolean darkLock,manualPanel=true,manualExit;int nodeSliderMode;
     float enterLux=10,exitLux=50;
     int minutes=1,exitSeconds=1;
     final java.util.Set<String> manualApps=new java.util.LinkedHashSet<>();
@@ -26,11 +26,11 @@ final class BrightnessControlOptions {
         if(o.exitLux<o.enterLux+5)throw new IllegalArgumentException("退出照度至少比进入照度高 5 lux");
         return o;
     }
-    // Existing pre-feature configurations never opted in; new UI drafts use the defaults above.
+    // Both fresh drafts and missing legacy flags stay off; explicit saved choices win.
     static BrightnessControlOptions parseStored(JSONObject j)throws JSONException {
         BrightnessControlOptions o=parse(j);if(!j.has("dark_lock_enabled"))o.darkLock=false;return o;
     }
-    void bedtime(){BrightnessControlOptions o=new BrightnessControlOptions();darkLock=o.darkLock;manualExit=o.manualExit;enterLux=o.enterLux;exitLux=o.exitLux;minutes=o.minutes;exitSeconds=o.exitSeconds;}
+    void bedtime(){BrightnessControlOptions o=new BrightnessControlOptions();darkLock=true;manualExit=o.manualExit;enterLux=o.enterLux;exitLux=o.exitLux;minutes=o.minutes;exitSeconds=o.exitSeconds;}
     static boolean bool(JSONObject j,String key,boolean def){if(!j.has(key))return def;Object v=j.opt(key);if(!(v instanceof Boolean))throw new IllegalArgumentException("开关无效："+key);return (Boolean)v;}
     static float number(JSONObject j,String key,float def,float min,float max){if(!j.has(key))return def;Object v=j.opt(key);if(!(v instanceof Number))throw new IllegalArgumentException("参数无效："+key);float n=((Number)v).floatValue();if(!Float.isFinite(n)||n<min||n>max)throw new IllegalArgumentException("参数超出范围："+key);return n;}
     static int integer(JSONObject j,String key,int def,int min,int max){float n=number(j,key,def,min,max);if(n!=Math.rint(n))throw new IllegalArgumentException("参数必须为整数："+key);return (int)n;}

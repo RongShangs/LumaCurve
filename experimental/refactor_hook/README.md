@@ -1,6 +1,10 @@
 # HyperLux 当前 APP 源码
 
-正式版 4.0.0 / 40000（release-4.0.0），legacy Xposed API 82。Root + LSPosed，包名 top.rongshangs.lumacurve；本目录是当前产品的唯一 APP / Hook / 原生主屏程序源码入口，目录名保留开发历史。
+2026-10-19 当前有效授权：用户明确说“推”，正式发布 **4.0.1 / 40100 / release-4.0.1**，覆盖此前仅本地的限制。保持已验证 APK 原字节与原签名，更新说明仍为两项：默认关闭暗光锁定、已有设置不受影响；新增小米 18 Fold 折叠屏适配。同步 GitHub、LSPosed 与官网，逐渠道下载核对；不自动安装手机。折叠机未实测，不将主机 / 固件静态核验表述为全机型真机通过。发布回执在私有 build/release-4.0.1-publish/；此前 Beta 02 未独立交付，原 4.0.0 与 Beta 01 保留。
+
+2026-10-19 当前任务：4.0.0 Beta 01 / 40001 / beta-4.0.0-beta01，仅本地验证与打包，不发布、不安装手机。针对折叠机已选中私有主光感的样本补充独立路线；按当前默认逻辑屏及真实 ABC / SensorManager / 主辅光感绑定，物理屏或对象变化时清空旧采样和计时，旧监听代际不参与新判断。保留标准 ALS、移植辅助等全部旧路线与配置。目标折叠机与独立副屏未实测，不按型号 / 系统版本放行，也不新增其他逻辑屏控制。详见 docs/releases/4.0.0-beta01.md、docs/reviews/review-4.0.0-beta01.md。公开版仍为 4.0.0 / 40000；此前发布授权不自动用于新 Beta。
+
+正式版 4.0.1 / 40100（release-4.0.1），legacy Xposed API 82。Root + LSPosed，包名 top.rongshangs.lumacurve；本目录是当前产品的唯一 APP / Hook / 原生主屏程序源码入口，目录名保留开发历史。
 
 产品说明为兼容 HyperOS，实际功能逐项按接口核验。Refactor、传统物理映射、原生 / 移植辅助、不同场景 / HBM / 目标 / SDR 和窗口路径均保留，见 [兼容路线管理](../../docs/guides/compatibility-routes.md)。新增兼容不能删旧路线，覆盖更新不能丢设置。
 
@@ -18,6 +22,6 @@
 
 运行 tools/build_refactor_hook_test.py 构建；工具链与私有夹具边界见 [开发指南](../../docs/guides/development.md)。安装更新后需重启加载 Hook，普通设置保存并应用即可。完整 ZIP 是 APK、源码和恢复工具合集，不是 KSU 刷入模块。
 
-后续发布必须同时更新官网文案、实际下载与更新元数据，并与 GitHub / LSPosed 文件核对。本次按授权同步 GitHub、LSPosed 与官网；使用已验证的原签名 APK，不自动安装手机，不将主机测试当作真机验证。
+后续发布必须同时更新官网文案、实际下载与更新元数据，并与 GitHub / LSPosed 文件核对。本次按用户明确授权发布 4.0.1，同步 GitHub、LSPosed 与官网；使用原签名，不自动安装手机，不将主机测试当作真机验证。
 
 [需求](../../PROJECT.md) · [边界](../../PROJECT_SCOPE.md) · [使用](../../docs/guides/usage.md) · [4.0.0 日志](../../docs/releases/4.0.0.md) · [复审](../../docs/reviews/review-4.0.0.md)

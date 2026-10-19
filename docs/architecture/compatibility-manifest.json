@@ -69,24 +69,30 @@
         "main_sensor"
       ],
       "routes": [
-        "oem_main"
+        "oem_main",
+        "oem_selected_secondary",
+        "oem_selected_fov"
       ],
       "owners": [
         "RuntimeFeatureChecks.java",
         "HookRuntime.java",
-        "SensorState.java"
+        "SensorState.java",
+        "BrightnessSensorAccess.java"
       ],
-      "selector": "读取实际 ABC TYPE_LIGHT；无新增监听。",
+      "selector": "优先保留当前默认逻辑屏 ABC 的 TYPE_LIGHT；新增 ABC 已直接选中的 xiaomi.sensor.light_secondary 非唤醒、按变化、无权限且量程 / 精度有效的照度源。不枚举，不按私有类型编号或机型选择，不将原始 / 工厂 / 流式通道当作 lux。 配置槽非标准且 OEM 开启 FOV 时，核验其默认屏标识、真实 FOV 对象和 Sensor→Sensor 选择器结果，仅使用选择器实际返回的源；虚拟 FOV 的 values[0] 已为 lux，确认驾驶数据包才读取 values[2] 并用原生倍率。优先接口残缺 / 抛错拒绝，不回落物理槽；标准 TYPE_LIGHT 优先原路径，不受新 FOV 判定影响。",
       "evidence": [
         "sensor_status",
         "sensor_sampling_enabled",
         "ambient_lux_valid",
-        "main_fast_lux"
+        "main_fast_lux",
+        "main_input_compatibility"
       ],
       "cleanup": "只读观察，不拥有 OEM 监听。",
       "tests": [
         "tests/refactor_feature_self_check.py",
-        "tests/refactor_status_presentation.py"
+        "tests/refactor_status_presentation.py",
+        "tests/refactor_brightness_control.py",
+        "tests/refactor_fold_sensor_firmware.py"
       ],
       "composition": "exclusive"
     },
@@ -274,15 +280,19 @@
       ],
       "owners": [
         "BrightnessControl.java",
-        "DarkLockPolicy.java"
+        "DarkLockPolicy.java",
+        "BrightnessSensorAccess.java"
       ],
-      "selector": "ABC SensorManager / 实际句柄识别；退出低频确认独立于 OEM 辅助采样；需接管 / 恢复模式权限。",
+      "selector": "新配置默认关闭；用户明确启用后，ABC SensorManager / 实际句柄识别；退出低频确认独立于 OEM 辅助采样；需接管 / 恢复模式权限。 绑定 ABC、双光感策略、SensorManager、实际句柄及可读物理屏身份；私有折叠主光感直出 lux；FOV 覆盖按真实选择器、驾驶状态及倍率解析，不对已换算照度重复放大。",
       "evidence": [
         "brightness_control.owner",
         "brightness_control.watch_main_lux",
-        "brightness_control.watch_assist_lux"
+        "brightness_control.watch_assist_lux",
+        "brightness_control.watch_binding_active",
+        "brightness_control.watch_physical_display_id",
+        "brightness_control.watch_main_profile"
       ],
-      "cleanup": "锁屏 / 熄屏 / 切用户 / 停用注销模块监听，只有模块取得的自动状态可恢复。",
+      "cleanup": "锁屏 / 熄屏 / 切用户 / 停用注销模块监听，只有模块取得的自动状态可恢复。 光感、管理器、控制器、倍率、面板配置或物理屏变化时释放旧监听和已拥有的锁定，清空采样及确认计时；代际监听拒绝旧队列回调。状态查看只读。",
       "tests": [
         "tests/refactor_brightness_control.py",
         "tests/refactor_display_scheduling.py"
@@ -788,6 +798,17 @@
       ],
       "rule": "相同程序仅验证；显式节点使用时才停止旧租约并原子换程序，不因自检启动输出器。",
       "test": "tests/refactor_native_asset.py"
+    },
+    {
+      "id": "main_light_identity",
+      "owner": "BrightnessSensorAccess.java",
+      "alternatives": [
+        "standard_type_light",
+        "oem_selected_scalar_secondary",
+        "native_fov_selector"
+      ],
+      "rule": "沿用系统当前默认逻辑屏 ABC 的真实主槽和 SensorManager；标准路径不变；私有折叠光感需精确语义身份与有效元数据，暗光监听不猜测 FOV / 非标单位。其他屏幕、同类多候选与原始通道不参与选择。 FOV 路线由已启用字段、实际 FOV 对象、同屏标识和非静态选择器返回值共同确认；正常值与驾驶替代值沿用固件消费者单位。",
+      "test": "tests/refactor_brightness_control.py"
     }
   ],
   "native_variants": [

@@ -4,7 +4,7 @@
 
 此索引说明已实现和验证责任，不代表所有功能已在所有设备启用或实测。
 
-共 48 项功能、20 组适配、121 份生产 Java。
+共 48 项功能、20 组适配、122 份生产 Java。
 
 ## 曲线与手动记忆 · curve
 
@@ -32,21 +32,23 @@
 
 功能：`main_sensor`。
 
-选择：读取实际 ABC TYPE_LIGHT；无新增监听。
+选择：优先保留当前默认逻辑屏 ABC 的 TYPE_LIGHT；新增 ABC 已直接选中的 xiaomi.sensor.light_secondary 非唤醒、按变化、无权限且量程 / 精度有效的照度源。不枚举，不按私有类型编号或机型选择，不将原始 / 工厂 / 流式通道当作 lux。 配置槽非标准且 OEM 开启 FOV 时，核验其默认屏标识、真实 FOV 对象和 Sensor→Sensor 选择器结果，仅使用选择器实际返回的源；虚拟 FOV 的 values[0] 已为 lux，确认驾驶数据包才读取 values[2] 并用原生倍率。优先接口残缺 / 抛错拒绝，不回落物理槽；标准 TYPE_LIGHT 优先原路径，不受新 FOV 判定影响。
 
 组合关系：`exclusive`；互斥、独立功能、双维度和补充组件分别处理。
 
 | 路线 | 条件 |
 | --- | --- |
-| `oem_main` · 系统原生主光感 | 使用自动亮度控制器实际绑定的 TYPE_LIGHT 传感器，不另开采样。 |
+| `oem_main` · 系统标准主光感 | 读取当前主屏 ABC 选用的 TYPE_LIGHT 光感，沿用原适配。 |
+| `oem_selected_secondary` · 系统选用的折叠光感 | 当前主屏 ABC 直接选用已验证的私有照度光感；拒绝原始、工厂、流式及其他屏幕候选。 |
+| `oem_selected_fov` · 系统 FOV 融合光感 | 沿用主屏原生光感选择器返回的 FOV 源和照度解析；不混用 ABC 保留的物理光感槽。 |
 
-实现：[RuntimeFeatureChecks.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/RuntimeFeatureChecks.java)、[HookRuntime.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/HookRuntime.java)、[SensorState.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/SensorState.java)。
+实现：[RuntimeFeatureChecks.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/RuntimeFeatureChecks.java)、[HookRuntime.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/HookRuntime.java)、[SensorState.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/SensorState.java)、[BrightnessSensorAccess.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/BrightnessSensorAccess.java)。
 
-证据：`sensor_status`、`sensor_sampling_enabled`、`ambient_lux_valid`、`main_fast_lux`。
+证据：`sensor_status`、`sensor_sampling_enabled`、`ambient_lux_valid`、`main_fast_lux`、`main_input_compatibility`。
 
 退出 / 回滚：只读观察，不拥有 OEM 监听。
 
-验证：[refactor_feature_self_check.py](../../tests/refactor_feature_self_check.py)、[refactor_status_presentation.py](../../tests/refactor_status_presentation.py)。
+验证：[refactor_feature_self_check.py](../../tests/refactor_feature_self_check.py)、[refactor_status_presentation.py](../../tests/refactor_status_presentation.py)、[refactor_brightness_control.py](../../tests/refactor_brightness_control.py)、[refactor_fold_sensor_firmware.py](../../tests/refactor_fold_sensor_firmware.py)。
 
 ## 辅助光感 · assist_input
 
@@ -182,7 +184,7 @@
 
 功能：`dark_lock`。
 
-选择：ABC SensorManager / 实际句柄识别；退出低频确认独立于 OEM 辅助采样；需接管 / 恢复模式权限。
+选择：新配置默认关闭；用户明确启用后，ABC SensorManager / 实际句柄识别；退出低频确认独立于 OEM 辅助采样；需接管 / 恢复模式权限。 绑定 ABC、双光感策略、SensorManager、实际句柄及可读物理屏身份；私有折叠主光感直出 lux；FOV 覆盖按真实选择器、驾驶状态及倍率解析，不对已换算照度重复放大。
 
 组合关系：`exclusive`；互斥、独立功能、双维度和补充组件分别处理。
 
@@ -190,11 +192,11 @@
 | --- | --- |
 | `abc_sensor_manager` · 自动亮度控制器的光感服务 | 复用本机 ABC 的 SensorManager；按传感器类型和句柄识别，锁定期间低频确认退出条件。 |
 
-实现：[BrightnessControl.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/BrightnessControl.java)、[DarkLockPolicy.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/DarkLockPolicy.java)。
+实现：[BrightnessControl.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/BrightnessControl.java)、[DarkLockPolicy.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/DarkLockPolicy.java)、[BrightnessSensorAccess.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/BrightnessSensorAccess.java)。
 
-证据：`brightness_control.owner`、`brightness_control.watch_main_lux`、`brightness_control.watch_assist_lux`。
+证据：`brightness_control.owner`、`brightness_control.watch_main_lux`、`brightness_control.watch_assist_lux`、`brightness_control.watch_binding_active`、`brightness_control.watch_physical_display_id`、`brightness_control.watch_main_profile`。
 
-退出 / 回滚：锁屏 / 熄屏 / 切用户 / 停用注销模块监听，只有模块取得的自动状态可恢复。
+退出 / 回滚：锁屏 / 熄屏 / 切用户 / 停用注销模块监听，只有模块取得的自动状态可恢复。 光感、管理器、控制器、倍率、面板配置或物理屏变化时释放旧监听和已拥有的锁定，清空采样及确认计时；代际监听拒绝旧队列回调。状态查看只读。
 
 验证：[refactor_brightness_control.py](../../tests/refactor_brightness_control.py)、[refactor_display_scheduling.py](../../tests/refactor_display_scheduling.py)。
 
@@ -455,6 +457,7 @@
 | `platform_description` · `SystemVersion.java` | `system_properties` / `bounded_getprop` | 仅诊断版本描述；超时受限，不用版本状态阻止功能。 | [refactor_system_version.py](../../tests/refactor_system_version.py) |
 | `module_loader_discovery` · `HookEntry.java` | `initial_loader` / `bounded_startup_loader_watch` | 启动找不到显示类才监听加载，找到后撤销，45 秒封顶；不轮询亮度。 | [refactor_hook_firmware.py](../../tests/refactor_hook_firmware.py) |
 | `native_payload_refresh` · `NativePanelRoot.java` | `same_asset_hash` / `atomic_asset_replace` | 相同程序仅验证；显式节点使用时才停止旧租约并原子换程序，不因自检启动输出器。 | [refactor_native_asset.py](../../tests/refactor_native_asset.py) |
+| `main_light_identity` · `BrightnessSensorAccess.java` | `standard_type_light` / `oem_selected_scalar_secondary` / `native_fov_selector` | 沿用系统当前默认逻辑屏 ABC 的真实主槽和 SensorManager；标准路径不变；私有折叠光感需精确语义身份与有效元数据，暗光监听不猜测 FOV / 非标单位。其他屏幕、同类多候选与原始通道不参与选择。 FOV 路线由已启用字段、实际 FOV 对象、同屏标识和非静态选择器返回值共同确认；正常值与驾驶替代值沿用固件消费者单位。 | [refactor_brightness_control.py](../../tests/refactor_brightness_control.py) |
 
 ## 原生协议与运行分支
 
@@ -472,7 +475,7 @@
 
 ### adapters · 设备接口与所有权
 
-`AdvancedTuning.java`、`AssistSensorCompat.java`、`ControlCenterCalibration.java`、`ControlCenterHooks.java`、`ForegroundApps.java`、`FrameworkBrightness.java`、`HbmAccess.java`、`LowLightTuning.java`、`OutdoorOpr.java`、`OutdoorSdrScope.java`、`OutdoorTuning.java`、`PipelineHooks.java`、`RawPanelOutputHooks.java`、`RefactorAdapter.java`、`ResponseTuning.java`、`SceneTuning.java`、`TraditionalAdapter.java`、`TraditionalHooks.java`。
+`AdvancedTuning.java`、`AssistSensorCompat.java`、`BrightnessSensorAccess.java`、`ControlCenterCalibration.java`、`ControlCenterHooks.java`、`ForegroundApps.java`、`FrameworkBrightness.java`、`HbmAccess.java`、`LowLightTuning.java`、`OutdoorOpr.java`、`OutdoorSdrScope.java`、`OutdoorTuning.java`、`PipelineHooks.java`、`RawPanelOutputHooks.java`、`RefactorAdapter.java`、`ResponseTuning.java`、`SceneTuning.java`、`TraditionalAdapter.java`、`TraditionalHooks.java`。
 
 ### bootstrap · 入口与代次
 

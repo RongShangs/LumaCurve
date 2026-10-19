@@ -63,6 +63,11 @@
       "purpose": "界面与只读说明"
     },
     {
+      "file": "BrightnessSensorAccess.java",
+      "layer": "adapters",
+      "purpose": "当前主屏光感身份、物理屏幕与监听绑定快照；不枚举其他屏幕候选"
+    },
+    {
       "file": "BrightnessTileService.java",
       "layer": "presentation",
       "purpose": "界面与只读说明"

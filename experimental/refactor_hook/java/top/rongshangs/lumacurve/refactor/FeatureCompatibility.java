@@ -16,6 +16,7 @@ public final class FeatureCompatibility {
         Route[] routes=catalogue(id);String choice="";
         if(routes[0].id.equals("refactor"))choice=curveSelection(runtime);
         else switch(id){
+        case "main_sensor":choice=text(object(runtime,"main_input_compatibility"),"profile");break;
         case "assist_sensor":JSONObject binding=object(runtime,"assist_compatibility");String mode=text(binding,"state"),kind=text(binding,"binding_kind");choice=kind.equals("native_auxiliary")||kind.equals("ported_auxiliary")?kind:mode.equals("native")?"native_auxiliary":mode.equals("bound")?"ported_auxiliary":"";break;
         case "hbm":choice=text(object(runtime,"outdoor"),"hbm_tuning_profile");String controller=text(object(runtime,"outdoor"),"hbm_controller_profile");if(controller.equals("enabled_field")||controller.equals("native_support_method"))result.add(controller);break;
         case "response":case "small_response":case "low_light":case "low_threshold":case "threshold_override":case "assist_gate":case "assist_override":choice=text(runtime,"response_scene_profile");break;
@@ -33,6 +34,7 @@ public final class FeatureCompatibility {
         String backend=text(runtime,"curve_backend");JSONObject out=object(runtime,"outdoor"),assist=object(runtime,"assist_compatibility");
         if(catalogue(id)[0].id.equals("refactor")){String mapper=text(runtime,"physical_mapper_class");return "曲线后端："+(backend.isEmpty()?"未报告":backend)+(mapper.isEmpty()?"":"\n映射器："+mapper);}
         switch(id){
+        case "main_sensor":JSONObject main=object(runtime,"main_input_compatibility");return "主光感来源："+text(main,"source")+"\n"+text(main,"sensor_name")+(text(main,"sensor_string_type").isEmpty()?"":" · "+text(main,"sensor_string_type"))+"\n配置光感："+text(main,"configured_sensor_name")+"\n选择方式："+text(main,"binding_source")+"\n"+text(main,"detail");
         case "assist_sensor":return "辅助绑定："+(text(assist,"state").isEmpty()?"未报告":text(assist,"state"))+(text(assist,"sensor_name").isEmpty()?"":"\n传感器："+text(assist,"sensor_name"))+(text(assist,"sensor_string_type").isEmpty()?"":" · "+text(assist,"sensor_string_type"))+(assist.has("dual_policy_cached")?"\n双光感能力缓存："+assist.optBoolean("dual_policy_cached"):"");
         case "hbm":return "计时适配："+(text(out,"hbm_tuning_profile").isEmpty()?"未报告":text(out,"hbm_tuning_profile"))+"\n"+"控制器适配："+(text(out,"hbm_controller_profile").isEmpty()?"未报告":text(out,"hbm_controller_profile"))+(out.has("original_minimum_lux")?"\n原生门槛："+out.optDouble("original_minimum_lux")+" lux":"")+(out.has("original_time_window_ms")?"\n原生计时（窗口 / 最大 / 最短）："+out.optLong("original_time_window_ms")+" / "+out.optLong("original_time_max_ms")+" / "+out.optLong("original_time_min_ms")+" ms":"");
         case "response":case "small_response":case "low_light":case "low_threshold":case "threshold_override":case "assist_gate":case "assist_override":return "场景适配："+(text(runtime,"response_scene_profile").isEmpty()?"未报告":text(runtime,"response_scene_profile"))+"\n"+text(entry,"detail");

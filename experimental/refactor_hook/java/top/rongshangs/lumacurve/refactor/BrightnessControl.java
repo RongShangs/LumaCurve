@@ -15,8 +15,7 @@ final class BrightnessControl implements SensorEventListener {
     final HookRuntime s;final DarkLockPolicy policy=new DarkLockPolicy();
     BrightnessControlOptions options=new BrightnessControlOptions();FrameworkBrightness display;SensorManager sensors;Sensor main,assist;
     boolean listening,registered,busy,failed;String owner="none",session="",reason="inactive",error="",lastRequest="";
-    static final java.lang.reflect.Method SENSOR_HANDLE=sensorHandle();
-    static java.lang.reflect.Method sensorHandle(){try{java.lang.reflect.Method m=Sensor.class.getDeclaredMethod("getHandle");m.setAccessible(true);return m;}catch(Throwable unavailable){return null;}}
+    BrightnessSensorAccess.Binding sensorBinding;SensorEventListener sensorListener;
     long mainSamples,assistSamples,unmatchedSamples,sensorEvaluations;
     boolean sensorTickQueued;
     final Runnable sensorTick=()->runSensorTick();
@@ -161,21 +160,10 @@ final class BrightnessControl implements SensorEventListener {
     boolean available(){try{if(!supported())return false;display.read();return true;}catch(Throwable unknown){error=unknown.toString();return false;}}
     boolean bindSensors(){
         try{
-            Object impl=HookEntry.get(s.owner,"mAutomaticBrightnessControllerImpl"),abc=HookEntry.get(impl,"mAutomaticBrightnessController");
-            Sensor selectedMain=(Sensor)HookEntry.get(abc,"mLightSensor");if(selectedMain==null||selectedMain.getType()!=Sensor.TYPE_LIGHT)return false;
-            Object dual=null;try{dual=HookEntry.get(impl,"mDualSensorPolicy");}catch(Throwable optional){}
-            float selectedMainScale=1,selectedAssistScale=1;Sensor selectedAssist=null;
-            if(dual!=null){selectedAssist=(Sensor)HookEntry.get(dual,"mAssistLightSensor");selectedMainScale=((Number)HookEntry.get(dual,"mFovAmplifyFactor")).floatValue();selectedAssistScale=((Number)HookEntry.get(dual,"mAssistFovAmplifyFactor")).floatValue();
-                if(!Float.isFinite(selectedMainScale)||!Float.isFinite(selectedAssistScale)||selectedMainScale<=0||selectedAssistScale<=0||selectedMainScale>100||selectedAssistScale>100)return false;}
-            // Accept verified scalar-lux identities, including a rebound port-ROM source.
-            if(selectedAssist!=null&&(!AuxiliarySensorIdentity.accepted(selectedAssist)||sameSensor(selectedAssist,selectedMain)))return false;
-            // SensorEvent.sensor belongs to its registering manager's handle map.
-            // The display service uses a separately constructed SensorManager.
-            SensorManager selectedManager=(SensorManager)HookEntry.get(abc,"mSensorManager");
-            if(selectedManager==null)return false;
-            if(listening&&(!sameSensor(main,selectedMain)||!sameSensor(assist,selectedAssist)||sensors!=selectedManager||mainScale!=selectedMainScale||assistScale!=selectedAssistScale))relinquish("sensor_changed",true);
-            main=selectedMain;assist=selectedAssist;mainScale=selectedMainScale;assistScale=selectedAssistScale;
-            sensors=selectedManager;return true;
+            BrightnessSensorAccess.Binding selected=BrightnessSensorAccess.read(s.owner);
+            if(listening&&!selected.same(sensorBinding))relinquish("sensor_changed",true);
+            main=selected.main;assist=selected.assist;mainScale=selected.mainScale;assistScale=selected.assistScale;
+            sensors=selected.manager;sensorBinding=selected;return true;
         }catch(Throwable unknown){error=unknown.toString();return false;}
     }
     boolean enabled(){return !s.closed&&!failed&&s.phase.equals("active")&&s.appliesToUser();}
@@ -240,20 +228,27 @@ final class BrightnessControl implements SensorEventListener {
         for(ContentObserver observer:new ContentObserver[]{modeObserver,commandObserver,brightnessObserver})try{s.context.getContentResolver().unregisterContentObserver(observer);}catch(Throwable failure){error=failure.toString();}
         registered=false;
     }
-    void unlisten(){s.handler.removeCallbacks(sensorTick);sensorTickQueued=false;try{if(listening&&sensors!=null)sensors.unregisterListener(this);}catch(Throwable failure){error=failure.toString();}finally{listening=false;mainLux=assistLux=Float.NaN;mainAt=assistAt=-1;}}
+    void unlisten(){
+        s.handler.removeCallbacks(sensorTick);sensorTickQueued=false;SensorEventListener old=sensorListener;sensorListener=null;
+        try{if(old!=null&&sensors!=null)sensors.unregisterListener(old);}catch(Throwable failure){error=failure.toString();}
+        finally{listening=false;mainLux=assistLux=Float.NaN;mainAt=assistAt=-1;}
+    }
     boolean listen(){
         if(!bindSensors())return false;if(listening)return true;
-        try{if(!sensors.registerListener(this,main,1000000,s.handler))return false;
-            if(assist!=null&&!sensors.registerListener(this,assist,1000000,s.handler)){sensors.unregisterListener(this);return false;}
+        SensorEventListener next=new SensorEventListener(){
+            public void onSensorChanged(SensorEvent e){if(sensorListener==this)BrightnessControl.this.onSensorChanged(e);}
+            public void onAccuracyChanged(Sensor sensor,int accuracy){}
+        };
+        sensorListener=next;
+        try{
+            if(!sensors.registerListener(next,main,1000000,s.handler))throw new IllegalStateException("Main sensor registration rejected");
+            if(assist!=null&&!sensors.registerListener(next,assist,1000000,s.handler))throw new IllegalStateException("Auxiliary sensor registration rejected");
             listening=true;mainAt=assistAt=-1;return true;
-        }catch(Throwable failure){sensors.unregisterListener(this);error=failure.toString();return false;}
+        }catch(Throwable failure){unlisten();error=failure.toString();return false;}
     }
     float usable(Sensor sensor,float lux,long time,long now){return sensor!=null&&DarkLockPolicy.valid(lux)&&time>=0&&(sensor.getReportingMode()==Sensor.REPORTING_MODE_ON_CHANGE||now-time<=10000)?lux:Float.NaN;}
-    static boolean sameSensor(Sensor a,Sensor b){
-        if(a==b)return true;if(a==null||b==null||a.getType()!=b.getType())return false;
-        try{return SENSOR_HANDLE!=null&&((Number)SENSOR_HANDLE.invoke(a)).intValue()==((Number)SENSOR_HANDLE.invoke(b)).intValue();}catch(Throwable unavailable){return false;}
-    }
-    public void onSensorChanged(SensorEvent e){if(!listening||e==null||e.sensor==null||e.values==null||e.values.length==0)return;float v=e.values[0];long now=SystemClock.uptimeMillis();if(sameSensor(e.sensor,main)){v*=mainScale;mainLux=v;mainAt=now;mainSamples++;}else if(sameSensor(e.sensor,assist)){v*=assistScale;assistLux=v;assistAt=now;assistSamples++;}else{unmatchedSamples++;return;}sensorChanged(v);}
+    static boolean sameSensor(Sensor a,Sensor b){return BrightnessSensorAccess.same(a,b);}
+    public void onSensorChanged(SensorEvent e){if(!listening||e==null||e.sensor==null||e.values==null||e.values.length==0)return;float v=e.values[0];long now=SystemClock.uptimeMillis();if(sameSensor(e.sensor,main)){try{v=BrightnessSensorAccess.mainValue(sensorBinding,e);}catch(Throwable invalid){fail(invalid);return;}mainLux=v;mainAt=now;mainSamples++;}else if(sameSensor(e.sensor,assist)){v*=assistScale;assistLux=v;assistAt=now;assistSamples++;}else{unmatchedSamples++;return;}sensorChanged(v);}
     public void onAccuracyChanged(Sensor sensor,int accuracy){}
     void tick(){
         if(screenCleanupQueued)return;
@@ -283,8 +278,10 @@ final class BrightnessControl implements SensorEventListener {
         }catch(Throwable failure){fail(failure);}
     }
     void fail(Throwable failure){error=failure.toString();failed=true;relinquish("error",true);unlisten();s.handler.removeCallbacks(timer);s.handler.removeCallbacks(retry);if((options.darkLock||!options.manualApps.isEmpty()||options.manualPanel&&!registered)&&!s.closed&&s.phase.equals("active")&&s.screenOn())s.handler.postDelayed(retry,30000);s.log("主屏亮度控制退出："+error);s.queuePublish();}
+    boolean sensorsReady(){try{BrightnessSensorAccess.read(s.owner);return true;}catch(Throwable unavailable){return false;}}
     JSONObject status()throws JSONException{
-        JSONObject j=new JSONObject();options.put(j);boolean supported=supported();j.put("elapsed_ms",SystemClock.elapsedRealtime()).put("manual_panel_supported",mainDisplay()&&RawPanelOutputHooks.supports(s.owner.getClass())).put("dark_lock_supported",supported&&bindSensors()).put("owner",owner).put("reason",reason).put("error",error).put("auto",auto()).put("listening",listening).put("session",session).put("raw_target",rawTarget).put("raw_paused",rawPaused).put("raw_confirmed",rawConfirmed).put("raw_blocked_output_calls",rawBlockedWrites);
+        JSONObject j=new JSONObject();options.put(j);boolean supported=supported();j.put("elapsed_ms",SystemClock.elapsedRealtime()).put("manual_panel_supported",mainDisplay()&&RawPanelOutputHooks.supports(s.owner.getClass())).put("dark_lock_supported",supported&&sensorsReady()).put("owner",owner).put("reason",reason).put("error",error).put("auto",auto()).put("listening",listening).put("session",session).put("raw_target",rawTarget).put("raw_paused",rawPaused).put("raw_confirmed",rawConfirmed).put("raw_blocked_output_calls",rawBlockedWrites);
+        j.put("watch_binding_active",listening).put("watch_main_profile",listening&&sensorBinding!=null?sensorBinding.profile:"").put("watch_physical_display_id",listening&&sensorBinding!=null?sensorBinding.physicalId:"");
         j.put("app_auto_supported",ForegroundApps.supported()).put("foreground_package",foreground.pkg).put("foreground_auto_suppressed",!appSuppressed.isEmpty());
         j.put("app_multiwindow_supported",ForegroundApps.multiWindowSupported).put("foreground_visibility_known",foreground.visibilityKnown).put("foreground_visible_packages",new JSONArray(foreground.visible)).put("foreground_matched_package",foreground.selected(options.manualApps)).put("foreground_visibility_pending",foregroundPending);
         j.put("foreground_auto_exemptions",new JSONArray(appExemptions)).put("foreground_auto_override_pending",appSuppressionPending);

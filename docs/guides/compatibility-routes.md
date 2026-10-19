@@ -3,7 +3,7 @@
 兼容维护已统一为长期规范，避免随版本复制多套清单：
 
 - [架构与维护入口](../architecture/README.md)：阅读顺序与校验命令。
-- [完整路线索引](../architecture/compatibility-index.md)：48 项功能、20 组适配、18 类 ABI 内部分支及全部生产 Java 的负责人、条件、证据、退出与验证。
+- [完整路线索引](../architecture/compatibility-index.md)：全部功能、适配路线、ABI 内部分支及生产 Java 的负责人、条件、证据、退出与验证。
 - [兼容开发规范](../architecture/compatibility-policy.md)：新增路径、回退拒绝、安装事务、线程 / 所有权、设置保留和验收要求。
 - [适配记录模板](../architecture/compatibility-change-template.md)：以后每轮新增或修改适配的设计与验证依据。
 

@@ -22,6 +22,10 @@ public class FeatureCompatibilityTest{
   r.put("curve_backend","physical_mapping").put("physical_mapper_class","com.android.server.display.MiuiPhysicalBrightnessMappingStrategy");for(String id:memory)picked(id,r,"miui_physical");
   r.put("physical_mapper_class","com.android.server.display.BrightnessMappingStrategy$PhysicalMappingStrategy");for(String id:memory)picked(id,r,"aosp_physical");
   r.remove("physical_mapper_class");check(selected(enrich("curve","available",r)).isEmpty());check(enrich("curve","available",r).getString("route_name").contains("未确认"));r.put("curve_backend","unknown");check(selected(enrich("curve","available",r)).isEmpty());
+  check(selected(enrich("main_sensor","available",r)).isEmpty());
+  r.put("main_input_compatibility",new JSONObject().put("profile","oem_selected_secondary").put("source","automatic_brightness_controller").put("sensor_name","selected").put("sensor_string_type","xiaomi.sensor.light_secondary"));picked("main_sensor",r,"oem_selected_secondary");
+  check(enrich("main_sensor","available",r).getString("evidence").contains("xiaomi.sensor.light_secondary"));
+  r.getJSONObject("main_input_compatibility").put("profile","oem_selected_fov");picked("main_sensor",r,"oem_selected_fov");
   JSONObject auxiliary=new JSONObject().put("state","native").put("sensor_string_type","zte.sensor.light_second");r.put("assist_compatibility",auxiliary);picked("assist_sensor",r,"native_auxiliary");
   auxiliary.put("state","bound");picked("assist_sensor",r,"ported_auxiliary");auxiliary.put("binding_kind","native_auxiliary");picked("assist_sensor",r,"native_auxiliary");
   auxiliary.put("state","inactive").put("binding_kind","ported_auxiliary");picked("assist_sensor",r,"ported_auxiliary");
@@ -41,6 +45,7 @@ public class FeatureCompatibilityTest{
   JSONObject disabled=enrich("scene_proximity","inactive",r);check(disabled.getString("route_name").contains("系统未启用"));check(disabled.getJSONArray("routes").getJSONObject(0).getString("condition").contains("不混用"));
   for(String id:new String[]{"scene_unknown","unrecognized_feature"})check(selected(enrich(id,"available",r)).isEmpty());
   r.put("response_scene_profile","native_driving");outdoor.put("target_compatibility_profile","override_target");
+  r.put("main_input_compatibility",new JSONObject().put("profile","oem_main"));
   String[] simple={"main_sensor","dark_lock","manual_panel","node_output","thermal","response","small_response","low_light","low_threshold","assist_gate","threshold_override","assist_override","animation_override","sunlight_override","touch_override","outdoor","root_storage","stored_config","outdoor_node_device","native_payload","launcher","preferences","app_files"};
   for(String id:simple){JSONObject row=enrich(id,"available",r);check(selected(row).size()==1);for(String state:new String[]{"pending","unsupported","inactive"})check(selected(enrich(id,state,r)).isEmpty());}
   r.put("response_scene_profile","native_without_driving");for(String id:new String[]{"response","small_response","low_light","low_threshold","threshold_override","assist_gate","assist_override"})picked(id,r,"native_without_driving");

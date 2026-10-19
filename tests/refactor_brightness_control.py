@@ -16,7 +16,7 @@ stubs={
 'android/content/Context':'''package android.content;public class Context{public static final String DISPLAY_SERVICE="display",SENSOR_SERVICE="sensor",KEYGUARD_SERVICE="keyguard";public final ContentResolver resolver=new ContentResolver();public Object display=new android.hardware.display.DisplayManager(),sensor=new android.hardware.SensorManager(),keyguard=new android.app.KeyguardManager();public ContentResolver getContentResolver(){return resolver;}public Object getSystemService(String key){return key.equals(DISPLAY_SERVICE)?display:key.equals(KEYGUARD_SERVICE)?keyguard:sensor;}}''',
 'android/app/KeyguardManager':'''package android.app;public class KeyguardManager{public boolean locked;public boolean isKeyguardLocked(){return locked;}}''',
 'android/view/Display':'''package android.view;public class Display{public static final int DEFAULT_DISPLAY=0;}''',
-'android/hardware/Sensor':'''package android.hardware;public class Sensor{public static final int TYPE_DEVICE_PRIVATE_BASE=65536,REPORTING_MODE_ON_CHANGE=1;public String kind="";public String getStringType(){return kind;}public boolean isWakeUpSensor(){return false;}public String getRequiredPermission(){return "";}public float getMaximumRange(){return 100000;}public float getResolution(){return 1;}public static final int TYPE_LIGHT=5;public int type,reporting=1,handle;public Sensor(int t){this(t,t);}public Sensor(int t,int h){type=t;handle=h;}int getHandle(){return handle;}public int getType(){return type;}public int getReportingMode(){return reporting;}public String getName(){return "sensor-"+type;}}''',
+'android/hardware/Sensor':'''package android.hardware;public class Sensor{public static final int TYPE_DEVICE_PRIVATE_BASE=65536,REPORTING_MODE_ON_CHANGE=1;public boolean wake;public String permission="";public float range=100000,resolution=1;public String kind="";public String getStringType(){return kind;}public boolean isWakeUpSensor(){return wake;}public String getRequiredPermission(){return permission;}public float getMaximumRange(){return range;}public float getResolution(){return resolution;}public static final int TYPE_LIGHT=5;public int type,reporting=1,handle;public Sensor(int t){this(t,t);}public Sensor(int t,int h){type=t;handle=h;}int getHandle(){return handle;}public int getType(){return type;}public int getReportingMode(){return reporting;}public String getName(){return "sensor-"+type;}}''',
 'android/hardware/SensorEvent':'''package android.hardware;public class SensorEvent{public Sensor sensor;public float[] values;public SensorEvent(Sensor s,float v){sensor=s;values=new float[]{v};}}''',
 'android/hardware/SensorEventListener':'''package android.hardware;public interface SensorEventListener{void onSensorChanged(SensorEvent e);void onAccuracyChanged(Sensor s,int a);}''',
 'android/hardware/SensorManager':'''package android.hardware;import android.os.Handler;public class SensorManager{public int registers,unregisters;public boolean ok=true;public boolean registerListener(SensorEventListener l,Sensor s,int rate,Handler h){registers++;return ok;}public void unregisterListener(SensorEventListener l){unregisters++;}}''',
@@ -44,7 +44,7 @@ sources.append(write(base+'NativePanelClient', '''package top.rongshangs.lumacur
 sources.append(write('android/os/Process', '''package android.os;public class Process{public static int myPid(){return 123;}}'''))
 sources.append(write(base+'HookEntry', '''package top.rongshangs.lumacurve.refactor;public class HookEntry{static final ForegroundUser currentUser=new ForegroundUser();static{currentUser.switched(0);}static java.lang.reflect.Field field(Class<?> c,String key)throws Exception{for(Class<?> k=c;k!=null;k=k.getSuperclass())try{java.lang.reflect.Field f=k.getDeclaredField(key);f.setAccessible(true);return f;}catch(NoSuchFieldException e){}throw new NoSuchFieldException(key);}static Object get(Object o,String key)throws Exception{return field(o.getClass(),key).get(o);}}'''))
 sources.append(write(base+'HookRuntime', '''package top.rongshangs.lumacurve.refactor;import android.content.*;import android.os.*;import java.util.*;public class HookRuntime{int memoryNotices;boolean memoryAuto;void memorySettingChanged(boolean a){memoryNotices++;memoryAuto=a;}void memoryModeKnown(boolean a){memoryAuto=a;}public final Writer stateWriter=new Writer();public static class Writer{volatile java.util.Map<String,String> last;void submit(String group,java.util.Map<String,String> values){last=new java.util.HashMap<>(values);}}public final Node outdoorNode=new Node();public static class Node{public void release(){}public void frame(float v){}}BrightnessControl brightnessControl;static final String BUILD="test";final Context context=new Context();final Handler handler=new Handler();final PowerManager power=new PowerManager();final Owner owner=new Owner();final String fingerprint="device";HookRuntime(){owner.mAutomaticBrightnessControllerImpl.mAutomaticBrightnessController.mSensorManager=(android.hardware.SensorManager)context.sensor;}boolean closed,on=true,user=true,hdr;String phase="active";int publishes,fastPublishes;List<String> logs=new ArrayList<>();boolean screenOn(){return on;}boolean appliesToUser(){return user;}Boolean hdrActive(){return hdr;}void log(String t){logs.add(t);}void requestRecalculation(){}void queuePublish(){publishes++;}void queueControlPublish(){fastPublishes++;}static String processStart(){return "123";}static Boolean optionalBoolean(Object o,String key){try{return (Boolean)HookEntry.get(o,key);}catch(Exception e){return null;}}
-public static class Owner{public int mDisplayId=0;public Impl mAutomaticBrightnessControllerImpl=new Impl();}public static class Impl{public boolean mProximityPositive=false;public ABC mAutomaticBrightnessController=new ABC();public Dual mDualSensorPolicy=new Dual();}public static class ABC{public android.hardware.SensorManager mSensorManager;public boolean mAmbientLuxValid=true,mLightSensorEnabled=true;public float mAmbientLux=1;public android.hardware.Sensor mLightSensor=new android.hardware.Sensor(5);}public static class Dual{public float mFovAmplifyFactor=1,mAssistFovAmplifyFactor=1;public android.hardware.Sensor mAssistLightSensor=new android.hardware.Sensor(33171055);}}'''))
+public static class Owner{public Object mDisplayDeviceConfig=new Object();public Dpc mDisplayPowerController=new Dpc();public int mDisplayId=0;public Impl mAutomaticBrightnessControllerImpl=new Impl();}public static class Dpc{public String mUniqueDisplayId="panel-a";}public static class Impl{public int mDisplayId=0;public boolean mSupportFovSensor,driving,selectorFail;public float fovScale=1;public android.hardware.Sensor mLightFovSensor,selectorOverride;public android.hardware.Sensor switchLightSensor(android.hardware.Sensor base){if(selectorFail)throw new IllegalStateException("selector failed");if(selectorOverride!=null)return selectorOverride;return mSupportFovSensor&&mLightFovSensor!=null&&mDisplayId==0?mLightFovSensor:base;}public boolean getDrivingStatus(){return driving;}public float getFovAmplifyFactor(){return fovScale;}public boolean mProximityPositive=false;public ABC mAutomaticBrightnessController=new ABC();public Dual mDualSensorPolicy=new Dual();}public static class ABC{public android.hardware.SensorManager mSensorManager;public boolean mAmbientLuxValid=true,mLightSensorEnabled=true;public float mAmbientLux=1;public android.hardware.Sensor mLightSensor=new android.hardware.Sensor(5);}public static class Dual{public float mFovAmplifyFactor=1,mAssistFovAmplifyFactor=1;public android.hardware.Sensor mAssistLightSensor=new android.hardware.Sensor(33171055);}}'''))
 sources.append(write(base+'BrightnessControlHostTest', '''package top.rongshangs.lumacurve.refactor;
 import org.json.*;import android.os.*;import android.hardware.*;import android.hardware.display.*;import android.provider.Settings;
 public class BrightnessControlHostTest{
@@ -59,8 +59,11 @@ static JSONObject keep(BrightnessControl c,boolean on)throws Exception{JSONObjec
 static void slider(ControlCenterEngine e,String token,double fraction,long gesture,long sent)throws Exception{JSONObject r=new JSONObject().put("id",java.util.UUID.randomUUID().toString()).put("build",AppBuild.BUILD).put("process_start","123").put("elapsed",sent).put("gesture_elapsed",gesture).put("session",token).put("fraction",fraction);Settings.Global.putString(e.s.context.getContentResolver(),ControlCenterEngine.REQUEST,r.toString());e.request();}
 static android.app.TaskInfo task(String pkg,int user,int display,boolean visible){android.app.TaskInfo i=new android.app.TaskInfo();i.topActivity=new android.content.ComponentName(pkg);i.userId=user;i.displayId=display;i.isVisibleRequested=visible;return i;}
 public static void main(String[] ignored)throws Exception{
-BrightnessControlOptions defaults=BrightnessControlOptions.parse(new JSONObject());check(defaults.darkLock&&defaults.manualPanel&&defaults.enterLux==10&&defaults.exitLux==50&&defaults.minutes==1&&defaults.exitSeconds==1);
+BrightnessControlOptions defaults=BrightnessControlOptions.parse(new JSONObject());check(!defaults.darkLock&&defaults.manualPanel&&defaults.enterLux==10&&defaults.exitLux==50&&defaults.minutes==1&&defaults.exitSeconds==1);
 check(!BrightnessControlOptions.parseStored(new JSONObject()).darkLock);
+for(boolean enabled:new boolean[]{false,true}){JSONObject prior=new JSONObject().put("dark_lock_enabled",enabled).put("dark_lock_manual_exit",true).put("dark_lock_minutes",7);String beforeParse=prior.toString();BrightnessControlOptions retained=BrightnessControlOptions.parseStored(prior);check(retained.darkLock==enabled&&retained.manualExit&&retained.minutes==7&&prior.toString().equals(beforeParse));JSONObject written=new JSONObject();retained.put(written);check(BrightnessControlOptions.parseStored(written).darkLock==enabled);}
+HookRuntime untouched=new HookRuntime();Settings.System.values.put("mode","1");BrightnessControl fresh=new BrightnessControl(untouched);untouched.brightnessControl=fresh;fresh.configure(new BrightnessControlOptions());check(fresh.auto()&&!fresh.listening&&fresh.owner.equals("none")&&((SensorManager)untouched.context.sensor).registers==0);time(fresh,180000);check(fresh.auto()&&writes(fresh)==0&&untouched.handler.jobs.isEmpty());fresh.close();
+
 BrightnessControlOptions saved=BrightnessControlOptions.parseStored(new JSONObject().put("dark_lock_enabled",false).put("dark_lock_enter_lux",5).put("dark_lock_exit_lux",100).put("dark_lock_minutes",5).put("dark_lock_exit_seconds",5));check(!saved.darkLock&&saved.enterLux==5&&saved.exitLux==100&&saved.minutes==5&&saved.exitSeconds==5);
 saved.manualPanel=false;saved.bedtime();check(saved.darkLock&&saved.enterLux==10&&saved.exitLux==50&&saved.minutes==1&&saved.exitSeconds==1&&!saved.manualPanel);
 for(String k:new String[]{"dark_lock_minutes","dark_lock_enter_lux","dark_lock_exit_lux","dark_lock_exit_seconds"})try{BrightnessControlOptions.parse(new JSONObject().put(k,"5"));throw new AssertionError();}catch(IllegalArgumentException e){cases++;}
@@ -109,7 +112,7 @@ c=controller();c.options.darkLock=false;c.tick();check(!c.listening&&c.auto()&&c
 c=controller();Settings.System.values.put("mode","0");try{c.claim("dark","race",.3f);throw new AssertionError();}catch(IllegalStateException expected){cases++;}check(!c.auto()&&writes(c)==0&&c.owner.equals("none"));
 c=controller();check(command(c,"begin","dedupe",.3).getBoolean("ok"));int n=writes(c);c.command();check(writes(c)==n);
 c=controller();sample(c,1,1);time(c,60000);Sensor previous=c.main;c.s.owner.mAutomaticBrightnessControllerImpl.mAutomaticBrightnessController.mLightSensor=new Sensor(5,99);c.tick();check(c.auto()&&c.owner.equals("none")&&c.main!=previous&&c.listening);check(c.policy.darkSince<0&&writes(c)==1);c.onSensorChanged(new SensorEvent(previous,1));check(Float.isNaN(c.mainLux));sample(c,1,1);time(c,119999);check(c.auto());time(c,120000);check(!c.auto()&&writes(c)==2);
-c=controller();sample(c,1,1);time(c,60000);c.s.owner.mAutomaticBrightnessControllerImpl.mDualSensorPolicy.mFovAmplifyFactor=2;c.status();check(c.auto()&&c.owner.equals("none")&&!c.listening&&c.mainScale==2);c.tick();sample(c,1,1);time(c,120000);check(!c.auto());
+c=controller();sample(c,1,1);time(c,60000);c.s.owner.mAutomaticBrightnessControllerImpl.mDualSensorPolicy.mFovAmplifyFactor=2;c.status();check(!c.auto()&&c.owner.equals("dark")&&c.listening&&c.mainScale==1);c.tick();check(c.auto()&&c.owner.equals("none")&&c.listening&&c.mainScale==2);sample(c,1,1);time(c,120000);check(!c.auto());
 // Native readiness must be confirmed before blocking any official brightness frame.
 c=controller();check(command(c,"raw_begin","raw",1000).getBoolean("ok"));check(!c.auto()&&c.owner.equals("raw_panel")&&writes(c)==0&&RawPanelLease.token.equals("raw"));check(!c.rawOutputBlocked(.3f));check(command(c,"raw_ready","raw",1000).getBoolean("ok"));check(c.rawOutputBlocked(.3f)&&c.rawConfirmed&&RawPanelLease.target==1000&&c.s.fastPublishes>=2);check(!c.rawOutputBlocked(0)&&!c.rawOutputBlocked(-1)&&!c.rawOutputBlocked(Float.NaN));time(c,2000);check(RawPanelLease.until==10000);Settings.System.putInt(c.s.context.getContentResolver(),"mode",1);check(c.owner.equals("none")&&RawPanelLease.token.equals("none")&&!c.rawOutputBlocked(.3f));check(!command(c,"raw_validate","raw",1000).getBoolean("ok"));
 // Lock releases write permission while remembering the target. Screen-on alone is not unlock.
@@ -131,7 +134,8 @@ c=controller();DisplayManagerGlobal.instance.info=null;check(command(c,"raw_begi
 c=controller();Sensor aliasMain=new Sensor(5,c.main.handle),aliasAssist=new Sensor(c.assist.type,c.assist.handle);c.onSensorChanged(new SensorEvent(aliasMain,0));c.onSensorChanged(new SensorEvent(aliasAssist,0));c.s.handler.due();check(c.mainLux==0&&c.assistLux==0&&c.mainSamples==1&&c.assistSamples==1);time(c,60000);check(!c.auto()&&c.owner.equals("dark"));
 c=controller();c.onSensorChanged(new SensorEvent(new Sensor(5,91),1));check(c.unmatchedSamples==1&&Float.isNaN(c.mainLux));time(c,120000);check(c.auto()&&c.reason.equals("waiting_sensor_data"));c.onSensorChanged(new SensorEvent(null,1));check(c.unmatchedSamples==1);
 c=controller();SensorManager official=new SensorManager();c.s.owner.mAutomaticBrightnessControllerImpl.mAutomaticBrightnessController.mSensorManager=official;c.tick();check(c.sensors==official&&c.listening);sample(c,1,1);time(c,60000);check(!c.auto());c.s.owner.mAutomaticBrightnessControllerImpl.mAutomaticBrightnessController.mSensorManager=new SensorManager();c.tick();check(c.auto()&&Float.isNaN(c.mainLux)&&c.policy.darkSince<0);
-// Execute the requested defaults: both sensors must be <=10 for a minute;
+// Explicit opt-in retains the default thresholds: both sensors <=10 for a minute;
+defaults.bedtime();
 // either sensor at exactly 50 for one second exits.
 c=controller();c.configure(defaults);sample(c,10,10);time(c,59999);check(c.auto());time(c,60000);check(!c.auto());sample(c,49.9f,49.9f);time(c,65000);check(!c.auto());sample(c,1,50);time(c,65999);check(!c.auto());time(c,66000);check(c.auto()&&c.owner.equals("none"));
 c=controller();c.configure(defaults);sample(c,10,10);time(c,60000);check(!c.auto());sample(c,50,1);time(c,61000);check(c.auto());
@@ -286,12 +290,81 @@ for(int mode=0;mode<=2;mode++)for(boolean automatic:new boolean[]{false,true}){c
 c=controller();ControlCenterEngine calibrationEngine=new ControlCenterEngine(c.s);calibrationEngine.start();long deadline=System.currentTimeMillis()+5000;while(c.s.stateWriter.last==null&&System.currentTimeMillis()<deadline){calibrationEngine.supported();Thread.sleep(2);}check(c.s.stateWriter.last!=null&&c.s.stateWriter.last.get(ControlCenterEngine.TABLES)!=null);for(;;){synchronized(calibrationEngine){if(!calibrationEngine.queued)break;}if(System.currentTimeMillis()>deadline)throw new AssertionError("calibration worker did not settle");Thread.sleep(2);}ControlCenterCalibration.fail=true;calibrationEngine.supported();deadline=System.currentTimeMillis()+5000;while(c.s.stateWriter.last.get(ControlCenterEngine.TABLES)!=null&&System.currentTimeMillis()<deadline)Thread.sleep(2);check(calibrationEngine.calibration==null&&c.s.stateWriter.last.containsKey(ControlCenterEngine.TABLES)&&c.s.stateWriter.last.get(ControlCenterEngine.TABLES)==null);check(c.auto()&&c.owner.equals("none"));calibrationEngine.close();c.close();ControlCenterCalibration.fail=false;
 // Mode notifications reach preference retention even during owned mode changes.
 c=controller();c.configure(c.options);int notices=c.s.memoryNotices;c.busy=true;Settings.System.putInt(c.s.context.getContentResolver(),"mode",0);check(c.s.memoryNotices==notices+1&&!c.s.memoryAuto);c.busy=false;c.close();
+// The real foldable sample registers a FOV virtual source instead of its configured ALS.
+c=controller();HookRuntime.Impl fovImpl=c.s.owner.mAutomaticBrightnessControllerImpl;
+Sensor foldConfigured=new Sensor(33171081,164);foldConfigured.kind="xiaomi.sensor.light_secondary";
+Sensor fovSource=new Sensor(33172111,900);fovImpl.mAutomaticBrightnessController.mLightSensor=foldConfigured;
+fovImpl.mSupportFovSensor=true;fovImpl.mLightFovSensor=fovSource;fovImpl.fovScale=2;
+c.tick();check(c.listening&&c.main==fovSource&&c.sensorBinding.profile.equals("oem_selected_fov"));
+check(BrightnessSensorAccess.evidence(c.s.owner).getString("binding_source").equals("oem_fov_override"));
+c.onSensorChanged(new SensorEvent(fovSource,20));check(c.mainLux==20); // values[0] is already lux
+SensorEvent fovPacket=new SensorEvent(fovSource,3);fovPacket.values=new float[]{3,1,50};
+c.onSensorChanged(fovPacket);check(c.mainLux==3);fovImpl.driving=true;c.onSensorChanged(fovPacket);check(c.mainLux==100);
+fovPacket.values=new float[]{3,0,50};c.onSensorChanged(fovPacket);check(c.mainLux==3);
+fovPacket.values=new float[]{4,1};c.onSensorChanged(fovPacket);check(c.mainLux==4);
+long beforeConfigured=c.mainSamples;c.onSensorChanged(new SensorEvent(foldConfigured,0));check(c.mainSamples==beforeConfigured);
+SensorEventListener oldFovListener=c.sensorListener;Sensor otherConfigured=new Sensor(33171081,165);otherConfigured.kind="xiaomi.sensor.light_secondary";fovImpl.mAutomaticBrightnessController.mLightSensor=otherConfigured;c.tick();check(c.sensorListener!=oldFovListener&&Float.isNaN(c.mainLux));oldFovListener.onSensorChanged(new SensorEvent(fovSource,1));check(Float.isNaN(c.mainLux));fovImpl.mAutomaticBrightnessController.mLightSensor=foldConfigured;
+fovImpl.mSupportFovSensor=false;fovImpl.mDualSensorPolicy.mFovAmplifyFactor=1;c.tick();check(c.main==foldConfigured&&Float.isNaN(c.mainLux)&&c.policy.darkSince<0);c.close();
+for(int badFov=0;badFov<8;badFov++){
+ c=controller();fovImpl=c.s.owner.mAutomaticBrightnessControllerImpl;fovImpl.mAutomaticBrightnessController.mLightSensor=foldConfigured;fovImpl.mSupportFovSensor=true;fovImpl.mLightFovSensor=new Sensor(33172111,900);
+ if(badFov==0)fovImpl.selectorOverride=new Sensor(33172111,901);
+ if(badFov==1)fovImpl.selectorFail=true;if(badFov==2)fovImpl.mLightFovSensor.wake=true;
+ if(badFov==3)fovImpl.mLightFovSensor.reporting=0;if(badFov==4)fovImpl.fovScale=Float.NaN;
+ if(badFov==5)fovImpl.mDisplayId=1;if(badFov==6)fovImpl.mLightFovSensor.permission="private.permission";if(badFov==7)fovImpl.mLightFovSensor.kind="xiaomi.sensor.ambientlight.raw_sec";
+ c.tick();check(c.failed&&!c.listening&&c.auto()&&c.options.darkLock);check(c.main.getType()==5);c.close();
+}
+// Preserve standard main sensors with optional FOV fields, including malformed unused slots.
+c=controller();fovImpl=c.s.owner.mAutomaticBrightnessControllerImpl;fovImpl.mSupportFovSensor=true;fovImpl.selectorFail=true;fovImpl.mLightFovSensor=new Sensor(33172111,900);c.tick();check(c.listening&&c.main.getType()==5&&c.sensorBinding.profile.equals("oem_main"));c.close();
+// Enabled FOV with a genuinely missing native source follows the OEM return, not a guess.
+c=controller();fovImpl=c.s.owner.mAutomaticBrightnessControllerImpl;fovImpl.mAutomaticBrightnessController.mLightSensor=foldConfigured;fovImpl.mSupportFovSensor=true;c.tick();check(c.listening&&c.main==foldConfigured&&c.sensorBinding.profile.equals("oem_selected_secondary"));c.close();
+// Foldable sources: the selected default-display slot is authoritative, not sensor order.
+c=controller();Sensor originalMain=c.main;SensorEventListener oldListener=c.sensorListener;
+Sensor fold=new Sensor(33171081,164);fold.kind="xiaomi.sensor.light_secondary";
+check(!BrightnessSensorAccess.profile(fold).isEmpty());
+c.s.owner.mAutomaticBrightnessControllerImpl.mAutomaticBrightnessController.mLightSensor=fold;
+int oldUnregister=c.sensors.unregisters;c.tick();check(c.main==fold&&c.listening&&c.sensors.unregisters==oldUnregister+1);
+check(Float.isNaN(c.mainLux)&&Float.isNaN(c.assistLux)&&c.policy.darkSince<0);
+long beforeSamples=c.mainSamples;oldListener.onSensorChanged(new SensorEvent(originalMain,0));check(c.mainSamples==beforeSamples&&Float.isNaN(c.mainLux));
+// Queued events from a previous physical panel are rejected even with an identical handle.
+sample(c,1,1);time(c,60000);check(c.owner.equals("dark")&&!c.auto());oldListener=c.sensorListener;
+c.s.owner.mDisplayPowerController.mUniqueDisplayId="panel-b";c.displayChanged();check(c.auto()&&c.owner.equals("none")&&c.listening);
+check(c.policy.darkSince<0&&Float.isNaN(c.mainLux)&&Float.isNaN(c.assistLux));beforeSamples=c.mainSamples;
+oldListener.onSensorChanged(new SensorEvent(fold,0));check(c.mainSamples==beforeSamples&&Float.isNaN(c.mainLux));
+sample(c,1,1);time(c,119999);check(c.auto());time(c,120000);check(!c.auto());
+// Unfold back to standard ALS: owned automatic mode is restored, user settings untouched.
+c.s.owner.mAutomaticBrightnessControllerImpl.mAutomaticBrightnessController.mLightSensor=originalMain;c.tick();
+check(c.auto()&&c.main==originalMain&&c.options.darkLock&&c.options.enterLux==5&&c.options.minutes==1);check(c.policy.darkSince<0);
+// A different controller/manager with the same handles cannot reuse previous samples.
+sample(c,1,1);SensorManager oldManager=c.sensors;oldListener=c.sensorListener;
+HookRuntime.ABC foldReplacement=new HookRuntime.ABC();foldReplacement.mSensorManager=new SensorManager();
+c.s.owner.mAutomaticBrightnessControllerImpl.mAutomaticBrightnessController=foldReplacement;c.tick();
+check(c.sensors==foldReplacement.mSensorManager&&oldManager.unregisters>0&&Float.isNaN(c.mainLux));
+beforeSamples=c.mainSamples;oldListener.onSensorChanged(new SensorEvent(c.main,0));check(c.mainSamples==beforeSamples);
+// Reading status must not rebind listeners or change automatic mode during a panel swap.
+int registrations=c.sensors.registers;oldListener=c.sensorListener;c.s.owner.mDisplayPowerController.mUniqueDisplayId="panel-c";
+c.status();check(c.sensorListener==oldListener&&c.sensors.registers==registrations&&c.auto());c.tick();check(c.sensorListener!=oldListener);
+c.close();check(!c.listening&&c.sensorListener==null&&c.s.handler.jobs.isEmpty());
+// Unknown/private streams are local failures, never a reason to subscribe to another ALS.
+for(int bad=0;bad<9;bad++){
+ c=controller();sample(c,1,1);time(c,60000);Sensor invalid=new Sensor(33171081,164);invalid.kind="xiaomi.sensor.light_secondary";
+ if(bad==0)invalid.kind="xiaomi.sensor.ambientlight.raw_sec";
+ if(bad==1)invalid.kind="xiaomi.sensor.ambientlightsecondary.factory";
+ if(bad==2)invalid.kind="xiaomi.sensor.light_primary2_strm";
+ if(bad==3)invalid.wake=true;if(bad==4)invalid.reporting=0;if(bad==5)invalid.permission="private.permission";
+ if(bad==6)invalid.range=Float.NaN;if(bad==7)invalid.resolution=-1;if(bad==8)invalid.type=4;
+ c.s.owner.mAutomaticBrightnessControllerImpl.mAutomaticBrightnessController.mLightSensor=invalid;c.tick();
+ check(c.failed&&c.auto()&&!c.listening&&c.owner.equals("none")&&c.options.darkLock);check(Float.isNaN(c.mainLux));c.close();
+}
+c=controller();c.s.owner.mAutomaticBrightnessControllerImpl.mAutomaticBrightnessController.mLightSensor=fold;
+c.s.owner.mAutomaticBrightnessControllerImpl.mDualSensorPolicy.mFovAmplifyFactor=2;c.tick();check(c.failed&&c.options.darkLock&&!c.listening);c.close();
+// A non-default logical display never receives framework brightness writes or listeners.
+c=controller();c.s.owner.mDisplayId=1;c.tick();check(c.failed&&!c.listening&&writes(c)==0&&c.auto());c.close();
 System.out.println("Brightness mode control: "+cases+" cases PASS; actual controller with service doubles, Android not tested");
 }}
 '''))
 classes=O/'classes';classes.mkdir(exist_ok=True)
 sources.append(write(base+'ControlCenterCalibration', '''package top.rongshangs.lumacurve.refactor;class ControlCenterCalibration{static boolean fail;static Object configuration(Object owner){if(fail)throw new IllegalStateException("configuration changed");return owner;}static org.json.JSONObject read(Object owner){return new org.json.JSONObject();}}'''))
 sources.append(write(base+'TemporaryScreenOn', '''package top.rongshangs.lumacurve.refactor;import android.content.Context;class TemporaryScreenOn{static boolean held;static void set(Context c,boolean value){held=value;}static boolean active(){return held;}static void clear(){held=false;}}'''))
-names=['AuxiliarySensorIdentity','BrightnessControl','BrightnessControlOptions','DarkLockPolicy','FrameworkBrightness','ForegroundUser','ForegroundApps','ControlCenterEngine','ControlCenterMapping','AppBuild']
+names=['BrightnessSensorAccess','AuxiliarySensorIdentity','BrightnessControl','BrightnessControlOptions','DarkLockPolicy','FrameworkBrightness','ForegroundUser','ForegroundApps','ControlCenterEngine','ControlCenterMapping','AppBuild']
 subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(J),'-d',str(classes),*[str(p) for p in sources],*[str(S/(n+'.java')) for n in names]],check=True)
 subprocess.run(['java','-cp',str(classes)+';'+str(J),'top.rongshangs.lumacurve.refactor.BrightnessControlHostTest'],check=True)

@@ -11,16 +11,12 @@ final class RuntimeFeatureChecks {
     HbmAccess hbm()throws Exception{if(checkedHbm==null)checkedHbm=new HbmAccess(HookEntry.get(s.owner,"mHbmController"));return checkedHbm;}
     boolean outdoor()throws Exception{return OutdoorTuning.owners.contains(s.owner.getClass())&&hbm()!=null;}
     boolean range()throws Exception{return outdoor()&&OutdoorTuning.ranges.contains(hbm().controller.getClass())&&OutdoorTuning.peaks.contains(s.owner.getClass());}
-    Object abc()throws Exception{return HookEntry.get(HookEntry.get(s.owner,"mAutomaticBrightnessControllerImpl"),"mAutomaticBrightnessController");}
-    boolean sensor(boolean assist)throws Exception{Object abc=abc();Object value=assist?HookEntry.get(HookEntry.get(HookEntry.get(s.owner,"mAutomaticBrightnessControllerImpl"),"mDualSensorPolicy"),"mAssistLightSensor"):HookEntry.get(abc,"mLightSensor");if(value==null)return false;Sensor sensor=(Sensor)value;return assist?AuxiliarySensorIdentity.accepted(sensor):sensor.getType()==Sensor.TYPE_LIGHT;}
-    boolean darkSensors()throws Exception{
-        if(!sensor(false)||HookEntry.get(abc(),"mSensorManager")==null)return false;
-        Object impl=HookEntry.get(s.owner,"mAutomaticBrightnessControllerImpl"),dual;
-        try{dual=HookEntry.get(impl,"mDualSensorPolicy");}catch(NoSuchFieldException optional){return true;}
-        if(dual==null)return true;
-        for(String key:new String[]{"mFovAmplifyFactor","mAssistFovAmplifyFactor"}){double scale=((Number)HookEntry.get(dual,key)).doubleValue();if(!Double.isFinite(scale)||scale<=0||scale>100)return false;}
-        Object assist=HookEntry.get(dual,"mAssistLightSensor");return assist==null||sensor(true);
+    boolean sensor(boolean assist)throws Exception{
+        if(!assist)return !BrightnessSensorAccess.selection(s.owner).profile.isEmpty();
+        Object value=HookEntry.get(HookEntry.get(HookEntry.get(s.owner,"mAutomaticBrightnessControllerImpl"),"mDualSensorPolicy"),"mAssistLightSensor");
+        return value instanceof Sensor&&AuxiliarySensorIdentity.accepted((Sensor)value);
     }
+    boolean darkSensors()throws Exception{BrightnessSensorAccess.read(s.owner);return true;}
     boolean pending(){JSONArray entries=report.optJSONArray("features");if(entries!=null)for(int i=0;i<entries.length();i++)if("pending".equals(entries.optJSONObject(i).optString("state")))return true;return false;}
     void run(String request){
         checkedHbm=null;

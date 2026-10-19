@@ -6,6 +6,15 @@ public final class UiText {
     private static final LinkedHashMap<String,String> WORDS=new LinkedHashMap<>();
     private static final List<Map.Entry<String,String>> PHRASES;
     static {
+        WORDS.put("配置光感：","Configured ALS: ");
+        WORDS.put("选择方式：","Selection: ");
+        WORDS.put("系统 FOV 融合光感","Native FOV fused ALS");
+        WORDS.put("沿用主屏原生光感选择器返回的 FOV 源和照度解析；不混用 ABC 保留的物理光感槽。","Uses the FOV source returned by the native default-display selector and its lux interpretation, without mixing the retained physical ALS slot.");
+        WORDS.put("系统标准主光感","Native standard main ALS");
+        WORDS.put("读取当前主屏 ABC 选用的 TYPE_LIGHT 光感，沿用原适配。","Uses the TYPE_LIGHT source selected by the current default display ABC, retaining the existing route.");
+        WORDS.put("系统选用的折叠光感","Native selected foldable ALS");
+        WORDS.put("当前主屏 ABC 直接选用已验证的私有照度光感；拒绝原始、工厂、流式及其他屏幕候选。","Uses a verified private lux source directly selected by the default display ABC. Raw, factory, streaming and other display candidates are rejected.");
+        WORDS.put("主光感来源：","Main ALS source: ");
         WORDS.put("实际接口检查通过","Actual interface checks passed");
         WORDS.put("系统未启用","Disabled by the system");
         WORDS.put("系统未启用，设置已保留","Disabled by the system; saved settings retained");

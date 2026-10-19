@@ -5,7 +5,9 @@ R=Path(__file__).resolve().parents[1];S=R/'experimental/refactor_hook/java/top/r
 O=R/'build/feature-self-check-tests';O.mkdir(exist_ok=True);J=R/'build/refactor-diagnostics/json-20240303.jar'
 sources={
 'android/os/SystemClock.java':'package android.os;public class SystemClock{public static long elapsedRealtime(){return 1234;}}',
-'android/hardware/Sensor.java':'package android.hardware;public class Sensor{public static final int TYPE_DEVICE_PRIVATE_BASE=65536,REPORTING_MODE_ON_CHANGE=1;public String getStringType(){return "";}public boolean isWakeUpSensor(){return false;}public int getReportingMode(){return 1;}public String getRequiredPermission(){return "";}public float getMaximumRange(){return 100000;}public float getResolution(){return 1;}public static final int TYPE_LIGHT=5;public int getType(){return TYPE_LIGHT;}}',
+'android/hardware/SensorEvent.java':'package android.hardware;public class SensorEvent{public float[] values;}',
+'android/hardware/SensorManager.java':'package android.hardware;public class SensorManager{}',
+ 'android/hardware/Sensor.java':'package android.hardware;public class Sensor{public static final int TYPE_DEVICE_PRIVATE_BASE=65536,REPORTING_MODE_ON_CHANGE=1;public int type=5;public String kind="";public String getName(){return "selected";}public String getStringType(){return kind;}public boolean isWakeUpSensor(){return false;}public int getReportingMode(){return 1;}public String getRequiredPermission(){return "";}public float getMaximumRange(){return 100000;}public float getResolution(){return 1;}public static final int TYPE_LIGHT=5;public int getType(){return type;}}',
 'top/rongshangs/lumacurve/refactor/Doubles.java':r'''package top.rongshangs.lumacurve.refactor;
 import org.json.*;import java.util.*;
 class HookRuntime{
@@ -19,7 +21,7 @@ class Kernel{float[] factoryLux={0,100},factoryNit={2,500};float min=1,max=500;i
 class Assist{int refreshes;void refresh(){refreshes++;}}
 class Slider{boolean ready=true;boolean supported(){return ready;}}
 class Control{boolean available(){return true;}}class Memory{boolean resetSupported=true,timeoutSupported=true,modeSupported=true,foreverSupported=true;}
-class HookEntry{static Set<Class<?>> thermalSupported=new HashSet<>(Arrays.asList(Object.class));static boolean ready=true;static String fail="";static Object get(Object o,String k)throws Exception{if(k.equals(fail))throw new NoSuchFieldException(k);if(k.equals("mLightSensor")||k.equals("mAssistLightSensor"))return ready?new android.hardware.Sensor():null;if(k.contains("AmplifyFactor"))return 1f;return new Object();}}
+class HookEntry{static Set<Class<?>> thermalSupported=new HashSet<>(Arrays.asList(Object.class));static boolean ready=true;static String fail="";static android.hardware.Sensor main=new android.hardware.Sensor();static Fov fov;static class Fov{public int mDisplayId=0;public boolean mSupportFovSensor=true;public android.hardware.Sensor mLightFovSensor=new android.hardware.Sensor();public Object mAutomaticBrightnessController=new Object();public android.hardware.Sensor switchLightSensor(android.hardware.Sensor base){return mLightFovSensor;}public boolean getDrivingStatus(){return false;}public float getFovAmplifyFactor(){return 1;}}static Object get(Object o,String k)throws Exception{if(o instanceof Fov){java.lang.reflect.Field f=o.getClass().getDeclaredField(k);f.setAccessible(true);return f.get(o);}if(k.equals("mAutomaticBrightnessControllerImpl")&&fov!=null)return fov;if(k.equals(fail))throw new NoSuchFieldException(k);if(k.equals("mDisplayId"))return 0;if(k.equals("mDisplayDeviceConfig")||k.equals("mDisplayPowerController")||k.equals("mSupportFovSensor"))throw new NoSuchFieldException(k);if(k.equals("mSensorManager"))return new android.hardware.SensorManager();if(k.equals("mLightSensor"))return ready?main:null;if(k.equals("mAssistLightSensor"))return ready?new android.hardware.Sensor():null;if(k.contains("AmplifyFactor"))return 1f;return new Object();}}
 class CurvePlan{CurvePlan(float[] a,float[] b,float c,float d,float[] e){}}
 class RawPanelOutputHooks{static boolean supports(Class<?> c){return true;}}
 class ForegroundApps{static boolean supported(){return true;}static boolean install(ClassLoader c){throw new AssertionError("read-only self-check installed hooks");}}
@@ -74,6 +76,11 @@ public class SelfCheckTest{
   for(String key:new String[]{"persistent_memory_supported","memory_mode_supported","memory_forever_supported","outdoor_supported","outdoor_hbm_supported","scene_proximity_supported","app_auto_supported","control_center_slider_supported"}){
    JSONObject transientCaps=new JSONObject(recoveredCaps.toString()).put(key,false);ConfigurationCompatibility.fit(desired,transientCaps,new JSONArray());check(stored.equals(desired.toString()));JSONObject restored=ConfigurationCompatibility.fit(desired,recoveredCaps,new JSONArray());check(restored.getBoolean("outdoor_hbm_tuning")&&restored.getBoolean("memory_hold_forever"));check(restored.getInt("control_center_node_mode")==2);check(restored.getJSONArray("manual_brightness_apps").length()==1);check(restored.getJSONObject("scene_options").getJSONObject("policies").getJSONObject("proximity").getString("mode").equals("block"));check(restored.getDouble("outdoor_hbm_budget_factor")==1.7);check(restored.getString("factors").equals("1.0,0.8,1.2,1.0"));
   }
+  HookEntry.ready=true;HookEntry.fail="";HookEntry.main.type=33171081;HookEntry.main.kind="xiaomi.sensor.light_secondary";
+  s.featureChecks.run("fold-main");check(find(s.featureChecks.report.getJSONArray("features"),"main_sensor").getString("state").equals("available"));check(s.featureChecks.caps.getBoolean("dark_lock_supported"));
+  HookEntry.main.kind="xiaomi.sensor.ambientlight.raw_sec";s.featureChecks.run("unverified-fold-main");check(!s.featureChecks.caps.getBoolean("dark_lock_supported"));check(find(s.featureChecks.report.getJSONArray("features"),"main_sensor").getString("state").equals("pending"));
+  HookEntry.main.type=5;s.featureChecks.run("unfold-main");check(s.featureChecks.caps.getBoolean("dark_lock_supported"));
+  HookEntry.main.type=33171081;HookEntry.main.kind="xiaomi.sensor.light_secondary";HookEntry.fov=new HookEntry.Fov();HookEntry.fov.mLightFovSensor.type=33172111;s.featureChecks.run("fov-source");check(s.featureChecks.caps.getBoolean("dark_lock_supported"));check(find(s.featureChecks.report.getJSONArray("features"),"main_sensor").getString("state").equals("available"));HookEntry.fov=null;
   System.out.println("Independent feature self-check: "+cases+" cases PASS; production probes with service doubles, Android not tested");
  }
 }'''}
@@ -86,7 +93,7 @@ paths=[]
 for name,body in sources.items():
     p=O/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_text(body,encoding='utf-8');paths.append(p)
 C=O/'classes';C.mkdir(exist_ok=True)
-subprocess.run(['javac','--release','8','-encoding','UTF-8','-cp',str(J),'-d',str(C),*[str(p) for p in paths],*[str(S/n) for n in ['MemoryOptions.java','AuxiliarySensorIdentity.java','FeatureSelfCheck.java','ConfigurationCompatibility.java','RuntimeFeatureChecks.java']]],check=True)
+subprocess.run(['javac','--release','8','-encoding','UTF-8','-cp',str(J),'-d',str(C),*[str(p) for p in paths],*[str(S/n) for n in ['MemoryOptions.java','BrightnessSensorAccess.java','AuxiliarySensorIdentity.java','FeatureSelfCheck.java','ConfigurationCompatibility.java','RuntimeFeatureChecks.java']]],check=True)
 subprocess.run(['java','-cp',str(C)+';'+str(J),'top.rongshangs.lumacurve.refactor.SelfCheckTest'],check=True)
 hook=(S/'HookEntry.java').read_text(encoding='utf-8');ui=(S/'MainActivity.java').read_text(encoding='utf-8')
 assert 'major!=4' not in hook and 'SystemVersion.read().unsupported()' not in ui

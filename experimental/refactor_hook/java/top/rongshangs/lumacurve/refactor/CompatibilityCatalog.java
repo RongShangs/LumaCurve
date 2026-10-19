@@ -22,7 +22,7 @@ final class CompatibilityCatalog {
     static Route[] catalogue(String id){
         if(Arrays.asList("curve","manual_memory","saved_curve","persistent_memory","memory_mode","memory_forever","memory_reset","memory_timeout").contains(id))return curveRoutes();
         switch(id){
-        case "main_sensor":return new Route[]{route("oem_main","系统原生主光感","使用自动亮度控制器实际绑定的 TYPE_LIGHT 传感器，不另开采样。")};
+        case "main_sensor":return new Route[]{route("oem_main","系统标准主光感","读取当前主屏 ABC 选用的 TYPE_LIGHT 光感，沿用原适配。"),route("oem_selected_secondary","系统选用的折叠光感","当前主屏 ABC 直接选用已验证的私有照度光感；拒绝原始、工厂、流式及其他屏幕候选。"),route("oem_selected_fov","系统 FOV 融合光感","沿用主屏原生光感选择器返回的 FOV 源和照度解析；不混用 ABC 保留的物理光感槽。")};
         case "assist_sensor":return new Route[]{
             route("native_auxiliary","系统原生辅助光感","原生辅助槽已有传感器时优先使用，继续沿用系统采样和融合。"),
             route("ported_auxiliary","移植系统辅助补位","原生槽为空；唯一 zte.sensor.light_second 候选通过类型、单位、权限、线程及主屏检查后，补入 OEM 槽并同步双光感能力缓存。")};

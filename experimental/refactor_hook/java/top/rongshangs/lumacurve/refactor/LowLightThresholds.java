@@ -5,7 +5,7 @@ final class LowLightThresholds {
  static final String[] KEYS={"low_light_brighten_ratio","low_light_brighten_floor","low_light_darken_ratio","low_light_darken_floor"};
  static final double[] DEFAULT={.6,10,.4,2},MIN={.1,1,.1,0},MAX={3,30,.9,10};
  final boolean enabled;final double[] values;
- LowLightThresholds(){this(true,DEFAULT.clone());}
+ LowLightThresholds(){this(false,DEFAULT.clone());}
  LowLightThresholds(boolean enabled,double[] values){this.enabled=enabled;this.values=values.clone();}
  // Older configurations only enabled longer confirmation; do not silently opt them
  // into a new threshold Hook that their firmware may not support.
