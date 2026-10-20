@@ -42,6 +42,7 @@ final class StatusPresentation {
     static Reading sensor(JSONObject s,boolean assist,long elapsed){
         if(s==null)return new Reading("等待读取");
         if(!fresh(s,elapsed))return new Reading("状态待刷新");
+        if(assist&&s.has("assist_source_present")&&!s.optBoolean("assist_source_present"))return new Reading("未接入");
         JSONObject c=s.optJSONObject("brightness_control");
         if(c!=null&&"dark".equals(c.optString("owner"))&&c.optBoolean("listening")){
             double v=c.optDouble(assist?"watch_assist_lux":"watch_main_lux",Double.NaN);

@@ -31,6 +31,7 @@ public class FeatureCompatibilityTest{
   auxiliary.put("state","inactive").put("binding_kind","ported_auxiliary");picked("assist_sensor",r,"ported_auxiliary");
   auxiliary.remove("binding_kind");auxiliary.put("state","no_verified_candidate");check(selected(enrich("assist_sensor","available",r)).isEmpty());
   for(String state:new String[]{"pending","unsupported","inactive"}){auxiliary.put("state","bound");check(selected(enrich("assist_sensor",state,r)).isEmpty());}
+  for(String animation:new String[]{"oem_animation","traditional_ramp"}){r.put("animation_compatibility_profile",animation);picked("animation_override",r,animation);}r.remove("animation_compatibility_profile");check(selected(enrich("animation_override","available",r)).isEmpty());
   JSONObject outdoor=new JSONObject();r.put("outdoor",outdoor);
   for(String profile:new String[]{"timed_budget","ambient_only"}){outdoor.put("hbm_tuning_profile",profile);picked("hbm",r,profile);}
   outdoor.put("hbm_tuning_profile","unsupported");check(selected(enrich("hbm","available",r)).isEmpty());
@@ -46,6 +47,7 @@ public class FeatureCompatibilityTest{
   for(String id:new String[]{"scene_unknown","unrecognized_feature"})check(selected(enrich(id,"available",r)).isEmpty());
   r.put("response_scene_profile","native_driving");outdoor.put("target_compatibility_profile","override_target");
   r.put("main_input_compatibility",new JSONObject().put("profile","oem_main"));
+  r.put("animation_compatibility_profile","oem_animation");
   String[] simple={"main_sensor","dark_lock","manual_panel","node_output","thermal","response","small_response","low_light","low_threshold","assist_gate","threshold_override","assist_override","animation_override","sunlight_override","touch_override","outdoor","root_storage","stored_config","outdoor_node_device","native_payload","launcher","preferences","app_files"};
   for(String id:simple){JSONObject row=enrich(id,"available",r);check(selected(row).size()==1);for(String state:new String[]{"pending","unsupported","inactive"})check(selected(enrich(id,state,r)).isEmpty());}
   r.put("response_scene_profile","native_without_driving");for(String id:new String[]{"response","small_response","low_light","low_threshold","threshold_override","assist_gate","assist_override"})picked(id,r,"native_without_driving");

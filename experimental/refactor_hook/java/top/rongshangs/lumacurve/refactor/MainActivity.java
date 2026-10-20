@@ -53,7 +53,7 @@ public final class MainActivity extends Activity {
     LinearLayout settingsHome,settingsTarget,bottomNav;ScrollView settingsHomeScroll;int settingsHomeY;long settingsScrollRestore;boolean settingsHomeRestoring;final LinearLayout[] settingGroups=new LinearLayout[11];final LinearLayout[] settingScreens=new LinearLayout[11];final Button[] settingApply=new Button[11];int settingsGroup=-1;float curveFloor;
     View displayedPage;long pageTransition;
     BrightnessControlOptions controls=new BrightnessControlOptions();ManualBrightnessPanel manualPanel;boolean openManualPanel;
-    Switch darkLockSwitch,manualPanelSwitch;final SeekBar[] controlSliders=new SeekBar[4];final TextView[] controlLabels=new TextView[4];TextView controlStatus;
+    Switch darkLockSwitch,darkSunsetSwitch,manualPanelSwitch;TextView darkScheduleStatus;final SeekBar[] controlSliders=new SeekBar[4];final TextView[] controlLabels=new TextView[4];TextView controlStatus;
     java.lang.Process bridge;BufferedReader bridgeReader;BufferedWriter bridgeWriter;
     FeatureCheckPage featureCheckPage;JSONObject rootFeatureReport;boolean featureChecksVisible,featureCheckRefreshPending,startupFeatureCheckRequested;
     final Runnable tick=()->{if(visible&&!welcome.showing()){if(!busy&&!permissionBlocked&&(page==0||page==2&&!featureChecksVisible||page==1&&(settingsGroup==5||settingsGroup==2)))run("inspect",null);ui.postDelayed(this.tick,page==0?refreshSeconds*1000:5000);}};
@@ -413,11 +413,17 @@ public final class MainActivity extends Activity {
     }
     String assistGateReason(String reason){switch(reason){case "confirming_main_only":return tr("主光感单独变亮，观察中");case "assist_unreliable":return tr("辅助无可靠证据，已放行");case "assist_changed":return tr("辅助也有变化，已放行");case "large_main_rise":return tr("主光感明显变亮，已放行");case "wait_complete":case "released_cooldown":return tr("观察结束，已放行");case "no_main_rise":return tr("未触发主光感变亮");default:return tr("未启用或不适用");}}
     void makeDarkLockSettings(){
-        LinearLayout b=card(settingsTarget);b.addView(text("暗光定时锁定",18,INK));
-        LinearLayout presets=row(b);compact("不锁定",()->{controls.darkLock=false;dirty=true;drawCurve();},presets);compact("睡前保持",()->{controls.bedtime();dirty=true;drawCurve();},presets);
+        LinearLayout b=card(settingsTarget);b.addView(text("暗光锁定",18,INK));
+        LinearLayout presets=row(b);compact("不锁定",()->{controls.darkLock=false;dirty=true;drawCurve();},presets);compact("暗处保持",()->{controls.holdInDarkness();dirty=true;drawCurve();},presets);
+        button("日落后锁定",()->{controls.afterSunset();dirty=true;drawCurve();},b);
+        b.addView(text("暗处保持：全天按照度判断。日落后锁定：仅夜间按照度判断。两个预设均为低于或等于 10 lux 持续 1 分钟锁定，达到 50 lux 持续 1 秒恢复自动；可在详细参数中调整。",12,MUTED));
         darkLockSwitch=new Switch(this);darkLockSwitch.setText(tr("暗光持续后关闭自动亮度"));b.addView(darkLockSwitch,new LinearLayout.LayoutParams(-1,dp(48)));darkLockSwitch.setOnCheckedChangeListener((v,on)->{if(on!=controls.darkLock){controls.darkLock=on;dirty=true;drawCurve();}});
         b.addView(text("保持进入时的亮度；照度明显升高后恢复自动。息屏或重新开启自动亮度即退出。你主动关闭的自动亮度不会被重新开启。",12,MUTED));
-        b.addView(text("需要主辅光感共同确认暗处；任一侧持续变亮可退出。锁定期间低频监听光感，温控和应用指定亮度仍生效。",12,MUTED));
+        b.addView(text("系统接入双光感时，两侧共同确认暗处，任一侧持续变亮可退出；只接入主光感时，按主光感判断。锁定期间低频监听，温控和应用指定亮度仍生效。",12,MUTED));
+        darkSunsetSwitch=new Switch(this);darkSunsetSwitch.setText(tr("仅在日落后至日出前启用"));darkSunsetSwitch.setTextSize(14);darkSunsetSwitch.setMinimumHeight(dp(48));b.addView(darkSunsetSwitch,new LinearLayout.LayoutParams(-1,-2));
+        darkSunsetSwitch.setOnCheckedChangeListener((v,on)->{if(controls.sunsetOnly!=on){controls.sunsetOnly=on;dirty=true;drawCurve();}});
+        b.addView(text("使用系统提供的日出日落时间，不申请额外定位权限。日落后仍需满足暗光条件才锁定；日出时结束本模块的锁定。时间不可用时等待，不使用固定钟点代替。",12,MUTED));
+        darkScheduleStatus=text("",12,MUTED);b.addView(darkScheduleStatus);
         controlStatus=text("等待读取暗光锁定状态",12,BLUE);b.addView(controlStatus);
         darkManualExitSwitch=new Switch(this);darkManualExitSwitch.setText(tr("手动调整后退出锁定"));darkManualExitSwitch.setTextSize(14);darkManualExitSwitch.setMinimumHeight(dp(48));b.addView(darkManualExitSwitch,new LinearLayout.LayoutParams(-1,-2));
         darkManualExitDescription=text("",12,MUTED);b.addView(darkManualExitDescription);
@@ -459,10 +465,18 @@ public final class MainActivity extends Activity {
     }
     TextView controlCenterChoice;
     void drawControls(){if(controlCenterChoice!=null)controlCenterChoice.setText(tr(new String[]{"关闭","仅手动亮度","手动和自动亮度"}[controls.nodeSliderMode]));if(darkLockSwitch==null||manualPanelSwitch==null)return;boolean supported=runtime!=null&&runtime.optBoolean("dark_lock_supported");darkLockSwitch.setChecked(controls.darkLock);darkLockSwitch.setEnabled(supported||controls.darkLock);manualPanelSwitch.setChecked(controls.manualPanel);manualPanelSwitch.setEnabled(runtime!=null&&runtime.optBoolean("manual_panel_supported"));
+        if(darkSunsetSwitch!=null){darkSunsetSwitch.setChecked(controls.sunsetOnly);darkSunsetSwitch.setEnabled(controls.darkLock);}
         if(darkManualExitSwitch!=null){darkManualExitSwitch.setChecked(controls.manualExit);darkManualExitSwitch.setEnabled(supported||controls.manualExit);darkManualExitDescription.setText(controls.manualExit?"当前方案：手动调整即结束锁定，保持手动亮度；环境变亮后也不自动开启。":"当前方案：保留新亮度并继续锁定；任一光感持续达到退出阈值后恢复自动亮度。");}
         String[] labels={"进入照度："+format(controls.enterLux)+" lux","等待时间："+controls.minutes+" 分钟","退出照度："+format(controls.exitLux)+" lux","退出确认："+controls.exitSeconds+" 秒"};int[] p={Math.round(controls.enterLux)-1,controls.minutes-1,Math.round((controls.exitLux-5)/5),controls.exitSeconds-1};for(int i=0;i<4;i++){controlSliders[i].setProgress(p[i]);controlLabels[i].setText(labels[i]);enableParameter(controlSliders[i],controlLabels[i],supported&&controls.darkLock);}
-        JSONObject c=runtime==null?null:runtime.optJSONObject("brightness_control");String reason=c==null?"":c.optString("reason");String state=reason.equals("locked")?"已保持当前亮度":reason.equals("countdown")?"暗光计时中":reason.equals("watching")?"等待持续暗光":reason.equals("waiting_sensor_data")?"等待光感读数":reason.equals("user_manual")?"用户手动模式，不自动恢复":reason.equals("manual_panel")?"主屏手动面板控制中":reason.equals("error")?"接口异常，已退出":"未锁定";controlStatus.setText(state+(c!=null&&reason.equals("countdown")?" · "+Math.round(c.optLong("countdown_left_ms")/1000.0)+" 秒":""));
+        JSONObject c=runtime==null?null:runtime.optJSONObject("brightness_control");
+        if(darkScheduleStatus!=null){
+            JSONObject night=c==null?null:c.optJSONObject("dark_lock_schedule");
+            String note=!controls.darkLock?tr("暗光锁定已关闭"):!controls.sunsetOnly?tr("全天按照度判断，不限制日落日出"):night==null||!night.optBoolean("known")?tr("等待系统日出日落信息；未取得前不会锁定"):tr("系统日落：")+twilightTime(night.optLong("sunset_ms"))+" · "+tr("日出：")+twilightTime(night.optLong("sunrise_ms"));
+            darkScheduleStatus.setText(note);
+        }
+        String reason=c==null?"":c.optString("reason");String state=reason.equals("locked")?"已保持当前亮度":reason.equals("countdown")?"暗光计时中":reason.equals("watching")?"等待持续暗光":reason.equals("waiting_sensor_data")?"等待光感读数":reason.equals("before_sunset")?"日落前，暂不启用锁定":reason.equals("waiting_twilight")?"等待系统日出日落信息":reason.equals("user_manual")?"用户手动模式，不自动恢复":reason.equals("manual_panel")?"主屏手动面板控制中":reason.equals("error")?"接口异常，已退出":"未锁定";controlStatus.setText(state+(c!=null&&reason.equals("countdown")?" · "+Math.round(c.optLong("countdown_left_ms")/1000.0)+" 秒":""));
     }
+    String twilightTime(long millis){return new java.text.SimpleDateFormat("HH:mm",java.util.Locale.getDefault()).format(new java.util.Date(millis));}
     void showManualPanel(){startActivity(new Intent(this,BrightnessPanelActivity.class));}
     void addBrightnessTile(){try{android.app.StatusBarManager manager=getSystemService(android.app.StatusBarManager.class);manager.requestAddTileService(new ComponentName(this,BrightnessTileService.class),tr("主屏亮度"),android.graphics.drawable.Icon.createWithResource(this,getResources().getIdentifier("brightness_tile","drawable",getPackageName())),getMainExecutor(),result->show(result==android.app.StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ADDED||result==android.app.StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ALREADY_ADDED?"磁贴已添加":"可在控制中心编辑磁贴时添加 HyperLux 主屏亮度"));}catch(Throwable unavailable){show("可在控制中心编辑磁贴时添加 HyperLux 主屏亮度");}}
     @Override protected void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);if(intent.getBooleanExtra("manual_brightness_panel",false)){openManualPanel=true;if(welcome.showing())return;if(runtime!=null){openManualPanel=false;showManualPanel();}else if(!busy)run("inspect",null);}}

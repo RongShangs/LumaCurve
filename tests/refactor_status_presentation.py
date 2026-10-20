@@ -40,9 +40,12 @@ public class StatusPresentationTest{
   s=state().put("hdr_active",true);s.optJSONObject("system_scene").put("night_driving",true).put("reflective",true);check(StatusPresentation.modes(s,1000).size()==3);check(StatusPresentation.modeSummary(s,1000).contains("HDR"));
   // A newer scene snapshot updates the UI independently of unchanged primary limit text.
   check(!StatusPresentation.modeSummary(state(),1000).equals(StatusPresentation.modeSummary(s,1000)));
+  s=state().put("assist_source_present",false);sensor(s,true,"未接入");check(StatusPresentation.sensor(s,false,1000).lux==10);
+  s.put("brightness_control",new JSONObject().put("owner","dark").put("listening",true).put("watch_assist_lux",0));sensor(s,true,"未接入");
   s=state();s.remove("system_scene");check(StatusPresentation.modeSummary(s,1000).contains("场景未取得"));
   Owner owner=new Owner();Collector c=new Collector(owner);JSONObject collected=new JSONObject().put("auto_mode",true);c.collectOfficial(collected);
   check(collected.getString("sensor_status").equals("active"));check(collected.getDouble("assist_fast_lux")==0);check(collected.getBoolean("assist_sampling_enabled"));check(collected.getBoolean("assist_ambient_lux_valid"));check(collected.getString("assist_reading_state").equals("valid"));check(collected.getString("sensor_reference_name").equals("main"));
+  JSONObject single=new JSONObject().put("auto_mode",true).put("main_input_compatibility",new JSONObject().put("input_mode","single_main").put("assist_source_present",false));c.collectOfficial(single);check(single.getDouble("main_fast_lux")==20&&!single.getBoolean("assist_source_present"));check(single.getString("main_reading_source").equals("accepted_main_ambient_lux"));
   JSONObject scene=collected.getJSONObject("system_scene");check(scene.getBoolean("night_driving")&&scene.getBoolean("driving")&&scene.getBoolean("night_driving_allowed"));check(scene.getInt("sunrise_minutes")==360&&scene.getInt("sunset_minutes")==1080);
   owner.mAutomaticBrightnessControllerImpl.mDualSensorPolicy.mAssistFastAmbientLux=-1;collected=new JSONObject().put("auto_mode",true);c.collectOfficial(collected);check(!collected.has("assist_fast_lux"));check(collected.getString("assist_reading_state").equals("reset"));
   owner.mAutomaticBrightnessControllerImpl.mDualSensorPolicy.mAssistAmbientLuxValid=false;collected=new JSONObject().put("auto_mode",true);c.collectOfficial(collected);check(!collected.getBoolean("assist_valid")&&!collected.has("assist_fast_lux"));check(!c.probingScenes);

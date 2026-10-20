@@ -7,6 +7,10 @@ J=R/'build/refactor-diagnostics/json-20240303.jar'
 def write(name,text):
  p=O/(name+'.java');p.parent.mkdir(parents=True,exist_ok=True);p.write_text(text,encoding='utf-8');return p
 sources=[]
+sources.append(write('com/android/server/LocalServices', 'package com.android.server;public class LocalServices{public static Object service=new com.android.server.twilight.TwilightManager();public static Object getService(Class<?> c){return service;}}'))
+sources.append(write('com/android/server/twilight/TwilightState', 'package com.android.server.twilight;public class TwilightState{public long rise,set;public TwilightState(long r,long s){rise=r;set=s;}public long sunriseTimeMillis(){return rise;}public long sunsetTimeMillis(){return set;}}'))
+sources.append(write('com/android/server/twilight/TwilightListener', 'package com.android.server.twilight;public interface TwilightListener{void onTwilightStateChanged(TwilightState s);}'))
+sources.append(write('com/android/server/twilight/TwilightManager', 'package com.android.server.twilight;import android.os.Handler;public class TwilightManager{public TwilightState state;public boolean failRead,failRegister;public int registrations,unregistrations;public TwilightListener listener;public TwilightState getLastTwilightState(){if(failRead)throw new IllegalStateException("read failed");return state;}public void registerListener(TwilightListener l,Handler h){listener=l;registrations++;if(failRegister)throw new IllegalStateException("register failed");}public void unregisterListener(TwilightListener l){if(listener==l)listener=null;unregistrations++;}public void change(TwilightState v){state=v;if(listener!=null)listener.onTwilightStateChanged(v);}}'))
 stubs={
 'android/os/SystemClock':'''package android.os;public class SystemClock{public static long now=0;public static long uptimeMillis(){return now;}public static long elapsedRealtime(){return now;}}''',
 'android/os/Handler':'''package android.os;import java.util.*;public class Handler{public final Map<Runnable,Long> jobs=new IdentityHashMap<>();public boolean post(Runnable r){return postDelayed(r,0);}public boolean postDelayed(Runnable r,long ms){jobs.put(r,SystemClock.now+ms);return true;}public void removeCallbacks(Runnable r){jobs.remove(r);}public void due(){for(int i=0;i<20;i++){Runnable next=null;for(Map.Entry<Runnable,Long> e:jobs.entrySet())if(e.getValue()<=SystemClock.now){next=e.getKey();break;}if(next==null)return;jobs.remove(next);next.run();}throw new AssertionError("timer spin");}}''',
@@ -65,7 +69,7 @@ for(boolean enabled:new boolean[]{false,true}){JSONObject prior=new JSONObject()
 HookRuntime untouched=new HookRuntime();Settings.System.values.put("mode","1");BrightnessControl fresh=new BrightnessControl(untouched);untouched.brightnessControl=fresh;fresh.configure(new BrightnessControlOptions());check(fresh.auto()&&!fresh.listening&&fresh.owner.equals("none")&&((SensorManager)untouched.context.sensor).registers==0);time(fresh,180000);check(fresh.auto()&&writes(fresh)==0&&untouched.handler.jobs.isEmpty());fresh.close();
 
 BrightnessControlOptions saved=BrightnessControlOptions.parseStored(new JSONObject().put("dark_lock_enabled",false).put("dark_lock_enter_lux",5).put("dark_lock_exit_lux",100).put("dark_lock_minutes",5).put("dark_lock_exit_seconds",5));check(!saved.darkLock&&saved.enterLux==5&&saved.exitLux==100&&saved.minutes==5&&saved.exitSeconds==5);
-saved.manualPanel=false;saved.bedtime();check(saved.darkLock&&saved.enterLux==10&&saved.exitLux==50&&saved.minutes==1&&saved.exitSeconds==1&&!saved.manualPanel);
+saved.manualPanel=false;saved.holdInDarkness();check(saved.darkLock&&saved.enterLux==10&&saved.exitLux==50&&saved.minutes==1&&saved.exitSeconds==1&&!saved.manualPanel);
 for(String k:new String[]{"dark_lock_minutes","dark_lock_enter_lux","dark_lock_exit_lux","dark_lock_exit_seconds"})try{BrightnessControlOptions.parse(new JSONObject().put(k,"5"));throw new AssertionError();}catch(IllegalArgumentException e){cases++;}
 try{BrightnessControlOptions.parse(new JSONObject().put("dark_lock_enter_lux",20).put("dark_lock_exit_lux",20));throw new AssertionError();}catch(IllegalArgumentException e){cases++;}
 try{BrightnessControlOptions.parse(new JSONObject().put("dark_lock_minutes",1.5));throw new AssertionError();}catch(IllegalArgumentException e){cases++;}
@@ -135,7 +139,7 @@ c=controller();Sensor aliasMain=new Sensor(5,c.main.handle),aliasAssist=new Sens
 c=controller();c.onSensorChanged(new SensorEvent(new Sensor(5,91),1));check(c.unmatchedSamples==1&&Float.isNaN(c.mainLux));time(c,120000);check(c.auto()&&c.reason.equals("waiting_sensor_data"));c.onSensorChanged(new SensorEvent(null,1));check(c.unmatchedSamples==1);
 c=controller();SensorManager official=new SensorManager();c.s.owner.mAutomaticBrightnessControllerImpl.mAutomaticBrightnessController.mSensorManager=official;c.tick();check(c.sensors==official&&c.listening);sample(c,1,1);time(c,60000);check(!c.auto());c.s.owner.mAutomaticBrightnessControllerImpl.mAutomaticBrightnessController.mSensorManager=new SensorManager();c.tick();check(c.auto()&&Float.isNaN(c.mainLux)&&c.policy.darkSince<0);
 // Explicit opt-in retains the default thresholds: both sensors <=10 for a minute;
-defaults.bedtime();
+defaults.holdInDarkness();
 // either sensor at exactly 50 for one second exits.
 c=controller();c.configure(defaults);sample(c,10,10);time(c,59999);check(c.auto());time(c,60000);check(!c.auto());sample(c,49.9f,49.9f);time(c,65000);check(!c.auto());sample(c,1,50);time(c,65999);check(!c.auto());time(c,66000);check(c.auto()&&c.owner.equals("none"));
 c=controller();c.configure(defaults);sample(c,10,10);time(c,60000);check(!c.auto());sample(c,50,1);time(c,61000);check(c.auto());
@@ -189,7 +193,7 @@ sample(c,60,1);time(c,68149);check(!c.auto());time(c,68150);check(c.auto()&&c.ow
 c=controller();sample(c,1,1);time(c,60000);time(c,63000);Settings.System.putInt(c.s.context.getContentResolver(),"brightness",101);Settings.System.putInt(c.s.context.getContentResolver(),"mode",1);time(c,64000);check(c.auto()&&c.owner.equals("none")&&!c.s.handler.jobs.containsKey(c.manualUpdate));c.close();
 check(!BrightnessControlOptions.parse(new JSONObject()).manualExit);check(!BrightnessControlOptions.parse(new JSONObject().put("dark_lock_manual_hold",true)).manualExit);check(!BrightnessControlOptions.parse(new JSONObject().put("dark_lock_manual_hold",false)).manualExit);
 check(BrightnessControlOptions.parse(new JSONObject().put("dark_lock_manual_exit",true)).manualExit);check(!BrightnessControlOptions.parse(new JSONObject().put("dark_lock_manual_exit",false)).manualExit);
-BrightnessControlOptions exitOptions=BrightnessControlOptions.parse(new JSONObject().put("dark_lock_manual_hold",false).put("dark_lock_manual_exit",true));JSONObject exitJson=new JSONObject().put("dark_lock_manual_hold",false);exitOptions.put(exitJson);check(exitJson.getBoolean("dark_lock_manual_exit")&&!exitJson.has("dark_lock_manual_hold"));check(BrightnessControlOptions.parse(exitJson).manualExit);exitOptions.bedtime();check(!exitOptions.manualExit);
+BrightnessControlOptions exitOptions=BrightnessControlOptions.parse(new JSONObject().put("dark_lock_manual_hold",false).put("dark_lock_manual_exit",true));JSONObject exitJson=new JSONObject().put("dark_lock_manual_hold",false);exitOptions.put(exitJson);check(exitJson.getBoolean("dark_lock_manual_exit")&&!exitJson.has("dark_lock_manual_hold"));check(BrightnessControlOptions.parse(exitJson).manualExit);exitOptions.holdInDarkness();check(!exitOptions.manualExit);
 for(Object raw:new Object[]{"true",1,new JSONObject()})try{BrightnessControlOptions.parse(new JSONObject().put("dark_lock_manual_exit",raw));throw new AssertionError();}catch(IllegalArgumentException expected){cases++;}
 for(Object raw:new Object[]{"true",1,new JSONObject()})try{BrightnessControlOptions.parse(new JSONObject().put("dark_lock_manual_hold",raw));throw new AssertionError();}catch(IllegalArgumentException expected){cases++;}
 for(String pkg:new String[]{"bad name","com.demo;reboot","../etc","com..demo","com."})try{BrightnessControlOptions.parse(new JSONObject().put("manual_brightness_apps",new JSONArray().put(pkg)));throw new AssertionError();}catch(IllegalArgumentException expected){cases++;}
@@ -359,12 +363,59 @@ c=controller();c.s.owner.mAutomaticBrightnessControllerImpl.mAutomaticBrightness
 c.s.owner.mAutomaticBrightnessControllerImpl.mDualSensorPolicy.mFovAmplifyFactor=2;c.tick();check(c.failed&&c.options.darkLock&&!c.listening);c.close();
 // A non-default logical display never receives framework brightness writes or listeners.
 c=controller();c.s.owner.mDisplayId=1;c.tick();check(c.failed&&!c.listening&&writes(c)==0&&c.auto());c.close();
+// A genuinely unbound auxiliary slot or absent dual policy uses only the actual main ALS.
+for(boolean noPolicy:new boolean[]{false,true}){
+ c=controller();c.unlisten();if(noPolicy)c.s.owner.mAutomaticBrightnessControllerImpl.mDualSensorPolicy=null;else c.s.owner.mAutomaticBrightnessControllerImpl.mDualSensorPolicy.mAssistLightSensor=null;
+ c.tick();check(c.listening&&c.assist==null&&c.auto());JSONObject input=BrightnessSensorAccess.evidence(c.s.owner);check(input.getString("input_mode").equals("single_main")&&!input.getBoolean("assist_source_present"));
+ sample(c,1,Float.NaN);time(c,60000);check(!c.auto()&&c.owner.equals("dark"));sample(c,60,Float.NaN);time(c,65000);check(c.auto()&&c.owner.equals("none"));c.close();
+}
+// Sunset opt-in never changes legacy defaults or unrelated preferences.
+BrightnessControlOptions nightOptions=BrightnessControlOptions.parseStored(new JSONObject().put("dark_lock_enabled",true));check(!nightOptions.sunsetOnly);
+nightOptions.manualPanel=false;nightOptions.manualApps.add("com.example.app");nightOptions.afterSunset();check(nightOptions.darkLock&&nightOptions.sunsetOnly&&!nightOptions.manualPanel&&nightOptions.manualApps.size()==1);
+JSONObject nightSaved=new JSONObject();nightOptions.put(nightSaved);check(BrightnessControlOptions.parseStored(nightSaved).sunsetOnly);check(nightOptions.same(BrightnessControlOptions.parseStored(nightSaved)));
+nightOptions.holdInDarkness();check(!nightOptions.sunsetOnly&&nightOptions.darkLock&&!nightOptions.manualPanel);
+try{BrightnessControlOptions.parse(new JSONObject().put("dark_lock_sunset_only","true"));throw new AssertionError();}catch(IllegalArgumentException expected){cases++;}
+for(long[] twilightCase:new long[][]{{100,200,99,0,0},{100,200,100,1,0},{100,200,199,1,0},{100,200,200,0,0},{200,100,100,1,1},{200,100,199,1,1},{200,100,200,0,0},{0,200,100,0,0},{200,200,200,0,0}}){DarkLockSchedule.Window window=new DarkLockSchedule.Window(twilightCase[0],twilightCase[1],twilightCase[2]);check(window.known==(twilightCase[3]==1)&&window.night==(twilightCase[4]==1));}
+long wall=System.currentTimeMillis();
+com.android.server.twilight.TwilightManager twilight=new com.android.server.twilight.TwilightManager();com.android.server.LocalServices.service=twilight;
+twilight.state=new com.android.server.twilight.TwilightState(wall-3600000,wall+3600000);
+check(DarkLockSchedule.supported(BrightnessControlHostTest.class.getClassLoader())&&twilight.registrations==0);
+c=controller();c.options.sunsetOnly=true;c.tick();check(c.auto()&&!c.listening&&c.reason.equals("before_sunset")&&twilight.registrations==1);check(!c.s.handler.jobs.isEmpty());
+twilight.change(new com.android.server.twilight.TwilightState(wall+3600000,wall-3600000));c.s.handler.due();check(c.listening&&c.auto());sample(c,1,1);time(c,60000);check(c.owner.equals("dark")&&!c.auto());
+twilight.change(new com.android.server.twilight.TwilightState(wall-1000,wall+3600000));c.s.handler.due();check(c.auto()&&c.owner.equals("none")&&!c.listening&&c.reason.equals("before_sunset"));
+// A user's independent manual mode is never restored at sunrise.
+twilight.change(new com.android.server.twilight.TwilightState(wall+3600000,wall-3600000));c.s.handler.due();Settings.System.putInt(c.s.context.getContentResolver(),"mode",0);
+twilight.change(new com.android.server.twilight.TwilightState(wall-1000,wall+3600000));c.s.handler.due();check(!c.auto()&&c.owner.equals("none"));
+c.screenOff();check(!c.schedule.active&&twilight.listener==null&&c.s.handler.jobs.isEmpty());c.close();
+// Pending/stale system data and failures do not become a fixed-hour schedule.
+for(int invalid=0;invalid<4;invalid++){
+ twilight=new com.android.server.twilight.TwilightManager();com.android.server.LocalServices.service=twilight;
+ if(invalid==1)twilight.state=new com.android.server.twilight.TwilightState(wall-10000,wall-20000);if(invalid==2)twilight.failRead=true;if(invalid==3)twilight.failRegister=true;
+ c=controller();c.options.sunsetOnly=true;c.tick();check(c.auto()&&!c.listening&&c.reason.equals("waiting_twilight")&&!c.failed&&c.options.sunsetOnly);
+ com.android.server.twilight.TwilightListener staleTwilight=twilight.listener;c.screenOff();check(!c.schedule.active&&twilight.listener==null&&c.s.handler.jobs.isEmpty());
+ if(staleTwilight!=null){staleTwilight.onTwilightStateChanged(null);c.s.handler.due();check(!c.listening&&!c.schedule.active);}
+ // All-day behavior recovers even with a broken optional twilight service.
+ c.options.sunsetOnly=false;c.screenOn();sample(c,1,1);time(c,60000);check(c.owner.equals("dark"));c.close();
+}
+com.android.server.LocalServices.service=null;c=controller();c.options.sunsetOnly=true;c.tick();check(c.reason.equals("waiting_twilight")&&c.schedule.attempts==1);
+time(c,60000);time(c,120000);time(c,180000);check(c.schedule.attempts==3&&c.s.handler.jobs.isEmpty()&&c.auto());c.screenOff();c.close();
+// A stale state at the real boundary releases an owned lock until new native data arrives.
+twilight=new com.android.server.twilight.TwilightManager();com.android.server.LocalServices.service=twilight;
+twilight.state=new com.android.server.twilight.TwilightState(wall+3600000,wall-3600000);c=controller();c.options.sunsetOnly=true;c.tick();sample(c,1,1);time(c,60000);check(c.owner.equals("dark"));
+twilight.state=new com.android.server.twilight.TwilightState(wall-1000,wall-3600000);c.schedule.boundary.run();check(c.auto()&&c.reason.equals("waiting_twilight")&&!c.listening);c.close();
+// Read-only status never creates a listener, reads location or reschedules deadlines.
+twilight=new com.android.server.twilight.TwilightManager();com.android.server.LocalServices.service=twilight;
+c=controller();int jobs=c.s.handler.jobs.size();for(int i=0;i<5;i++)c.schedule.status();check(twilight.registrations==0&&jobs==c.s.handler.jobs.size());c.close();
+ClassLoader missingTwilight=new ClassLoader(BrightnessControlHostTest.class.getClassLoader()){protected Class<?> loadClass(String name,boolean resolve)throws ClassNotFoundException{if(name.equals("com.android.server.twilight.TwilightManager"))throw new ClassNotFoundException(name);return super.loadClass(name,resolve);}};
+try{DarkLockSchedule.supported(missingTwilight);throw new AssertionError();}catch(ClassNotFoundException expected){cases++;}
+com.android.server.LocalServices.service=new Object();c=controller();c.options.sunsetOnly=true;c.tick();check(c.auto()&&!c.failed&&!c.listening&&c.reason.equals("waiting_twilight"));c.close();
+com.android.server.LocalServices.service=new com.android.server.twilight.TwilightManager();
 System.out.println("Brightness mode control: "+cases+" cases PASS; actual controller with service doubles, Android not tested");
 }}
 '''))
 classes=O/'classes';classes.mkdir(exist_ok=True)
 sources.append(write(base+'ControlCenterCalibration', '''package top.rongshangs.lumacurve.refactor;class ControlCenterCalibration{static boolean fail;static Object configuration(Object owner){if(fail)throw new IllegalStateException("configuration changed");return owner;}static org.json.JSONObject read(Object owner){return new org.json.JSONObject();}}'''))
 sources.append(write(base+'TemporaryScreenOn', '''package top.rongshangs.lumacurve.refactor;import android.content.Context;class TemporaryScreenOn{static boolean held;static void set(Context c,boolean value){held=value;}static boolean active(){return held;}static void clear(){held=false;}}'''))
-names=['BrightnessSensorAccess','AuxiliarySensorIdentity','BrightnessControl','BrightnessControlOptions','DarkLockPolicy','FrameworkBrightness','ForegroundUser','ForegroundApps','ControlCenterEngine','ControlCenterMapping','AppBuild']
+names=['BrightnessSensorAccess','AuxiliarySensorIdentity','BrightnessControl','BrightnessControlOptions','DarkLockSchedule','DarkLockPolicy','FrameworkBrightness','ForegroundUser','ForegroundApps','ControlCenterEngine','ControlCenterMapping','AppBuild']
 subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(J),'-d',str(classes),*[str(p) for p in sources],*[str(S/(n+'.java')) for n in names]],check=True)
 subprocess.run(['java','-cp',str(classes)+';'+str(J),'top.rongshangs.lumacurve.refactor.BrightnessControlHostTest'],check=True)

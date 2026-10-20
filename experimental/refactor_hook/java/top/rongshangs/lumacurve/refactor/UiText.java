@@ -1162,7 +1162,18 @@ public final class UiText {
         WORDS.put("主屏手动亮度","Manual display brightness");
         WORDS.put("暗光定时锁定","Timed low-light lock");
         WORDS.put("不锁定","No lock");
-        WORDS.put("睡前保持","Bedtime hold");
+        WORDS.put("系统接入双光感时，两侧共同确认暗处，任一侧持续变亮可退出；只接入主光感时，按主光感判断。锁定期间低频监听，温控和应用指定亮度仍生效。","With two connected sensors, both must confirm darkness and either can trigger exit. With only a main sensor connected, use that sensor. Low-rate monitoring runs during locking; thermal protection and app brightness requests remain effective.");
+        WORDS.put("未接入","Not connected");
+        WORDS.put("Refactor 原生时长过渡","Native Refactor duration transition");
+        WORDS.put("调整已验证的原生过渡时长倍率，保持系统动画及主副屏隔离。","Adjusts verified native duration multipliers while preserving native animation and display isolation.");
+        WORDS.put("传统自动亮度速率过渡","Traditional automatic brightness ramp");
+        WORDS.put("原生 Refactor 策略关闭且时长对象为空；匹配主屏双 RampAnimator 和速率原因，只调整普通自动亮度速率，保留系统时长上限及特殊过渡。","Requires a disabled native Refactor policy, empty duration slots, verified primary dual ramps and native rate reasons. Tunes ordinary automatic brightness only; native time limits and special transitions remain effective.");
+        WORDS.put("过渡适配：","Transition route: ");
+        WORDS.put("输入模式：","Input mode: ");WORDS.put("仅主光感","Main sensor only");WORDS.put("主辅光感共同确认","Main and auxiliary confirmation");
+        WORDS.put("当前系统未接入辅助光感，沿用主光感输入；不能据此认定硬件不存在。其他功能独立检查，用户设置保留。","No auxiliary light sensor is connected to the current system. Main sensor input is used; this does not prove the hardware is absent. Other features are checked independently and saved preferences are retained.");
+        WORDS.put("当前未接入辅助光感，无法进行双侧对照；主光感暗光稳定继续独立运行，保存的设置保留。","No auxiliary sensor is connected for comparison. Main sensor low-light stability remains independent; saved preferences are retained.");
+        WORDS.put("当前未接入辅助光感，辅助确认不参与；主光感的确认时间可独立设置，保存的设置保留。","No auxiliary sensor is connected, so auxiliary confirmation is inactive. Main sensor confirmation can be configured independently; saved preferences are retained.");
+        WORDS.put("\n仅调整普通自动亮度过渡；温控、唤醒、手动及其他特殊原因沿用系统。","\nTunes ordinary automatic transitions only. Thermal, wake, manual and other special transitions follow the system.");
         WORDS.put("暗光持续后关闭自动亮度","Switch to manual after sustained darkness");
         WORDS.put("保持进入时的亮度；照度明显升高后恢复自动。锁屏或重新开启自动亮度即退出。你主动关闭的自动亮度不会被重新开启。","Holds the current brightness, resuming auto when the environment brightens. Locking the screen or enabling auto ends the hold. Auto turned off by you will stay off.");
         WORDS.put("需要主辅光感共同确认暗处；任一侧持续变亮可退出。锁定期间低频监听光感，温控和应用指定亮度仍生效。","Both available sensors must confirm darkness; sustained light on either releases the hold. Low-rate monitoring continues during the hold. Thermal and app brightness limits remain.");
@@ -1768,6 +1779,23 @@ public final class UiText {
         WORDS.put("上一步","Previous");WORDS.put("下一步","Next");WORDS.put("返回设置","Back to settings");
         WORDS.put("本次报告未提供完整的路线依据，尚未确认。","The report does not provide complete route evidence; unconfirmed.");
         WORDS.put("完成","Done");
+        WORDS.put("暗处保持","Hold in darkness");
+        WORDS.put("日落后锁定","After-sunset low-light lock");
+        WORDS.put("暗处保持：全天按照度判断。日落后锁定：仅夜间按照度判断。两个预设均为低于或等于 10 lux 持续 1 分钟锁定，达到 50 lux 持续 1 秒恢复自动；可在详细参数中调整。","Hold in darkness works all day; the sunset preset works only at night. Both lock at 10 lux or below for 1 minute and resume auto at 50 lux for 1 second. Adjust these in detailed settings.");
+        WORDS.put("仅在日落后至日出前启用","Only enable between sunset and sunrise");
+        WORDS.put("使用系统提供的日出日落时间，不申请额外定位权限。日落后仍需满足暗光条件才锁定；日出时结束本模块的锁定。时间不可用时等待，不使用固定钟点代替。","Uses system sunrise/sunset times without additional location permission. Darkness must still be confirmed after sunset; sunrise releases locks owned by this module. Waits if times are unavailable, without guessing fixed hours.");
+        WORDS.put("全天按照度判断，不限制日落日出","Light-based lock throughout the day");
+        WORDS.put("暗光锁定已关闭","Low-light lock is off");
+        WORDS.put("等待系统日出日落信息；未取得前不会锁定","Waiting for system sunrise/sunset information; will not lock until available");
+        WORDS.put("系统日落：","System sunset: ");
+        WORDS.put("日出：","Sunrise: ");
+        WORDS.put("日落前，暂不启用锁定","Before sunset; lock is inactive");
+        WORDS.put("等待系统日出日落信息","Waiting for system sunrise/sunset information");
+        WORDS.put("系统日出日落服务","System twilight service");
+        WORDS.put("复用实际 TwilightManager 与原生时间戳；只在夜间允许暗光锁定。缺时间等待，不以深色模式或固定钟点代替。","Uses the actual TwilightManager and native timestamps to permit low-light lock only at night. Waits for unavailable times; does not use dark mode or fixed hours.");
+        WORDS.put("系统判定为日落后至日出前。","The system reports the interval between sunset and sunrise.");
+        WORDS.put("系统判定为日出后至日落前。","The system reports the interval between sunrise and sunset.");
+        WORDS.put("系统时间尚未提供或已过期，夜间锁定等待；全天暗光锁定不受影响。","System twilight data is unavailable or stale; night locking waits. All-day low-light locking is unaffected.");
         PHRASES=new ArrayList<>(WORDS.entrySet());PHRASES.sort((a,b)->Integer.compare(b.getKey().length(),a.getKey().length()));
     }
     public static String translate(String text,boolean english){

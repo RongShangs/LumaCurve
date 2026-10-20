@@ -3,6 +3,22 @@ import org.json.*;
 
 /** An OTA may change version text while the detected device baseline is unchanged. */
 public final class ConfigurationCompatibility {
+    /** Submission validation may retain unchanged dormant auxiliary choices. Never use this copy as stored config or runtime input. */
+    public static JSONObject submissionValidation(JSONObject proposed,JSONObject caps,JSONObject stored,String fingerprint)throws JSONException{
+        JSONObject checked=new JSONObject(proposed.toString());
+        if(!canReuse(stored,caps,fingerprint))return checked;
+        String[][] groups={{"assist_override","assist_override_supported","assist_brighten","assist_darken","assist_small"},
+            {"low_light_assist_gate","low_light_assist_gate_supported","low_light_assist_wait","low_light_assist_tolerance"}};
+        for(String[] group:groups){
+            if(!Boolean.TRUE.equals(proposed.opt(group[0]))||!Boolean.TRUE.equals(stored.opt(group[0]))||!caps.has(group[1])||caps.optBoolean(group[1]))continue;
+            boolean unchanged=true;for(int i=2;i<group.length;i++){Object a=proposed.opt(group[i]),b=stored.opt(group[i]);
+                if(a instanceof Number&&b instanceof Number){double x=((Number)a).doubleValue(),y=((Number)b).doubleValue();if(!Double.isFinite(x)||Double.compare(x,y)!=0)unchanged=false;}
+                else if(!java.util.Objects.equals(a,b))unchanged=false;
+            }
+            if(unchanged)checked.put(group[0],false);
+        }
+        return checked;
+    }
     public static JSONObject fit(JSONObject original,JSONObject caps,JSONArray paused)throws JSONException{
         JSONObject out=new JSONObject(original.toString());
         MemoryOptions holds=MemoryOptions.parse(out);holds.put(out);

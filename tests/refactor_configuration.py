@@ -24,7 +24,7 @@ public class ConfigHostTest{
   JSONObject neutral=new JSONObject().put("factors","1,1,1,1").put("curve_floor_nit",0).put("memory_strength",1);
   new BrightnessControlOptions().put(neutral);new OutdoorOptions().put(neutral);new AdvancedOptions().put(neutral);new MemoryOptions(false,30).put(neutral);new LowLightThresholds().put(neutral);new LowLightAssistGate().put(neutral);new SceneOptions().put(neutral);
   for(String key:ConfigurationFile.FLAGS)neutral.put(key,false);
-  String[] disabled={"dark_lock_enabled","dark_lock_manual_exit","memory_persist","memory_restore_unlock","memory_hold_switch","memory_hold_forever","memory_reset_override","memory_timeout_override","low_light_threshold","low_light_assist_gate","outdoor_node_boost"};
+  String[] disabled={"dark_lock_enabled","dark_lock_sunset_only","dark_lock_manual_exit","memory_persist","memory_restore_unlock","memory_hold_switch","memory_hold_forever","memory_reset_override","memory_timeout_override","low_light_threshold","low_light_assist_gate","outdoor_node_boost"};
   for(String key:disabled)check(!neutral.getBoolean(key));for(String key:AdvancedOptions.GROUPS)check(!neutral.getBoolean(key));for(String key:OutdoorOptions.FLAGS)check(!neutral.getBoolean(key));
   check(neutral.getInt("control_center_node_mode")==0);check(neutral.getBoolean("manual_panel_enabled"));check(neutral.getDouble("memory_strength")==1);check(neutral.getJSONObject("scene_options").getJSONObject("policies").length()==0);
   String originalDefaults=neutral.toString();JSONObject portable=ConfigurationFile.export(neutral,s,false,2,true);ConfigurationFile.Imported decoded=ConfigurationFile.read(portable.toString(),s,neutral);
@@ -38,7 +38,7 @@ public class ConfigHostTest{
    check(retained.darkLock==choice&&retained.minutes==9&&retainedLow.enabled==choice&&retainedLow.values[1]==17&&retainedMemory.modeSwitch==choice&&retainedMemory.unlock==choice);check(prior.toString().equals(beforeParse));
    JSONObject roundtrip=new JSONObject();retained.put(roundtrip);retainedLow.put(roundtrip);retainedMemory.put(roundtrip);check(BrightnessControlOptions.parseStored(roundtrip).darkLock==choice&&LowLightThresholds.parse(roundtrip).enabled==choice&&MemoryOptions.parse(roundtrip).modeSwitch==choice);
   }
-  BrightnessControlOptions intentional=new BrightnessControlOptions();intentional.bedtime();check(intentional.darkLock&&!new BrightnessControlOptions().darkLock);intentional.darkLock=false;check(!BrightnessControlOptions.parseStored(new JSONObject()).darkLock);
+  BrightnessControlOptions intentional=new BrightnessControlOptions();intentional.holdInDarkness();check(intentional.darkLock&&!new BrightnessControlOptions().darkLock);intentional.darkLock=false;check(!BrightnessControlOptions.parseStored(new JSONObject()).darkLock);
   JSONObject first=clone(file);first.put("format","hyperlux_config_v1");first.remove("schema");check(ConfigurationFile.read(first.toString(),s,c).options.getDouble("curve_floor_nit")==10);
   JSONObject changed=clone(file);changed.put("baseline_id","other");changed.getJSONObject("options").put("factors","1,1.5,1,1").put("curve_floor_nit",15).put("thermal_ceiling",40);r=ConfigurationFile.read(changed.toString(),s,c);check(r.options.getString("factors").equals("1.0,1.0,1.0,1.0"));check(r.options.getDouble("curve_floor_nit")==10);check(r.options.getInt("thermal_ceiling")==40);check(r.notes.size()==1);
   JSONObject unsupported=clone(file);JSONObject opts=unsupported.getJSONObject("options");for(String key:ConfigurationFile.FLAGS)opts.put(key,true);for(String key:AdvancedOptions.GROUPS)opts.put(key,true);for(String key:OutdoorOptions.FLAGS)opts.put(key,true);
@@ -151,6 +151,15 @@ public class ConfigHostTest{
   JSONObject exitFile=clone(appsFile);exitFile.getJSONObject("options").put("dark_lock_manual_exit",true);ConfigurationFile.Imported exitRead=ConfigurationFile.read(exitFile.toString(),appCaps,c);check(exitRead.options.getBoolean("dark_lock_manual_exit")&&!exitRead.options.has("dark_lock_manual_hold"));
   learnedRead=ConfigurationFile.read(appsFile.toString(),s,c);check(learnedRead.options.getJSONArray("manual_brightness_apps").length()==0);check(learnedRead.notes.size()==1);check(!learnedRead.options.getBoolean("dark_lock_manual_exit")&&!learnedRead.options.has("dark_lock_manual_hold"));
   appsFile.getJSONObject("options").put("manual_brightness_apps",new JSONArray().put("com.example;bad"));bad(appsFile,appCaps,c);
+  // Opt-in night scope is independent of existing lock flags, thresholds and other preferences.
+  for(boolean sunset:new boolean[]{false,true}){
+   JSONObject scheduled=clone(dark);scheduled.getJSONObject("options").put("dark_lock_sunset_only",sunset);
+   ConfigurationFile.Imported scheduledRead=ConfigurationFile.read(scheduled.toString(),new JSONObject(s.toString()).put("dark_lock_supported",true),c);
+   check(scheduledRead.options.getBoolean("dark_lock_sunset_only")==sunset&&scheduledRead.options.getBoolean("dark_lock_enabled"));
+   check(scheduledRead.options.getInt("dark_lock_minutes")==12&&scheduledRead.options.getDouble("dark_lock_exit_lux")==80&&!scheduledRead.options.getBoolean("manual_panel_enabled"));
+   scheduledRead=ConfigurationFile.read(scheduled.toString(),s,c);check(scheduledRead.options.getBoolean("dark_lock_sunset_only")==sunset&&!scheduledRead.options.getBoolean("dark_lock_enabled"));
+  }
+  JSONObject malformedSchedule=clone(file);malformedSchedule.getJSONObject("options").put("dark_lock_sunset_only",1);bad(malformedSchedule,s,c);
   System.out.println("Configuration migration: "+cases+" cases PASS; cross-version settings and curve identity, Android not tested");
  }
 }''',encoding='utf-8')

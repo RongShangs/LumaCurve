@@ -9,7 +9,7 @@ final class AdvancedTuning {
     static final Set<Class<?>> thresholds=new HashSet<>(),animators=new HashSet<>(),sunlights=new HashSet<>(),touches=new HashSet<>();
     static final ThreadLocal<HookRuntime> thresholdScope=new ThreadLocal<>();
     static final Map<Object,double[]> animationOriginal=new WeakHashMap<>();
-    static void install(ClassLoader loader){installThresholds(loader);installAnimator(loader);installSunlight(loader);installTouch(loader);}
+    static void install(ClassLoader loader){installThresholds(loader);installAnimator(loader);TraditionalAnimation.install(loader);installSunlight(loader);installTouch(loader);}
     static void installThresholds(ClassLoader loader){
         List<XC_MethodHook.Unhook> added=new ArrayList<>();
         try{Class<?> cls=Class.forName("com.android.server.display.HysteresisLevelsImpl",false,loader);if(thresholds.contains(cls))return;
@@ -109,6 +109,7 @@ final class AdvancedTuning {
         }catch(Throwable unavailable){for(XC_MethodHook.Unhook h:added)h.unhook();XposedBridge.log("HyperLux sunlight options unavailable: "+unavailable);}
     }
     static boolean supported(int group,HookRuntime s){try{
+        if(group==2&&TraditionalAnimation.supported(s))return s.hdrProbe!=null&&ResponseTuning.supported(s.owner);
         Object impl=HookEntry.get(s.owner,"mAutomaticBrightnessControllerImpl");
         if(s.hdrProbe==null||!ResponseTuning.supported(s.owner))return false;
         if(group==0)return thresholds.contains(HookEntry.get(impl,"mHysteresisLevelsImpl").getClass());
@@ -117,6 +118,10 @@ final class AdvancedTuning {
         if(group==3)return sunlights.contains(HookEntry.get(s.owner,"mSunlightController").getClass());
         return group==4&&touches.contains(HookEntry.get(impl,"mTouchAreaHelper").getClass());
     }catch(Throwable missing){return false;}}
+    static String animationProfile(HookRuntime s){
+        if(!supported(2,s))return "";
+        return TraditionalAnimation.supported(s)?"traditional_ramp":"oem_animation";
+    }
     static void capabilities(JSONObjectSink sink,HookRuntime s)throws Exception{for(int i=0;i<AdvancedOptions.GROUPS.length;i++)sink.put(AdvancedOptions.GROUPS[i]+"_supported",supported(i,s));}
     static void installTouch(ClassLoader loader){try{
         Class<?> cls=Class.forName("com.android.server.display.TouchCoverProtectionHelper",false,loader);if(touches.contains(cls))return;
@@ -143,7 +148,7 @@ final class AdvancedTuning {
             Object dual=HookEntry.get(impl,"mDualSensorPolicy");if(Boolean.TRUE.equals(HookRuntime.optionalBoolean(dual,"mAssistAmbientLuxValid")))refresh(h,dual,"mAssistFastAmbientLux",new String[]{"mAssistBrighteningThreshold","mAssistDarkeningThreshold","mAssistBrighteningSmallThreshold"});
         }catch(Throwable unavailable){s.log("阈值将在系统下次确认照度时更新");}finally{if(previous==null)thresholdScope.remove();else thresholdScope.set(previous);}
     }
-    static void restoreAnimation(HookRuntime s){for(String name:new String[]{"mBrightnessAnimator","mSdrBrightnessAnimator"})try{
+    static void restoreAnimation(HookRuntime s){TraditionalAnimation.restore(s);for(String name:new String[]{"mBrightnessAnimator","mSdrBrightnessAnimator"})try{
         Object animator=HookEntry.get(s.owner,name);double[] previous=animationOriginal.remove(animator);if(previous==null)continue;
         if(((Number)HookEntry.get(animator,"mDuration")).doubleValue()==previous[1]){
             HookEntry.field(animator.getClass(),"mDuration").setDouble(animator,previous[0]);

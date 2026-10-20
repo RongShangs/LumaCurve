@@ -4,14 +4,14 @@ import org.json.*;
 
 /** Optional mode ownership, independent of curve learning and ordinary low-light tuning. */
 final class BrightnessControlOptions {
-    boolean darkLock,manualPanel=true,manualExit;int nodeSliderMode;
+    boolean darkLock,sunsetOnly,manualPanel=true,manualExit;int nodeSliderMode;
     float enterLux=10,exitLux=50;
     int minutes=1,exitSeconds=1;
     final java.util.Set<String> manualApps=new java.util.LinkedHashSet<>();
     static BrightnessControlOptions parse(JSONObject j)throws JSONException {
         BrightnessControlOptions o=new BrightnessControlOptions();
         o.nodeSliderMode=integer(j,"control_center_node_mode",0,0,2);
-        o.darkLock=bool(j,"dark_lock_enabled",o.darkLock);o.manualPanel=bool(j,"manual_panel_enabled",true);
+        o.darkLock=bool(j,"dark_lock_enabled",o.darkLock);o.sunsetOnly=bool(j,"dark_lock_sunset_only",false);o.manualPanel=bool(j,"manual_panel_enabled",true);
         // The replacement switch defaults to continuing the lock. Legacy fields
         // are type-checked, but cannot silently enable the new exit behavior.
         if(j.has("dark_lock_manual_hold"))bool(j,"dark_lock_manual_hold",false);
@@ -30,12 +30,13 @@ final class BrightnessControlOptions {
     static BrightnessControlOptions parseStored(JSONObject j)throws JSONException {
         BrightnessControlOptions o=parse(j);if(!j.has("dark_lock_enabled"))o.darkLock=false;return o;
     }
-    void bedtime(){BrightnessControlOptions o=new BrightnessControlOptions();darkLock=true;manualExit=o.manualExit;enterLux=o.enterLux;exitLux=o.exitLux;minutes=o.minutes;exitSeconds=o.exitSeconds;}
+    void holdInDarkness(){BrightnessControlOptions o=new BrightnessControlOptions();darkLock=true;sunsetOnly=false;manualExit=o.manualExit;enterLux=o.enterLux;exitLux=o.exitLux;minutes=o.minutes;exitSeconds=o.exitSeconds;}
+    void afterSunset(){holdInDarkness();sunsetOnly=true;}
     static boolean bool(JSONObject j,String key,boolean def){if(!j.has(key))return def;Object v=j.opt(key);if(!(v instanceof Boolean))throw new IllegalArgumentException("开关无效："+key);return (Boolean)v;}
     static float number(JSONObject j,String key,float def,float min,float max){if(!j.has(key))return def;Object v=j.opt(key);if(!(v instanceof Number))throw new IllegalArgumentException("参数无效："+key);float n=((Number)v).floatValue();if(!Float.isFinite(n)||n<min||n>max)throw new IllegalArgumentException("参数超出范围："+key);return n;}
     static int integer(JSONObject j,String key,int def,int min,int max){float n=number(j,key,def,min,max);if(n!=Math.rint(n))throw new IllegalArgumentException("参数必须为整数："+key);return (int)n;}
     static boolean validPackage(String p){return p!=null&&p.length()<=160&&p.matches("[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z][A-Za-z0-9_]*)+");}
-    void put(JSONObject j)throws JSONException{j.remove("dark_lock_manual_hold");j.put("control_center_node_mode",nodeSliderMode);j.put("dark_lock_enabled",darkLock).put("manual_panel_enabled",manualPanel).put("dark_lock_manual_exit",manualExit).put("manual_brightness_apps",new JSONArray(manualApps)).put("dark_lock_enter_lux",enterLux).put("dark_lock_exit_lux",exitLux).put("dark_lock_minutes",minutes).put("dark_lock_exit_seconds",exitSeconds);}
+    void put(JSONObject j)throws JSONException{j.remove("dark_lock_manual_hold");j.put("control_center_node_mode",nodeSliderMode);j.put("dark_lock_enabled",darkLock).put("dark_lock_sunset_only",sunsetOnly).put("manual_panel_enabled",manualPanel).put("dark_lock_manual_exit",manualExit).put("manual_brightness_apps",new JSONArray(manualApps)).put("dark_lock_enter_lux",enterLux).put("dark_lock_exit_lux",exitLux).put("dark_lock_minutes",minutes).put("dark_lock_exit_seconds",exitSeconds);}
     void verify(JSONObject state){if(nodeSliderMode>0&&!state.optBoolean("control_center_slider_supported"))throw new IllegalArgumentException("本机控制中心节点输出接口尚未兼容");if(darkLock&&!state.optBoolean("dark_lock_supported"))throw new IllegalArgumentException("本机暗光锁定所需的主屏与光感接口尚未就绪");if(!manualApps.isEmpty()&&!state.optBoolean("app_auto_supported"))throw new IllegalArgumentException("本机前台应用事件接口尚未兼容");}
-    boolean same(BrightnessControlOptions o){return nodeSliderMode==o.nodeSliderMode&&darkLock==o.darkLock&&manualPanel==o.manualPanel&&manualExit==o.manualExit&&manualApps.equals(o.manualApps)&&enterLux==o.enterLux&&exitLux==o.exitLux&&minutes==o.minutes&&exitSeconds==o.exitSeconds;}
+    boolean same(BrightnessControlOptions o){return nodeSliderMode==o.nodeSliderMode&&darkLock==o.darkLock&&sunsetOnly==o.sunsetOnly&&manualPanel==o.manualPanel&&manualExit==o.manualExit&&manualApps.equals(o.manualApps)&&enterLux==o.enterLux&&exitLux==o.exitLux&&minutes==o.minutes&&exitSeconds==o.exitSeconds;}
 }

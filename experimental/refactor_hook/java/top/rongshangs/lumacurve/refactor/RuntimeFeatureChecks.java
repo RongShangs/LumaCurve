@@ -17,12 +17,16 @@ final class RuntimeFeatureChecks {
         return value instanceof Sensor&&AuxiliarySensorIdentity.accepted((Sensor)value);
     }
     boolean darkSensors()throws Exception{BrightnessSensorAccess.read(s.owner);return true;}
+    boolean assistAbsent(){try{Object impl=HookEntry.get(s.owner,"mAutomaticBrightnessControllerImpl"),dual=HookEntry.get(impl,"mDualSensorPolicy");return dual==null||HookEntry.get(dual,"mAssistLightSensor")==null;}catch(Throwable unknown){return false;}}
     boolean pending(){JSONArray entries=report.optJSONArray("features");if(entries!=null)for(int i=0;i<entries.length();i++)if("pending".equals(entries.optJSONObject(i).optString("state")))return true;return false;}
     void run(String request){
         checkedHbm=null;
         FeatureSelfCheck f=new FeatureSelfCheck();
         f.check("curve","基础曲线",null,false,()->{new CurvePlan(s.kernel.factoryLux,s.kernel.factoryNit,s.kernel.min,s.kernel.max,new float[]{1,1,1,1});return true;});
-        f.check("main_sensor","主光感",null,true,()->sensor(false));f.check("assist_sensor","辅助光感",null,true,()->sensor(true));
+        f.check("main_sensor","主光感",null,true,()->sensor(false));
+        boolean missingAssist=assistAbsent();
+        if(missingAssist)f.inactive("assist_sensor","辅助光感",null,"当前系统未接入辅助光感，沿用主光感输入；不能据此认定硬件不存在。其他功能独立检查，用户设置保留。");
+        else f.check("assist_sensor","辅助光感",null,true,()->sensor(true));
         f.check("manual_memory","手动记忆",null,false,()->s.kernel.manualPointCapacity()>0);
         f.check("saved_curve","记忆转基础曲线",null,false,()->s.kernel.name().equals("refactor")||s.kernel.name().equals("physical_mapping"));
         f.check("persistent_memory","记忆持久化","persistent_memory_supported",false,()->s.kernel.persistentMemorySupported());
@@ -31,6 +35,7 @@ final class RuntimeFeatureChecks {
         f.check("memory_reset","记忆重置条件","memory_reset_supported",false,()->s.memoryLifecycle.resetSupported);
         f.check("memory_timeout","记忆超时","memory_timeout_supported",false,()->s.memoryLifecycle.timeoutSupported);
         f.check("dark_lock","暗光锁定","dark_lock_supported",true,()->s.receiverRegistered&&s.brightnessControl.available()&&darkSensors());
+        f.check("dark_lock_schedule","日落后暗光锁定","dark_lock_schedule_supported",true,()->DarkLockSchedule.supported(s.owner.getClass().getClassLoader()));
         f.check("manual_panel","主屏手动亮度","manual_panel_supported",true,()->s.receiverRegistered&&RawPanelOutputHooks.supports(s.owner.getClass()));
         f.check("control_center_slider","控制中心节点映射","control_center_slider_supported",true,()->s.receiverRegistered&&s.controlCenter.supported());
         f.check("apps","暂停自动亮度名单","app_auto_supported",true,()->s.receiverRegistered&&ForegroundApps.supported());
@@ -39,9 +44,12 @@ final class RuntimeFeatureChecks {
         f.check("small_response","微小变亮确认","small_response_supported",false,()->ResponseTuning.smallSupported(s.owner));
         f.check("low_light","暗光稳定","low_light_supported",false,()->LowLightTuning.supported(s));
         f.check("low_threshold","暗光阈值","low_light_threshold_supported",false,()->AdvancedTuning.supported(0,s));
-        f.check("assist_gate","辅助光感闸门","low_light_assist_gate_supported",false,()->LowLightAssistEvidence.supported(s));
+        if(missingAssist)f.inactive("assist_gate","辅助光感闸门","low_light_assist_gate_supported","当前未接入辅助光感，无法进行双侧对照；主光感暗光稳定继续独立运行，保存的设置保留。");
+        else f.check("assist_gate","辅助光感闸门","low_light_assist_gate_supported",false,()->LowLightAssistEvidence.supported(s));
         String[] advanced={"光感变化阈值","辅助光感确认","亮度过渡","阳光模式条件","触摸遮挡"};
-        for(int i=0;i<AdvancedOptions.GROUPS.length;i++){final int group=i;f.check(AdvancedOptions.GROUPS[i],advanced[i],AdvancedOptions.GROUPS[i]+"_supported",false,()->AdvancedTuning.supported(group,s));}
+        for(int i=0;i<AdvancedOptions.GROUPS.length;i++){final int group=i;
+            if(i==1&&missingAssist)f.inactive(AdvancedOptions.GROUPS[i],advanced[i],AdvancedOptions.GROUPS[i]+"_supported","当前未接入辅助光感，辅助确认不参与；主光感的确认时间可独立设置，保存的设置保留。");
+            else f.check(AdvancedOptions.GROUPS[i],advanced[i],AdvancedOptions.GROUPS[i]+"_supported",false,()->AdvancedTuning.supported(group,s));}
         for(int i=0;i<SceneOptions.IDS.length;i++){final int group=i;final String id=SceneOptions.IDS[i];String inactive=SceneTuning.inactiveReason(s,group);if(!inactive.isEmpty())f.inactive("scene_"+id,SceneOptions.NAMES[i],"scene_"+id+"_supported",inactive);else f.check("scene_"+id,SceneOptions.NAMES[i],"scene_"+id+"_supported",false,()->SceneTuning.supported(s,group));}
         f.check("outdoor","户外增强","outdoor_supported",true,()->s.receiverRegistered&&outdoor());
         f.check("hbm","HBM 触发与预算","outdoor_hbm_supported",false,()->hbm().tunable());

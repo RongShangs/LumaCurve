@@ -12,7 +12,7 @@ import java.util.*;
 /** Event-driven mode owner inside system_server; raw output uses an optional native guard. */
 final class BrightnessControl implements SensorEventListener {
     static final String REQUEST="hyperlux_brightness_request_v1",ACK="hyperlux_brightness_ack_v1",OWNER="hyperlux_brightness_owner_v1";
-    final HookRuntime s;final DarkLockPolicy policy=new DarkLockPolicy();
+    final HookRuntime s;final DarkLockPolicy policy=new DarkLockPolicy();final DarkLockSchedule schedule;
     BrightnessControlOptions options=new BrightnessControlOptions();FrameworkBrightness display;SensorManager sensors;Sensor main,assist;
     boolean listening,registered,busy,failed;String owner="none",session="",reason="inactive",error="",lastRequest="";
     BrightnessSensorAccess.Binding sensorBinding;SensorEventListener sensorListener;
@@ -139,7 +139,7 @@ final class BrightnessControl implements SensorEventListener {
     boolean rawOutputBlocked(float value){return owner.equals("raw_panel")&&rawConfirmed&&!rawPaused&&!rawScreenOff&&Float.isFinite(value)&&value>0&&rawTarget>=10&&SystemClock.uptimeMillis()<rawLeaseUntil&&enabled()&&!auto()&&awake()&&unlocked();}
     void screenOn(){if(screenCleanupQueued){s.handler.removeCallbacks(screenCleanup);screenCleanup.run();}if(!registered&&!s.closed)start();if(!options.manualApps.isEmpty())ForegroundApps.attach(this);if(owner.equals("raw_panel")){rawScreenOff=false;renewRaw();}else tick();}
     BrightnessControl(HookRuntime state){
-        s=state;timer=()->tick();snapshot=()->{try{
+        s=state;schedule=new DarkLockSchedule(s.owner.getClass().getClassLoader(),s.handler,()->{if(!s.closed){tick();s.queueControlPublish();}});timer=()->tick();snapshot=()->{try{
             if(owner.equals("dark")&&!auto()){float requested=(float)display.read().getDouble("value");if(Math.abs(requested-held)>.0005f){manualBrightnessChanged();return;}}
             brightnessSnapshot=brightnessValues();
         }catch(Throwable failure){fail(failure);}
@@ -220,8 +220,8 @@ final class BrightnessControl implements SensorEventListener {
         if(previous.equals("raw_panel"))s.handler.postDelayed(()->{if(awake())s.requestRecalculation();},400);
         if(!previous.equals("none")){s.log(previous.equals("dark")?"暗光锁定退出："+why:previous.equals("app")?"应用亮度接管结束："+why:"主屏手动面板已退让："+why);s.queueControlPublish();}
     }
-    void screenOff(){TemporaryScreenOn.clear();ForegroundApps.detach(this);s.handler.removeCallbacks(screenCleanup);screenCleanupQueued=false;if(owner.equals("raw_panel")){rawScreenOff=true;pauseRaw();}else relinquish("screen_off",true);unlisten();s.handler.removeCallbacks(timer);s.handler.removeCallbacks(retry);failed=false;}
-    void stop(){TemporaryScreenOn.clear();ForegroundApps.detach(this);appExemptions.clear();appSuppressionPending=false;syncApplicationSuppression();s.handler.removeCallbacks(screenCleanup);screenCleanupQueued=false;relinquish("disabled",true);unlisten();s.handler.removeCallbacks(timer);s.handler.removeCallbacks(retry);options=new BrightnessControlOptions();}
+    void screenOff(){schedule.stop();TemporaryScreenOn.clear();ForegroundApps.detach(this);s.handler.removeCallbacks(screenCleanup);screenCleanupQueued=false;if(owner.equals("raw_panel")){rawScreenOff=true;pauseRaw();}else relinquish("screen_off",true);unlisten();s.handler.removeCallbacks(timer);s.handler.removeCallbacks(retry);failed=false;}
+    void stop(){schedule.stop();TemporaryScreenOn.clear();ForegroundApps.detach(this);appExemptions.clear();appSuppressionPending=false;syncApplicationSuppression();s.handler.removeCallbacks(screenCleanup);screenCleanupQueued=false;relinquish("disabled",true);unlisten();s.handler.removeCallbacks(timer);s.handler.removeCallbacks(retry);options=new BrightnessControlOptions();}
     void close(){stop();unregisterObservers();}
     void unregisterObservers(){
         try{if(displayEvents!=null)displayEvents.unregisterDisplayListener(displayListener);}catch(Throwable failure){error=failure.toString();}
@@ -254,12 +254,17 @@ final class BrightnessControl implements SensorEventListener {
         if(screenCleanupQueued)return;
         if(busy||s.closed)return;s.handler.removeCallbacks(timer);
         try{
+            schedule.enabled(options.darkLock&&options.sunsetOnly&&enabled()&&awake()&&!owner.equals("raw_panel")&&!owner.equals("panel"));
             if(owner.equals("raw_panel")){if(!awake())screenOff();return;}
             if(applicationMode()){policy.reset();unlisten();reason="app_manual";return;}
             if(!options.darkLock&&!owner.equals("dark")){policy.reset();unlisten();reason=owner.equals("panel")?"manual_panel":"disabled";return;}
             boolean ok=eligible();if(!options.darkLock||!ok||(owner.equals("panel")||owner.equals("raw_panel"))||!auto()&&!owner.equals("dark")){
                 if(owner.equals("dark"))relinquish(ok?"mode_changed":"scene_changed",true);else policy.reset();
                 unlisten();reason=(owner.equals("panel")||owner.equals("raw_panel"))?"manual_panel":!options.darkLock?"disabled":!ok?"scene":"user_manual";return;
+            }
+            if(options.sunsetOnly&&!schedule.allowed()){
+                if(owner.equals("dark"))relinquish("night_window_ended",true);else policy.reset();
+                unlisten();reason=schedule.window.known?"before_sunset":"waiting_twilight";return;
             }
             if(!available()||!listen())throw new IllegalStateException("暗光锁定接口不可用");
             long now=SystemClock.uptimeMillis();float front=usable(main,mainLux,mainAt,now),back=usable(assist,assistLux,assistAt,now);
@@ -281,6 +286,7 @@ final class BrightnessControl implements SensorEventListener {
     boolean sensorsReady(){try{BrightnessSensorAccess.read(s.owner);return true;}catch(Throwable unavailable){return false;}}
     JSONObject status()throws JSONException{
         JSONObject j=new JSONObject();options.put(j);boolean supported=supported();j.put("elapsed_ms",SystemClock.elapsedRealtime()).put("manual_panel_supported",mainDisplay()&&RawPanelOutputHooks.supports(s.owner.getClass())).put("dark_lock_supported",supported&&sensorsReady()).put("owner",owner).put("reason",reason).put("error",error).put("auto",auto()).put("listening",listening).put("session",session).put("raw_target",rawTarget).put("raw_paused",rawPaused).put("raw_confirmed",rawConfirmed).put("raw_blocked_output_calls",rawBlockedWrites);
+        j.put("dark_lock_schedule",schedule.status());
         j.put("watch_binding_active",listening).put("watch_main_profile",listening&&sensorBinding!=null?sensorBinding.profile:"").put("watch_physical_display_id",listening&&sensorBinding!=null?sensorBinding.physicalId:"");
         j.put("app_auto_supported",ForegroundApps.supported()).put("foreground_package",foreground.pkg).put("foreground_auto_suppressed",!appSuppressed.isEmpty());
         j.put("app_multiwindow_supported",ForegroundApps.multiWindowSupported).put("foreground_visibility_known",foreground.visibilityKnown).put("foreground_visible_packages",new JSONArray(foreground.visible)).put("foreground_matched_package",foreground.selected(options.manualApps)).put("foreground_visibility_pending",foregroundPending);

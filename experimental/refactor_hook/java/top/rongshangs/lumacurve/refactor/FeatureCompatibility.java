@@ -17,6 +17,8 @@ public final class FeatureCompatibility {
         if(routes[0].id.equals("refactor"))choice=curveSelection(runtime);
         else switch(id){
         case "main_sensor":choice=text(object(runtime,"main_input_compatibility"),"profile");break;
+        case "dark_lock_schedule":choice=text(object(object(runtime,"brightness_control"),"dark_lock_schedule"),"profile");break;
+        case "animation_override":choice=text(runtime,"animation_compatibility_profile");break;
         case "assist_sensor":JSONObject binding=object(runtime,"assist_compatibility");String mode=text(binding,"state"),kind=text(binding,"binding_kind");choice=kind.equals("native_auxiliary")||kind.equals("ported_auxiliary")?kind:mode.equals("native")?"native_auxiliary":mode.equals("bound")?"ported_auxiliary":"";break;
         case "hbm":choice=text(object(runtime,"outdoor"),"hbm_tuning_profile");String controller=text(object(runtime,"outdoor"),"hbm_controller_profile");if(controller.equals("enabled_field")||controller.equals("native_support_method"))result.add(controller);break;
         case "response":case "small_response":case "low_light":case "low_threshold":case "threshold_override":case "assist_gate":case "assist_override":choice=text(runtime,"response_scene_profile");break;
@@ -35,7 +37,10 @@ public final class FeatureCompatibility {
         if(catalogue(id)[0].id.equals("refactor")){String mapper=text(runtime,"physical_mapper_class");return "曲线后端："+(backend.isEmpty()?"未报告":backend)+(mapper.isEmpty()?"":"\n映射器："+mapper);}
         switch(id){
         case "main_sensor":JSONObject main=object(runtime,"main_input_compatibility");return "主光感来源："+text(main,"source")+"\n"+text(main,"sensor_name")+(text(main,"sensor_string_type").isEmpty()?"":" · "+text(main,"sensor_string_type"))+"\n配置光感："+text(main,"configured_sensor_name")+"\n选择方式："+text(main,"binding_source")+"\n"+text(main,"detail");
+        case "animation_override":return "过渡适配："+(text(runtime,"animation_compatibility_profile").isEmpty()?"未报告":text(runtime,"animation_compatibility_profile"))+"\n仅调整普通自动亮度过渡；温控、唤醒、手动及其他特殊原因沿用系统。";
         case "assist_sensor":return "辅助绑定："+(text(assist,"state").isEmpty()?"未报告":text(assist,"state"))+(text(assist,"sensor_name").isEmpty()?"":"\n传感器："+text(assist,"sensor_name"))+(text(assist,"sensor_string_type").isEmpty()?"":" · "+text(assist,"sensor_string_type"))+(assist.has("dual_policy_cached")?"\n双光感能力缓存："+assist.optBoolean("dual_policy_cached"):"");
+        case "dark_lock_schedule":JSONObject night=object(object(runtime,"brightness_control"),"dark_lock_schedule");return (night.optBoolean("known")?night.optBoolean("night")?"系统判定为日落后至日出前。":"系统判定为日出后至日落前。":"系统时间尚未提供或已过期，夜间锁定等待；全天暗光锁定不受影响。")+"\n"+text(night,"error");
+        case "dark_lock":return "输入模式："+("single_main".equals(text(object(runtime,"main_input_compatibility"),"input_mode"))?"仅主光感":"dual_input".equals(text(object(runtime,"main_input_compatibility"),"input_mode"))?"主辅光感共同确认":"未报告")+"\n"+text(entry,"detail");
         case "hbm":return "计时适配："+(text(out,"hbm_tuning_profile").isEmpty()?"未报告":text(out,"hbm_tuning_profile"))+"\n"+"控制器适配："+(text(out,"hbm_controller_profile").isEmpty()?"未报告":text(out,"hbm_controller_profile"))+(out.has("original_minimum_lux")?"\n原生门槛："+out.optDouble("original_minimum_lux")+" lux":"")+(out.has("original_time_window_ms")?"\n原生计时（窗口 / 最大 / 最短）："+out.optLong("original_time_window_ms")+" / "+out.optLong("original_time_max_ms")+" / "+out.optLong("original_time_min_ms")+" ms":"");
         case "response":case "small_response":case "low_light":case "low_threshold":case "threshold_override":case "assist_gate":case "assist_override":return "场景适配："+(text(runtime,"response_scene_profile").isEmpty()?"未报告":text(runtime,"response_scene_profile"))+"\n"+text(entry,"detail");
         case "outdoor":return "目标适配："+(text(out,"target_compatibility_profile").isEmpty()?"未报告":text(out,"target_compatibility_profile"))+"\n"+text(entry,"detail");

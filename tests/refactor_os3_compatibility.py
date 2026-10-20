@@ -78,7 +78,7 @@ public class AdvancedHookTest{
   System.out.println("OS3 scene "+args[0]+": "+cases+" cases PASS");
  }
 }'''.replace('IMPL',impl)
-    total+=run('scene',scenario,sources,['AdvancedPolicy','AdvancedOptions','AdvancedTuning','DelayPolicy','LowLightPolicy','LowLightThresholds','LowLightAssistGate','LowLightAssistEvidence','MemoryOptions','ResponseTuning','LowLightTuning'],'top.rongshangs.lumacurve.refactor.AdvancedHookTest')
+    total+=run('scene',scenario,sources,['AdvancedPolicy','AdvancedOptions','AdvancedTuning','TraditionalAnimation','DelayPolicy','LowLightPolicy','LowLightThresholds','LowLightAssistGate','LowLightAssistEvidence','MemoryOptions','ResponseTuning','LowLightTuning'],'top.rongshangs.lumacurve.refactor.AdvancedHookTest')
 
 outdoor=fixtures('refactor_outdoor.py')
 for scenario in ['native_old','modern_priority','wrong_enable','wrong_support','partial_target','wrong_owner']:

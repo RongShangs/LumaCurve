@@ -79,20 +79,23 @@
         "SensorState.java",
         "BrightnessSensorAccess.java"
       ],
-      "selector": "优先保留当前默认逻辑屏 ABC 的 TYPE_LIGHT；新增 ABC 已直接选中的 xiaomi.sensor.light_secondary 非唤醒、按变化、无权限且量程 / 精度有效的照度源。不枚举，不按私有类型编号或机型选择，不将原始 / 工厂 / 流式通道当作 lux。 配置槽非标准且 OEM 开启 FOV 时，核验其默认屏标识、真实 FOV 对象和 Sensor→Sensor 选择器结果，仅使用选择器实际返回的源；虚拟 FOV 的 values[0] 已为 lux，确认驾驶数据包才读取 values[2] 并用原生倍率。优先接口残缺 / 抛错拒绝，不回落物理槽；标准 TYPE_LIGHT 优先原路径，不受新 FOV 判定影响。",
+      "selector": "优先保留当前默认逻辑屏 ABC 的 TYPE_LIGHT；新增 ABC 已直接选中的 xiaomi.sensor.light_secondary 非唤醒、按变化、无权限且量程 / 精度有效的照度源。不枚举，不按私有类型编号或机型选择，不将原始 / 工厂 / 流式通道当作 lux。 配置槽非标准且 OEM 开启 FOV 时，核验其默认屏标识、真实 FOV 对象和 Sensor→Sensor 选择器结果，仅使用选择器实际返回的源；虚拟 FOV 的 values[0] 已为 lux，确认驾驶数据包才读取 values[2] 并用原生倍率。优先接口残缺 / 抛错拒绝，不回落物理槽；标准 TYPE_LIGHT 优先原路径，不受新 FOV 判定影响。 当前未接入辅助源时独立沿用已确认主光感，状态读取 ABC 已接受照度；不伪造辅助样本，也不把未接入等同没有硬件。",
       "evidence": [
         "sensor_status",
         "sensor_sampling_enabled",
         "ambient_lux_valid",
         "main_fast_lux",
-        "main_input_compatibility"
+        "main_input_compatibility",
+        "assist_source_present",
+        "main_reading_source"
       ],
       "cleanup": "只读观察，不拥有 OEM 监听。",
       "tests": [
         "tests/refactor_feature_self_check.py",
         "tests/refactor_status_presentation.py",
         "tests/refactor_brightness_control.py",
-        "tests/refactor_fold_sensor_firmware.py"
+        "tests/refactor_fold_sensor_firmware.py",
+        "tests/refactor_single_sensor_firmware.py"
       ],
       "composition": "exclusive"
     },
@@ -108,9 +111,12 @@
       ],
       "owners": [
         "AssistSensorCompat.java",
-        "AuxiliarySensorIdentity.java"
+        "AuxiliarySensorIdentity.java",
+        "RuntimeFeatureChecks.java",
+        "ConfigurationCompatibility.java",
+        "RootControl.java"
       ],
-      "selector": "原生有效槽优先；空槽才考虑唯一且类型 / 单位 / 权限 / 线程 / 主屏均合格的移植候选，并同步当前 ABC 构造缓存。",
+      "selector": "原生有效槽优先；空槽才考虑唯一且类型 / 单位 / 权限 / 线程 / 主屏均合格的移植候选，并同步当前 ABC 构造缓存。 已确认本次辅助槽为空时显示未接入，不把初始化未知或缺读数当作硬件不存在；保留补位条件和旧路线。 保存时只对同设备 / 用户 / 基准、原已开启且参数未改的辅助选择使用独立验证副本，原始选项和能力不变；新开启或改不支持参数仍拒绝。",
       "evidence": [
         "assist_compatibility.binding_kind",
         "assist_compatibility.state",
@@ -119,7 +125,8 @@
       "cleanup": "补位失败回滚传感器槽、启用状态和本次能力缓存；其他所有者已替换时不覆盖。",
       "tests": [
         "tests/refactor_assist_compat.py",
-        "tests/refactor_assist_compat_firmware.py"
+        "tests/refactor_assist_compat_firmware.py",
+        "tests/refactor_feature_self_check.py"
       ],
       "composition": "exclusive"
     },
@@ -164,18 +171,23 @@
         "animation_override"
       ],
       "routes": [
-        "oem_animation"
+        "oem_animation",
+        "traditional_ramp"
       ],
       "owners": [
-        "AdvancedTuning.java"
+        "AdvancedTuning.java",
+        "TraditionalAnimation.java"
       ],
-      "selector": "验证双动画对象、字段及原生 updatePerceptualDuration；保留 HDR、主屏与用户资格。",
+      "selector": "原 Refactor 双时长对象完整时沿用 oem_animation；仅原生 Refactor 策略明确关闭、两时长槽为空且主屏双 RampAnimator / RampRateController / 原生原因记录完整时采用 traditional_ramp。读取原生自动亮度原因常量，仅普通慢速自动过渡可调；保留 HDR、用户、主屏、手动确认及下游时长上限。",
       "evidence": [
-        "animation_override_supported"
+        "animation_override_supported",
+        "animation_compatibility_profile"
       ],
-      "cleanup": "只恢复本次仍由模块拥有的时长，不覆盖系统已改写的值。",
+      "cleanup": "旧时长和传统速率均只恢复仍等于本次应用值的字段；原生限时裁剪和后来系统更新优先，目标与帧调度不改。",
       "tests": [
-        "tests/refactor_advanced_hooks.py"
+        "tests/refactor_advanced_hooks.py",
+        "tests/refactor_traditional_animation.py",
+        "tests/refactor_traditional_animation_firmware.py"
       ],
       "composition": "exclusive"
     },
@@ -615,6 +627,36 @@
         "tests/refactor_control_center_root.py"
       ],
       "composition": "exclusive"
+    },
+    {
+      "id": "dark_lock_schedule",
+      "name": "日落后暗光锁定",
+      "features": [
+        "dark_lock_schedule"
+      ],
+      "routes": [
+        "system_twilight"
+      ],
+      "owners": [
+        "DarkLockSchedule.java",
+        "BrightnessControl.java"
+      ],
+      "selector": "可选、默认关闭。实际 LocalServices / TwilightManager / TwilightState / Listener 签名完整，时间戳覆盖当前时刻才参与；原有全天锁定独立保留。缺数据或调用失败等待，不按型号、深色模式或固定时钟猜测。",
+      "evidence": [
+        "brightness_control.dark_lock_schedule.profile",
+        "brightness_control.dark_lock_schedule.known",
+        "brightness_control.dark_lock_schedule.sunrise_ms",
+        "brightness_control.dark_lock_schedule.sunset_ms",
+        "brightness_control.dark_lock_schedule.night",
+        "brightness_control.reason"
+      ],
+      "cleanup": "显示 Handler 复用系统 twilight 通知与一个下次边界回调；系统时钟变化重读。熄屏 / 停用 / 切用户注销本次 Listener、取消重试与边界计时；旧代际回调无效。注册异常事务撤销，最多三次就绪补试。日出仅恢复本模块取得的自动亮度，用户手动关闭不恢复。自检只查接口，不注册监听或申请定位。",
+      "tests": [
+        "tests/refactor_brightness_control.py",
+        "tests/refactor_feature_self_check.py",
+        "tests/refactor_configuration.py"
+      ],
+      "composition": "exclusive"
     }
   ],
   "abi_variants": [
@@ -686,8 +728,8 @@
         "dual_policy_present",
         "dual_policy_absent"
       ],
-      "rule": "没有双光感策略可用主光感；存在但缩放或传感器格式异常不伪造双光感。",
-      "test": "tests/refactor_feature_self_check.py"
+      "rule": "无辅助槽或双策略不存在时保留实际主光感独立确认；真实双源继续共同确认，坏类型 / 单位拒绝。",
+      "test": "tests/refactor_brightness_control.py"
     },
     {
       "id": "foreground_user_field",
@@ -809,6 +851,16 @@
       ],
       "rule": "沿用系统当前默认逻辑屏 ABC 的真实主槽和 SensorManager；标准路径不变；私有折叠光感需精确语义身份与有效元数据，暗光监听不猜测 FOV / 非标单位。其他屏幕、同类多候选与原始通道不参与选择。 FOV 路线由已启用字段、实际 FOV 对象、同屏标识和非静态选择器返回值共同确认；正常值与驾驶替代值沿用固件消费者单位。",
       "test": "tests/refactor_brightness_control.py"
+    },
+    {
+      "id": "traditional_animation_reason",
+      "owner": "TraditionalAnimation.java",
+      "alternatives": [
+        "native_auto_slow_no_modifier",
+        "native_special_or_immediate"
+      ],
+      "rule": "只读取本机原生自动原因常量；普通慢速自动过渡且没有特殊 modifier 时调整调用速率，温控 / HDR / 手动 / 唤醒 / 即时原样保留。",
+      "test": "tests/refactor_traditional_animation.py"
     }
   ],
   "native_variants": [

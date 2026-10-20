@@ -2,18 +2,18 @@
 
 将本目录的全部内容放到 `lc.rongshangs.top` 站点根目录。`index.html`、`assets/`、`downloads/`、`thanks.json` 与 `update.json` 同级；只上传网页会导致下载失败。
 
-当前版本 **3.1.1 / 31100**，构建 **release-3.1.1**。支持 HyperOS 4、Root 与 LSPosed。覆盖安装后重启一次加载新版 Hook，已有设置保留。
+当前版本 **4.0.2 / 40200**，构建 **release-4.0.2**。兼容 HyperOS，需 Root 与 LSPosed。覆盖安装后重启一次加载新版 Hook，已有设置保留。
 
-合入多窗口应用名单，修复多名单和初次异步查询的手动自动亮度优先权；完整复审查询超时、监听锁和主副屏隔离，保留此前曲线、记忆、户外及实际设备兼容改进。
+完善单光感设备适配，新增传统亮度过渡路线，以及暗处保持、日落后锁定预设。按本机实际能力逐项适配，原有路线与用户设置保留。
 
 ## 下载与安装
 
-- `downloads/HyperLux-3.1.1.apk`：APP 安装包。
-- `downloads/LumaCurve-3.1.1-source.zip`：对应 GPL-3.0 源码。
-- `downloads/LumaCurve-3.1.1.zip`：APK、源码与恢复工具合集，不是 KSU 模块。
+- `downloads/HyperLux-4.0.2.apk`：APP 安装包。
+- `downloads/LumaCurve-4.0.2-source.zip`：对应 GPL-3.0 源码。
+- `downloads/LumaCurve-4.0.2.zip`：APK、源码与恢复工具合集，不是 KSU 模块。
 - `downloads/SHA256SUMS.txt`：上述三个文件的校验值。
 
-新配置及“睡前保持”默认开启暗光锁定：主辅均 ≤10 lux 持续 1 分钟进入，任一侧 ≥50 lux 持续 1 秒退出；已有设置与早期未配置开关的未启用状态保留。普通暗光稳定和户外增强仍默认关闭。本版已完成主机回归与既有固件静态检查，未完成本版长期实机验证。
+暗光锁定、夜间范围、普通暗光稳定和户外增强默认关闭，保留已有显式设置。“暗处保持”全天按照度判断；“日落后锁定”仅在系统提供的日落至日出区间启用，仍需满足照度与持续时间，缺时间时等待。本版已完成主机回归与既有固件静态检查，未完成本版长期实机验证。
 
 ## 重建与同步
 
@@ -25,7 +25,7 @@ python tools/sync_website.py
 python tools/package_website.py
 ```
 
-没有私有固件资料时，构建命令可加 `--skip-device-fixtures`；此时不代表固件静态核对通过。同步脚本读取 APP 清单和 `docs/releases/3.1.1.md`，复制对应 APK、源码、恢复合集及资源，生成更新元数据，再同步完整站点到 `D:/IOS/web/`。`dist/LumaCurve-website-3.1.1.zip` 解压后即站点根目录。
+没有私有固件资料时，构建命令可加 `--skip-device-fixtures`；此时不代表固件静态核对通过。同步脚本读取 APP 清单和 `docs/releases/4.0.2.md`，复制对应 APK、源码、恢复合集及资源，生成更新元数据，再同步完整站点到 `D:/IOS/web/`。`dist/LumaCurve-website-4.0.2.zip` 解压后即站点根目录。
 
 网站版本字段使用 `distribution=apk`。APP 查询 GitHub 最新正式 APK Release，不使用旧 KSU 模块元数据。上传后检查首页、`/update.json`、上述下载链接和校验文件，确认版本及 APK SHA-256 一致。本地同步和打包不代表服务器已更新。
 

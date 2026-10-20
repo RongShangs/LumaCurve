@@ -142,10 +142,13 @@ public final class RootControl implements AutoCloseable {
         if(encoded.length()>40000)throw new IOException("参数过长");
         String decoded=new String(Base64.getDecoder().decode(encoded),StandardCharsets.UTF_8);
         JSONObject options=decoded.startsWith("{")?new JSONObject(decoded):new JSONObject().put("factors",decoded);
+        String previous=settings.get(CONFIG);JSONObject stored=null;
+        if(previous!=null&&!previous.equals("null"))try{stored=new JSONObject(previous);}catch(JSONException invalid){/* Invalid storage cannot authorize a dormant preference. */}
+        JSONObject validation=ConfigurationCompatibility.submissionValidation(options,state,stored,Build.FINGERPRINT);
         String factors=options.getString("factors");
         OutdoorNodeRoot.annotate(state);BrightnessControlOptions controls=BrightnessControlOptions.parseStored(options);controls.verify(state);
         SceneOptions sceneOptions=SceneOptions.parse(options);sceneOptions.verify(state);
-        AdvancedOptions advanced=AdvancedOptions.parse(options);advanced.verify(state);
+        AdvancedOptions advanced=AdvancedOptions.parse(options);AdvancedOptions.parse(validation).verify(state);
         OutdoorOptions outdoor=OutdoorOptions.parse(options);if(outdoor.nodeBoost)outdoor.nodeTarget=OutdoorNodeTarget.stored(outdoor.nodeTarget,state.optInt("outdoor_node_maximum"));outdoor.verify(state);
         boolean thermal=options.optBoolean("thermal_relax",false);float ceiling=(float)options.optDouble("thermal_ceiling",43);ThermalPolicy.validate(ceiling);
         float memory=(float)options.optDouble("memory_strength",1);MemoryPolicy.validate(memory);
@@ -160,7 +163,7 @@ public final class RootControl implements AutoCloseable {
         float lowLimit=(float)options.optDouble("low_light_limit",50);long lowBright=options.optLong("low_light_brighten",3000),lowDark=options.optLong("low_light_darken",4000);LowLightPolicy.validate(lowLimit,lowBright,lowDark);
         if(lowLight&&!state.optBoolean("low_light_supported"))throw new IOException("暗光稳定接口尚未完整兼容");
         LowLightThresholds lowThresholds=LowLightThresholds.parse(options);lowThresholds.verify(lowLight,state.optBoolean("low_light_threshold_supported"));
-        LowLightAssistGate assistGate=new LowLightAssistGate();assistGate.configure(options);if(lowLight&&assistGate.enabled&&!state.optBoolean("low_light_assist_gate_supported"))throw new IOException("辅助光感暗光闸门接口暂未兼容");
+        LowLightAssistGate assistGate=new LowLightAssistGate();assistGate.configure(options);if(lowLight&&validation.optBoolean("low_light_assist_gate")&&!state.optBoolean("low_light_assist_gate_supported"))throw new IOException("辅助光感暗光闸门接口暂未兼容");
         if(thermal&&!state.optBoolean("thermal_supported"))throw new IOException("此固件温控亮度接口尚未兼容，不能启用该选项");
         float[] f=CurvePlan.factors(factors);
         float floor=CurvePlan.floor(options.has("curve_floor_nit")?options.opt("curve_floor_nit"):null);
@@ -169,7 +172,6 @@ public final class RootControl implements AutoCloseable {
         if(saved!=null)saved.verifyBackend(state.optString("curve_backend"));
         SavedCurve.plan(saved,numbers(state.getJSONArray("factory_lux")),numbers(state.getJSONArray("factory_logical_nit")),
             (float)state.getDouble("min_logical_nit"),(float)state.getDouble("max_logical_nit"),f,floor);
-        String previous=settings.get(CONFIG);
         boolean wasActive=state.optString("phase").equals("active");
         String revision=UUID.randomUUID().toString();
         JSONObject config=new JSONObject().put("schema",1).put("enabled",true).put("revision",revision)

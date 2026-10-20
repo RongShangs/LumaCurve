@@ -68,6 +68,7 @@ final class HookRuntime {
         batteryListener=new BroadcastReceiver(){public void onReceive(Context c,Intent intent){if(closed)return;
             if(Intent.ACTION_SCREEN_OFF.equals(intent.getAction())){outdoorNode.release();persistentMemory.screenOff();assistGate.reset();brightnessControl.screenOff();return;}
             if(Intent.ACTION_SCREEN_ON.equals(intent.getAction())){persistentMemory.screenOn();handler.post(brightnessControl::screenOn);return;}
+            if(Intent.ACTION_TIME_CHANGED.equals(intent.getAction())||Intent.ACTION_TIMEZONE_CHANGED.equals(intent.getAction())){brightnessControl.schedule.refresh();brightnessControl.tick();return;}
             if(Intent.ACTION_USER_PRESENT.equals(intent.getAction())){handler.post(brightnessControl::screenOn);return;}
             batteryTemperature=intent.hasExtra(BatteryManager.EXTRA_TEMPERATURE)?intent.getIntExtra(BatteryManager.EXTRA_TEMPERATURE,-1000)/10f:Float.NaN;
             int level=intent.getIntExtra(BatteryManager.EXTRA_LEVEL,-1),scale=intent.getIntExtra(BatteryManager.EXTRA_SCALE,-1);batteryLevel=level>=0&&scale>0&&level<=scale?(int)(100L*level/scale):-1;
@@ -87,7 +88,7 @@ final class HookRuntime {
             context.getContentResolver().registerContentObserver(Settings.Global.getUriFor(CONFIG),false,observer);
             context.getContentResolver().registerContentObserver(Settings.Global.getUriFor(REFRESH),false,refresh);
             try{if(power!=null){thermalSeverity=power.getCurrentThermalStatus();power.addThermalStatusListener(command->handler.post(command),thermalListener);thermalRegistered=true;}}catch(Throwable unavailable){thermalSeverity=-1;log("温控事件未就绪，其他功能继续检查："+unavailable.getClass().getSimpleName());}
-            IntentFilter batteryAndScreen=new IntentFilter(Intent.ACTION_BATTERY_CHANGED);batteryAndScreen.addAction(Intent.ACTION_SCREEN_OFF);batteryAndScreen.addAction(Intent.ACTION_SCREEN_ON);batteryAndScreen.addAction(Intent.ACTION_USER_PRESENT);
+            IntentFilter batteryAndScreen=new IntentFilter(Intent.ACTION_BATTERY_CHANGED);batteryAndScreen.addAction(Intent.ACTION_SCREEN_OFF);batteryAndScreen.addAction(Intent.ACTION_SCREEN_ON);batteryAndScreen.addAction(Intent.ACTION_USER_PRESENT);batteryAndScreen.addAction(Intent.ACTION_TIME_CHANGED);batteryAndScreen.addAction(Intent.ACTION_TIMEZONE_CHANGED);
             try{Intent initial=context.registerReceiver(batteryListener,batteryAndScreen,null,handler,Context.RECEIVER_EXPORTED);receiverRegistered=true;if(initial!=null)batteryListener.onReceive(context,initial);}catch(Throwable unavailable){log("电池与屏幕事件未就绪，暂停依赖该事件的控制："+unavailable.getClass().getSimpleName());}
             InjectionStatus.write(context,"attached","已读取设备本地曲线："+kernel.name());
             log("系统曲线已连接："+kernel.name()+"；使用此设备本地基准");reload();scheduleReadinessChecks();
@@ -314,6 +315,7 @@ final class HookRuntime {
             AdvancedTuning.capabilities((key,value)->status.put(key,value),this);JSONObject settings=new JSONObject();advanced.put(settings);status.put("advanced_options",settings)
                 .put("threshold_adjustments",thresholdAdjustments).put("assist_adjustments",assistAdjustments).put("animation_adjustments",animationAdjustments).put("sunlight_adjustments",sunlightAdjustments).put("touch_adjustments",touchAdjustments).put("delay_window_clamps",delayWindowClamps);
             if(lastAnimationSeconds>0)status.put("last_animation_seconds",lastAnimationSeconds);
+            status.put("animation_compatibility_profile",AdvancedTuning.animationProfile(this));
             if(lastMainBrighten>=0)status.put("last_main_brighten_ms",lastMainBrighten);if(lastMainDarken>=0)status.put("last_main_darken_ms",lastMainDarken);if(lastMainSmall>=0)status.put("last_main_small_ms",lastMainSmall);status.put("last_main_extra_ms",lastMainExtra);
             status.put("curve_backend",kernel.name()).put("baseline_id",baselineId()).put("curve_coordinate",kernel.name().equals("refactor")?"logical_nit":"physical_nit")
                 .put("factory_full_lux",array(kernel.fullLux())).put("factory_full_nit",array(kernel.fullNit()));
@@ -389,6 +391,11 @@ final class HookRuntime {
                 status.put("sensor_policy_flag",HookEntry.get(dual,"mUseLightSensorFlag"));
                 String reference=sensorName(((Number)HookEntry.get(dual,"mUseLightSensorFlag")).intValue());if(reference!=null)status.put("sensor_reference_name",reference);
             }
+            JSONObject input=status.optJSONObject("main_input_compatibility");
+            if(input!=null&&"single_main".equals(input.optString("input_mode"))){
+                status.put("assist_source_present",false).put("sensor_reference_name","main");
+                if(usable){readNumber(status,"main_fast_lux",abc,"mAmbientLux");status.put("main_reading_source","accepted_main_ambient_lux");}
+            }else if(input!=null&&input.has("assist_source_present"))status.put("assist_source_present",input.getBoolean("assist_source_present"));
             status.put("proximity_near",HookEntry.get(impl,"mProximityPositive"));
         }catch(Throwable optional){}
         readNumber(status,"official_thermal_cap",owner,"mThermalMaxBrightness");

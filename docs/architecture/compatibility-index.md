@@ -4,7 +4,7 @@
 
 此索引说明已实现和验证责任，不代表所有功能已在所有设备启用或实测。
 
-共 48 项功能、20 组适配、122 份生产 Java。
+共 49 项功能、21 组适配、124 份生产 Java。
 
 ## 曲线与手动记忆 · curve
 
@@ -32,7 +32,7 @@
 
 功能：`main_sensor`。
 
-选择：优先保留当前默认逻辑屏 ABC 的 TYPE_LIGHT；新增 ABC 已直接选中的 xiaomi.sensor.light_secondary 非唤醒、按变化、无权限且量程 / 精度有效的照度源。不枚举，不按私有类型编号或机型选择，不将原始 / 工厂 / 流式通道当作 lux。 配置槽非标准且 OEM 开启 FOV 时，核验其默认屏标识、真实 FOV 对象和 Sensor→Sensor 选择器结果，仅使用选择器实际返回的源；虚拟 FOV 的 values[0] 已为 lux，确认驾驶数据包才读取 values[2] 并用原生倍率。优先接口残缺 / 抛错拒绝，不回落物理槽；标准 TYPE_LIGHT 优先原路径，不受新 FOV 判定影响。
+选择：优先保留当前默认逻辑屏 ABC 的 TYPE_LIGHT；新增 ABC 已直接选中的 xiaomi.sensor.light_secondary 非唤醒、按变化、无权限且量程 / 精度有效的照度源。不枚举，不按私有类型编号或机型选择，不将原始 / 工厂 / 流式通道当作 lux。 配置槽非标准且 OEM 开启 FOV 时，核验其默认屏标识、真实 FOV 对象和 Sensor→Sensor 选择器结果，仅使用选择器实际返回的源；虚拟 FOV 的 values[0] 已为 lux，确认驾驶数据包才读取 values[2] 并用原生倍率。优先接口残缺 / 抛错拒绝，不回落物理槽；标准 TYPE_LIGHT 优先原路径，不受新 FOV 判定影响。 当前未接入辅助源时独立沿用已确认主光感，状态读取 ABC 已接受照度；不伪造辅助样本，也不把未接入等同没有硬件。
 
 组合关系：`exclusive`；互斥、独立功能、双维度和补充组件分别处理。
 
@@ -44,17 +44,17 @@
 
 实现：[RuntimeFeatureChecks.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/RuntimeFeatureChecks.java)、[HookRuntime.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/HookRuntime.java)、[SensorState.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/SensorState.java)、[BrightnessSensorAccess.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/BrightnessSensorAccess.java)。
 
-证据：`sensor_status`、`sensor_sampling_enabled`、`ambient_lux_valid`、`main_fast_lux`、`main_input_compatibility`。
+证据：`sensor_status`、`sensor_sampling_enabled`、`ambient_lux_valid`、`main_fast_lux`、`main_input_compatibility`、`assist_source_present`、`main_reading_source`。
 
 退出 / 回滚：只读观察，不拥有 OEM 监听。
 
-验证：[refactor_feature_self_check.py](../../tests/refactor_feature_self_check.py)、[refactor_status_presentation.py](../../tests/refactor_status_presentation.py)、[refactor_brightness_control.py](../../tests/refactor_brightness_control.py)、[refactor_fold_sensor_firmware.py](../../tests/refactor_fold_sensor_firmware.py)。
+验证：[refactor_feature_self_check.py](../../tests/refactor_feature_self_check.py)、[refactor_status_presentation.py](../../tests/refactor_status_presentation.py)、[refactor_brightness_control.py](../../tests/refactor_brightness_control.py)、[refactor_fold_sensor_firmware.py](../../tests/refactor_fold_sensor_firmware.py)、[refactor_single_sensor_firmware.py](../../tests/refactor_single_sensor_firmware.py)。
 
 ## 辅助光感 · assist_input
 
 功能：`assist_sensor`。
 
-选择：原生有效槽优先；空槽才考虑唯一且类型 / 单位 / 权限 / 线程 / 主屏均合格的移植候选，并同步当前 ABC 构造缓存。
+选择：原生有效槽优先；空槽才考虑唯一且类型 / 单位 / 权限 / 线程 / 主屏均合格的移植候选，并同步当前 ABC 构造缓存。 已确认本次辅助槽为空时显示未接入，不把初始化未知或缺读数当作硬件不存在；保留补位条件和旧路线。 保存时只对同设备 / 用户 / 基准、原已开启且参数未改的辅助选择使用独立验证副本，原始选项和能力不变；新开启或改不支持参数仍拒绝。
 
 组合关系：`exclusive`；互斥、独立功能、双维度和补充组件分别处理。
 
@@ -63,13 +63,13 @@
 | `native_auxiliary` · 系统原生辅助光感 | 原生辅助槽已有传感器时优先使用，继续沿用系统采样和融合。 |
 | `ported_auxiliary` · 移植系统辅助补位 | 原生槽为空；唯一 zte.sensor.light_second 候选通过类型、单位、权限、线程及主屏检查后，补入 OEM 槽并同步双光感能力缓存。 |
 
-实现：[AssistSensorCompat.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/AssistSensorCompat.java)、[AuxiliarySensorIdentity.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/AuxiliarySensorIdentity.java)。
+实现：[AssistSensorCompat.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/AssistSensorCompat.java)、[AuxiliarySensorIdentity.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/AuxiliarySensorIdentity.java)、[RuntimeFeatureChecks.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/RuntimeFeatureChecks.java)、[ConfigurationCompatibility.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ConfigurationCompatibility.java)、[RootControl.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/RootControl.java)。
 
 证据：`assist_compatibility.binding_kind`、`assist_compatibility.state`、`assist_compatibility.sensor_string_type`。
 
 退出 / 回滚：补位失败回滚传感器槽、启用状态和本次能力缓存；其他所有者已替换时不覆盖。
 
-验证：[refactor_assist_compat.py](../../tests/refactor_assist_compat.py)、[refactor_assist_compat_firmware.py](../../tests/refactor_assist_compat_firmware.py)。
+验证：[refactor_assist_compat.py](../../tests/refactor_assist_compat.py)、[refactor_assist_compat_firmware.py](../../tests/refactor_assist_compat_firmware.py)、[refactor_feature_self_check.py](../../tests/refactor_feature_self_check.py)。
 
 ## 主辅确认与暗光策略 · response
 
@@ -96,21 +96,22 @@
 
 功能：`animation_override`。
 
-选择：验证双动画对象、字段及原生 updatePerceptualDuration；保留 HDR、主屏与用户资格。
+选择：原 Refactor 双时长对象完整时沿用 oem_animation；仅原生 Refactor 策略明确关闭、两时长槽为空且主屏双 RampAnimator / RampRateController / 原生原因记录完整时采用 traditional_ramp。读取原生自动亮度原因常量，仅普通慢速自动过渡可调；保留 HDR、用户、主屏、手动确认及下游时长上限。
 
 组合关系：`exclusive`；互斥、独立功能、双维度和补充组件分别处理。
 
 | 路线 | 条件 |
 | --- | --- |
-| `oem_animation` · 系统亮度过渡接口 | 调整已验证的原生过渡倍率，保持系统动画及主副屏隔离。 |
+| `oem_animation` · Refactor 原生时长过渡 | 调整已验证的原生过渡时长倍率，保持系统动画及主副屏隔离。 |
+| `traditional_ramp` · 传统自动亮度速率过渡 | 原生 Refactor 策略关闭且时长对象为空；匹配主屏双 RampAnimator 和速率原因，只调整普通自动亮度速率，保留系统时长上限及特殊过渡。 |
 
-实现：[AdvancedTuning.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/AdvancedTuning.java)。
+实现：[AdvancedTuning.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/AdvancedTuning.java)、[TraditionalAnimation.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/TraditionalAnimation.java)。
 
-证据：`animation_override_supported`。
+证据：`animation_override_supported`、`animation_compatibility_profile`。
 
-退出 / 回滚：只恢复本次仍由模块拥有的时长，不覆盖系统已改写的值。
+退出 / 回滚：旧时长和传统速率均只恢复仍等于本次应用值的字段；原生限时裁剪和后来系统更新优先，目标与帧调度不改。
 
-验证：[refactor_advanced_hooks.py](../../tests/refactor_advanced_hooks.py)。
+验证：[refactor_advanced_hooks.py](../../tests/refactor_advanced_hooks.py)、[refactor_traditional_animation.py](../../tests/refactor_traditional_animation.py)、[refactor_traditional_animation_firmware.py](../../tests/refactor_traditional_animation_firmware.py)。
 
 ## 手动阳光屏 · sunlight
 
@@ -433,6 +434,26 @@
 
 验证：[refactor_control_center.py](../../tests/refactor_control_center.py)、[refactor_control_center_root.py](../../tests/refactor_control_center_root.py)。
 
+## 日落后暗光锁定 · dark_lock_schedule
+
+功能：`dark_lock_schedule`。
+
+选择：可选、默认关闭。实际 LocalServices / TwilightManager / TwilightState / Listener 签名完整，时间戳覆盖当前时刻才参与；原有全天锁定独立保留。缺数据或调用失败等待，不按型号、深色模式或固定时钟猜测。
+
+组合关系：`exclusive`；互斥、独立功能、双维度和补充组件分别处理。
+
+| 路线 | 条件 |
+| --- | --- |
+| `system_twilight` · 系统日出日落服务 | 复用实际 TwilightManager 与原生时间戳；只在夜间允许暗光锁定。缺时间等待，不以深色模式或固定钟点代替。 |
+
+实现：[DarkLockSchedule.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/DarkLockSchedule.java)、[BrightnessControl.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/BrightnessControl.java)。
+
+证据：`brightness_control.dark_lock_schedule.profile`、`brightness_control.dark_lock_schedule.known`、`brightness_control.dark_lock_schedule.sunrise_ms`、`brightness_control.dark_lock_schedule.sunset_ms`、`brightness_control.dark_lock_schedule.night`、`brightness_control.reason`。
+
+退出 / 回滚：显示 Handler 复用系统 twilight 通知与一个下次边界回调；系统时钟变化重读。熄屏 / 停用 / 切用户注销本次 Listener、取消重试与边界计时；旧代际回调无效。注册异常事务撤销，最多三次就绪补试。日出仅恢复本模块取得的自动亮度，用户手动关闭不恢复。自检只查接口，不注册监听或申请定位。
+
+验证：[refactor_brightness_control.py](../../tests/refactor_brightness_control.py)、[refactor_feature_self_check.py](../../tests/refactor_feature_self_check.py)、[refactor_configuration.py](../../tests/refactor_configuration.py)。
+
 ## ABI 内部变体
 
 以下是功能路线内部的字段、签名、协议或迁移选择；不应全部变成 APP 开关。相关测试表示验证入口，具体主机 / 固件 / 真机覆盖以测试输出与复审记录为准。
@@ -445,7 +466,7 @@
 | `inherited_mapper_members` · `TraditionalAdapter.java` | `declared_member` / `superclass_member` | 只沿同一对象真实继承链查找相同签名，非任意别名猜测。 | [refactor_traditional.py](../../tests/refactor_traditional.py) |
 | `sensor_identity` · `BrightnessControl.java` | `same_object` / `same_type_and_native_handle` | 对象一致优先；包装对象只允许同类型同系统句柄，缺句柄不按名称猜配。 | [refactor_brightness_control.py](../../tests/refactor_brightness_control.py) |
 | `sensor_freshness` · `BrightnessControl.java` | `on_change` / `continuous_timeout` | on-change 保留最近值，连续采样超过窗口无效；0 lux 是有效值，不伪装等待。 | [refactor_brightness_control.py](../../tests/refactor_brightness_control.py) |
-| `dark_primary_only` · `RuntimeFeatureChecks.java` | `dual_policy_present` / `dual_policy_absent` | 没有双光感策略可用主光感；存在但缩放或传感器格式异常不伪造双光感。 | [refactor_feature_self_check.py](../../tests/refactor_feature_self_check.py) |
+| `dark_primary_only` · `RuntimeFeatureChecks.java` | `dual_policy_present` / `dual_policy_absent` | 无辅助槽或双策略不存在时保留实际主光感独立确认；真实双源继续共同确认，坏类型 / 单位拒绝。 | [refactor_brightness_control.py](../../tests/refactor_brightness_control.py) |
 | `foreground_user_field` · `ForegroundApps.java` | `mUserId` / `userId` | 只在旧字段缺失时选择另一字段，类型必须为非静态 int。 | [refactor_brightness_control.py](../../tests/refactor_brightness_control.py) |
 | `task_visibility_field` · `ForegroundApps.java` | `isVisibleRequested` / `isVisible` | 已请求可见优先；字段缺失才用旧可见字段，均需非静态 boolean。 | [refactor_brightness_control.py](../../tests/refactor_brightness_control.py) |
 | `control_center_feedback` · `ControlCenterHooks.java` | `synthetic_updateSlider` / `direct_updateSlider` | 匹配合成 / 直接回显签名，两者属于同一坐标映射，不替换系统自动亮度策略；入口隐藏。 | [refactor_control_center.py](../../tests/refactor_control_center.py) |
@@ -458,6 +479,7 @@
 | `module_loader_discovery` · `HookEntry.java` | `initial_loader` / `bounded_startup_loader_watch` | 启动找不到显示类才监听加载，找到后撤销，45 秒封顶；不轮询亮度。 | [refactor_hook_firmware.py](../../tests/refactor_hook_firmware.py) |
 | `native_payload_refresh` · `NativePanelRoot.java` | `same_asset_hash` / `atomic_asset_replace` | 相同程序仅验证；显式节点使用时才停止旧租约并原子换程序，不因自检启动输出器。 | [refactor_native_asset.py](../../tests/refactor_native_asset.py) |
 | `main_light_identity` · `BrightnessSensorAccess.java` | `standard_type_light` / `oem_selected_scalar_secondary` / `native_fov_selector` | 沿用系统当前默认逻辑屏 ABC 的真实主槽和 SensorManager；标准路径不变；私有折叠光感需精确语义身份与有效元数据，暗光监听不猜测 FOV / 非标单位。其他屏幕、同类多候选与原始通道不参与选择。 FOV 路线由已启用字段、实际 FOV 对象、同屏标识和非静态选择器返回值共同确认；正常值与驾驶替代值沿用固件消费者单位。 | [refactor_brightness_control.py](../../tests/refactor_brightness_control.py) |
+| `traditional_animation_reason` · `TraditionalAnimation.java` | `native_auto_slow_no_modifier` / `native_special_or_immediate` | 只读取本机原生自动原因常量；普通慢速自动过渡且没有特殊 modifier 时调整调用速率，温控 / HDR / 手动 / 唤醒 / 即时原样保留。 | [refactor_traditional_animation.py](../../tests/refactor_traditional_animation.py) |
 
 ## 原生协议与运行分支
 
@@ -475,7 +497,7 @@
 
 ### adapters · 设备接口与所有权
 
-`AdvancedTuning.java`、`AssistSensorCompat.java`、`BrightnessSensorAccess.java`、`ControlCenterCalibration.java`、`ControlCenterHooks.java`、`ForegroundApps.java`、`FrameworkBrightness.java`、`HbmAccess.java`、`LowLightTuning.java`、`OutdoorOpr.java`、`OutdoorSdrScope.java`、`OutdoorTuning.java`、`PipelineHooks.java`、`RawPanelOutputHooks.java`、`RefactorAdapter.java`、`ResponseTuning.java`、`SceneTuning.java`、`TraditionalAdapter.java`、`TraditionalHooks.java`。
+`AdvancedTuning.java`、`AssistSensorCompat.java`、`BrightnessSensorAccess.java`、`ControlCenterCalibration.java`、`ControlCenterHooks.java`、`DarkLockSchedule.java`、`ForegroundApps.java`、`FrameworkBrightness.java`、`HbmAccess.java`、`LowLightTuning.java`、`OutdoorOpr.java`、`OutdoorSdrScope.java`、`OutdoorTuning.java`、`PipelineHooks.java`、`RawPanelOutputHooks.java`、`RefactorAdapter.java`、`ResponseTuning.java`、`SceneTuning.java`、`TraditionalAdapter.java`、`TraditionalAnimation.java`、`TraditionalHooks.java`。
 
 ### bootstrap · 入口与代次
 

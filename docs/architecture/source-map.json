@@ -148,6 +148,11 @@
       "purpose": "策略与算子"
     },
     {
+      "file": "DarkLockSchedule.java",
+      "layer": "adapters",
+      "purpose": "系统日出日落接口与夜间计划生命周期"
+    },
+    {
       "file": "DeferredStateWriter.java",
       "layer": "diagnostics",
       "purpose": "只读证据与诊断"
@@ -561,6 +566,11 @@
       "file": "TraditionalAdapter.java",
       "layer": "adapters",
       "purpose": "设备接口与所有权"
+    },
+    {
+      "file": "TraditionalAnimation.java",
+      "layer": "adapters",
+      "purpose": "传统亮度过渡速率与原生原因隔离"
     },
     {
       "file": "TraditionalCurve.java",

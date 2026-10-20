@@ -94,6 +94,8 @@ final class BrightnessSensorAccess {
         JSONObject j=new JSONObject().put("source","automatic_brightness_controller").put("extra_listener",false);
         try{Selection selected=selection(owner);Sensor sensor=selected.main;j.put("profile",selected.profile).put("binding_source",selected.fov?"oem_fov_override":"abc_main_slot").put("configured_sensor_name",selected.configured==null?"":selected.configured.getName()).put("sensor_name",sensor.getName()).put("sensor_type",sensor.getType()).put("sensor_string_type",sensor.getStringType()).put("display_id",0);}
         catch(Throwable unknown){j.put("profile","").put("detail",unknown.toString());}
+        try{Binding b=read(owner);j.put("input_mode",b.assist==null?"single_main":"dual_input").put("assist_source_present",b.assist!=null);}
+        catch(Throwable unknown){j.put("input_detail",unknown.toString());}
         return j;
     }
 }

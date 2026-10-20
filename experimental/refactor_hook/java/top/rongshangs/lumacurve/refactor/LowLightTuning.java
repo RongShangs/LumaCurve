@@ -42,12 +42,14 @@ final class LowLightTuning {
         }catch(Throwable unavailable){for(XC_MethodHook.Unhook h:hooks)h.unhook();XposedBridge.log("HyperLux assist stability unavailable: "+unavailable);}
     }
     static boolean supported(HookRuntime s){
-        try{Object impl=HookEntry.get(s.owner,"mAutomaticBrightnessControllerImpl"),dual=HookEntry.get(impl,"mDualSensorPolicy"),ring=HookEntry.get(dual,"mAssistLightSensorRingBuffer");
+        try{Object impl=HookEntry.get(s.owner,"mAutomaticBrightnessControllerImpl"),dual=HookEntry.get(impl,"mDualSensorPolicy");
             Object abc=HookEntry.get(impl,"mAutomaticBrightnessController");
-            return ResponseTuning.supported(s.owner)&&s.hdrProbe!=null&&ring!=null&&installed.contains(ring.getClass())&&
+            boolean main=ResponseTuning.supported(s.owner)&&s.hdrProbe!=null&&
                 HookEntry.field(abc.getClass(),"mAmbientLightHorizonLong").getType()==int.class&&
                 HookEntry.field(abc.getClass(),"mStepModeDarkenDebounceConfig").getType()==long.class&&
                 HookEntry.field(abc.getClass(),"mAmbientLuxValid").getType()==boolean.class;
+            if(!main||dual==null)return main;
+            Object ring=HookEntry.get(dual,"mAssistLightSensorRingBuffer");return ring!=null&&installed.contains(ring.getClass());
         }catch(Throwable absent){return false;}
     }
 }
