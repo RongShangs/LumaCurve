@@ -2,7 +2,7 @@
 from pathlib import Path
 import argparse,shutil,hashlib,json,xml.etree.ElementTree as ET
 ROOT=Path(__file__).resolve().parents[1]
-p=argparse.ArgumentParser();p.add_argument('--out',type=Path,default=ROOT.parent/'web');a=p.parse_args()
+p=argparse.ArgumentParser();p.add_argument('--out',type=Path,default=ROOT.parent/'web');p.add_argument('--release-dir',type=Path,default=ROOT/'dist',help='Verified release artifacts, including a same-version rebuild directory');a=p.parse_args()
 site=ROOT/'website';assets=site/'assets'
 thanks=json.loads((site/'thanks.json').read_text(encoding='utf-8'))
 assert thanks['schema']==1 and isinstance(thanks['entries'],list) and len(thanks['entries'])<=200
@@ -17,7 +17,7 @@ download=site/'downloads'
 files=[f'HyperLux-{version}.apk',f'LumaCurve-{version}-source.zip',f'LumaCurve-{version}.zip']
 checks=[]
 for name in files:
-    source=ROOT/'dist'/name
+    source=a.release_dir/name
     if not source.is_file():raise FileNotFoundError('Build the APK first: '+str(source))
     checks.append(hashlib.sha256(source.read_bytes()).hexdigest()+'  '+name+'\n')
 release_notes=ROOT/'docs/releases'/f'{version}.md'
@@ -38,7 +38,7 @@ assets.mkdir(parents=True,exist_ok=True);download.mkdir(parents=True,exist_ok=Tr
 (site/'thanks.js').write_text('window.HyperLuxThanks='+json.dumps(thanks,ensure_ascii=False)+';\n',encoding='utf-8',newline='\n')
 for name in asset_names:shutil.copy2(src/'assets'/name,assets/name)
 shutil.copy2(ROOT/'LICENSE',assets/'LICENSE.txt')
-for name in files:shutil.copy2(ROOT/'dist'/name,download/name)
+for name in files:shutil.copy2(a.release_dir/name,download/name)
 (download/'SHA256SUMS.txt').write_text(''.join(checks),encoding='utf-8',newline='\n')
 (site/'update.json').write_text(json.dumps(metadata,ensure_ascii=False,indent=2)+'\n',encoding='utf-8',newline='\n')
 (site/'update.js').write_text('window.HyperLuxRelease='+json.dumps(metadata,ensure_ascii=False)+';\n',encoding='utf-8',newline='\n')

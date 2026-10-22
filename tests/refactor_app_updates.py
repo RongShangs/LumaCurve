@@ -8,9 +8,10 @@ java=O/'UpdateTest.java'
 java.write_text(r'''package top.rongshangs.lumacurve.refactor;
 import org.json.*;import java.util.*;import java.util.function.*;
 class TextView{String value="";int minimum;void setText(String v){value=v;}void setMinHeight(int v){minimum=v;}void setLineSpacing(int gap,float scale){}}
-class LinearLayout{static final int VERTICAL=1;int orientation;String tag;List<Object> children=new ArrayList<>();void addView(Object v){children.add(v);}void setTag(String t){tag=t;}void setOrientation(int v){orientation=v;}Object findViewWithTag(String t){if(t.equals(tag))return this;for(Object v:children)if(v instanceof LinearLayout){Object found=((LinearLayout)v).findViewWithTag(t);if(found!=null)return found;}return null;}static class LayoutParams{LayoutParams(int w,int h){}}}
+class LinearLayout{static final int VERTICAL=1;int orientation;String tag;LinearLayout parent;List<Object> children=new ArrayList<>();void addView(Object v){children.add(v);if(v instanceof LinearLayout)((LinearLayout)v).parent=this;}Object getParent(){return parent;}void setTag(String t){tag=t;}void setOrientation(int v){orientation=v;}Object findViewWithTag(String t){if(t.equals(tag))return this;for(Object v:children)if(v instanceof LinearLayout){Object found=((LinearLayout)v).findViewWithTag(t);if(found!=null)return found;}return null;}static class LayoutParams{LayoutParams(int w,int h){}}}
+class ResponsiveDialog extends LinearLayout{float heightFraction=1;void setHeightFraction(float v){heightFraction=v;}}
 class ScrollView{ScrollView(Object host){}void addView(Object v){}void setLayoutParams(Object p){}}
-class Window{LinearLayout decor=new LinearLayout();LinearLayout getDecorView(){return decor;}}
+class Window{LinearLayout decor=new ResponsiveDialog();LinearLayout getDecorView(){return decor;}}
 class AlertDialog{final Window window=new Window();Window getWindow(){return window;}Consumer<AlertDialog> dismissed;boolean visible;void setOnDismissListener(Consumer<AlertDialog> c){dismissed=c;}void show(){visible=true;}void dismiss(){visible=false;if(dismissed!=null)dismissed.accept(this);}}
 class Queue{final ArrayDeque<Runnable> tasks=new ArrayDeque<>();void execute(Runnable r){tasks.add(r);}void post(Runnable r){tasks.add(r);}void drain(){while(!tasks.isEmpty())tasks.remove().run();}}
 class Preferences{Map<String,String> values=new HashMap<>();String getString(String k,String fallback){return values.getOrDefault(k,fallback);}Preferences edit(){return this;}Preferences putString(String k,String v){values.put(k,v);return this;}void apply(){}}
@@ -35,7 +36,8 @@ public class UpdateTest{
   for(String invalid:new String[]{"",null,"2.5.0-beta01","bad"})for(boolean manual:new boolean[]{false,true})check(!ReleasePolicy.shouldOffer(invalid,"",manual));
   Preferences prefs=new Preferences();release("2.5.0");MainActivity a=new MainActivity(prefs);a.checkUpdate(false);check(a.updateBusy&&a.updateDialog==null);a.complete();check(!a.updateBusy&&a.updateDialog.visible);
   check(a.buttons.keySet().equals(new LinkedHashSet<>(Arrays.asList("官网下载","GitHub 下载","稍后","忽略此版本"))));
-  check(a.dialogBody.children.size()==2&&a.dialogBody.children.get(1) instanceof TextView);check(((TextView)a.dialogBody.children.get(1)).minimum==320);
+  check(a.dialogBody.children.size()==2&&a.dialogBody.children.get(1) instanceof TextView);check(((TextView)a.dialogBody.children.get(1)).minimum==0);
+  check(((ResponsiveDialog)a.updateDialog.window.decor).heightFraction==.82f);
   check(a.buttonParents.get("官网下载")==a.buttonParents.get("GitHub 下载"));check(a.buttonParents.get("官网下载")!=a.dialogBody);
   check(a.buttonParents.get("稍后")==a.buttonParents.get("忽略此版本"));check(a.buttonParents.get("稍后")!=a.buttonParents.get("官网下载"));
   check(((LinearLayout)a.updateDialog.window.decor.findViewWithTag("update-footer")).orientation==LinearLayout.VERTICAL);

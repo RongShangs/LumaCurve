@@ -590,11 +590,11 @@ public final class MainActivity extends Activity {
         if(page!=3||pendingUpdate==null||!visible||permissionDialogVisible||legacyDialogVisible||pendingLegacy!=null||updateDialog!=null||welcome.showing()||quickSetup.showing())return;
         JSONObject release=pendingUpdate;pendingUpdate=null;String version=release.optString("version");
         if(!ReleasePolicy.shouldOffer(version,getPreferences(0).getString("ignored_update_version",""),release.optBoolean("manual_check")))return;
-        LinearLayout body=column();body.addView(text("版本 "+version,18,BLUE));String notes=release.optString("notes");TextView changes=text(notes.isEmpty()?"查看仓库了解更新内容":notes,14,MUTED);changes.setLineSpacing(dp(4),1);changes.setMinHeight(dp(320));body.addView(changes);
+        LinearLayout body=column();body.addView(text("版本 "+version,18,BLUE));String notes=release.optString("notes");TextView changes=text(notes.isEmpty()?"查看仓库了解更新内容":notes,14,MUTED);changes.setLineSpacing(dp(4),1);body.addView(changes);
         AlertDialog d=dialog("有新版本可用",body);updateDialog=d;d.setOnDismissListener(v->{updateDialog=null;offerLegacyModules();});
         // One scroll viewport for the notes. Both download and dismissal rows stay
         // outside it; ResponsiveDialog reserves their measured height and safe insets.
-        d.show();LinearLayout footer=(LinearLayout)d.getWindow().getDecorView().findViewWithTag("actions");footer.setTag("update-footer");footer.setOrientation(LinearLayout.VERTICAL);
+        d.show();LinearLayout footer=(LinearLayout)d.getWindow().getDecorView().findViewWithTag("actions");((ResponsiveDialog)footer.getParent()).setHeightFraction(.82f);footer.setTag("update-footer");footer.setOrientation(LinearLayout.VERTICAL);
         LinearLayout downloads=row(footer);compact("官网下载",()->{d.dismiss();open(UpdateChecker.WEBSITE);},downloads);compact("GitHub 下载",()->{d.dismiss();open(release.optString("url"));},downloads);
         LinearLayout choices=row(footer);choices.setTag("actions");dialogButton(d,"稍后",null,false);dialogButton(d,"忽略此版本",()->{getPreferences(0).edit().putString("ignored_update_version",version).apply();updateLabel.setText(tr("已忽略版本 ")+version);},false);
     }

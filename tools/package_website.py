@@ -2,7 +2,7 @@
 from pathlib import Path
 import argparse,hashlib,json,zipfile,xml.etree.ElementTree as ET
 ROOT=Path(__file__).resolve().parents[1]
-parser=argparse.ArgumentParser();parser.add_argument('--site',type=Path,default=ROOT.parent/'web');args=parser.parse_args();site=args.site
+parser=argparse.ArgumentParser();parser.add_argument('--site',type=Path,default=ROOT.parent/'web');parser.add_argument('--release-dir',type=Path,default=ROOT/'dist');args=parser.parse_args();site=args.site
 manifest=ET.parse(ROOT/'experimental/refactor_hook/AndroidManifest.xml').getroot()
 version=manifest.attrib['{http://schemas.android.com/apk/res/android}versionName']
 code=int(manifest.attrib['{http://schemas.android.com/apk/res/android}versionCode'])
@@ -20,13 +20,13 @@ checks=[]
 for name in downloads:
     assert f'downloads/{name}' in index,'Website download link mismatch'
     payload=(site/'downloads'/name).read_bytes()
-    assert payload==(ROOT/'dist'/name).read_bytes(),'Website download differs from built release: '+name
+    assert payload==(args.release_dir/name).read_bytes(),'Website download differs from built release: '+name
     checks.append(hashlib.sha256(payload).hexdigest()+'  '+name+'\n')
 assert (site/'downloads/SHA256SUMS.txt').read_text(encoding='utf-8')==''.join(checks),'Website checksum list mismatch'
 assert metadata['sha256']==checks[0].split()[0],'Website APK checksum mismatch'
 for key,name in zip(['apkUrl','sourceUrl','bundleUrl'],downloads):
     assert metadata[key]==f'https://lc.rongshangs.top/downloads/{name}','Website update URL mismatch'
-output=ROOT/'dist'/f'LumaCurve-website-{version}.zip'
+output=args.release_dir/f'LumaCurve-website-{version}.zip'
 with zipfile.ZipFile(output,'w',zipfile.ZIP_DEFLATED) as archive:
     for source in sorted(site.rglob('*')):
         if source.is_file():archive.write(source,source.relative_to(site).as_posix())
