@@ -1,5 +1,9 @@
 # 文档导航
 
+当前正式发布目标：[4.1.1 更新说明](releases/4.1.1.md) · [本版复审](reviews/review-4.1.1.md)。用户已授权同步三个渠道，完成状态见私有发布回执；下方是历史版本入口。
+
+当前本地Beta：[4.1.0 Beta 02](releases/4.1.0-beta02.md) · [适配复审](reviews/review-4.1.0-beta02.md)。公开正式版仍为4.1.0-r1。
+
 当前正式版：[4.1.0 更新说明](releases/4.1.0.md) · [发布复审](reviews/review-4.1.0.md) · [快速设置](guides/quick-setup.md)。4.0.2 Beta 01—08 保留独立历史记录。
 
 ## 当前使用

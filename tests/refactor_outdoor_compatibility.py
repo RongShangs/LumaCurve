@@ -75,13 +75,27 @@ public class OutdoorCompatibilityTest {
    java.lang.reflect.Field privacy=owner.getClass().getField("privacy"),failure=owner.getClass().getField("throwPrivacy");
    privacy.setBoolean(owner,true);eq(owner.adjustSdrBrightness(1,true,new BrightnessReason(),false,false),.5f);eq(owner.lastSdrInput,1);privacy.setBoolean(owner,false);
    failure.setBoolean(owner,true);eq(owner.adjustSdrBrightness(1,true,new BrightnessReason(),false,false),.5f);eq(owner.lastSdrInput,1);check(OutdoorSdrScope.profile(owner.getClass()).equals("privacy_aware"));failure.setBoolean(owner,false);
-   if(scenario.equals("modern_dual")){java.lang.reflect.Field f=owner.getClass().getField("mOprNitThreshold");f.set(owner,null);eq(owner.adjustSdrBrightness(1,true,new BrightnessReason(),false,false),cap);}
+   if(scenario.equals("modern_dual")){java.lang.reflect.Field f=owner.getClass().getField("mOprNitThreshold");Object table=f.get(owner);f.set(owner,null);eq(owner.adjustSdrBrightness(1,true,new BrightnessReason(),false,false),.5f);f.set(owner,table);}
   }
   // A different instance cannot inherit this instance's active outdoor policy.
   DisplayPowerControllerImpl other=new DisplayPowerControllerImpl();other.opr=.4f;other.thermal=1;HookRuntime otherState=state(other);
   eq(other.adjustSdrBrightness(1,true,new BrightnessReason(),false,false),.4f);check(otherState.outdoor.oprRaises==0);check(OutdoorOpr.current.get()==null);
   owner.throwSdr=true;try{owner.adjustSdrBrightness(1,true,new BrightnessReason(),false,false);throw new AssertionError();}catch(RuntimeException expected){cases++;}check(OutdoorOpr.current.get()==null);owner.throwSdr=false;
   s.outdoor.stop();eq(owner.adjustSdrBrightness(1,true,new BrightnessReason(),false,false),.5f);eq(owner.lastSdrInput,1);
+  if(old||scenario.equals("modern_dual")){
+   s.outdoor.configure(OutdoorOptions.parse(config(false)));s.handler.advance(SystemClock.now+3000);
+   owner.nitScale=10000;
+   BrightnessReason bounded=new BrightnessReason();bounded.addModifier(2);
+   float delivered=owner.adjustSdrBrightness(1,true,bounded,false,false);
+   check(delivered>.5f&&delivered<1);check(owner.convertBrightnessToNit(delivered)<=3500.01f);
+   check(bounded.getModifier()==2);check(s.outdoor.status().getString("opr_envelope_profile").equals("native_opr_envelope"));
+   check(s.outdoor.status().getDouble("opr_envelope_max_nit")==3500);
+   owner.thermal=.3f;eq(owner.adjustSdrBrightness(1,true,new BrightnessReason(),false,false),.3f);owner.thermal=1;
+   owner.battery=.2f;eq(owner.adjustSdrBrightness(1,true,new BrightnessReason(),false,false),.2f);owner.battery=1;
+   owner.hdrScene=true;eq(owner.adjustSdrBrightness(1,true,new BrightnessReason(),false,false),.5f);owner.hdrScene=false;
+   owner.nitScale=3500;eq(owner.adjustSdrBrightness(1,true,new BrightnessReason(),false,false),1);
+   s.outdoor.stop();eq(owner.adjustSdrBrightness(1,true,new BrightnessReason(),false,false),.5f);
+  }
   System.out.println("Outdoor ABI "+scenario+": "+cases+" cases PASS");
  }
 }'''
@@ -108,7 +122,7 @@ for scenario in ['modern','modern_dual','legacy','unknown_privacy','unknown_layo
     for name,text in sources.items():
         dest=out/name;dest.parent.mkdir(parents=True,exist_ok=True);dest.write_text(text,encoding='utf-8')
     classes=out/'classes';classes.mkdir(exist_ok=True)
-    production=[SRC/'hooking/HookTransaction.java']+[SRC/(n+'.java') for n in ['OutdoorNodeTarget','OutdoorOptions','OutdoorPolicy','HbmAccess','OutdoorController','OutdoorTuning','OutdoorOpr','OutdoorSdrScope','ThermalPolicy','AdvancedPolicy','LiveLimitEvidence','NitBrightnessLimit']]
+    production=[SRC/'hooking/HookTransaction.java']+[SRC/(n+'.java') for n in ['OutdoorNodeTarget','OutdoorOptions','OutdoorPolicy','HbmAccess','OutdoorController','OutdoorTuning','OutdoorOpr','OutdoorOprEnvelope','OutdoorSdrScope','ThermalPolicy','AdvancedPolicy','LiveLimitEvidence','NitBrightnessLimit']]
     subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(JSON),'-d',str(classes),*map(str,production),*[str(out/n) for n in sources]],check=True)
     result=subprocess.run(['java','-cp',str(classes)+';'+str(JSON),'top.rongshangs.lumacurve.refactor.OutdoorCompatibilityTest',scenario],check=True,capture_output=True,text=True)
     print(result.stdout,end='');total+=int(re.search(r'(\d+) cases PASS',result.stdout).group(1))

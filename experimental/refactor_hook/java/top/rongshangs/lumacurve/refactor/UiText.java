@@ -117,6 +117,10 @@ public final class UiText {
         WORDS.put("系统未启用普通距离策略，当前使用流式距离遮挡；请在流式距离遮挡中设置。","The native ordinary proximity policy is disabled. Use the active stream proximity settings instead.");
         WORDS.put("系统未启用普通距离策略，沿用系统；不强制启动传感器。","The native ordinary proximity policy is disabled. Follow the system without forcing a sensor to start.");
         WORDS.put("Refactor 逻辑曲线","Refactor logical curve");
+        WORDS.put("本机采用分段拟合；仅报告最近一次手动输入","Native segmented fitting; only the latest manual input is reported.");
+        WORDS.put("Refactor 分段系数曲线","Refactor segmented-coefficient curve");
+        WORDS.put("\n曲线路线：","\nCurve route: ");
+        WORDS.put("旧式9项系数与22项状态完整；保留原生手动学习和输出，尚不提供虚拟拟合点的跨模式 / 锁屏 / 重启恢复或记忆转基础。","Complete native 9-coefficient / 22-state ABI. Keeps native learning and output; portable fitting-point replay and learned-base saving are not verified.");
         WORDS.put("使用本机 RefactorNitController 的逻辑锚点、手动点与曲线重建接口。","Uses the device RefactorNitController anchors, manual points and native curve rebuilding.");
         WORDS.put("小米传统物理映射","Xiaomi traditional physical mapper");
         WORDS.put("实际映射器为 MiuiPhysicalBrightnessMappingStrategy，保留完整设备曲线与应用修正。","Uses MiuiPhysicalBrightnessMappingStrategy and preserves the complete device curve and application corrections.");
@@ -219,6 +223,8 @@ public final class UiText {
         WORDS.put("\n原生门槛：","\nNative threshold:");
         WORDS.put("\n原生计时（窗口 / 最大 / 最短）：","\nNative timers, window/max/min:");
         WORDS.put("SDR 适配：","SDR profile:");
+        WORDS.put("匹配 shouldUsePrivacyOprBrightness，保留隐私显示、HDR、温控与电量判断；额外放宽遵守完整原生OPR表的最高档。","Matches shouldUsePrivacyOprBrightness; preserves privacy, HDR, thermal and battery checks, and bounds added relaxation by the complete native OPR table.");
+        WORDS.put("OPR 放宽范围：","OPR relaxation envelope:");
         WORDS.put("本机可见任务接口完整；已接入多窗口判断。","Complete visible-task interfaces are connected, including multi-window checks.");
         WORDS.put("本机仅提供已验证的焦点回退；不能保证小窗失焦时继续暂停。","Only the verified focus fallback is available. Pausing may end when a floating window changes focus.");
         WORDS.put("多窗口接口信息尚未报告。","Multi-window interface information has not been reported.");

@@ -57,7 +57,7 @@ final class HookRuntime {
         Class<?> util=Class.forName("com.android.server.display.RefactorBrightnessUtil",true,ref.getClass().getClassLoader());
         if(HookEntry.field(util,"MIN_NIT").getType()!=float.class||HookEntry.field(util,"MAX_NIT").getType()!=float.class)throw new IllegalStateException("逻辑亮度边界类型已变化");
         float min=((Number)HookEntry.field(util,"MIN_NIT").get(null)).floatValue(),max=((Number)HookEntry.field(util,"MAX_NIT").get(null)).floatValue();
-        kernel=new RefactorAdapter(ref,min,max);
+        kernel=RefactorProfiles.create(ref,min,max);
         }else {Object impl=HookEntry.get(owner,"mAutomaticBrightnessControllerImpl");Object abc=HookEntry.get(impl,"mAutomaticBrightnessController");kernel=new TraditionalAdapter(owner,ref,abc,()->HookEntry.currentUser.serial());}
         baselineIdentity=CurveIdentity.of(kernel.name(),kernel.fullLux(),kernel.fullNit(),kernel.min,kernel.max);
         try{hdrProbe=owner.getClass().getDeclaredMethod("isHdrScene");if(hdrProbe.getReturnType()!=boolean.class)hdrProbe=null;else hdrProbe.setAccessible(true);}catch(Throwable optional){}
@@ -225,7 +225,7 @@ final class HookRuntime {
                     controlCenter.configure(config);phase="active";assistCompat.refresh();scenes.configure(proposedScenes);brightnessControl.configure(controls);outdoor.configure(outdoorOptions);message=firmwareRevalidated?"系统更新后的曲线与接口已重新核验，原设置继续生效":"自定义曲线已接入，官方光感和过渡动画继续运行";
                     // Configuration can itself switch auto brightness while callbacks
                     // are transaction-suppressed. Verify the curve before acknowledging.
-                    if(kernel instanceof RefactorAdapter)((RefactorAdapter)kernel).reconcile();
+                    if(kernel.name().equals("refactor"))kernel.reconcile();
                     if(compatibilityPaused.length()>0)message+="；已暂停不可用选项："+compatibilityPaused.toString();
                     persistentMemory.configure(memoryOptions,curveChanged);
                     log(curveChanged?"曲线已应用，重新建立基础锚点":"设置已更新，保留当前手动锚点");
@@ -317,7 +317,7 @@ final class HookRuntime {
             if(lastAnimationSeconds>0)status.put("last_animation_seconds",lastAnimationSeconds);
             status.put("animation_compatibility_profile",AdvancedTuning.animationProfile(this));
             if(lastMainBrighten>=0)status.put("last_main_brighten_ms",lastMainBrighten);if(lastMainDarken>=0)status.put("last_main_darken_ms",lastMainDarken);if(lastMainSmall>=0)status.put("last_main_small_ms",lastMainSmall);status.put("last_main_extra_ms",lastMainExtra);
-            status.put("curve_backend",kernel.name()).put("baseline_id",baselineId()).put("curve_coordinate",kernel.name().equals("refactor")?"logical_nit":"physical_nit")
+            status.put("curve_backend",kernel.name()).put("curve_route",kernel.compatibilityRoute()).put("baseline_id",baselineId()).put("curve_coordinate",kernel.name().equals("refactor")?"logical_nit":"physical_nit")
                 .put("factory_full_lux",array(kernel.fullLux())).put("factory_full_nit",array(kernel.fullNit()));
             if(kernel instanceof TraditionalAdapter)status.put("user_identity_source",HookEntry.currentUser.source()).put("user_identity_ready",kernel.integer("mUserSerial")>=0);
             status.put("memory_strength",memoryStrength).put("memory_events",memoryEvents);persistentMemory.put(status);
@@ -339,8 +339,7 @@ final class HookRuntime {
             PipelineHistory.Frame recent=pipelineHistory.last();if(recent!=null)status.put("last_pipeline",traceJson(recent));
             Boolean hdr=hdrActive();if(hdr!=null)status.put("hdr_active",hdr);
             status.put("current_anchors_lux",array(kernel.currentLux())).put("current_anchors_nit",array(kernel.currentNit()));
-            if(kernel.name().equals("refactor")){int count=kernel.integer("mAnchorCount");JSONArray flags=new JSONArray();boolean[] user=(boolean[])kernel.get("mAnchorIsUserDrag");for(int i=0;i<count;i++)flags.put(user[i]);status.put("manual_anchor_flags",flags);}
-            else {TraditionalAdapter physical=(TraditionalAdapter)kernel;status.put("physical_mapping_active",HookEntry.get(physical.abc,"mCurrentBrightnessMapper")==physical.mapper).put("physical_mapper_class",physical.mapper.getClass().getName()).put("physical_user_lux_field",physical.userLuxField);}
+            kernel.putCurveState(status);
             status.put("curve_adapter_class",kernel.getClass().getName());
             status.put("control_center_slider",controlCenter.status());JSONObject controls=brightnessControl.status();status.put("brightness_control",controls).put("dark_lock_supported",controls.optBoolean("dark_lock_supported")).put("manual_panel_supported",controls.optBoolean("manual_panel_supported"));
             status.put("app_auto_supported",controls.optBoolean("app_auto_supported"));
@@ -354,11 +353,11 @@ final class HookRuntime {
                 Object display=dpc.getClass().getMethod("getDisplayPowerState").invoke(dpc);
                 float brightness=((Number)display.getClass().getMethod("getScreenBrightness").invoke(display)).floatValue();
                 float nit=((Number)owner.getClass().getMethod("convertBrightnessToNit",float.class).invoke(owner,brightness)).floatValue();
-                if(Float.isFinite(nit)&&nit>=0)status.put("actual_nit",nit);
+                if(Float.isFinite(nit)&&nit>=0)status.put("actual_nit",nit).put("actual_nit_source","device_backlight_mapping");
                 status.put("screen_state",display.getClass().getMethod("getScreenState").invoke(display));
             }catch(Throwable unavailable){}
             CurvePlan plan=kernel.plan();if(plan!=null){float[] handles=new float[4];for(int i=0;i<4;i++)handles[i]=plan.at(kernel.factoryLux[i]);status.put("active_logical_nit",array(handles)).put("applied_base_lux",array(kernel.baselineLux())).put("applied_base_nit",array(kernel.baselineNit()));}
-            if(kernel instanceof RefactorAdapter)try{((RefactorAdapter)kernel).putVerification(status);}catch(Exception unavailable){status.put("refactor_curve_verification_error",unavailable.toString());}
+            if(kernel.name().equals("refactor"))try{kernel.putVerification(status);}catch(Exception unavailable){status.put("refactor_curve_verification_error",unavailable.toString());}
             for(Iterator<String> keys=featureChecks.caps.keys();keys.hasNext();){String key=keys.next();status.put(key,featureChecks.caps.get(key));}
             // Screen identity is live state, not the startup self-check snapshot.
             long outdoorPhysical=OutdoorOutputAccess.physical(this);if(outdoorPhysical>0)status.put("outdoor_node_physical_id",outdoorPhysical);

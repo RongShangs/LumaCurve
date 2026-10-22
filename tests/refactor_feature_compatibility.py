@@ -18,7 +18,8 @@ public class FeatureCompatibilityTest{
  public static void main(String[] args)throws Exception{
   JSONObject r=new JSONObject().put("curve_backend","refactor");
   String[] memory={"curve","manual_memory","saved_curve","persistent_memory","memory_mode","memory_forever","memory_reset","memory_timeout"};
-  for(String id:memory){picked(id,r,"refactor");JSONObject row=enrich(id,"available",r);check(row.getJSONArray("routes").length()==3);}
+  for(String id:memory){picked(id,r,"refactor");JSONObject row=enrich(id,"available",r);check(row.getJSONArray("routes").length()==4);}
+  r.put("curve_route","refactor_coefficients");picked("curve",r,"refactor_coefficients");check(selected(enrich("persistent_memory","unsupported",r)).isEmpty());r.put("curve_route","unknown");check(selected(enrich("curve","available",r)).isEmpty());r.remove("curve_route");
   r.put("curve_backend","physical_mapping").put("physical_mapper_class","com.android.server.display.MiuiPhysicalBrightnessMappingStrategy");for(String id:memory)picked(id,r,"miui_physical");
   r.put("physical_mapper_class","com.android.server.display.BrightnessMappingStrategy$PhysicalMappingStrategy");for(String id:memory)picked(id,r,"aosp_physical");
   r.remove("physical_mapper_class");check(selected(enrich("curve","available",r)).isEmpty());check(enrich("curve","available",r).getString("route_name").contains("未确认"));r.put("curve_backend","unknown");check(selected(enrich("curve","available",r)).isEmpty());

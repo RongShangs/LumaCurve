@@ -28,7 +28,7 @@ final class RuntimeFeatureChecks {
         if(missingAssist)f.inactive("assist_sensor","辅助光感",null,"当前系统未接入辅助光感，沿用主光感输入；不能据此认定硬件不存在。其他功能独立检查，用户设置保留。");
         else f.check("assist_sensor","辅助光感",null,true,()->sensor(true));
         f.check("manual_memory","手动记忆",null,false,()->s.kernel.manualPointCapacity()>0);
-        f.check("saved_curve","记忆转基础曲线",null,false,()->s.kernel.name().equals("refactor")||s.kernel.name().equals("physical_mapping"));
+        f.check("saved_curve","记忆转基础曲线","saved_curve_supported",false,()->s.kernel.savedCurveSupported());
         f.check("persistent_memory","记忆持久化","persistent_memory_supported",false,()->s.kernel.persistentMemorySupported());
         f.check("memory_mode","跨开关保持记忆","memory_mode_supported",false,()->s.memoryLifecycle.modeSupported);
         f.check("memory_forever","永久保持记忆","memory_forever_supported",false,()->s.memoryLifecycle.foreverSupported);

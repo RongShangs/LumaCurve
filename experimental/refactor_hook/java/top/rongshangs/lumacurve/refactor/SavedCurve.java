@@ -40,6 +40,7 @@ public final class SavedCurve {
     }
     public static boolean same(SavedCurve a,SavedCurve b){return a==b||a!=null&&b!=null&&Arrays.equals(a.lux,b.lux)&&Arrays.equals(a.nit,b.nit);}
     public static SavedCurve capture(JSONObject state)throws JSONException {
+        if("refactor_coefficients".equals(state.optString("curve_route")))throw new IllegalArgumentException("此系数路线尚不支持记忆转基础曲线");
         if(!"active".equals(state.optString("phase"))||state.optInt("memory_live_count")==0)throw new IllegalArgumentException("当前没有可保存的手动记忆曲线");
         String backend=state.optString("curve_backend");JSONObject pipeline=state.optJSONObject("last_pipeline");
         if(state.optBoolean("hdr_active")||"physical_mapping".equals(backend)&&!state.optBoolean("physical_mapping_active")||pipeline!=null&&!("refactor".equals(backend)&&"refactor".equals(pipeline.optString("route"))||"physical_mapping".equals(backend)&&"mapping".equals(pipeline.optString("route"))))throw new IllegalArgumentException("当前输出路径不是可保存的普通亮度曲线");

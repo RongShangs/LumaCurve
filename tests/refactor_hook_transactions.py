@@ -77,7 +77,7 @@ public class InstallFailureTest{
   System.out.println("Outdoor install "+fail+": "+cases+" cases PASS");
  }
 }'''
-production=['hooking/HookTransaction.java']+[name+'.java' for name in ['OutdoorNodeTarget','OutdoorOptions','OutdoorPolicy','HbmAccess','OutdoorController','OutdoorTuning','OutdoorOpr','OutdoorSdrScope','ThermalPolicy','AdvancedPolicy','LiveLimitEvidence','NitBrightnessLimit']]
+production=['hooking/HookTransaction.java']+[name+'.java' for name in ['OutdoorNodeTarget','OutdoorOptions','OutdoorPolicy','HbmAccess','OutdoorController','OutdoorTuning','OutdoorOpr','OutdoorOprEnvelope','OutdoorSdrScope','ThermalPolicy','AdvancedPolicy','LiveLimitEvidence','NitBrightnessLimit']]
 for method in ['static_abi','AutomaticBrightnessControllerImpl.getOverrideLimitBrightness','HighBrightnessModeController.onAmbientLuxChange','HighBrightnessModeController.getCurrentBrightnessMax','BrightnessRangeControllerImpl.getCurrentBrightnessMax','DisplayPowerControllerImpl.getMaxHbmBrightnessForPeak','DisplayPowerControllerImpl.adjustBrightnessByThermal','DisplayPowerControllerImpl.adjustSdrBrightness']:
     total+=run(method.replace('.','-'),sources,production,'top.rongshangs.lumacurve.refactor.InstallFailureTest',method)
 hook=(S/'HookEntry.java').read_text(encoding='utf-8')

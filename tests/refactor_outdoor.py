@@ -212,6 +212,6 @@ public class OutdoorTest{static int count;static void check(boolean b){if(!b)thr
 for path,text in sources.items():
     file=OUT/path;file.parent.mkdir(parents=True,exist_ok=True);file.write_text(text,encoding='utf-8')
 classes=OUT/'classes';classes.mkdir(exist_ok=True)
-production=[SRC/'hooking/HookTransaction.java']+[SRC/(name+'.java') for name in ['OutdoorNodeTarget','OutdoorOptions','OutdoorPolicy','HbmAccess','OutdoorController','OutdoorTuning','OutdoorOpr','OutdoorSdrScope','ThermalPolicy','AdvancedPolicy','LiveLimitEvidence','NitBrightnessLimit']]
+production=[SRC/'hooking/HookTransaction.java']+[SRC/(name+'.java') for name in ['OutdoorNodeTarget','OutdoorOptions','OutdoorPolicy','HbmAccess','OutdoorController','OutdoorTuning','OutdoorOpr','OutdoorOprEnvelope','OutdoorSdrScope','ThermalPolicy','AdvancedPolicy','LiveLimitEvidence','NitBrightnessLimit']]
 subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(JSON),'-d',str(classes),*map(str,production),*[str(OUT/p) for p in sources]],check=True)
 subprocess.run(['java','-cp',str(classes)+';'+str(JSON),'top.rongshangs.lumacurve.refactor.OutdoorTest'],check=True)

@@ -136,7 +136,7 @@ public class Os3OutdoorTest{
   System.out.println("OS3 outdoor "+which+": "+cases+" cases PASS");
  }
 }'''
-    total+=run('outdoor',scenario,sources,['OutdoorNodeTarget','OutdoorOptions','OutdoorPolicy','HbmAccess','OutdoorController','OutdoorTuning','OutdoorOpr','OutdoorSdrScope','ThermalPolicy','AdvancedPolicy','LiveLimitEvidence','NitBrightnessLimit'],'top.rongshangs.lumacurve.refactor.Os3OutdoorTest')
+    total+=run('outdoor',scenario,sources,['OutdoorNodeTarget','OutdoorOptions','OutdoorPolicy','HbmAccess','OutdoorController','OutdoorTuning','OutdoorOpr','OutdoorOprEnvelope','OutdoorSdrScope','ThermalPolicy','AdvancedPolicy','LiveLimitEvidence','NitBrightnessLimit'],'top.rongshangs.lumacurve.refactor.Os3OutdoorTest')
 
 print(f'OS3 compatibility: {total} cases PASS; actual hooks with isolated native ABI fixtures, not a device test')
 

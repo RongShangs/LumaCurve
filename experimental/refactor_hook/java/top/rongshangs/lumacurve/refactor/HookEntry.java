@@ -82,6 +82,7 @@ public final class HookEntry {
                 ForegroundApps.install(owner.getClassLoader());
                 try (HookTransaction refactorHooks=new HookTransaction()) {
                 Class<?> ref=Class.forName(REFACTOR,false,owner.getClassLoader());
+                Method defaultCurve=RefactorProfiles.defaultMethod(ref);
                 Method output=ref.getDeclaredMethod("getCurrentNit",float.class,float.class,boolean.class);
                 if(output.getReturnType()!=float.class)throw new IllegalStateException("Refactor output ABI");
                 Method memory=ref.getDeclaredMethod("updateLogicalCurve",float.class,float.class);
@@ -107,9 +108,9 @@ public final class HookEntry {
                 // Keep ordinary edited and saved bases through OEM reset/learning.
                 // Public handovers below also cover inlined private default helpers.
                 refactorHooks.add(XposedBridge.hookMethod(ref.getDeclaredMethod("resetDefaultSpline"),new XC_MethodHook(){protected void afterHookedMethod(MethodHookParam p){HookRuntime state=states.get(p.thisObject);if(state!=null&&state.onDisplayThread()&&!state.changing&&!p.hasThrowable()){
-                    if(state.kernel.plan()!=null&&state.phase.equals("active")&&state.appliesToUser())try{((RefactorAdapter)state.kernel).afterReset();}catch(Throwable failure){state.handler.post(()->state.fault(failure));}
+                    if(state.kernel.plan()!=null&&state.phase.equals("active")&&state.appliesToUser())try{state.kernel.afterReset();}catch(Throwable failure){state.handler.post(()->state.fault(failure));}
                     state.persistentMemory.requestAfterReset();}}}));
-                refactorHooks.add(XposedBridge.hookMethod(ref.getDeclaredMethod("defaultAtLux",float.class),new XC_MethodHook(){protected void afterHookedMethod(MethodHookParam p){HookRuntime state=states.get(p.thisObject);if(state!=null&&!p.hasThrowable()&&state.onDisplayThread()&&state.kernel.plan()!=null&&state.phase.equals("active")&&state.appliesToUser()){float lux=(Float)p.args[0];if(Float.isFinite(lux)&&lux>=0)p.setResult(state.kernel.plan().at(lux));}}}));
+                refactorHooks.add(XposedBridge.hookMethod(defaultCurve,new XC_MethodHook(){protected void afterHookedMethod(MethodHookParam p){HookRuntime state=states.get(p.thisObject);if(state!=null&&!p.hasThrowable()&&state.onDisplayThread()&&state.kernel.plan()!=null&&state.phase.equals("active")&&state.appliesToUser()){float lux=(Float)p.args[0];if(Float.isFinite(lux)&&lux>=0){float value=state.kernel.plan().at(lux);if(defaultCurve.getReturnType()==double.class)p.setResult(Double.valueOf(value));else p.setResult(Float.valueOf(value));}}}}));
                 // Public handovers remain observable even if an OEM inlines reset/default helpers.
                 for(String name:new String[]{"setAutoBrightnessState","shouldUseGoodCurve"})refactorHooks.addAll(XposedBridge.hookAllMethods(ref,name,new XC_MethodHook(){protected void afterHookedMethod(MethodHookParam p){if(!p.hasThrowable())reconcile(states.get(p.thisObject));}}));
                 refactorHooks.add(XposedBridge.hookMethod(output,new XC_MethodHook(){protected void beforeHookedMethod(MethodHookParam param){HookRuntime state=states.get(param.thisObject);if(state!=null&&state.onDisplayThread()&&Float.isNaN((Float)param.args[1])&&!((Boolean)param.args[2]))state.persistentMemory.requestRestore();}protected void afterHookedMethod(MethodHookParam param){
@@ -139,8 +140,8 @@ public final class HookEntry {
         finally{discovering=false;}
     }
     static boolean reconcile(HookRuntime state){
-        if(state==null||!state.onDisplayThread()||state.changing||!state.phase.equals("active")||!state.appliesToUser()||!(state.kernel instanceof RefactorAdapter)||state.kernel.plan()==null)return false;
-        try{if(((RefactorAdapter)state.kernel).reconcile())state.log("已校正系统重建后的基础曲线，保留手动节点");return true;}
+        if(state==null||!state.onDisplayThread()||state.changing||!state.phase.equals("active")||!state.appliesToUser()||!state.kernel.name().equals("refactor")||state.kernel.plan()==null)return false;
+        try{if(state.kernel.reconcile())state.log("已校正系统重建后的基础曲线，保留手动节点");return true;}
         catch(Throwable failure){state.handler.post(()->state.fault(failure));return false;}
     }
     static void installThermal(Class<?> owner){

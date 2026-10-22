@@ -30,6 +30,7 @@
       ],
       "routes": [
         "refactor",
+        "refactor_coefficients",
         "miui_physical",
         "aosp_physical"
       ],
@@ -42,23 +43,28 @@
         "MemoryLifecycle.java",
         "PersistentMemory.java",
         "MemoryPersistence.java",
-        "SavedCurve.java"
+        "SavedCurve.java",
+        "RefactorProfiles.java",
+        "RefactorCoefficientsAdapter.java"
       ],
-      "selector": "ABC 活动策略为准；Refactor 未就绪不得因物理映射对象存在而抢用，未知活动标记才按已验证对象选择。",
+      "selector": "ABC 活动策略为准；Refactor 未就绪不得因物理映射对象存在而抢用，未知活动标记才按已验证对象选择。 Refactor内部分段锚点优先；任一旧锚点标记存在时不得回退绕过残缺旧结构；仅旧锚点整体缺失且9/22系数布局、实例字段与原生消费者签名完整时采用系数路径。",
       "evidence": [
         "curve_backend",
         "physical_mapper_class",
         "baseline_id",
-        "user_serial"
+        "user_serial",
+        "curve_route"
       ],
-      "cleanup": "关闭 / 故障 / OTA 基准或用户变化恢复本次应用的曲线；只按所选保持范围恢复匹配记忆。",
+      "cleanup": "关闭 / 故障 / OTA 基准或用户变化恢复本次应用的曲线；只按所选保持范围恢复匹配记忆。 系数路线事务快照同时保存数组内容与身份；拒绝其他所有者替换的基线，未验证的虚拟拟合参考点不冒充可移植用户锚点。",
       "tests": [
         "tests/refactor_traditional.py",
         "tests/refactor_curve_integrity.py",
         "tests/refactor_configuration.py",
         "tests/refactor_saved_curve_transaction.py",
         "tests/refactor_persistent_memory.py",
-        "tests/refactor_memory_lifecycle.py"
+        "tests/refactor_memory_lifecycle.py",
+        "tests/refactor_coefficient_curve.py",
+        "tests/refactor_coefficient_firmware.py"
       ],
       "composition": "exclusive"
     },
@@ -441,17 +447,24 @@
       "owners": [
         "OutdoorSdrScope.java",
         "OutdoorOpr.java",
-        "NitBrightnessLimit.java"
+        "NitBrightnessLimit.java",
+        "OutdoorOprEnvelope.java"
       ],
-      "selector": "完整隐私判断优先；完全没有隐私 / UHBM 残片且旧 OPR 完整才用传统路径。实际物理换算用于 nit 上限。调用失败不降级。",
+      "selector": "完整隐私判断优先；完全没有隐私 / UHBM 残片且旧 OPR 完整才用传统路径。实际物理换算用于 nit 上限。调用失败不降级。 OPR额外放宽独立读取完整原生灰阶/nit包络，最多到该表最高档；不存在整组字段时保留旧映射路线，部分缺失/坏表/换算失败保留原生限亮。",
       "evidence": [
         "outdoor.sdr_compatibility_profile",
-        "outdoor.sdr_compatibility_detail"
+        "outdoor.sdr_compatibility_detail",
+        "outdoor.opr_envelope_profile",
+        "outdoor.opr_envelope_max_nit",
+        "outdoor.opr_envelope_max_brightness",
+        "outdoor.opr_envelope_detail"
       ],
       "cleanup": "ThreadLocal 帧按调用恢复；只移除本次引入的 OPR 原因位；温控、电量、HDR 与系统接管继续优先。",
       "tests": [
         "tests/refactor_outdoor_compatibility.py",
-        "tests/refactor_outdoor_compatibility_firmware.py"
+        "tests/refactor_outdoor_compatibility_firmware.py",
+        "tests/refactor_opr_envelope.py",
+        "tests/refactor_opr_envelope_firmware.py"
       ],
       "composition": "exclusive"
     },
@@ -927,6 +940,27 @@
       ],
       "rule": "无折叠证据保留旧主屏节点；折叠设备复用统一 ActivePanelNode 只读发现，要求实时框架物理身份与所选节点一致、布局物理 ID 清单完整，启动前后重新验证节点/最大值/身份，显式传递折叠清单。动态切屏由原生协作路径核验，不复用手动面板接管或权限修改。",
       "test": "tests/refactor_outdoor_fold.py"
+    },
+    {
+      "id": "refactor_curve_layout",
+      "owner": "RefactorProfiles.java",
+      "alternatives": [
+        "anchors_7",
+        "coefficients_9_22"
+      ],
+      "rule": "旧式锚点标记优先且不回退；真实9项系数、22项状态、9项拟合数据与实例方法全部通过才选择独立系数路线。系数路径的基准端点从设备实际系数与逻辑上限反解，不按型号、OS或固定照度推算。保留原生拟合 / 物理输出，跨模式、锁屏、重启恢复及记忆转基础暂不支持，保存配置不重置。",
+      "test": "tests/refactor_coefficient_curve.py"
+    },
+    {
+      "id": "opr_relaxation_envelope",
+      "owner": "OutdoorOprEnvelope.java",
+      "alternatives": [
+        "mapping_only",
+        "native_opr_envelope",
+        "native_limit_retained"
+      ],
+      "rule": "灰阶/nit表字段整组不存在才沿用原映射范围；实际对象上的完整表最高档经物理nit换算限定本模块增加量，不能把换算末端当原生OPR高亮档；字段部分存在、非实例/类型错、顺序/形状错、未启用或换算失败均保留原生结果。不写原生灰阶、色彩、映射表或用户设置。未触发额外放宽前保持unconfirmed。",
+      "test": "tests/refactor_opr_envelope.py"
     }
   ],
   "native_variants": [

@@ -51,6 +51,9 @@ public final class TraditionalAdapter extends CurveBackend {
     static Method method(Class<?> type,String name,Class<?>...params)throws Exception{for(Class<?> c=type;c!=null;c=c.getSuperclass())try{Method m=c.getDeclaredMethod(name,params);m.setAccessible(true);return m;}catch(NoSuchMethodException missing){}throw new NoSuchMethodException(name);}
     static float bound(Object mapper,boolean high)throws Exception{float[] n=(float[])read(mapper,"mNits");if(n==null||n.length<2)throw new IllegalArgumentException("设备亮度标定未就绪");for(int i=0;i<n.length;i++)if(!Float.isFinite(n[i])||n[i]<0||(i>0&&n[i]<=n[i-1]))throw new IllegalArgumentException("设备亮度标定无效");return high?n[n.length-1]:n[0];}
     public String name(){return "physical_mapping";}
+    public void putCurveState(org.json.JSONObject status)throws Exception{
+        status.put("physical_mapping_active",read(abc,"mCurrentBrightnessMapper")==mapper).put("physical_mapper_class",mapper.getClass().getName()).put("physical_user_lux_field",userLuxField);
+    }
     public boolean persistentMemorySupported(){if(persistenceSupported==null)try{persistenceSupported=method(abc.getClass(),"setScreenBrightnessByUser",float.class,float.class).getReturnType()==boolean.class && method(mapper.getClass(),"getUserBrightness").getReturnType()==float.class;}catch(Exception unavailable){persistenceSupported=false;}return persistenceSupported;}
     public int manualPointCapacity(){return persistentMemorySupported()?1:0;}
     public org.json.JSONArray manualPoints()throws Exception {

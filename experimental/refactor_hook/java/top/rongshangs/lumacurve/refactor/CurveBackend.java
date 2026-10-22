@@ -20,6 +20,14 @@ public abstract class CurveBackend {
     public abstract float currentAt(float lux)throws Exception;
     public float memoryAt(float lux)throws Exception{return currentAt(lux);}
     public abstract String name();
+    public String compatibilityRoute(){return name();}
+    public Object target(){throw new IllegalStateException("此后端没有 Refactor 对象");}
+    public void afterReset()throws Exception{}
+    public boolean reconcile()throws Exception{return false;}
+    public void putVerification(org.json.JSONObject status)throws Exception{}
+    public void putCurveState(org.json.JSONObject status)throws Exception{}
+    public boolean savedCurveSupported(){return name().equals("refactor")||name().equals("physical_mapping");}
+    public boolean memoryHandoverSupported(){return true;}
     public boolean persistentMemorySupported(){return false;}
     public int manualPointCapacity(){return 0;}
     public org.json.JSONArray manualPoints()throws Exception{return new org.json.JSONArray();}

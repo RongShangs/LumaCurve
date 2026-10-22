@@ -17,6 +17,7 @@ final class CompatibilityCatalog {
     static Route route(String id,String name,String condition){return new Route(id,name,condition);}
     static Route[] curveRoutes(){return new Route[]{
         route("refactor","Refactor 逻辑曲线","使用本机 RefactorNitController 的逻辑锚点、手动点与曲线重建接口。"),
+        route("refactor_coefficients","Refactor 分段系数曲线","旧式9项系数与22项状态完整；保留原生手动学习和输出，尚不提供虚拟拟合点的跨模式 / 锁屏 / 重启恢复或记忆转基础。"),
         route("miui_physical","小米传统物理映射","实际映射器为 MiuiPhysicalBrightnessMappingStrategy，保留完整设备曲线与应用修正。"),
         route("aosp_physical","系统标准物理映射","实际映射器为 PhysicalMappingStrategy，使用其亮度 / nit 转换与短期模型。")};}
     static Route[] catalogue(String id){
@@ -28,7 +29,7 @@ final class CompatibilityCatalog {
             route("ported_auxiliary","移植系统辅助补位","原生槽为空；唯一 zte.sensor.light_second 候选通过类型、单位、权限、线程及主屏检查后，补入 OEM 槽并同步双光感能力缓存。")};
         case "apps":return new Route[]{route("visible_tasks","可见任务路径（含小窗 / 分屏）","可见任务接口完整；任一名单应用仍可见时保持暂停。"),route("focus_fallback","前台焦点回退路径","没有完整的可见任务能力时按系统焦点判断，并提示小窗限制。")};
         case "hbm":return new Route[]{route("timed_budget","HBM 照度＋时间预算","时间窗口、最大时长与最短时长均通过预算校验；复制本机数据后调整。"),route("ambient_only","HBM 仅照度门槛（原生零计时）","三个时间字段全部为零且接口完整；只调整照度，保留三个零计时值。"),route("enabled_field","控制器：原生启用字段","读取 mHbmControllerIsEnabled；存在此字段时始终优先，不回退绕过错误。"),route("native_support_method","控制器：原生能力方法","没有启用字段且旧结构完整；调用 deviceSupportsHbm 判断实际支持，继续保留照度、时间与省电条件。")};
-        case "opr":case "nit_limit":return new Route[]{route("privacy_aware","带隐私显示判断的新式 SDR 路径","匹配 shouldUsePrivacyOprBrightness，保留隐私显示、HDR、温控与电量判断。"),route("legacy_opr","传统 OPR / SDR 路径","不存在隐私显示分支且旧版灰阶 / nit 接口完整；不将残缺的新式接口误当旧接口。")};
+        case "opr":case "nit_limit":return new Route[]{route("privacy_aware","带隐私显示判断的新式 SDR 路径","匹配 shouldUsePrivacyOprBrightness，保留隐私显示、HDR、温控与电量判断；额外放宽遵守完整原生OPR表的最高档。"),route("legacy_opr","传统 OPR / SDR 路径","不存在隐私显示分支且旧版灰阶 / nit 接口完整；不将残缺的新式接口误当旧接口。")};
         case "outdoor_range":return new Route[]{route("hbm_range","HBM 与峰值范围","实际 HBM 最大亮度与峰值范围接口均已接入，仍受原生允许条件限制。"),route("dynamic_range","照度动态范围补充","额外匹配 BrightnessRangeControllerImpl；仅该设备实际使用动态范围时参与。")};
         case "dark_lock_schedule":return new Route[]{route("system_twilight","系统日出日落服务","复用实际 TwilightManager 与原生时间戳；只在夜间允许暗光锁定。缺时间等待，不以深色模式或固定钟点代替。")};
         case "dark_lock":return new Route[]{route("abc_sensor_manager","自动亮度控制器的光感服务","复用本机 ABC 的 SensorManager；按传感器类型和句柄识别，锁定期间低频确认退出条件。")};

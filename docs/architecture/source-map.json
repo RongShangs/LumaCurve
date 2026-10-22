@@ -353,6 +353,11 @@
       "purpose": "设备接口与所有权"
     },
     {
+      "file": "OutdoorOprEnvelope.java",
+      "layer": "adapters",
+      "purpose": "只读原生OPR灰阶/nit包络，限制额外放宽而不改变原机输出"
+    },
+    {
       "file": "OutdoorOptions.java",
       "layer": "configuration",
       "purpose": "配置、保持与迁移"
@@ -436,6 +441,16 @@
       "file": "RefactorAdapter.java",
       "layer": "adapters",
       "purpose": "设备接口与所有权"
+    },
+    {
+      "file": "RefactorCoefficientsAdapter.java",
+      "layer": "adapters",
+      "purpose": "原生9/22分段系数读写、逻辑上限反解与数组身份回滚"
+    },
+    {
+      "file": "RefactorProfiles.java",
+      "layer": "adapters",
+      "purpose": "Refactor锚点 / 分段系数互斥选择与默认方法ABI"
     },
     {
       "file": "RelativeNodeGesture.java",

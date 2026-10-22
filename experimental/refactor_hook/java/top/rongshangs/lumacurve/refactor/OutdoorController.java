@@ -12,6 +12,8 @@ final class OutdoorController {
     final ArrayDeque<JSONObject> history=new ArrayDeque<>();final Map<String,JSONObject> lastStages=new HashMap<>();
     final LiveLimitEvidence liveLimits=new LiveLimitEvidence();
     NitBrightnessLimit nitLimit;
+    OutdoorOprEnvelope oprEnvelope;
+    String oprEnvelopeError="";
     String nitLimitError="";
     final Runnable wake;
     OutdoorController(HookRuntime s){this.s=s;wake=()->{deadline=-1;if(s.closed)return;tick();s.requestRecalculation();s.queuePublish();};}
@@ -24,8 +26,11 @@ final class OutdoorController {
         if(!oprAllowed()||!OutdoorPolicy.valid(input)||!OutdoorPolicy.valid(limited)||limited>=input)return limited;
         try{float allowed=access.allowedMax(),mapping=access.max();
             if(!OutdoorPolicy.valid(allowed)||!OutdoorPolicy.valid(mapping))return limited;
-            return Math.max(limited,Math.min(input,Math.min(allowed,mapping)));
-        }catch(Throwable unknown){return limited;}
+            float proposed=Math.max(limited,Math.min(input,Math.min(allowed,mapping)));
+            if(oprEnvelope==null)oprEnvelope=new OutdoorOprEnvelope(s.owner);
+            oprEnvelopeError="";
+            return oprEnvelope.bound(proposed,limited,HookRuntime.optionalNumber(access.controller,"mBrightnessMin"),mapping);
+        }catch(Throwable unknown){oprEnvelopeError=unknown.toString();return limited;}
     }
     void oprApplied(float input,float limited,float delivered){oprRaises++;stage("outdoor_opr_native",input,limited);stage("outdoor_opr_relax",limited,delivered);}
     void configure(OutdoorOptions next){liveLimits.clear();if(!options.same(next)){policy.reset();goal=Float.NaN;}nitLimit=null;nitLimitError="";options=next;failed=false;error="";tick();}
@@ -109,6 +114,10 @@ final class OutdoorController {
         j.put("hbm_budget_supported",h!=null&&h.budgetTunable()).put("hbm_tuning_profile",h==null?"unsupported":h.tuningProfile());
         j.put("hbm_controller_profile",h==null?"unsupported":h.controllerProfile).put("target_compatibility_profile",OutdoorTuning.targetProfile(s.owner.getClass()));
         j.put("sdr_compatibility_profile",OutdoorSdrScope.profile(s.owner.getClass()));
+        j.put("opr_envelope_profile",oprEnvelope==null?(oprEnvelopeError.isEmpty()?"unconfirmed":"native_limit_retained"):oprEnvelope.profile);
+        if(oprEnvelope!=null&&Float.isFinite(oprEnvelope.maximumNit))j.put("opr_envelope_max_nit",oprEnvelope.maximumNit).put("opr_envelope_max_brightness",oprEnvelope.maximumBrightness);
+        String envelopeError=oprEnvelope==null?oprEnvelopeError:oprEnvelope.error;
+        if(!envelopeError.isEmpty())j.put("opr_envelope_detail",envelopeError);
         String scopeDetail=OutdoorSdrScope.detail(s.owner.getClass());if(!scopeDetail.isEmpty())j.put("sdr_compatibility_detail",scopeDetail);
         float cap=nitCeiling(options.values[OutdoorOptions.MAX_NIT]);j.put("nit_limit_supported",OutdoorPolicy.valid(cap));
         if(nitLimit!=null&&Float.isFinite(nitLimit.maximumNit))j.put("mapping_max_nit",nitLimit.maximumNit).put("mapping_min_nit",nitLimit.minimumNit);

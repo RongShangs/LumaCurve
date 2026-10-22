@@ -17,7 +17,7 @@ class HookRuntime{
  // Production lifecycle methods are inserted by the test driver below.
  LIFECYCLE
 }
-class Kernel{float[] factoryLux={0,100},factoryNit={2,500};float min=1,max=500;int manualPointCapacity(){return 7;}String name(){return "physical_mapping";}boolean persistentMemorySupported(){return true;}}
+class Kernel{float[] factoryLux={0,100},factoryNit={2,500};float min=1,max=500;boolean savedCurveSupported(){return true;}int manualPointCapacity(){return 7;}String name(){return "physical_mapping";}boolean persistentMemorySupported(){return true;}}
 class Assist{int refreshes;void refresh(){refreshes++;}}
 class Slider{boolean ready=true;boolean supported(){return ready;}}
 class Control{boolean available(){return true;}}class Memory{boolean resetSupported=true,timeoutSupported=true,modeSupported=true,foreverSupported=true;}

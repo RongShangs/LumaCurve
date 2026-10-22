@@ -18,12 +18,13 @@ final class MemoryLifecycle {
     static MemoryLifecycle active(Object target){MemoryLifecycle m=links.get(target);return m!=null&&!m.state.closed&&m.state.onDisplayThread()?m:null;}
     boolean allowed(){return !state.closed&&!state.changing&&!state.persistentMemory.replaying&&state.phase.equals("active")&&state.appliesToUser();}
     void attach(){
+        if(!state.kernel.memoryHandoverSupported())return;
         links.put(state.owner,this);try{installMode(state.owner);modeSupported=true;}catch(Throwable absent){}
         try{impl=TraditionalAdapter.read(state.owner,"mAutomaticBrightnessControllerImpl");abc=TraditionalAdapter.read(impl,"mAutomaticBrightnessController");mapper=TraditionalAdapter.read(state.owner,"mBrightnessMapper");model=TraditionalAdapter.read(abc,"mShortTermModel");
             for(Object o:new Object[]{state.owner,impl,abc,mapper,model})if(o!=null)links.put(o,this);
             Method modelSetter=TraditionalAdapter.method(model.getClass(),"setUserBrightness",float.class,float.class);modelSupported=modelSetter.getReturnType()==void.class&&TraditionalAdapter.find(model.getClass(),"mAnchor").getType()==float.class&&TraditionalAdapter.find(model.getClass(),"mBrightness").getType()==float.class&&TraditionalAdapter.find(model.getClass(),"mIsValid").getType()==boolean.class;
             observe(abc,"resetShortTermModel");boolean expiry=observe(model,"invalidate");observe(impl,"needResetShortTermModelPolicy");foreverSupported=modeSupported&&modelSupported&&expiry&&state.kernel.persistentMemorySupported();
-            if(state.kernel.name().equals("refactor")){Object target=((RefactorAdapter)state.kernel).target();links.put(target,this);observe(target,"shouldUseGoodCurve");}
+            if(state.kernel.name().equals("refactor")){Object target=state.kernel.target();links.put(target,this);observe(target,"shouldUseGoodCurve");}
             try{installAmbient(abc);}catch(Throwable absent){}try{installDisplayPolicy(abc);}catch(Throwable absent){}installResetRule();installTimeout();
         }catch(Throwable optional){state.log("手动记忆交接观察接口未完整兼容："+optional.getClass().getSimpleName());}
     }

@@ -48,8 +48,12 @@ public final class RefactorAdapter extends CurveBackend {
     public float number(String name)throws Exception{return ((Number)get(name)).floatValue();}
     public int integer(String name)throws Exception{return ((Number)get(name)).intValue();}
     public CurvePlan plan(){return active;}
-    Object target(){return target;}
+    public Object target(){return target;}
     public String name(){return "refactor";}
+    public void putCurveState(org.json.JSONObject status)throws Exception{
+        int count=integer("mAnchorCount");boolean[] user=(boolean[])get("mAnchorIsUserDrag");if(count<0||count>user.length)throw new IllegalStateException("系统锚点数量异常");
+        org.json.JSONArray flags=new org.json.JSONArray();for(int i=0;i<count;i++)flags.put(user[i]);status.put("manual_anchor_flags",flags);
+    }
     public boolean persistentMemorySupported(){return true;}
     public int manualPointCapacity(){try{return Math.min(PersistentMemory.MAX_POINTS,java.lang.reflect.Array.getLength(get("mAnchorLux")));}catch(Exception unavailable){return 0;}}
     public org.json.JSONArray manualPoints()throws Exception {
