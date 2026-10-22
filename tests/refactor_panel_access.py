@@ -12,6 +12,7 @@ S = R / 'experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor'
 O = R / 'build/panel-access-tests'
 J = R / 'build/refactor-diagnostics/json-20240303.jar'
 files = {
+    'top/rongshangs/lumacurve/refactor/ActivePanelNode.java': 'package top.rongshangs.lumacurve.refactor;class ActivePanelNode{static final String PROFILE="fold_default_display";static org.json.JSONObject discover()throws Exception{return PanelNodeDiscovery.discover(new java.io.File("/sys"));}}',
     'android/system/ErrnoException.java': '''package android.system;public class ErrnoException extends Exception{public final int errno;public ErrnoException(String op,int e){super(op+" errno="+e);errno=e;}}''',
     'android/system/StructStat.java': '''package android.system;public class StructStat{public int st_mode;public long st_dev=1,st_ino=2;}''',
     'android/system/OsConstants.java': '''package android.system;public class OsConstants{public static final int O_WRONLY=1,O_CLOEXEC=02000000,O_NOFOLLOW=0400000;public static boolean S_ISREG(int mode){return (mode&0170000)==0100000;}}''',
@@ -101,7 +102,7 @@ c.write_text(r'''
 #endif
 #define RECORD "record"
 static char node[PANEL_NODE_PATH_SIZE]="/sys/class/backlight/panel0-backlight/brightness",real_node[PANEL_REAL_PATH_SIZE]="/sys/devices/panel0/brightness",boot_id[40]="5a30f9e3-021b-4ec1-8131-47f151ebb7aa";
-static dev_t node_device=1;static ino_t node_inode=2;static int output=-1,original=-1;
+static dev_t node_device=1;static ino_t node_inode=2;static int output=-1,original=-1,active_fold_port=-1;
 static int mode,deny,changed,live,opens,closes,chmods,restores,record_writes,record_exists,chmod_mode,fail_chmod,fail_sync;
 static int same_node(void){return live;}
 static int fake_open(const char *path,int flags,...){

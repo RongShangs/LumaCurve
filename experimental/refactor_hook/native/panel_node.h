@@ -27,13 +27,23 @@ static inline int panel_class_path(const char *path){
  for(size_t i=0;i<sizeof(allowed)/sizeof(allowed[0]);i++)if(!strcmp(lower,allowed[i]))return 1;
  return 0;
 }
+/* Additional namespace is accepted only with an explicit verified fold binding. */
+static inline int panel_fold_path(const char *path,int port){
+ if(port<0||port>7)return 0;char expected[PANEL_NODE_PATH_SIZE];
+ snprintf(expected,sizeof(expected),"/sys/class/backlight/panel%d-backlight/brightness",port);
+ return !strcmp(path,expected);
+}
 static inline int panel_boot_token(const char *s){
  if(strlen(s)!=36)return 0;for(int i=0;i<36;i++){if(i==8||i==13||i==18||i==23){if(s[i]!='-')return 0;}else if(!isxdigit((unsigned char)s[i]))return 0;}return 1;
 }
-struct panel_permissions {unsigned mode;unsigned long long device,inode;char boot[40],path[PANEL_NODE_PATH_SIZE],real[PANEL_REAL_PATH_SIZE];int legacy;};
+struct panel_permissions {unsigned mode;unsigned long long device,inode;char boot[40],path[PANEL_NODE_PATH_SIZE],real[PANEL_REAL_PATH_SIZE];int legacy,fold_route,fold_port;};
 static inline int panel_permissions_parse(const char *text,struct panel_permissions *record){
  memset(record,0,sizeof(*record));char tail;
- if(!strncmp(text,"v2\n",3)){
+ if(!strncmp(text,"v3\n",3)){
+  if(sscanf(text,"v3\n%o\n%llu %llu\n%39s\n%255s\n%767s\n%d %c",&record->mode,&record->device,&record->inode,record->boot,record->path,record->real,&record->fold_port,&tail)!=7)return 0;
+  record->fold_route=1;
+  if(!panel_boot_token(record->boot)||!panel_fold_path(record->path,record->fold_port)||strncmp(record->real,"/sys/devices/",13))return 0;
+ }else if(!strncmp(text,"v2\n",3)){
   if(sscanf(text,"v2\n%o\n%llu %llu\n%39s\n%255s\n%767s %c",&record->mode,&record->device,&record->inode,record->boot,record->path,record->real,&tail)!=6)return 0;
   if(!panel_boot_token(record->boot)||!panel_class_path(record->path)||strncmp(record->real,"/sys/devices/",13))return 0;
  }else{
@@ -43,6 +53,7 @@ static inline int panel_permissions_parse(const char *text,struct panel_permissi
  return record->mode<=0777;
 }
 static inline int panel_permissions_format(char *text,size_t size,const struct panel_permissions *record){
+ if(record->fold_route)return snprintf(text,size,"v3\n%o\n%llu %llu\n%s\n%s\n%s\n%d\n",record->mode,record->device,record->inode,record->boot,record->path,record->real,record->fold_port);
  return snprintf(text,size,"v2\n%o\n%llu %llu\n%s\n%s\n%s\n",record->mode,record->device,record->inode,record->boot,record->path,record->real);
 }
 static inline int panel_permissions_new_boot(const struct panel_permissions *record,const char *boot){return !record->legacy&&strcmp(record->boot,boot)!=0;}

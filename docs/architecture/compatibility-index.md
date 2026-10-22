@@ -4,7 +4,7 @@
 
 此索引说明已实现和验证责任，不代表所有功能已在所有设备启用或实测。
 
-共 49 项功能、21 组适配、124 份生产 Java。
+共 49 项功能、21 组适配、128 份生产 Java。
 
 ## 曲线与手动记忆 · curve
 
@@ -103,7 +103,7 @@
 | 路线 | 条件 |
 | --- | --- |
 | `oem_animation` · Refactor 原生时长过渡 | 调整已验证的原生过渡时长倍率，保持系统动画及主副屏隔离。 |
-| `traditional_ramp` · 传统自动亮度速率过渡 | 原生 Refactor 策略关闭且时长对象为空；匹配主屏双 RampAnimator 和速率原因，只调整普通自动亮度速率，保留系统时长上限及特殊过渡。 |
+| `traditional_ramp` · 传统自动亮度速率过渡 | 原生 Refactor 策略关闭且时长对象为空；匹配主屏双 RampAnimator、三参或四参目标入口及速率原因，只调整普通自动亮度速率，保留系统时长上限及特殊过渡。 |
 
 实现：[AdvancedTuning.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/AdvancedTuning.java)、[TraditionalAnimation.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/TraditionalAnimation.java)。
 
@@ -332,27 +332,28 @@
 
 功能：`manual_panel`、`node_output`。
 
-选择：主屏输出 / 电源状态对象完整；租约、解锁、模式、屏幕状态均通过才隔离正亮度帧，第一帧留给系统。
+选择：主屏输出 / 电源状态对象完整；租约、解锁、模式、屏幕状态均通过才隔离正亮度帧，第一帧留给系统。 户外协作独立匹配原生策略或完整旧自动对象 / 双原因，原手动面板检查不代替此检查。
 
 组合关系：`exclusive`；互斥、独立功能、双维度和补充组件分别处理。
 
 | 路线 | 条件 |
 | --- | --- |
-| `raw_primary_output` · 主屏原生节点输出 | 主屏输出接口配合实际节点识别、所有权租约与系统接管退让；不把节点值视为 nit。 |
+| `raw_primary_output` · 原生策略节点协作 | 优先使用实际输出策略，普通自动输出到顶后协作，保留原生保护。 |
+| `automatic_strategy2_node` · 独立自动对象与原因协作 | 仅原生策略入口缺失时核验独立自动对象、同屏归属和双份亮度原因，不替换手动面板路径。 |
 
-实现：[RawPanelOutputHooks.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/RawPanelOutputHooks.java)、[BrightnessControl.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/BrightnessControl.java)、[OutdoorNodeBridge.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/OutdoorNodeBridge.java)、[RawPanelLease.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/RawPanelLease.java)。
+实现：[RawPanelOutputHooks.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/RawPanelOutputHooks.java)、[BrightnessControl.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/BrightnessControl.java)、[OutdoorNodeBridge.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/OutdoorNodeBridge.java)、[RawPanelLease.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/RawPanelLease.java)、[OutdoorOutputAccess.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/OutdoorOutputAccess.java)。
 
-证据：`brightness_control.owner`、`outdoor_node_supported`。
+证据：`brightness_control.owner`、`outdoor_node_supported`、`outdoor_output_profile`、`outdoor_node_physical_id`。
 
 退出 / 回滚：熄屏先撤销控制权，租约失联自动归还，系统改写优先。
 
-验证：[refactor_raw_output.py](../../tests/refactor_raw_output.py)、[refactor_raw_panel_transaction.py](../../tests/refactor_raw_panel_transaction.py)、[refactor_outdoor_node.py](../../tests/refactor_outdoor_node.py)。
+验证：[refactor_raw_output.py](../../tests/refactor_raw_output.py)、[refactor_raw_panel_transaction.py](../../tests/refactor_raw_panel_transaction.py)、[refactor_outdoor_node.py](../../tests/refactor_outdoor_node.py)、[refactor_outdoor_fold.py](../../tests/refactor_outdoor_fold.py)。
 
 ## 真实主屏节点 · node
 
 功能：`main_panel_node`。
 
-选择：backlight 或明确标识显示的 leds；真实 sysfs 路径与上限配对且唯一主屏，不按机型写死上限。
+选择：backlight 或明确标识显示的 leds；真实 sysfs 路径与上限配对且唯一主屏，不按机型写死上限。 新增手动面板折叠路线：实际原生布局至少两个不同默认物理屏；实时默认内部屏地址与布局、成对同控制器背光、唯一 DSI 亮屏端口一致，选当前端口，扫描后再确认物理屏未变化。无切换布局证据时原发现路径不变；有折叠证据但不完整则等待。 兼容实际 Physical / StablePhysical 地址对象，均直接调用原生 getPort；StablePhysical 的物理 ID 与端口独立，按内核成对 panelN 清单验证，不解码该 ID。
 
 组合关系：`exclusive`；互斥、独立功能、双维度和补充组件分别处理。
 
@@ -360,14 +361,15 @@
 | --- | --- |
 | `backlight_node` · 主屏 backlight 节点 | 扫描 backlight，验证主屏身份、真实路径及 brightness / max_brightness 配对。 |
 | `display_led_node` · 显示专用 leds 节点 | 仅接受明确标识为主屏背光的 leds 节点，排除通知灯、手电与背屏。 |
+| `fold_default_display` · 折叠屏当前主屏节点 | 原生折叠布局允许不同物理屏作为默认屏；根据实时默认屏地址、成对背光与唯一点亮 DSI 选择节点；显示端口与内核编号不一致时独立核验默认屏点亮状态，切屏释放旧接管。 |
 
-实现：[PanelNodeDiscovery.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/PanelNodeDiscovery.java)、[NativePanelRoot.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/NativePanelRoot.java)。
+实现：[PanelNodeDiscovery.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/PanelNodeDiscovery.java)、[NativePanelRoot.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/NativePanelRoot.java)、[ActivePanelNode.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ActivePanelNode.java)。
 
-证据：`main_panel_node.node_class`、`main_panel_node.node_path`、`main_panel_node.node_maximum`。
+证据：`main_panel_node.node_class`、`main_panel_node.node_path`、`main_panel_node.node_maximum`、`main_panel_node.node_discovery`、`main_panel_node.node_physical_display_id`、`main_panel_node.node_address_profile`、`main_panel_node.node_port_source`、`main_panel_node.node_detail`。
 
-退出 / 回滚：发现与权限检查只读，不启动写入器；实际租约写入另由原生事务负责，拒绝副屏 / 指示灯 / 手电。
+退出 / 回滚：发现与权限检查只读，不启动写入器；实际租约写入另由原生事务负责，拒绝副屏 / 指示灯 / 手电。 折叠专用原生选项与 v3 权限恢复记录仅允许绑定端口节点；v2 / 旧节点拒绝规则不变。关闭、熄屏、DRM 改变结束旧接管；租约和框架输出隔离绑定物理屏，晚到命令拒绝，不复用旧目标。户外新增显式折叠协作分支，使用独立物理租约和原生 DSI 核验；隐藏映射仍不启用此分支。
 
-验证：[refactor_panel_nodes.py](../../tests/refactor_panel_nodes.py)、[refactor_panel_access.py](../../tests/refactor_panel_access.py)。
+验证：[refactor_panel_nodes.py](../../tests/refactor_panel_nodes.py)、[refactor_panel_access.py](../../tests/refactor_panel_access.py)、[refactor_fold_panel.py](../../tests/refactor_fold_panel.py)。
 
 ## Root 存储与原生工具 · root_tools
 
@@ -383,14 +385,15 @@
 | `stored_json` · 原始配置 JSON | 读取原始配置；自检与兼容裁剪不会将默认值写回用户设置。 |
 | `primary_node_profile` · 实际主屏节点与框架输出组合 | 按实际节点上限、曲线映射和输出能力核验，不按机型名单放行。 |
 | `apk_native_asset` · APK 内原生程序校验 | 核对当前 APK 的主屏程序资产完整性，不启动守护、不试写亮度。 |
+| `fold_bound_outdoor` · 折叠主屏节点协作绑定 | 当前物理主屏、原生布局和背光配对完整；用独立物理租约核验切屏，不跨屏继承目标。 |
 
 实现：[RootControl.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/RootControl.java)、[RootFeatureChecks.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/RootFeatureChecks.java)、[NativePanelAsset.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/NativePanelAsset.java)、[OutdoorNodeRoot.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/OutdoorNodeRoot.java)。
 
-证据：`feature_self_check`、`root_feature_self_check`。
+证据：`feature_self_check`、`root_feature_self_check`、`outdoor_node_device_profile`。
 
 退出 / 回滚：短命 Root 桥和有界 IPC；诊断不写回用户配置，失败只禁本项。
 
-验证：[refactor_feature_self_check.py](../../tests/refactor_feature_self_check.py)、[refactor_native_asset.py](../../tests/refactor_native_asset.py)、[refactor_outdoor_node_settings.py](../../tests/refactor_outdoor_node_settings.py)。
+验证：[refactor_feature_self_check.py](../../tests/refactor_feature_self_check.py)、[refactor_native_asset.py](../../tests/refactor_native_asset.py)、[refactor_outdoor_node_settings.py](../../tests/refactor_outdoor_node_settings.py)、[refactor_outdoor_fold.py](../../tests/refactor_outdoor_fold.py)。
 
 ## APP 本地工具 · app_tools
 
@@ -480,6 +483,11 @@
 | `native_payload_refresh` · `NativePanelRoot.java` | `same_asset_hash` / `atomic_asset_replace` | 相同程序仅验证；显式节点使用时才停止旧租约并原子换程序，不因自检启动输出器。 | [refactor_native_asset.py](../../tests/refactor_native_asset.py) |
 | `main_light_identity` · `BrightnessSensorAccess.java` | `standard_type_light` / `oem_selected_scalar_secondary` / `native_fov_selector` | 沿用系统当前默认逻辑屏 ABC 的真实主槽和 SensorManager；标准路径不变；私有折叠光感需精确语义身份与有效元数据，暗光监听不猜测 FOV / 非标单位。其他屏幕、同类多候选与原始通道不参与选择。 FOV 路线由已启用字段、实际 FOV 对象、同屏标识和非静态选择器返回值共同确认；正常值与驾驶替代值沿用固件消费者单位。 | [refactor_brightness_control.py](../../tests/refactor_brightness_control.py) |
 | `traditional_animation_reason` · `TraditionalAnimation.java` | `native_auto_slow_no_modifier` / `native_special_or_immediate` | 只读取本机原生自动原因常量；普通慢速自动过渡且没有特殊 modifier 时调整调用速率，温控 / HDR / 手动 / 唤醒 / 即时原样保留。 | [refactor_traditional_animation.py](../../tests/refactor_traditional_animation.py) |
+| `fold_physical_address` · `ActivePanelNode.java` | `physical` / `stable_physical` | 按实际默认内部屏的地址对象分支：Physical 与 StablePhysical 是同父类下的独立类型。严格校验非静态 long getPhysicalDisplayId / int getPort 与 uniqueId；StablePhysical 使用独立端口，不从 ID 低位推导。绑定布局中的默认物理 ID、成对内核 panel 端口及唯一点亮 DSI；未知地址或残缺接口等待，不将错误降级旧类型。 | [refactor_fold_panel.py](../../tests/refactor_fold_panel.py) |
+| `traditional_animation_target_signature` · `TraditionalAnimation.java` | `target_with_lux` / `target_without_lux` | 四参目标入口存在时严格沿用；只有签名不存在才选择三参入口。返回值、实例方法、下游限时消费者、实际双 RampAnimator 与原生原因门控均完整才安装；残缺优先接口不降级。 | [refactor_traditional_animation.py](../../tests/refactor_traditional_animation.py) |
+| `fold_kernel_binding` · `ActivePanelNode.java` | `native_port_pair` / `exclusive_internal_dsi` | 小编号显示端口继续使用原生成对端口绑定；非内核编号的显示端口不做固定偏移换算，只在当前逻辑默认内部屏明确点亮、布局身份有效、成对内核节点完整、唯一活动 DSI 与非零背光一致且二次读取身份状态不变时采用活动节点。双屏同亮、熄屏、未知及切换中拒绝写入。 | [refactor_fold_panel.py](../../tests/refactor_fold_panel.py) |
+| `outdoor_output_provenance` · `OutdoorOutputAccess.java` | `selected_strategy` / `automatic_strategy2_reason` | 户外控制专用：优先 getLastSelectedStrategy，存在但错误或调用失败不降级；仅该方法缺失且独立 AutomaticBrightnessStrategy2 主屏归属、同一 ABC、启用/使用/已应用三个状态及已提交和当前计算的原生自动原因都完整时采用旧 ABI。仅允许已验证的 BCBC/OPR/PEAK 修饰，不绕开临时、手动、HDR、温控及其他修饰。能力检查不依赖当前是否已启用自动模式。 | [refactor_outdoor_fold.py](../../tests/refactor_outdoor_fold.py) |
+| `outdoor_root_panel_binding` · `OutdoorNodeRoot.java` | `primary_node` / `fold_bound_node` | 无折叠证据保留旧主屏节点；折叠设备复用统一 ActivePanelNode 只读发现，要求实时框架物理身份与所选节点一致、布局物理 ID 清单完整，启动前后重新验证节点/最大值/身份，显式传递折叠清单。动态切屏由原生协作路径核验，不复用手动面板接管或权限修改。 | [refactor_outdoor_fold.py](../../tests/refactor_outdoor_fold.py) |
 
 ## 原生协议与运行分支
 
@@ -490,14 +498,15 @@
 | `freezer_startup` · `main_panel.c` | `root_cgroup` / `uid_0_cgroup` / `dev_freezer` / `legacy_freezer` / `no_freezer_path` | 只在显式启动原生工具时尝试现有路径；发现但均无法迁出时拒绝启动，不把错误吞成就绪。 | [refactor_native_asset.py](../../tests/refactor_native_asset.py) |
 | `native_primary_node` · `panel_node.h` | `backlight` / `display_labelled_leds` | 真实路径与上限配对，拒绝副屏 / 手电 / 通知灯，不能仅因 Java 曾发现就省略原生复核。 | [refactor_panel_nodes.py](../../tests/refactor_panel_nodes.py) |
 | `native_slider_listener` · `control_center_policy.h` | `ordinary_manual_lease` / `explicit_control_center_pid` | 控制中心监听必须 Root 明确启用、匹配现有框架 PID 和 cc_ 会话；普通手动租约不自动获得监听权限。 | [refactor_control_center.py](../../tests/refactor_control_center.py) |
+| `outdoor_physical_lease` · `outdoor_node_policy.h` | `legacy_v1_fraction` / `legacy_v2_raw` / `physical_v3_raw` | v1/v2 继续用于原主屏路径；新增 v3 携带正数物理 ID。折叠协作仅接受在显式根进程清单内的 v3，按唯一活动 DSI 与新旧物理身份共同确认切屏，两者只变一个时等待、不写旧屏。重新绑定重置稳定确认，不跨屏恢复旧目标；未知、双亮、熄屏、原生改写或手动接管时退让。 | [refactor_outdoor_fold.py](../../tests/refactor_outdoor_fold.py) |
 
 ## 源码职责索引
 
 每份生产 Java / C / 头文件必须有明确归属；新增文件漏登记会使检查失败。
 
-### adapters · 设备接口与所有权
+### adapters · 原生折叠布局、默认物理屏与背光节点绑定
 
-`AdvancedTuning.java`、`AssistSensorCompat.java`、`BrightnessSensorAccess.java`、`ControlCenterCalibration.java`、`ControlCenterHooks.java`、`DarkLockSchedule.java`、`ForegroundApps.java`、`FrameworkBrightness.java`、`HbmAccess.java`、`LowLightTuning.java`、`OutdoorOpr.java`、`OutdoorSdrScope.java`、`OutdoorTuning.java`、`PipelineHooks.java`、`RawPanelOutputHooks.java`、`RefactorAdapter.java`、`ResponseTuning.java`、`SceneTuning.java`、`TraditionalAdapter.java`、`TraditionalAnimation.java`、`TraditionalHooks.java`。
+`ActivePanelNode.java`、`AdvancedTuning.java`、`AssistSensorCompat.java`、`BrightnessSensorAccess.java`、`ControlCenterCalibration.java`、`ControlCenterHooks.java`、`DarkLockSchedule.java`、`ForegroundApps.java`、`FrameworkBrightness.java`、`HbmAccess.java`、`LowLightTuning.java`、`OutdoorOpr.java`、`OutdoorOutputAccess.java`、`OutdoorSdrScope.java`、`OutdoorTuning.java`、`PipelineHooks.java`、`RawPanelOutputHooks.java`、`RefactorAdapter.java`、`ResponseTuning.java`、`SceneTuning.java`、`TraditionalAdapter.java`、`TraditionalAnimation.java`、`TraditionalHooks.java`。
 
 ### bootstrap · 入口与代次
 
@@ -533,7 +542,7 @@
 
 ### presentation · 界面与只读说明
 
-`ApplicationBrightnessSettings.java`、`BranchReport.java`、`BrightnessPanelActivity.java`、`BrightnessTileService.java`、`CurveEditor.java`、`FeatureCheckPage.java`、`FeatureCompatibility.java`、`MainActivity.java`、`ManualBrightnessPanel.java`、`RawBrightnessPanel.java`、`ResponsiveDialog.java`、`SceneCatalog.java`、`SceneDescriptions.java`、`SceneSettings.java`、`SettingsPresets.java`、`StatusAdvice.java`、`StatusLimits.java`、`StatusPageLayout.java`、`StatusPresentation.java`、`ThemePalette.java`、`TutorialContent.java`、`UiText.java`、`WelcomeGuide.java`。
+`ApplicationBrightnessSettings.java`、`BranchReport.java`、`BrightnessPanelActivity.java`、`BrightnessTileService.java`、`CurveEditor.java`、`FeatureCheckPage.java`、`FeatureCompatibility.java`、`MainActivity.java`、`ManualBrightnessPanel.java`、`QuickSetupPage.java`、`QuickSetupPlan.java`、`RawBrightnessPanel.java`、`ResponsiveDialog.java`、`SceneCatalog.java`、`SceneDescriptions.java`、`SceneSettings.java`、`SettingsPresets.java`、`StatusAdvice.java`、`StatusLimits.java`、`StatusPageLayout.java`、`StatusPresentation.java`、`ThemePalette.java`、`TutorialContent.java`、`UiText.java`、`WelcomeGuide.java`。
 
 ### native · 原生主屏工具
 
@@ -543,3 +552,4 @@
 - `outdoor_node.h`：户外协作输出、锁和健康状态
 - `outdoor_node_policy.h`：户外 v1 / v2 租约和系统改写退让
 - `control_center_policy.h`：隐藏映射监听的进程与租约许可
+- `fold_panel.h`：显式折叠端口的唯一 DSI 亮屏核验

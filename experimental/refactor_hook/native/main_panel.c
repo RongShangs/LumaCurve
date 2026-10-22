@@ -20,6 +20,8 @@
 #include "panel_policy.h"
 #include "control_center_policy.h"
 #include "panel_node.h"
+#include "fold_panel.h"
+typedef DIR panel_directory;
 #define DIR "/data/adb/luma_curve_refactor_test"
 #define RECORD DIR "/main-panel-permissions"
 #define SOCKET_NAME "hyperlux.main.panel.raw04"
@@ -33,6 +35,7 @@ static int64_t due;
 static int corrections;
 static int64_t last_correction_log;
 static int control_center_listener,control_center_pid;
+static int active_fold_port=-1;
 static int read_lease(struct panel_lease *lease);
 static int64_t clock_ms(void){struct timespec t;clock_gettime(CLOCK_MONOTONIC,&t);return (int64_t)t.tv_sec*1000+t.tv_nsec/1000000;}
 static void signal_stop(int sig){(void)sig;stopping=1;}
@@ -49,7 +52,7 @@ static int load_boot(void){
 }
 static int resolve_node(const char *path){
  char resolved[PATH_MAX];struct stat st;
- if(!panel_class_path(path)||strlen(path)>=sizeof(node)||!realpath(path,resolved)||strncmp(resolved,"/sys/devices/",13)||strlen(resolved)>=sizeof(real_node)||lstat(path,&st)||!S_ISREG(st.st_mode)){errno=EINVAL;return -1;}
+ if(!(active_fold_port>=0?panel_fold_path(path,active_fold_port):panel_class_path(path))||strlen(path)>=sizeof(node)||!realpath(path,resolved)||strncmp(resolved,"/sys/devices/",13)||strlen(resolved)>=sizeof(real_node)||lstat(path,&st)||!S_ISREG(st.st_mode)){errno=EINVAL;return -1;}
  for(const char *p=resolved;*p;p++)if((unsigned char)*p<33||*p=='"'||*p=='\\'){errno=EINVAL;return -1;}
  strcpy(node,path);strcpy(real_node,resolved);node_device=st.st_dev;node_inode=st.st_ino;
  int len=snprintf(max_node,sizeof(max_node),"%.*s/max_brightness",(int)(strrchr(path,'/')-path),path);
@@ -95,7 +98,7 @@ static int acquire_output(void){
  original=st.st_mode&0777;
  // Save permissions before locking. The already-open descriptor remains writable.
  int f=open(RECORD,O_WRONLY|O_CREAT|O_EXCL|O_CLOEXEC|O_NOFOLLOW,0600);if(f<0)return -1;
- struct panel_permissions record={.mode=(unsigned)original,.device=(unsigned long long)st.st_dev,.inode=(unsigned long long)st.st_ino};strcpy(record.boot,boot_id);strcpy(record.path,node);strcpy(record.real,real_node);
+ struct panel_permissions record={.mode=(unsigned)original,.device=(unsigned long long)st.st_dev,.inode=(unsigned long long)st.st_ino};record.fold_route=active_fold_port>=0;record.fold_port=active_fold_port;strcpy(record.boot,boot_id);strcpy(record.path,node);strcpy(record.real,real_node);
  char b[1200];int len=panel_permissions_format(b,sizeof(b),&record);int ok=len>0&&(size_t)len<sizeof(b)&&write(f,b,(size_t)len)==len&&fsync(f)==0;close(f);
  if(!ok){unlink(RECORD);return -1;}
  output=open_output();if(output<0){int error=errno;restore_record();errno=error;return -1;}
@@ -105,9 +108,9 @@ static int write_output(int value){
  struct panel_lease lease;
  if(!read_lease(&lease)||lease.pid!=state.pid||strcmp(lease.token,state.token)){last_error=ECANCELED;return -1;}
  if(!same_node()){last_error=ESTALE;return -1;}
- if(!lease.active||lease.target!=value||!panel_output_live(number(node)))return 1;
+ if(!lease.active||lease.target!=value||!panel_output_live(number(node))||(active_fold_port>=0&&!fold_panel_live("/sys",active_fold_port)))return 1;
  attempts++;if(acquire_output()){last_error=errno?errno:EIO;return -1;}
- if(!read_lease(&lease)||!lease.active||lease.target!=value||lease.pid!=state.pid||strcmp(lease.token,state.token)){release_output();return 1;}
+ if(!read_lease(&lease)||!lease.active||lease.target!=value||lease.pid!=state.pid||strcmp(lease.token,state.token)||(active_fold_port>=0&&!fold_panel_live("/sys",active_fold_port))){release_output();return 1;}
  char b[24];int len=snprintf(b,sizeof(b),"%d",value);
  if(lseek(output,0,SEEK_SET)<0||write(output,b,(size_t)len)!=len){last_error=errno?errno:EIO;return -1;}
  if(number(node)!=value){last_error=ERANGE;return -1;}
@@ -120,7 +123,7 @@ static int private_lock(void){
  return 0;
 }
 static void response(int c,int ok,const char *reason){
- char out[2048];int n=snprintf(out,sizeof(out),"{\"ok\":%s,\"reason\":\"%s\",\"backend\":\"raw_main_node\",\"native_build\":\"raw08-slider\",\"path\":\"%s\",\"canonical_path\":\"%s\",\"control_center_listener\":%s,\"control_center_pid\":%d,\"target\":%d,\"actual\":%d,\"maximum\":%d,\"armed\":%s,\"paused\":%s,\"session\":\"%s\",\"write_attempts\":%d,\"write_successes\":%d,\"corrections\":%d,\"errno\":%d}\n",ok?"true":"false",reason,node,real_node,control_center_listener?"true":"false",control_center_pid,state.target,number(node),maximum,state.armed?"true":"false",state.paused?"true":"false",state.token,attempts,successes,corrections,last_error);
+ char out[2048];int n=snprintf(out,sizeof(out),"{\"ok\":%s,\"reason\":\"%s\",\"backend\":\"raw_main_node\",\"native_build\":\"raw08-slider\",\"path\":\"%s\",\"canonical_path\":\"%s\",\"fold_port\":%d,\"control_center_listener\":%s,\"control_center_pid\":%d,\"target\":%d,\"actual\":%d,\"maximum\":%d,\"armed\":%s,\"paused\":%s,\"session\":\"%s\",\"write_attempts\":%d,\"write_successes\":%d,\"corrections\":%d,\"errno\":%d}\n",ok?"true":"false",reason,node,real_node,active_fold_port,control_center_listener?"true":"false",control_center_pid,state.target,number(node),maximum,state.armed?"true":"false",state.paused?"true":"false",state.token,attempts,successes,corrections,last_error);
  if(n>0&&(size_t)n<sizeof(out))send(c,out,(size_t)n,MSG_NOSIGNAL);
 }
 static int read_lease(struct panel_lease *lease){
@@ -174,14 +177,17 @@ static int escape_freezer(void){
 static int startup_fail(int code,const char *stage){fprintf(stderr,"NATIVE_START_FAIL stage=%s exit=%d errno=%d (%s)\n",stage,code,errno,strerror(errno));return code;}
 #include "outdoor_node.h"
 int main(int argc,char **argv){
- if(argc==4&&!strcmp(argv[1],"--outdoor")&&!strcmp(argv[2],"--node")){if(geteuid()!=0)return 2;return outdoor_run(argv[3]);}
+ if((argc==4||argc==5)&&!strcmp(argv[1],"--outdoor")&&!strcmp(argv[2],"--node")){
+  if(geteuid()!=0)return 2;if(argc==5){if(strncmp(argv[4],"--fold-ids=",11)||!outdoor_fold_ids_parse(argv[4]+11,&outdoor_ids))return 2;snprintf(outdoor_ids_text,sizeof(outdoor_ids_text),"%s",argv[4]+11);}return outdoor_run(argv[3]);
+ }
  if(geteuid()!=0||private_lock())return startup_fail(2,"root_private_lock");
  if(load_boot())return startup_fail(3,"boot_identity");
  if(restore_record())return startup_fail(3,"restore_permissions");
  if(argc==2&&!strcmp(argv[1],"--recover"))return 0;
  if((argc!=4&&argc!=5)||strcmp(argv[1],"--daemon")||strcmp(argv[2],"--node"))return 2;
- control_center_listener=argc==5&&!strncmp(argv[4],"--control-center=",17);if(argc==5&&!control_center_listener)return 2;if(control_center_listener){char end; if(sscanf(argv[4]+17,"%d%c",&control_center_pid,&end)!=1||control_center_pid<=1)return 2;}
+ control_center_listener=argc==5&&!strncmp(argv[4],"--control-center=",17);if(argc==5&&!control_center_listener){char end;if(sscanf(argv[4],"--active-fold=%d%c",&active_fold_port,&end)!=1||active_fold_port<0||active_fold_port>7)return 2;}if(control_center_listener){char end; if(sscanf(argv[4]+17,"%d%c",&control_center_pid,&end)!=1||control_center_pid<=1)return 2;}
  if(resolve_node(argv[3]))return startup_fail(4,"primary_node_identity");
+ if(active_fold_port>=0&&!fold_panel_live("/sys",active_fold_port))return startup_fail(4,"fold_display_not_active");
  setsid();if(escape_freezer())return startup_fail(6,"escape_app_freezer");
  maximum=number(max_node);int current=number(node);if(maximum<=10||maximum>65535||current<0||current>maximum)return startup_fail(4,"main_panel_range");
  // Open-only check before Java asks the system to disable automatic brightness.
@@ -196,6 +202,7 @@ int main(int argc,char **argv){
  while(!stopping){
   int64_t now=clock_ms();
   if(control_center_listener&&kill(control_center_pid,0))break;
+  if(active_fold_port>=0&&!fold_panel_live("/sys",active_fold_port)){last_error=ESTALE;break;}
   if(state.armed){struct panel_lease lease;
    if(!read_lease(&lease)||lease.pid!=state.pid||kill(state.pid,0)){if(!control_center_listener)break;if(release_output())break;panel_clear(&state);health(0);continue;}
    int changed=strcmp(lease.token,state.token)||state.paused==lease.active;

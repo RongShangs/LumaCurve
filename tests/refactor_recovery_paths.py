@@ -27,6 +27,7 @@ class RootControl{
  String getSystem(String k){return mode;}boolean putSystem(String k,String v){modeWrites++;if(rejectMode)return false;mode=v;return true;}}
 ''' +stop+r'''}
 class PanelNodeDiscovery{static JSONObject value;static int scans;static JSONObject discover(File f)throws Exception{scans++;return new JSONObject(value.toString());}}
+class ActivePanelNode{static final String PROFILE="fold_default_display";static JSONObject discover()throws Exception{return PanelNodeDiscovery.discover(new File("/sys"));}}
 class NativePanelClient{static JSONObject reply;static int probes;static JSONObject call(String action)throws Exception{probes++;return new JSONObject(reply.toString());}}
 class NativePanelRoot{
  static File BIN=new File("never-launch-on-host");static int installs,stops;static boolean changeDuringInstall;

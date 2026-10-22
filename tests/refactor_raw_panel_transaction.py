@@ -6,6 +6,7 @@ O=R/'build/raw-panel-transaction-tests';O.mkdir(parents=True,exist_ok=True)
 J=R/'build/refactor-diagnostics/json-20240303.jar'
 text=(S/'RootControl.java').read_text(encoding='utf-8');start=text.index('    JSONObject rawPanel(String payload)');end=text.index('    JSONObject execute(',start);method=text[start:end]
 files={
+'top/rongshangs/lumacurve/refactor/ActivePanelNode.java':'package top.rongshangs.lumacurve.refactor;class ActivePanelNode{static final String PROFILE="fold_default_display";}',
 'android/app/ActivityManager.java':'package android.app;public class ActivityManager{public static int getCurrentUser(){return 0;}}',
 'top/rongshangs/lumacurve/refactor/RootControl.java':r'''package top.rongshangs.lumacurve.refactor;
 import org.json.*;import java.util.*;import java.io.*;import java.nio.file.*;import java.nio.charset.StandardCharsets;

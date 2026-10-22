@@ -44,6 +44,7 @@ final class OutdoorController {
         if(access!=null)try{boolean changed=access.restore();if(changed)access.reevaluate(lux());}catch(Throwable failed){error=failed.toString();s.log("户外增强恢复异常："+error);}}
     float lux(){try{Object impl=HookEntry.get(s.owner,"mAutomaticBrightnessControllerImpl"),abc=HookEntry.get(impl,"mAutomaticBrightnessController");if(!Boolean.TRUE.equals(HookRuntime.optionalBoolean(abc,"mAmbientLuxValid")))return Float.NaN;return HookRuntime.optionalNumber(abc,"mAmbientLux");}catch(Throwable unknown){return Float.NaN;}}
     String block(){
+        if(!options.flags[0])return "disabled";
         if(s.closed||!s.phase.equals("active")||!s.appliesToUser())return "inactive";
         if(!s.screenOn()||Boolean.TRUE.equals(HookRuntime.optionalBoolean(access.controller,"mIsAutoBrightnessOffByState")))return "screen_off";
         try{
@@ -55,7 +56,7 @@ final class OutdoorController {
             if(Boolean.TRUE.equals(HookRuntime.optionalBoolean(impl,"mIsOverrideDragPolicy")))return "manual";
             if(!s.normalTuningAllowed(abc,impl))return "scene";
             if(access.managed()&&!Boolean.TRUE.equals(HookRuntime.optionalBoolean(access.controller,"mIsAutoBrightnessEnabled")))return "auto_not_ready";
-            String strategy=s.outputStrategy(HookEntry.get(s.owner,"mDisplayPowerController"));
+            String strategy=OutdoorOutputAccess.name(s);
             if(!"AutomaticBrightnessStrategy".equals(strategy))return "output_override";
             return null;
         }catch(Throwable unknown){return "unknown";}

@@ -39,6 +39,7 @@ public final class MainActivity extends Activity {
     JSONObject pendingUpdate;AlertDialog updateDialog;
     final Set<AlertDialog> openDialogs=new HashSet<>();
     final WelcomeGuide welcome=new WelcomeGuide(this);Switch hideLauncherSwitch;boolean updatingLauncher;
+    final QuickSetupPage quickSetup=new QuickSetupPage(this);
     final Map<String,Runnable> detailOpeners=new HashMap<>();final ScrollView[] settingsScrollers=new ScrollView[11];
     LinearLayout thanksList;TextView thanksStatus;boolean thanksBusy,autoScroll=true;long thanksChecked;
     float lowLightLimit=50;long lowLightBrighten=3000,lowLightDarken=4000;
@@ -56,7 +57,7 @@ public final class MainActivity extends Activity {
     Switch darkLockSwitch,darkSunsetSwitch,manualPanelSwitch;TextView darkScheduleStatus;final SeekBar[] controlSliders=new SeekBar[4];final TextView[] controlLabels=new TextView[4];TextView controlStatus;
     java.lang.Process bridge;BufferedReader bridgeReader;BufferedWriter bridgeWriter;
     FeatureCheckPage featureCheckPage;JSONObject rootFeatureReport;boolean featureChecksVisible,featureCheckRefreshPending,startupFeatureCheckRequested;
-    final Runnable tick=()->{if(visible&&!welcome.showing()){if(!busy&&!permissionBlocked&&(page==0||page==2&&!featureChecksVisible||page==1&&(settingsGroup==5||settingsGroup==2)))run("inspect",null);ui.postDelayed(this.tick,page==0?refreshSeconds*1000:5000);}};
+    final Runnable tick=()->{if(visible&&!welcome.showing()&&!quickSetup.showing()){if(!busy&&!permissionBlocked&&(page==0||page==2&&!featureChecksVisible||page==1&&(settingsGroup==5||settingsGroup==2)))run("inspect",null);ui.postDelayed(this.tick,page==0?refreshSeconds*1000:5000);}};
     int dp(float value){return Math.round(value*getResources().getDisplayMetrics().density);}
     String tr(String value){return UiText.translate(value,english);}
     class LocalText extends TextView{
@@ -86,10 +87,11 @@ public final class MainActivity extends Activity {
         options.inSampleSize=sample;
         try(InputStream input=getAssets().open(asset)){return BitmapFactory.decodeStream(input,null,options);}
     }
-    AlertDialog dialog(String title,View body){LinearLayout actions=column();actions.setOrientation(LinearLayout.HORIZONTAL);actions.setBaselineAligned(false);actions.setGravity(Gravity.END);actions.setTag("actions");
-        ResponsiveDialog box=new ResponsiveDialog(this,text(title,20,INK),body,actions);boolean landscape=getResources().getConfiguration().orientation==android.content.res.Configuration.ORIENTATION_LANDSCAPE;box.setPadding(dp(22),dp(landscape?12:20),dp(22),dp(landscape?12:18));box.setBackground(background(BG,24));AlertDialog d=new AlertDialog.Builder(this).setView(box).create();
-        box.setClipToOutline(true);Window w=d.getWindow();ResponsiveDialog.configure(this,w,dp(landscape?520:440));if(w!=null)w.setDimAmount(.32f);
-        box.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener(){public void onViewAttachedToWindow(View v){openDialogs.add(d);}public void onViewDetachedFromWindow(View v){openDialogs.remove(d);ui.post(welcome::resume);}});
+    AlertDialog dialog(String title,View body){return dialog(text(title,20,INK),body,440);}
+    AlertDialog dialog(View title,View body,int width){LinearLayout actions=column();actions.setOrientation(LinearLayout.HORIZONTAL);actions.setBaselineAligned(false);actions.setGravity(Gravity.END);actions.setTag("actions");
+        ResponsiveDialog box=new ResponsiveDialog(this,title,body,actions);boolean landscape=getResources().getConfiguration().orientation==android.content.res.Configuration.ORIENTATION_LANDSCAPE;box.setPadding(dp(22),dp(landscape?12:20),dp(22),dp(landscape?12:18));box.setBackground(background(BG,24));AlertDialog d=new AlertDialog.Builder(this).setView(box).create();
+        box.setClipToOutline(true);Window w=d.getWindow();ResponsiveDialog.configure(this,w,dp(landscape?Math.max(520,width):width));if(w!=null)w.setDimAmount(.32f);
+        box.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener(){public void onViewAttachedToWindow(View v){openDialogs.add(d);}public void onViewDetachedFromWindow(View v){openDialogs.remove(d);ui.post(welcome::resume);ui.post(()->{quickSetup.resume();quickSetup.invite();});}});
         // Animate the content itself: application styles are not valid WMS animation resources.
         if(android.animation.ValueAnimator.areAnimatorsEnabled()){box.setAlpha(0);d.setOnShowListener(v->box.animate().alpha(1).setDuration(180).start());}return d;}
     void dialogButton(AlertDialog d,String label,Runnable task,boolean primary){View decor=d.getWindow().getDecorView();LinearLayout actions=(LinearLayout)decor.findViewWithTag("actions");
@@ -131,6 +133,7 @@ public final class MainActivity extends Activity {
         select(saved==null?0:saved.getInt("page",0));apply.setEnabled(false);
         if(saved!=null&&page==2&&saved.getBoolean("feature_checks_page")){java.util.ArrayList<String> expanded=saved.getStringArrayList("feature_checks_expanded");if(expanded!=null)featureCheckPage.expanded.addAll(expanded);showFeatureChecks();int y=saved.getInt("feature_checks_y",0);featureCheckPage.scroll.post(()->featureCheckPage.scroll.scrollTo(0,y));}
         welcome.restore(saved);
+        quickSetup.restore(saved);
     }
     void makeStatus(){
         stateTitle=text("",16,INK);luxReading=text("",20,BLUE);nitReading=text("",20,INK);flow=text("",12,MUTED);thermalState=text("",12,INK);userState=text("",12,MUTED);
@@ -146,9 +149,10 @@ public final class MainActivity extends Activity {
     void quickPreset(String group,int mode){if(busy){show("另一项操作还在执行");return;}try{if(runtime==null)throw new IllegalStateException("连接后读取曲线");JSONObject next=SettingsPresets.merge(configuration(),SettingsPresets.patch(group,mode,runtime));loadOptions(next);dirty=true;drawCurve();show("预设已选中，保存并应用后生效");}catch(Exception error){show(error.getMessage());}}
     void quickPresetRow(LinearLayout parent,String group,String first,String second){LinearLayout r=row(parent);compact("系统默认",()->quickPreset(group,0),r);compact(first,()->quickPreset(group,1),r);compact(second,()->quickPreset(group,2),r);}
     void makeSettings(){
-        LinearLayout b=card(pages[1]);b.setPadding(dp(16),dp(13),dp(16),dp(13));LinearLayout engineHeading=row(b);engineHeading.setBaselineAligned(false);TextView engineTitle=text("引擎控制",18,INK);engineTitle.setIncludeFontPadding(false);engineHeading.addView(engineTitle,new LinearLayout.LayoutParams(0,-2,1));unsavedHint=text("有未保存的设置",12,0xffbd3434);unsavedHint.setIncludeFontPadding(false);unsavedHint.setGravity(Gravity.END|Gravity.CENTER_VERTICAL);engineHeading.addView(unsavedHint,new LinearLayout.LayoutParams(-2,-2));unsavedHint.setVisibility(View.GONE);LinearLayout r=row(b);apply=compact("保存并应用",this::submit,r);stop=compact("停用并恢复",()->run("stop",null),r);
+        LinearLayout b=card(pages[1]);b.setPadding(dp(16),dp(13),dp(16),dp(13));unsavedHint=text("有未保存的设置",12,0xffbd3434);unsavedHint.setIncludeFontPadding(false);unsavedHint.setGravity(Gravity.END|Gravity.CENTER_VERTICAL);b.addView(unsavedHint,new LinearLayout.LayoutParams(-1,-2));unsavedHint.setVisibility(View.GONE);LinearLayout r=row(b);apply=compact("保存并应用",this::submit,r);stop=compact("停用并恢复",()->run("stop",null),r);
         LinearLayout files=row(b);compact("导出配置",this::exportConfiguration,files);compact("导入配置",this::importConfiguration,files);
         settingsHome=column();pages[1].addView(settingsHome);
+        LinearLayout quickEntry=card(settingsHome);quickEntry.setBackground(ripple(0xffedf3ff,18));quickEntry.setClickable(true);quickEntry.setFocusable(true);quickEntry.setOnClickListener(v->quickSetup.open());LinearLayout quickLine=row(quickEntry);LinearLayout quickCopy=column();quickLine.addView(quickCopy,new LinearLayout.LayoutParams(0,-2,1));quickCopy.addView(text("快速设置",17,BLUE));quickCopy.addView(text("回答6个简单的问题，找到适合自己的亮度预设",12,MUTED));quickLine.addView(new NavigationArrow(false),new LinearLayout.LayoutParams(dp(28),dp(40)));
         String[] names={"亮度曲线","手动记忆","户外高亮","环境变化与确认","亮度过渡","场景判定与控制","运行状态与界面","暗光稳定与锁定","主屏手动亮度","温控与显示保护","暂停自动亮度名单"};
         String[] descriptions={"基础亮度、暗处下限与曲线预设","偏好强度、持久保存与锁屏交接","强光增强、HBM 与手动阳光屏","主辅光感阈值与确认时间","分别设置变亮和变暗时长","场景的进入条件、生效效果与退出条件","兼容状态与界面刷新","减少暗光波动，或定时保持亮度","磁贴面板、直接写值与自动退让","显示温控、温度门槛与冷却恢复","指定应用前台时暂停，退出后恢复"};
         for(int i:new int[]{3,5,0,1,4,7,2,9,8,10,6}){
@@ -168,7 +172,7 @@ public final class MainActivity extends Activity {
         settingsTarget=settingGroups[2];makeAdvancedSettings(3,sceneSettings.addScene(settingsTarget,7));sceneSettings.refresh();
         settingsTarget=settingGroups[9];makeThermalSettings();
         settingsTarget=settingGroups[6];makeAdvancedStatus();makeRefreshSettings();
-        settingsTarget=settingGroups[7];makeDarkLockSettings();makeLowLightSettings();
+        settingsTarget=settingGroups[7];makeLowLightSettings();makeDarkLockSettings();
         settingsTarget=settingGroups[8];makeManualPanelSettings();
         appBrightnessSettings=new ApplicationBrightnessSettings(this,settingGroups[10]);
         makeLauncherSetting();
@@ -208,7 +212,7 @@ public final class MainActivity extends Activity {
         target.animate().alpha(1).translationX(0).setInterpolator(new android.view.animation.DecelerateInterpolator()).setDuration(180).start();
     }
     void finishPageTransition(){++pageTransition;for(int i=0;i<content.getChildCount();i++){View child=content.getChildAt(i);child.animate().cancel();child.animate().setListener(null).withEndAction(null);child.setAlpha(1);child.setTranslationX(0);child.setVisibility(child==displayedPage?View.VISIBLE:View.GONE);}}
-    @Override public void onBackPressed(){if(welcome.back())return;if(featureChecksVisible){closeFeatureChecks();return;}if(page==1&&settingsGroup>=0){showSettingsGroup(-1);return;}super.onBackPressed();}
+    @Override public void onBackPressed(){if(quickSetup.back())return;if(welcome.back())return;if(featureChecksVisible){closeFeatureChecks();return;}if(page==1&&settingsGroup>=0){showSettingsGroup(-1);return;}super.onBackPressed();}
     void makeCurveSettings(){
         LinearLayout b=card(settingsTarget);b.addView(text("照度与亮度曲线",18,INK));
         LinearLayout presets=row(b);compact("柔和",()->preset(new float[]{.7f,.8f,.95f,1}),presets);compact("系统默认",()->preset(new float[]{1,1,1,1}),presets);compact("稍亮",()->preset(new float[]{1.2f,1.15f,1.05f,1}),presets);
@@ -370,7 +374,7 @@ public final class MainActivity extends Activity {
     }
     void restoreOriginalBaseline(){if(runtime==null||factoryLux==null||busy)return;try{savedBase=null;factoryNit=RootControl.numbers(runtime.getJSONArray("factory_logical_nit"));factors=new float[]{1,1,1,1};curveFloor=0;dirty=true;drawCurve();show("已选用设备原始基础曲线，点击保存并应用后生效");}catch(Exception unavailable){show(unavailable.getMessage());}}
     void makeThermalSettings(){
-        LinearLayout b=card(settingsTarget);b.addView(text("温控",18,INK));LinearLayout thermalPresets=row(b);compact("系统默认",()->quickPreset("thermal",0),thermalPresets);compact("适度放宽",()->quickPreset("thermal",1),thermalPresets);thermalSwitch=new Switch(this);thermalSwitch.setText(tr("减少温控降亮"));thermalSwitch.setTextSize(14);thermalSwitch.setShowText(false);b.addView(thermalSwitch,new LinearLayout.LayoutParams(-1,dp(48)));
+        LinearLayout b=card(settingsTarget);b.addView(text("温控",18,INK));LinearLayout thermalPresets=row(b);compact("系统默认",()->quickPreset("thermal",0),thermalPresets);compact("略微放宽",()->quickPreset("thermal",1),thermalPresets);LinearLayout moreThermal=row(b);compact("更多放宽",()->quickPreset("thermal",2),moreThermal);compact("最大放宽",()->quickPreset("thermal",3),moreThermal);thermalSwitch=new Switch(this);thermalSwitch.setText(tr("减少温控降亮"));thermalSwitch.setTextSize(14);thermalSwitch.setShowText(false);b.addView(thermalSwitch,new LinearLayout.LayoutParams(-1,dp(48)));
         thermalSwitch.setOnCheckedChangeListener((v,on)->{if(on!=thermalRelax){thermalRelax=on;dirty=true;drawCurve();}});
         b.addView(text("默认关闭。开启后可减少显示层的温控限亮；严重过热或达到电池温度阈值时恢复系统策略。",12,MUTED));
         b=settingsDetails(b,"thermal");
@@ -479,7 +483,7 @@ public final class MainActivity extends Activity {
     String twilightTime(long millis){return new java.text.SimpleDateFormat("HH:mm",java.util.Locale.getDefault()).format(new java.util.Date(millis));}
     void showManualPanel(){startActivity(new Intent(this,BrightnessPanelActivity.class));}
     void addBrightnessTile(){try{android.app.StatusBarManager manager=getSystemService(android.app.StatusBarManager.class);manager.requestAddTileService(new ComponentName(this,BrightnessTileService.class),tr("主屏亮度"),android.graphics.drawable.Icon.createWithResource(this,getResources().getIdentifier("brightness_tile","drawable",getPackageName())),getMainExecutor(),result->show(result==android.app.StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ADDED||result==android.app.StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ALREADY_ADDED?"磁贴已添加":"可在控制中心编辑磁贴时添加 HyperLux 主屏亮度"));}catch(Throwable unavailable){show("可在控制中心编辑磁贴时添加 HyperLux 主屏亮度");}}
-    @Override protected void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);if(intent.getBooleanExtra("manual_brightness_panel",false)){openManualPanel=true;if(welcome.showing())return;if(runtime!=null){openManualPanel=false;showManualPanel();}else if(!busy)run("inspect",null);}}
+    @Override protected void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);if(intent.getBooleanExtra("manual_brightness_panel",false)){openManualPanel=true;if(welcome.showing()||quickSetup.showing())return;if(runtime!=null){openManualPanel=false;showManualPanel();}else if(!busy)run("inspect",null);}}
     void makeRefreshSettings(){
         LinearLayout b=card(settingsTarget);b.addView(text("界面",18,INK));refreshLabel=text("",13,INK);b.addView(refreshLabel);refreshSlider=parameter(b,4,refreshSeconds-1,value->{refreshSeconds=value+1;getPreferences(0).edit().putInt("refresh_seconds",refreshSeconds).apply();});
         b.addView(text("只影响状态显示，不改变亮度调节频率。",12,MUTED));
@@ -572,7 +576,7 @@ public final class MainActivity extends Activity {
     void copyGroupNumber(){android.content.ClipboardManager cm=(android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE);cm.setPrimaryClip(ClipData.newPlainText(tr("QQ 交流群"),"314981836"));show("已复制群号");}
     void rememberLegacy(JSONObject answer){JSONArray modules=answer.optJSONArray("legacy_modules");if(modules==null||modules.length()==0){pendingLegacy=null;legacyNotice="";return;}if(!modules.toString().equals(legacyNotice))pendingLegacy=modules;}
     void offerLegacyModules(){
-        if(pendingLegacy==null||!visible||permissionDialogVisible||legacyDialogVisible||updateDialog!=null||welcome.showing())return;
+        if(pendingLegacy==null||!visible||permissionDialogVisible||legacyDialogVisible||updateDialog!=null||welcome.showing()||quickSetup.showing())return;
         JSONArray modules=pendingLegacy;pendingLegacy=null;legacyNotice=modules.toString();legacyDialogVisible=true;LinearLayout body=column();body.addView(text("请在 Root 管理器中卸载这些旧模块并重启，避免多套引擎同时调节亮度。",14,INK));
         for(int i=0;i<modules.length();i++){JSONObject module=modules.optJSONObject(i);if(module==null)continue;String state=module.optString("state");body.addView(text(module.optString("name")+"\n"+module.optString("id")+(state.equals("disabled")?" · 已停用":state.equals("pending")?" · 待更新":" · 已安装"),12,MUTED));}
         AlertDialog d=dialog("请卸载旧版亮度模块",body);d.setOnDismissListener(v->{legacyDialogVisible=false;offerUpdate();});d.show();dialogButton(d,"知道了",null,true);
@@ -583,23 +587,26 @@ public final class MainActivity extends Activity {
         network.execute(()->{try{JSONObject found=UpdateChecker.check();ui.post(()->{if(destroyed)return;updateBusy=false;if(found.optBoolean("newer")){String version=found.optString("version");if(!ReleasePolicy.shouldOffer(version,getPreferences(0).getString("ignored_update_version",""),manual)){pendingUpdate=null;updateLabel.setText(tr("已忽略版本 ")+version);return;}try{found.put("manual_check",manual);}catch(JSONException invalid){show(invalid.getMessage());return;}pendingUpdate=found;updateLabel.setText("发现新版本 "+version);offerUpdate();}else{pendingUpdate=null;updateLabel.setText("当前没有新应用版本");if(manual&&page==3)show("当前没有新应用版本");}});}catch(Exception failure){ui.post(()->{if(destroyed)return;updateBusy=false;updateLabel.setText("暂时无法检查更新");if(manual&&page==3)show("暂时无法检查更新");});}});
     }
     void offerUpdate(){
-        if(page!=3||pendingUpdate==null||!visible||permissionDialogVisible||legacyDialogVisible||pendingLegacy!=null||updateDialog!=null||welcome.showing())return;
+        if(page!=3||pendingUpdate==null||!visible||permissionDialogVisible||legacyDialogVisible||pendingLegacy!=null||updateDialog!=null||welcome.showing()||quickSetup.showing())return;
         JSONObject release=pendingUpdate;pendingUpdate=null;String version=release.optString("version");
         if(!ReleasePolicy.shouldOffer(version,getPreferences(0).getString("ignored_update_version",""),release.optBoolean("manual_check")))return;
-        LinearLayout body=column();body.addView(text("版本 "+version,18,BLUE));String notes=release.optString("notes");TextView changes=text(notes.isEmpty()?"查看仓库了解更新内容":notes,13,MUTED);ScrollView scroll=new ScrollView(this);scroll.addView(changes);scroll.setLayoutParams(new LinearLayout.LayoutParams(-1,Math.min(dp(200),dp(70+Math.min(8,notes.length()/40)*16))));body.addView(scroll);
+        LinearLayout body=column();body.addView(text("版本 "+version,18,BLUE));String notes=release.optString("notes");TextView changes=text(notes.isEmpty()?"查看仓库了解更新内容":notes,14,MUTED);changes.setLineSpacing(dp(4),1);changes.setMinHeight(dp(320));body.addView(changes);
         AlertDialog d=dialog("有新版本可用",body);updateDialog=d;d.setOnDismissListener(v->{updateDialog=null;offerLegacyModules();});
-        button("官网下载",()->{d.dismiss();open(UpdateChecker.WEBSITE);},body);button("GitHub 下载",()->{d.dismiss();open(release.optString("url"));},body);
-        d.show();dialogButton(d,"稍后",null,false);dialogButton(d,"忽略此版本",()->{getPreferences(0).edit().putString("ignored_update_version",version).apply();updateLabel.setText(tr("已忽略版本 ")+version);},false);
+        // One scroll viewport for the notes. Both download and dismissal rows stay
+        // outside it; ResponsiveDialog reserves their measured height and safe insets.
+        d.show();LinearLayout footer=(LinearLayout)d.getWindow().getDecorView().findViewWithTag("actions");footer.setTag("update-footer");footer.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout downloads=row(footer);compact("官网下载",()->{d.dismiss();open(UpdateChecker.WEBSITE);},downloads);compact("GitHub 下载",()->{d.dismiss();open(release.optString("url"));},downloads);
+        LinearLayout choices=row(footer);choices.setTag("actions");dialogButton(d,"稍后",null,false);dialogButton(d,"忽略此版本",()->{getPreferences(0).edit().putString("ignored_update_version",version).apply();updateLabel.setText(tr("已忽略版本 ")+version);},false);
     }
     void select(int value){featureChecksVisible=false;featureCheckRefreshPending=false;rememberSettingsHome();int previous=page;page=Math.max(0,Math.min(3,value));settingsGroup=-1;if(page!=3&&updateDialog!=null)updateDialog.dismiss();if(bottomNav!=null)bottomNav.setVisibility(View.VISIBLE);header.setVisibility(page==3?View.GONE:View.VISIBLE);note.setVisibility(View.GONE);transitionPage(content.getChildAt(page),Integer.compare(page,previous));if(page==1)restoreSettingsHome();
         for(int i=0;i<4;i++){if(nav[i]!=null){navNames[i].setTextColor(i==page?BLUE:MUTED);navIcons[i].selected=i==page;navIcons[i].invalidate();nav[i].setSelected(i==page);}}
         // Refresh every visit; retain unapplied edits until a successful save.
-        if(page==3&&previous!=3&&visible){checkUpdate(false);refreshThanks();}if(page==2)scrollLogs();if(visible){if(busy)rereadPending=true;else run("inspect",null);}
+        if(page==3&&previous!=3&&visible){checkUpdate(false);refreshThanks();}if(page==2)scrollLogs();ui.post(quickSetup::invite);if(visible){if(busy)rereadPending=true;else run("inspect",null);}
     }
     void show(String message){if(!destroyed){note.setText(message);note.setVisibility(message==null||message.isEmpty()?View.GONE:View.VISIBLE);if(message!=null&&!message.isEmpty()&&page!=2)Toast.makeText(this,tr(message),Toast.LENGTH_SHORT).show();}}
     void permissionPrompt(String key,String title,String message){
         permissionBlocked=true;if(!visible||destroyed||permissionDialogVisible||permissionNotice.equals(key))return;
-        if(welcome.showing())return;
+        if(welcome.showing()||quickSetup.showing())return;
         permissionNotice=key;permissionDialogVisible=true;LinearLayout body=column();TextView icon=text(key.equals("root")?"ROOT":key.equals("lsp")?"LSPosed":key.equals("os")?"HyperOS":"接口检查",14,BLUE);icon.setPadding(dp(12),dp(8),dp(12),dp(8));icon.setBackground(background(0xffedf3ff,12));body.addView(icon);body.addView(text(message,14,MUTED));
         AlertDialog d=dialog(title,body);d.setOnDismissListener(v->{permissionDialogVisible=false;ui.post(()->{offerLegacyModules();offerUpdate();});});d.show();dialogButton(d,"稍后",null,false);dialogButton(d,"重新检测",()->{permissionNotice="";permissionBlocked=false;ui.postDelayed(()->run("inspect",null),150);},true);
     }
@@ -765,12 +772,12 @@ public final class MainActivity extends Activity {
                 }
                 JSONObject state=(command.equals("inspect")||command.equals("self-check"))?result:(command.equals("apply")||command.equals("promote-memory")||command.equals("stop")||command.equals("reset-memory"))?request("inspect",null):null;
                 ui.post(()->{if(destroyed)return;finishCurveSaveProgress();busy=false;stop.setEnabled(true);if(command.equals("apply")||command.equals("promote-memory")){dirty=!draftStillMatches(payload);}
-                    if(state!=null)render(state);else apply.setEnabled(runtime!=null&&factoryLux!=null);drawDraftState();offerLegacyModules();offerUpdate();finishFeatureCheckRequest(command,result);
+                    if(state!=null)render(state);else apply.setEnabled(runtime!=null&&factoryLux!=null);drawDraftState();offerLegacyModules();offerUpdate();quickSetup.resume();quickSetup.invite();quickSetup.refreshed(command,true);finishFeatureCheckRequest(command,result);
                     if(featureCheckRefreshPending&&featureChecksVisible){rereadPending=false;ui.post(this::refreshFeatureChecks);}else if(rereadPending){rereadPending=false;ui.post(()->run("inspect",null));}
                     if(!(command.equals("inspect")||command.equals("self-check"))){String message=result.optString("message",result.has("path")?"已导出："+result.optString("path"):"操作完成");show(message);
                         if(result.has("path")){boolean configFile=command.equals("export-config");AlertDialog d=dialog(configFile?"配置已导出":"分析包已导出",text(result.optString("path")+"\n\n"+(configFile?"文件位于设备存储根目录。包含当前设置，可在后续版本导入。":"包含设备与显示信息，请按需分享。"),14,MUTED));d.show();dialogButton(d,"知道了",null,true);}}
                 });
-            }catch(Throwable error){closeBridge();ui.post(()->{if(destroyed)return;finishCurveSaveProgress();busy=false;stop.setEnabled(true);if((command.equals("inspect")||command.equals("self-check"))&&!(command.equals("self-check")&&runtime!=null)){runtime=null;factoryLux=factoryNit=null;badge.setText("连接中断");stateTitle.setText("等待连接");thermalSwitch.setEnabled(false);memorySwitch.setEnabled(false);permissionPrompt("root","需要 Root 授权","请在 Root 管理器中允许 HyperLux 获得 Root 权限，再点击重新检测。\nRoot 可用后才会继续检查 LSPosed。");}apply.setEnabled(runtime!=null&&factoryLux!=null);drawDraftState();if(featureChecksVisible&&featureCheckPage!=null){featureCheckRefreshPending=false;featureCheckPage.failed(String.valueOf(error.getMessage()));}operationFailure(command,error);if(rereadPending){rereadPending=false;ui.post(()->run("inspect",null));}});}
+            }catch(Throwable error){closeBridge();ui.post(()->{if(destroyed)return;finishCurveSaveProgress();busy=false;stop.setEnabled(true);if((command.equals("inspect")||command.equals("self-check"))&&!(command.equals("self-check")&&runtime!=null)){runtime=null;factoryLux=factoryNit=null;badge.setText("连接中断");stateTitle.setText("等待连接");thermalSwitch.setEnabled(false);memorySwitch.setEnabled(false);permissionPrompt("root","需要 Root 授权","请在 Root 管理器中允许 HyperLux 获得 Root 权限，再点击重新检测。\nRoot 可用后才会继续检查 LSPosed。");}apply.setEnabled(runtime!=null&&factoryLux!=null);drawDraftState();if(featureChecksVisible&&featureCheckPage!=null){featureCheckRefreshPending=false;featureCheckPage.failed(String.valueOf(error.getMessage()));}operationFailure(command,error);quickSetup.refreshed(command,false);if(rereadPending){rereadPending=false;ui.post(()->run("inspect",null));}});}
             finally{if(!visible)closeBridge();}
         });
     }
@@ -817,15 +824,15 @@ public final class MainActivity extends Activity {
             if(answer.optLong("state_age_ms")>15000)compatibility.append("\n"+tr("系统状态未及时刷新"));
             thermalSwitch.setEnabled(runtime.optBoolean("thermal_supported")||thermalRelax);responseSwitch.setEnabled(runtime.optBoolean("response_supported")||responseOverride);brightenSlider.setEnabled(runtime.optBoolean("response_supported"));darkenSlider.setEnabled(runtime.optBoolean("response_supported"));memorySwitch.setEnabled(true);apply.setEnabled(true);permissionNotice="";permissionBlocked=false;drawCurve();
             if(!firmwarePrompted&&config!=null&&config.optBoolean("enabled")&&!config.optString("fingerprint").equals(Build.FINGERPRINT)){firmwarePrompted=true;AlertDialog d=dialog("系统已更新",text("当前已恢复系统曲线。请核对兼容状态，再重新保存并应用。",14,MUTED));d.show();dialogButton(d,"知道了",null,true);}if(!busy&&!dirty)show("");
-            if(manualPanel!=null)manualPanel.update(runtime.optJSONObject("brightness_control"));if(openManualPanel){openManualPanel=false;ui.post(this::showManualPanel);}
+            if(manualPanel!=null)manualPanel.update(runtime.optJSONObject("brightness_control"));if(openManualPanel&&!quickSetup.showing()){openManualPanel=false;ui.post(this::showManualPanel);}
         }catch(Exception error){runtime=null;factoryLux=factoryNit=null;apply.setEnabled(false);stateGraph.invalidate();pipeline.invalidate();drawDraftState();show("状态格式不兼容："+error);}
     }
     static String severity(int level){String[] names={"正常","轻微","中等","严重","危急","紧急","关机"};return level>=0&&level<names.length?names[level]:"未知";}
-    void resumeRuntime(){if(destroyed||!visible||welcome.showing())return;permissionNotice="";permissionBlocked=false;syncLauncherSetting();if(!startupFeatureCheckRequested){startupFeatureCheckRequested=true;checkAppFeatures();run("self-check","app-start");}else run("inspect",null);ui.removeCallbacks(tick);ui.postDelayed(tick,refreshSeconds*1000);if(page==3){checkUpdate(false);refreshThanks();}offerLegacyModules();offerUpdate();}
-    @Override public void onResume(){super.onResume();visible=true;welcome.resume();if(!welcome.showing())resumeRuntime();}
-    @Override public void onPause(){visible=false;welcome.finishTransition();if(manualPanel!=null)manualPanel.close();finishPageTransition();ui.removeCallbacks(tick);getPreferences(0).edit().putString("draft",CurvePlan.encode(factors)).putString("draft_baseline",loadedBaseline).putFloat("draft_floor",curveFloor).apply();if(!busy)worker.execute(this::closeBridge);super.onPause();}
-    @Override public void onSaveInstanceState(Bundle saved){welcome.save(saved);if(featureCheckPage!=null){saved.putBoolean("feature_checks_page",featureChecksVisible);saved.putInt("feature_checks_y",featureCheckPage.scroll.getScrollY());saved.putStringArrayList("feature_checks_expanded",new java.util.ArrayList<>(featureCheckPage.expanded));}rememberSettingsHome();saved.putInt("settings_home_y",settingsHomeY);saved.putInt("page",page);saved.putInt("settings_group",settingsGroup);saved.putBoolean("dirty",dirty);saved.putString("baseline",loadedBaseline);if(dirty&&factoryLux!=null)try{saved.putString("draft_options",configuration(false).toString());}catch(Exception ignored){}super.onSaveInstanceState(saved);}
-    @Override public void onDestroy(){destroyed=true;welcome.dispose();for(AlertDialog d:new ArrayList<>(openDialogs))d.dismiss();if(manualPanel!=null)manualPanel.close();if(!busy)closeBridge();worker.shutdown();network.shutdownNow();super.onDestroy();}
+    void resumeRuntime(){if(destroyed||!visible||welcome.showing()||quickSetup.showing())return;permissionNotice="";permissionBlocked=false;syncLauncherSetting();if(!startupFeatureCheckRequested){startupFeatureCheckRequested=true;checkAppFeatures();run("self-check","app-start");}else run("inspect",null);ui.removeCallbacks(tick);ui.postDelayed(tick,refreshSeconds*1000);if(page==3){checkUpdate(false);refreshThanks();}offerLegacyModules();offerUpdate();}
+    @Override public void onResume(){super.onResume();visible=true;welcome.resume();quickSetup.resume();if(!welcome.showing()&&!quickSetup.showing())resumeRuntime();}
+    @Override public void onPause(){visible=false;welcome.finishTransition();quickSetup.finishTransition();if(manualPanel!=null)manualPanel.close();finishPageTransition();ui.removeCallbacks(tick);getPreferences(0).edit().putString("draft",CurvePlan.encode(factors)).putString("draft_baseline",loadedBaseline).putFloat("draft_floor",curveFloor).apply();if(!busy)worker.execute(this::closeBridge);super.onPause();}
+    @Override public void onSaveInstanceState(Bundle saved){welcome.save(saved);quickSetup.save(saved);if(featureCheckPage!=null){saved.putBoolean("feature_checks_page",featureChecksVisible);saved.putInt("feature_checks_y",featureCheckPage.scroll.getScrollY());saved.putStringArrayList("feature_checks_expanded",new java.util.ArrayList<>(featureCheckPage.expanded));}rememberSettingsHome();saved.putInt("settings_home_y",settingsHomeY);saved.putInt("page",page);saved.putInt("settings_group",settingsGroup);saved.putBoolean("dirty",dirty);saved.putString("baseline",loadedBaseline);if(dirty&&factoryLux!=null)try{saved.putString("draft_options",configuration(false).toString());}catch(Exception ignored){}super.onSaveInstanceState(saved);}
+    @Override public void onDestroy(){destroyed=true;quickSetup.dispose();welcome.dispose();for(AlertDialog d:new ArrayList<>(openDialogs))d.dismiss();if(manualPanel!=null)manualPanel.close();if(!busy)closeBridge();worker.shutdown();network.shutdownNow();super.onDestroy();}
     static JSONArray array(float[] values)throws JSONException{JSONArray result=new JSONArray();for(float n:values)result.put(n);return result;}
     final class NavigationArrow extends View{
         final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);final boolean back;

@@ -38,6 +38,13 @@ final class SceneTuning {
     }catch(Throwable missing){for(XC_MethodHook.Unhook h:added)h.unhook();XposedBridge.log("HyperLux scene option "+group+" unavailable: "+missing);}}
     static boolean hasSharedSceneConsumer(Class<?> cls){Set<Integer> cap=capabilities.get(cls);return cap!=null&&cap.contains(4);}
     static String inactiveReason(HookRuntime s,int group){
+        if(group==0||group==4||group==5)try{
+            Object scene=object(s,"scene");Set<Integer> cap=capabilities.get(scene.getClass());
+            String flag=group==0?"mUseDrivingModeForBrt":group==4?"mTransientProximityEnabled":"mUseAonFlareEnabled";
+            if(cap!=null&&cap.contains(group)&&Boolean.FALSE.equals(HookRuntime.optionalBoolean(scene,flag)))
+                return "系统未启用"+(group==0?"夜间驾驶":group==4?"流式距离遮挡":"反射与 AON 确认")+"策略，沿用系统；保留已保存设置，不主动启动传感器或服务。";
+            return "";
+        }catch(Throwable unknown){return "";}
         if(group!=3)return "";
         try{Object impl=object(s,"impl");Set<Integer> cap=capabilities.get(impl.getClass());
             if(cap==null||!cap.contains(3)||!Boolean.FALSE.equals(HookRuntime.optionalBoolean(impl,"mUseProximityEnabled")))return "";

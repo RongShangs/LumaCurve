@@ -63,7 +63,13 @@ final class TraditionalAnimation {
             for(String name:new String[]{"mCurrentValue","mRate","mTargetLinearValue"})field(c,name,float.class);
             field(c,"mFirstTime",boolean.class);
             // Both the ordinary target entry and its downstream time-limit consumer must match.
-            Method target=method(c,"setAnimationTarget",boolean.class,float.class,float.class,boolean.class,float.class);
+            // Older native wrappers omit ambient lux. Only an absent signature permits
+            // this alternative; a present but malformed preferred ABI must fail closed.
+            Method target;
+            try{target=c.getDeclaredMethod("setAnimationTarget",float.class,float.class,boolean.class,float.class);}
+            catch(NoSuchMethodException absent){target=c.getDeclaredMethod("setAnimationTarget",float.class,float.class,boolean.class);}
+            if(target.getReturnType()!=boolean.class||Modifier.isStatic(target.getModifiers()))throw new NoSuchMethodException("traditional target ABI");
+            target.setAccessible(true);
             method(c,"setAnimationTarget",boolean.class,float.class,float.class,float.class,float.class);
             method(c,"updateRampRate",float.class,float.class,float.class);
             try(HookTransaction tx=new HookTransaction()){

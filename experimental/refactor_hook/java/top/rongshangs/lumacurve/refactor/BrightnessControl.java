@@ -134,9 +134,10 @@ final class BrightnessControl implements SensorEventListener {
         if(!s.handler.post(screenCleanup))screenCleanupQueued=false;
     }
     void displayChanged(){if(!awake())screenOff();else screenOn();}
-    boolean rawWasAuto,rawPaused,rawConfirmed,rawScreenOff;int rawTarget=-1;long rawLeaseUntil,rawBlockedWrites;final Runnable rawRenew=()->renewRaw();
+    String rawPhysicalId="";boolean rawWasAuto,rawPaused,rawConfirmed,rawScreenOff;int rawTarget=-1;long rawLeaseUntil,rawBlockedWrites;final Runnable rawRenew=()->renewRaw();
     boolean unlocked(){try{android.app.KeyguardManager keyguard=(android.app.KeyguardManager)s.context.getSystemService(Context.KEYGUARD_SERVICE);return keyguard!=null&&!keyguard.isKeyguardLocked();}catch(Throwable missing){return false;}}
-    boolean rawOutputBlocked(float value){return owner.equals("raw_panel")&&rawConfirmed&&!rawPaused&&!rawScreenOff&&Float.isFinite(value)&&value>0&&rawTarget>=10&&SystemClock.uptimeMillis()<rawLeaseUntil&&enabled()&&!auto()&&awake()&&unlocked();}
+    boolean rawIdentityCurrent(){if(rawPhysicalId.isEmpty())return true;try{return rawPhysicalId.equals(HookEntry.get(HookEntry.get(s.owner,"mDisplayPowerController"),"mUniqueDisplayId"));}catch(Throwable missing){return false;}}
+    boolean rawOutputBlocked(float value){return rawIdentityCurrent()&&owner.equals("raw_panel")&&rawConfirmed&&!rawPaused&&!rawScreenOff&&Float.isFinite(value)&&value>0&&rawTarget>=10&&SystemClock.uptimeMillis()<rawLeaseUntil&&enabled()&&!auto()&&awake()&&unlocked();}
     void screenOn(){if(screenCleanupQueued){s.handler.removeCallbacks(screenCleanup);screenCleanup.run();}if(!registered&&!s.closed)start();if(!options.manualApps.isEmpty())ForegroundApps.attach(this);if(owner.equals("raw_panel")){rawScreenOff=false;renewRaw();}else tick();}
     BrightnessControl(HookRuntime state){
         s=state;schedule=new DarkLockSchedule(s.owner.getClass().getClassLoader(),s.handler,()->{if(!s.closed){tick();s.queueControlPublish();}});timer=()->tick();snapshot=()->{try{
@@ -285,7 +286,7 @@ final class BrightnessControl implements SensorEventListener {
     void fail(Throwable failure){error=failure.toString();failed=true;relinquish("error",true);unlisten();s.handler.removeCallbacks(timer);s.handler.removeCallbacks(retry);if((options.darkLock||!options.manualApps.isEmpty()||options.manualPanel&&!registered)&&!s.closed&&s.phase.equals("active")&&s.screenOn())s.handler.postDelayed(retry,30000);s.log("主屏亮度控制退出："+error);s.queuePublish();}
     boolean sensorsReady(){try{BrightnessSensorAccess.read(s.owner);return true;}catch(Throwable unavailable){return false;}}
     JSONObject status()throws JSONException{
-        JSONObject j=new JSONObject();options.put(j);boolean supported=supported();j.put("elapsed_ms",SystemClock.elapsedRealtime()).put("manual_panel_supported",mainDisplay()&&RawPanelOutputHooks.supports(s.owner.getClass())).put("dark_lock_supported",supported&&sensorsReady()).put("owner",owner).put("reason",reason).put("error",error).put("auto",auto()).put("listening",listening).put("session",session).put("raw_target",rawTarget).put("raw_paused",rawPaused).put("raw_confirmed",rawConfirmed).put("raw_blocked_output_calls",rawBlockedWrites);
+        JSONObject j=new JSONObject();options.put(j);boolean supported=supported();j.put("elapsed_ms",SystemClock.elapsedRealtime()).put("manual_panel_supported",mainDisplay()&&RawPanelOutputHooks.supports(s.owner.getClass())).put("dark_lock_supported",supported&&sensorsReady()).put("owner",owner).put("reason",reason).put("error",error).put("auto",auto()).put("listening",listening).put("session",session).put("raw_physical_display_id",rawPhysicalId).put("raw_target",rawTarget).put("raw_paused",rawPaused).put("raw_confirmed",rawConfirmed).put("raw_blocked_output_calls",rawBlockedWrites);
         j.put("dark_lock_schedule",schedule.status());
         j.put("watch_binding_active",listening).put("watch_main_profile",listening&&sensorBinding!=null?sensorBinding.profile:"").put("watch_physical_display_id",listening&&sensorBinding!=null?sensorBinding.physicalId:"");
         j.put("app_auto_supported",ForegroundApps.supported()).put("foreground_package",foreground.pkg).put("foreground_auto_suppressed",!appSuppressed.isEmpty());
@@ -300,7 +301,7 @@ final class BrightnessControl implements SensorEventListener {
     }
     void stopRaw(){
         s.handler.removeCallbacks(rawRenew);
-        rawTarget=-1;rawConfirmed=false;rawPaused=false;rawScreenOff=false;rawLeaseUntil=0;
+        rawTarget=-1;rawPhysicalId="";rawConfirmed=false;rawPaused=false;rawScreenOff=false;rawLeaseUntil=0;
         try{RawPanelLease.clear();}catch(Throwable failure){error=failure.toString();}
     }
     void writeRawLease(boolean active)throws Exception{
@@ -315,6 +316,7 @@ final class BrightnessControl implements SensorEventListener {
         if(!owner.equals("raw_panel"))return;
         s.handler.removeCallbacks(rawRenew);
         try{
+            if(!rawIdentityCurrent()){relinquish("fold_display_changed",true);return;}
             if(!enabled()||auto()){relinquish("raw_mode_changed",false);return;}
             if(!RawPanelLease.healthy(session))throw new IllegalStateException("主屏节点守护已退出");
             boolean paused=rawScreenOff||!awake()||!unlocked(),changed=rawPaused!=paused;
@@ -323,7 +325,8 @@ final class BrightnessControl implements SensorEventListener {
             if(changed){s.log(paused?"主屏节点已释放，保留手动目标等待解锁":"解锁后恢复主屏手动目标："+rawTarget);s.queueControlPublish();}
         }catch(Throwable failure){boolean restore=rawWasAuto;relinquish("raw_guard_error",false);if(restore)try{setAuto(true);}catch(Throwable ignored){}s.log("主屏节点守护续约失败，已退让");s.queuePublish();}
     }
-    void armRaw(String token,int target)throws Exception{
+    void armRaw(String token,int target)throws Exception{armRaw(token,target,"");}
+    void armRaw(String token,int target,String physical)throws Exception{
         if(!options.manualPanel&&!token.startsWith("cc_"))throw new IllegalStateException("主屏手动面板已关闭");
         if(!RawPanelOutputHooks.supports(s.owner.getClass()))throw new IllegalStateException("当前系统尚未接入主屏输出隔离");
         // A dark lock paused automatic mode on the user's behalf. Preserve that
@@ -333,7 +336,7 @@ final class BrightnessControl implements SensorEventListener {
         busy=true;
         try{
             mark(new JSONObject().put("owner","raw_panel").put("user",0).put("was_auto",wasAuto).put("session",token).toString());
-            owner="raw_panel";session=token;rawWasAuto=wasAuto;held=Float.NaN;reason="manual_panel";
+            owner="raw_panel";session=token;rawPhysicalId=physical;rawWasAuto=wasAuto;held=Float.NaN;reason="manual_panel";
             rawTarget=target;rawPaused=false;rawScreenOff=false;rawConfirmed=false;mode(false);writeRawLease(true);
             s.handler.removeCallbacks(rawRenew);s.handler.postDelayed(rawRenew,2000);
         }catch(Throwable failure){
@@ -358,9 +361,12 @@ final class BrightnessControl implements SensorEventListener {
             else if(action.equals("raw_begin")){
                 long gesture=request.getLong("gesture_elapsed"),age=SystemClock.elapsedRealtime()-gesture;
                 if(age<0||age>3000||lastAutoEnabledAt>gesture)throw new IllegalStateException("系统模式已改变，请再次滑动");
-                int target=request.getInt("value");if(request.getDouble("value")!=target||target<10||target>65535||!unlocked())throw new IllegalStateException("请解锁并选择有效的主屏节点值");armRaw(token,target);
+                String physical=request.optString("panel_display_id");
+                if(!physical.isEmpty()&&!physical.equals(HookEntry.get(HookEntry.get(s.owner,"mDisplayPowerController"),"mUniqueDisplayId")))throw new IllegalStateException("当前屏幕已切换，请重新打开面板后调节");
+                int target=request.getInt("value");if(request.getDouble("value")!=target||target<10||target>65535||!unlocked())throw new IllegalStateException("请解锁并选择有效的主屏节点值");armRaw(token,target,physical);
             }else if(action.equals("raw_validate")||action.equals("raw_ready")){
                 if(!owner.equals("raw_panel")||!session.equals(token)||auto())throw new IllegalStateException("自动亮度已开启或会话已失效，停止节点写入");
+                if(!rawIdentityCurrent()){relinquish("fold_display_changed",true);throw new IllegalStateException("当前屏幕已切换，请重新打开面板后调节");}
                 if(!unlocked()||rawScreenOff)throw new IllegalStateException("锁屏期间停止节点写入");
                 int target=request.getInt("value");if(request.getDouble("value")!=target||target<10||target>65535)throw new IllegalArgumentException("主屏节点值无效");
                 if(action.equals("raw_ready")){if(!RawPanelLease.healthy(session))throw new IllegalStateException("主屏节点守护未确认接管");rawConfirmed=true;}

@@ -58,6 +58,6 @@ final class RuntimeFeatureChecks {
         f.check("opr","画面限亮放宽","outdoor_opr_supported",false,()->range()&&OutdoorOpr.owners.contains(s.owner.getClass()));
         f.check("nit_limit","户外 nit 上限","outdoor_nit_limit_supported",true,()->OutdoorTuning.nitCaps.contains(s.owner.getClass())&&OutdoorPolicy.valid(new NitBrightnessLimit(s.owner).resolve(0,HookRuntime.optionalNumber(hbm().controller,"mBrightnessMin"),hbm().max())));
         f.check("node_output","节点高亮框架接口","outdoor_node_supported",true,()->OutdoorNodeBridge.interfaces(s,range()));
-        try{caps=f.capabilities();report=f.report(SystemClock.elapsedRealtime(),request);runs++;report.put("runs",runs);}catch(JSONException impossible){s.log("功能自检结果生成失败");}
+        try{caps=f.capabilities();try{caps.put("outdoor_output_profile",OutdoorOutputAccess.profile(s));}catch(Exception unavailable){}report=f.report(SystemClock.elapsedRealtime(),request);runs++;report.put("runs",runs);}catch(JSONException impossible){s.log("功能自检结果生成失败");}
     }
 }

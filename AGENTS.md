@@ -18,3 +18,5 @@ python tools/build_refactor_hook_test.py --verify-only
 按变更跑对应旧 / 新 / 负向测试，再跑完整检查；区分主机、私有固件静态核验、真机与功耗结果。私有输入不进公开产物。
 
 默认保留已有 APK / ZIP，先完成本地代码与验证；只有用户要求才重新打包，发布必须得到用户授权并同时同步官网与 GitHub / LSPosed。不要提交服务器认证、签名材料、固件或用户分析包。既有未提交改动不得重置。
+
+Beta 日志以其上一个已公开正式版为基线累计，每个 Beta 独立文件，文件内按各 Beta 分段；不只写前一 Beta 到本版的差异。具体规则见 docs/release-policy.md。

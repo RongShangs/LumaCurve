@@ -12,12 +12,12 @@ final class NativePanelRoot {
  static final File BIN=new File(RootControl.DATA,"hyperlux-main-panel");
  static int read(File f)throws Exception{return PanelNodeDiscovery.number(f);}
  static JSONObject status()throws Exception{
-  JSONObject j=PanelNodeDiscovery.discover(new File("/sys"));
+  JSONObject j=ActivePanelNode.discover();
   if(!j.optBoolean("supported"))return j;
   File node=new File(j.getString("path"));
   File driverActual=new File(node.getParentFile(),"actual_brightness");if(driverActual.isFile())try{j.put("driver_actual",read(driverActual));}catch(Exception unavailable){j.put("driver_actual_error",unavailable.toString());}
   boolean guardMatches=false;
-  try{JSONObject guard=NativePanelClient.call("STATUS");guardMatches=matches(j,guard);j.put("guard_running",guardMatches);if(guardMatches)j.put("guard",guard);else return j.put("supported",false).put("reason","guard_node_mismatch").put("guard_error","guard_node_mismatch");}catch(Exception unavailable){j.put("guard_running",false).put("guard_error",unavailable.toString());}
+  try{JSONObject guard=NativePanelClient.call("STATUS");guardMatches=matches(j,guard);j.put("guard_running",guardMatches);if(guardMatches)j.put("guard",guard);else if(ActivePanelNode.PROFILE.equals(j.optString("discovery")))j.put("guard_binding_stale",true);else return j.put("supported",false).put("reason","guard_node_mismatch").put("guard_error","guard_node_mismatch");}catch(Exception unavailable){j.put("guard_running",false).put("guard_error",unavailable.toString());}
   j.put("node_mode",Integer.toOctalString(Os.lstat(node.toString()).st_mode&0777));
   // Root may open a 0444 attribute. Probe the actual access decision without
   // truncating, writing brightness, changing permissions or starting a guard.
@@ -32,7 +32,7 @@ final class NativePanelRoot {
   try{StructStat opened=Os.fstat(fd);if(!OsConstants.S_ISREG(opened.st_mode)||expected.st_dev!=opened.st_dev||expected.st_ino!=opened.st_ino||!node.toPath().toRealPath().toString().equals(selected.getString("canonical_path")))throw new IOException("主屏节点在权限检查期间发生变化");}
   finally{Os.close(fd);}
  }
- static boolean matches(JSONObject node,JSONObject guard){return guard.optBoolean("ok")&&"raw08-slider".equals(guard.optString("native_build"))&&node.optString("path").equals(guard.optString("path"))&&node.optString("canonical_path").equals(guard.optString("canonical_path"))&&node.optInt("maximum",-1)==guard.optInt("maximum",-2);}
+ static boolean matches(JSONObject node,JSONObject guard){return (!ActivePanelNode.PROFILE.equals(node.optString("discovery"))||node.optInt("fold_port",-2)==guard.optInt("fold_port",-3))&&guard.optBoolean("ok")&&"raw08-slider".equals(guard.optString("native_build"))&&node.optString("path").equals(guard.optString("path"))&&node.optString("canonical_path").equals(guard.optString("canonical_path"))&&node.optInt("maximum",-1)==guard.optInt("maximum",-2);}
  static void install()throws Exception{
   Os.chmod(RootControl.DATA.toString(),0700);
   String source=System.getenv("CLASSPATH");if(source==null||source.isEmpty())throw new IOException("未取得主屏守护所在的 APK 路径");
@@ -50,15 +50,16 @@ final class NativePanelRoot {
  }
  static void start(JSONObject selected)throws Exception{start(selected,false,0);}
  static void start(JSONObject selected,boolean follow,int enginePid)throws Exception{
-  JSONObject current=PanelNodeDiscovery.discover(new File("/sys"));
+  if(follow&&ActivePanelNode.PROFILE.equals(selected.optString("discovery")))throw new IOException("折叠屏节点映射尚未启用");
+  JSONObject current=ActivePanelNode.discover();
   if(!current.optBoolean("supported")||!selected.optString("path").equals(current.optString("path"))||!selected.optString("canonical_path").equals(current.optString("canonical_path"))||selected.optInt("maximum",-1)!=current.optInt("maximum",-2))throw new IOException("主屏节点已变化，请重新打开面板");
    install();
-   current=PanelNodeDiscovery.discover(new File("/sys"));
+   current=ActivePanelNode.discover();
    if(!current.optBoolean("supported")||!selected.optString("path").equals(current.optString("path"))||!selected.optString("canonical_path").equals(current.optString("canonical_path"))||selected.optInt("maximum",-1)!=current.optInt("maximum",-2))throw new IOException("主屏节点已变化，请重新打开面板");
   JSONObject existing=null;try{existing=NativePanelClient.call("STATUS");}catch(Exception ignored){}
-  if(existing!=null){if(matches(current,existing)&&(!follow||existing.optBoolean("control_center_listener")&&existing.optInt("control_center_pid")==enginePid))return;if(matches(current,existing)){stop();existing=null;}else throw new IOException("已有守护使用其他节点，请先恢复自动亮度");}
+  if(existing!=null){if(matches(current,existing)&&(!follow||existing.optBoolean("control_center_listener")&&existing.optInt("control_center_pid")==enginePid))return;if(matches(current,existing)){stop();existing=null;}else if(ActivePanelNode.PROFILE.equals(current.optString("discovery"))&&existing.optInt("fold_port",-1)>=0){stop();existing=null;}else throw new IOException("已有守护使用其他节点，请先恢复自动亮度");}
   File log=new File(RootControl.DATA,"main-panel.log");
-  java.util.List<String> command=new java.util.ArrayList<>(java.util.Arrays.asList(BIN.toString(),"--daemon","--node",current.getString("path")));if(follow){if(enginePid<=1)throw new IOException("系统进程身份无效");command.add("--control-center="+enginePid);}
+  java.util.List<String> command=new java.util.ArrayList<>(java.util.Arrays.asList(BIN.toString(),"--daemon","--node",current.getString("path")));if(ActivePanelNode.PROFILE.equals(current.optString("discovery")))command.add("--active-fold="+current.getInt("fold_port"));if(follow){if(enginePid<=1)throw new IOException("系统进程身份无效");command.add("--control-center="+enginePid);}
   Process guard=new ProcessBuilder(command).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.to(log)).start();
   String lastProbe="未取得就绪响应";long deadline=System.nanoTime()+1500000000L;
   while(System.nanoTime()<deadline){

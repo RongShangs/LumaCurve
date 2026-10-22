@@ -410,6 +410,9 @@ ClassLoader missingTwilight=new ClassLoader(BrightnessControlHostTest.class.getC
 try{DarkLockSchedule.supported(missingTwilight);throw new AssertionError();}catch(ClassNotFoundException expected){cases++;}
 com.android.server.LocalServices.service=new Object();c=controller();c.options.sunsetOnly=true;c.tick();check(c.auto()&&!c.failed&&!c.listening&&c.reason.equals("waiting_twilight"));c.close();
 com.android.server.LocalServices.service=new com.android.server.twilight.TwilightManager();
+// Fold sessions carry a physical identity and cannot block or renew another screen.
+c=controller();JSONObject foldRequest=new JSONObject().put("id","fold_enter").put("build",HookRuntime.BUILD).put("process_start",HookRuntime.processStart()).put("elapsed",SystemClock.elapsedRealtime()).put("gesture_elapsed",SystemClock.elapsedRealtime()).put("action","raw_begin").put("session","fold_session").put("value",1000).put("panel_display_id","panel-a");Settings.Global.putString(c.s.context.getContentResolver(),BrightnessControl.REQUEST,foldRequest.toString());check(new JSONObject(Settings.Global.getString(c.s.context.getContentResolver(),BrightnessControl.ACK)).getBoolean("ok"));check(c.rawPhysicalId.equals("panel-a")&&!c.auto());
+c.rawConfirmed=true;check(c.rawOutputBlocked(.2f));c.s.owner.mDisplayPowerController.mUniqueDisplayId="panel-b";check(!c.rawOutputBlocked(.2f));c.renewRaw();check(c.owner.equals("none")&&c.auto()&&c.rawPhysicalId.isEmpty());c.close();
 System.out.println("Brightness mode control: "+cases+" cases PASS; actual controller with service doubles, Android not tested");
 }}
 '''))

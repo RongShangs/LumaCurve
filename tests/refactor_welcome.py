@@ -163,11 +163,11 @@ subprocess.run(['javac','--release','8','-encoding','UTF-8','-d',str(C),*map(str
 subprocess.run(['java','-cp',str(C),'top.rongshangs.lumacurve.refactor.WelcomeTest'],check=True)
 main=(S/'MainActivity.java').read_text(encoding='utf-8')
 assert 'SettingsNotice' not in main and 'settingsNotice' not in main
-assert 'welcome.resume();if(!welcome.showing())resumeRuntime()' in main
+assert 'welcome.resume();quickSetup.resume();if(!welcome.showing()&&!quickSetup.showing())resumeRuntime()' in main
 assert 'if(welcome.back())return;' in main
 assert 'button("再次查看使用教程",welcome::openTutorial,tutorial)' in main
 assert 'visible=false;welcome.finishTransition();' in main
-assert 'if(visible&&!welcome.showing())' in main
+assert 'if(visible&&!welcome.showing()&&!quickSetup.showing())' in main
 assert 'welcome.save(saved)' in main and 'welcome.restore(saved)' in main
 assert '勿忘 灭 春暖花开 无缺' in main and '兼容 HyperOS 的自动亮度工具。' in main
 guide=(S/'WelcomeGuide.java').read_text(encoding='utf-8')

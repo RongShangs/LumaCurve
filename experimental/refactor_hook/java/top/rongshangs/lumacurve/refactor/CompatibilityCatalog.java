@@ -32,20 +32,21 @@ final class CompatibilityCatalog {
         case "outdoor_range":return new Route[]{route("hbm_range","HBM 与峰值范围","实际 HBM 最大亮度与峰值范围接口均已接入，仍受原生允许条件限制。"),route("dynamic_range","照度动态范围补充","额外匹配 BrightnessRangeControllerImpl；仅该设备实际使用动态范围时参与。")};
         case "dark_lock_schedule":return new Route[]{route("system_twilight","系统日出日落服务","复用实际 TwilightManager 与原生时间戳；只在夜间允许暗光锁定。缺时间等待，不以深色模式或固定钟点代替。")};
         case "dark_lock":return new Route[]{route("abc_sensor_manager","自动亮度控制器的光感服务","复用本机 ABC 的 SensorManager；按传感器类型和句柄识别，锁定期间低频确认退出条件。")};
-        case "manual_panel":case "node_output":return new Route[]{route("raw_primary_output","主屏原生节点输出","主屏输出接口配合实际节点识别、所有权租约与系统接管退让；不把节点值视为 nit。")};
+        case "manual_panel":return new Route[]{route("raw_primary_output","主屏手动节点接管","主屏手动输出接口配合实际节点识别、所有权租约与系统接管退让；不把节点值视为 nit。")};
+        case "node_output":return new Route[]{route("raw_primary_output","原生策略节点协作","优先使用实际输出策略，普通自动输出到顶后协作，保留原生保护。"),route("automatic_strategy2_node","独立自动对象与原因协作","仅原生策略入口缺失时核验独立自动对象、同屏归属和双份亮度原因，不替换手动面板路径。")};
         case "control_center_slider":return new Route[]{route("coordinate_v2","双向设备坐标映射","使用本机亮度到背光的转换表；可可靠单调反解才启用。本版入口隐藏，旧选择保留。")};
         case "thermal":return new Route[]{route("display_thermal","显示层温控接口","仅调整显示亮度限制；严重温控、电池温度门槛及其他系统温控继续有效。")};
         case "response":case "small_response":case "low_light":case "low_threshold":case "threshold_override":case "assist_gate":case "assist_override":return new Route[]{
             route("native_driving","原生确认与夜间驾驶保护","使用已验证的主辅光感确认和阈值；保留原生夜间驾驶判断及附加等待。"),
             route("native_without_driving","传统确认与场景保护","完整旧场景结构没有夜间驾驶接口；使用原生确认窗口，保留步行、遮挡、HDR 等判断，不额外采样。")};
-        case "animation_override":return new Route[]{route("oem_animation","Refactor 原生时长过渡","调整已验证的原生过渡时长倍率，保持系统动画及主副屏隔离。"),route("traditional_ramp","传统自动亮度速率过渡","原生 Refactor 策略关闭且时长对象为空；匹配主屏双 RampAnimator 和速率原因，只调整普通自动亮度速率，保留系统时长上限及特殊过渡。")};
+        case "animation_override":return new Route[]{route("oem_animation","Refactor 原生时长过渡","调整已验证的原生过渡时长倍率，保持系统动画及主副屏隔离。"),route("traditional_ramp","传统自动亮度速率过渡","原生 Refactor 策略关闭且时长对象为空；匹配主屏双 RampAnimator、三参或四参目标入口及速率原因，只调整普通自动亮度速率，保留系统时长上限及特殊过渡。")};
         case "sunlight_override":return new Route[]{route("manual_sunlight","系统手动模式阳光屏","调整 SunlightController 的进入 / 退出等待，不代替自动 HBM。")};
         case "touch_override":return new Route[]{route("touch_release","系统触摸遮挡释放等待","调整 TouchCoverProtectionHelper 的移开等待，继续保留遮挡保护。")};
         case "outdoor":return new Route[]{route("override_target","系统覆盖目标入口","通过 getOverrideLimitBrightness 增强自动目标，保留原生手动接管与下游保护。"),route("legacy_custom_target","传统物理曲线目标入口","没有覆盖目标接口且旧调用结构完整；在原生自定义曲线目标返回后增强，仍经场景否决、范围裁剪及温控输出。")};
-        case "main_panel_node":return new Route[]{route("backlight_node","主屏 backlight 节点","扫描 backlight，验证主屏身份、真实路径及 brightness / max_brightness 配对。"),route("display_led_node","显示专用 leds 节点","仅接受明确标识为主屏背光的 leds 节点，排除通知灯、手电与背屏。")};
+        case "main_panel_node":return new Route[]{route("fold_default_display","折叠屏当前主屏节点","原生折叠布局允许不同物理屏作为默认屏；根据实时默认屏地址、成对背光与唯一点亮 DSI 选择节点；显示端口与内核编号不一致时独立核验默认屏点亮状态，切屏释放旧接管。"),route("backlight_node","主屏 backlight 节点","扫描 backlight，验证主屏身份、真实路径及 brightness / max_brightness 配对。"),route("display_led_node","显示专用 leds 节点","仅接受明确标识为主屏背光的 leds 节点，排除通知灯、手电与背屏。")};
         case "root_storage":return new Route[]{route("root_private_storage","Root 私有数据目录","只检查配置 / 分析目录的读写能力，不安装或启动输出程序。")};
         case "stored_config":return new Route[]{route("stored_json","原始配置 JSON","读取原始配置；自检与兼容裁剪不会将默认值写回用户设置。")};
-        case "outdoor_node_device":return new Route[]{route("primary_node_profile","实际主屏节点与框架输出组合","按实际节点上限、曲线映射和输出能力核验，不按机型名单放行。")};
+        case "outdoor_node_device":return new Route[]{route("primary_node_profile","实际主屏节点与框架输出组合","按实际节点上限、曲线映射和输出能力核验，不按机型名单放行。"),route("fold_bound_outdoor","折叠主屏节点协作绑定","当前物理主屏、原生布局和背光配对完整；用独立物理租约核验切屏，不跨屏继承目标。")};
         case "native_payload":return new Route[]{route("apk_native_asset","APK 内原生程序校验","核对当前 APK 的主屏程序资产完整性，不启动守护、不试写亮度。")};
         case "launcher":return new Route[]{route("launcher_alias","桌面入口别名","使用 PackageManager 的独立桌面别名，保留模块设置入口和欢迎引导完成状态。")};
         case "preferences":return new Route[]{route("app_preferences","应用本地偏好存储","读取设置草稿与欢迎记录，不清空、不改变开关。")};

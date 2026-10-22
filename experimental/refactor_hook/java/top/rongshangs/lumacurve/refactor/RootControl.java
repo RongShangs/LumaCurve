@@ -308,6 +308,7 @@ public final class RootControl implements AutoCloseable {
         }
         int value=request.getInt("value");if(request.getDouble("value")!=value)throw new IOException("请输入整数节点值");
         JSONObject node=NativePanelRoot.status();if(!node.optBoolean("supported"))throw new IOException("主屏节点尚不可用："+node.optString("reason","unknown"));if(value<10||value>node.getInt("maximum"))throw new IOException("主屏节点值超出范围");
+        if(ActivePanelNode.PROFILE.equals(node.optString("discovery"))&&!node.optString("physical_display_id").equals(request.optString("panel_display_id")))throw new IOException("当前屏幕已切换，请重新打开面板后调节");
         if(action.equals("begin")){step="启动主屏原生守护";NativePanelRoot.start(node);}else if(!action.equals("set"))throw new IOException("未知节点操作");
         request.put("action",action.equals("begin")?"raw_begin":"raw_validate");
         step=action.equals("begin")?"关闭自动亮度并取得系统许可":"确认当前接管会话";

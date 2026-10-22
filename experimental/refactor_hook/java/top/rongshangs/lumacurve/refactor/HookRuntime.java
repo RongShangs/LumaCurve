@@ -360,6 +360,8 @@ final class HookRuntime {
             CurvePlan plan=kernel.plan();if(plan!=null){float[] handles=new float[4];for(int i=0;i<4;i++)handles[i]=plan.at(kernel.factoryLux[i]);status.put("active_logical_nit",array(handles)).put("applied_base_lux",array(kernel.baselineLux())).put("applied_base_nit",array(kernel.baselineNit()));}
             if(kernel instanceof RefactorAdapter)try{((RefactorAdapter)kernel).putVerification(status);}catch(Exception unavailable){status.put("refactor_curve_verification_error",unavailable.toString());}
             for(Iterator<String> keys=featureChecks.caps.keys();keys.hasNext();){String key=keys.next();status.put(key,featureChecks.caps.get(key));}
+            // Screen identity is live state, not the startup self-check snapshot.
+            long outdoorPhysical=OutdoorOutputAccess.physical(this);if(outdoorPhysical>0)status.put("outdoor_node_physical_id",outdoorPhysical);
             stateWriter.submit("state",StatusTransport.encode(status));
         }catch(Throwable error){XposedBridge.log("LumaCurve status: "+error);}
     }

@@ -3,6 +3,11 @@
   "source_root": "experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor",
   "files": [
     {
+      "file": "ActivePanelNode.java",
+      "layer": "adapters",
+      "purpose": "原生折叠布局、默认物理屏与背光节点绑定"
+    },
+    {
       "file": "AdvancedOptions.java",
       "layer": "configuration",
       "purpose": "配置、保持与迁移"
@@ -353,6 +358,11 @@
       "purpose": "配置、保持与迁移"
     },
     {
+      "file": "OutdoorOutputAccess.java",
+      "layer": "adapters",
+      "purpose": "户外输出归属的原生策略与独立自动对象 ABI，保留其他功能原路径"
+    },
+    {
       "file": "OutdoorPolicy.java",
       "layer": "policy",
       "purpose": "策略与算子"
@@ -391,6 +401,16 @@
       "file": "PipelineHooks.java",
       "layer": "adapters",
       "purpose": "设备接口与所有权"
+    },
+    {
+      "file": "QuickSetupPage.java",
+      "layer": "presentation",
+      "purpose": "可选快速设置问答、邀请与生命周期"
+    },
+    {
+      "file": "QuickSetupPlan.java",
+      "layer": "presentation",
+      "purpose": "快速设置的分类预设组合与能力校验"
     },
     {
       "file": "RawBrightnessPanel.java",
@@ -647,6 +667,10 @@
     {
       "file": "control_center_policy.h",
       "purpose": "隐藏映射监听的进程与租约许可"
+    },
+    {
+      "file": "fold_panel.h",
+      "purpose": "显式折叠端口的唯一 DSI 亮屏核验"
     }
   ]
 }

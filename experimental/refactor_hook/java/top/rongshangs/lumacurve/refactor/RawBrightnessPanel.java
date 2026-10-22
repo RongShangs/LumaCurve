@@ -17,7 +17,7 @@ final class RawBrightnessPanel {
  final RootPanelBridge bridge;final boolean dark,en,landscape;final int ink,muted,blue,bg,surface;
  TextView state,current,target,range,fault;TextView inputAction,maxAction,keepAwakeAction;boolean keepingAwake;String lastFault="";NodeSlider slider;
  AlertDialog activeDialog;
- volatile boolean closed;boolean sending,dragging,claimed;Integer pending;String session=UUID.randomUUID().toString();int generation,maximum=10;long gesture;
+ volatile boolean closed;boolean sending,dragging,claimed;Integer pending;String panelDisplayId="";String session=UUID.randomUUID().toString();int generation,maximum=10;long gesture;
  final Runnable poll,flush;
  RawBrightnessPanel(Activity host,Runnable dismiss){
   this.host=host;this.dismiss=dismiss;bridge=new RootPanelBridge(host);
@@ -57,7 +57,8 @@ final class RawBrightnessPanel {
   if(closed)return;JSONObject node=answer.optJSONObject("node");JSONObject runtime=answer.optJSONObject("runtime");
   if(node==null||!node.optBoolean("supported")){
    String reason=node==null?"":node.optString("reason");
-   String message="ambiguous_primary_nodes".equals(reason)?(en?"Multiple display nodes; primary screen is uncertain":"发现多个显示节点，暂不能确定主屏"):
+   String message=reason.startsWith("fold_")?(en?"Waiting for a confirmed active fold display; export diagnostics if it persists":"等待确认当前折叠主屏；持续不可用请导出分析包"):
+       "ambiguous_primary_nodes".equals(reason)?(en?"Multiple display nodes; primary screen is uncertain":"发现多个显示节点，暂不能确定主屏"):
        "scan_incomplete".equals(reason)?(en?"Node scan incomplete; export diagnostics":"节点扫描不完整，请导出分析包"):
        "guard_node_mismatch".equals(reason)?(en?"Writer changed; restore automatic brightness first":"守护节点已变化，请先恢复自动亮度"):
        "node_not_writable".equals(reason)?(en?"Display node is read-only; export diagnostics":"已找到显示节点，但未取得写入权限"):
@@ -66,6 +67,8 @@ final class RawBrightnessPanel {
    state.setText(message);current.setText(node!=null&&node.has("actual")?String.valueOf(node.optInt("actual")):"—");target.setText("—");range.setText(node!=null&&node.has("maximum")?String.valueOf(node.optInt("maximum")):"—");
    slider.ready=false;inputAction.setEnabled(false);maxAction.setEnabled(false);inputAction.setAlpha(.4f);maxAction.setAlpha(.4f);slider.invalidate();return;
   }
+  String physical=node.optString("physical_display_id");
+  if(!panelDisplayId.equals(physical)){generation++;claimed=false;pending=null;dragging=false;session=UUID.randomUUID().toString();if(activeDialog!=null)activeDialog.dismiss();clearFault();panelDisplayId=physical;}
   maximum=node.optInt("maximum",10);int actual=node.optInt("actual",-1);JSONObject guard=node.optJSONObject("guard");
   boolean auto=runtime==null||runtime.optBoolean("auto_mode");JSONObject owner=runtime==null?null:runtime.optJSONObject("brightness_control");
   BrightnessTileService.publish(runtime);
@@ -80,7 +83,7 @@ final class RawBrightnessPanel {
   if(!slider.ready)state.setText(tr(owner!=null&&!owner.optBoolean("manual_panel_supported")?"主屏输出接口尚未兼容":"先启用引擎；刚更新应用需重启"));
  }
  void begin(int value){if(closed||!slider.ready)return;clearFault();generation++;claimed=false;pending=null;session=UUID.randomUUID().toString();gesture=SystemClock.elapsedRealtime();submit(command("begin",value),true);}
- JSONObject command(String action,int n){JSONObject j=new JSONObjectRequest(action);try{j.put("session",session).put("value",n).put("gesture_elapsed",gesture);}catch(Exception impossible){}return j;}
+ JSONObject command(String action,int n){JSONObject j=new JSONObjectRequest(action);try{j.put("session",session).put("panel_display_id",panelDisplayId).put("value",n).put("gesture_elapsed",gesture);}catch(Exception impossible){}return j;}
  void flush(){if(closed||sending||!claimed||pending==null)return;int n=pending;pending=null;submit(command("set",n),false);}
  void submit(JSONObject command,boolean begin){
   if(closed)return;final int epoch=generation;sending=true;

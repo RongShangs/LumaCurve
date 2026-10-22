@@ -7,22 +7,23 @@ main=(S/'MainActivity.java').read_text(encoding='utf-8');start=main.index('    v
 java=O/'UpdateTest.java'
 java.write_text(r'''package top.rongshangs.lumacurve.refactor;
 import org.json.*;import java.util.*;import java.util.function.*;
-class TextView{String value="";void setText(String v){value=v;}}
-class LinearLayout{void addView(Object v){}static class LayoutParams{LayoutParams(int w,int h){}}}
+class TextView{String value="";int minimum;void setText(String v){value=v;}void setMinHeight(int v){minimum=v;}void setLineSpacing(int gap,float scale){}}
+class LinearLayout{static final int VERTICAL=1;int orientation;String tag;List<Object> children=new ArrayList<>();void addView(Object v){children.add(v);}void setTag(String t){tag=t;}void setOrientation(int v){orientation=v;}Object findViewWithTag(String t){if(t.equals(tag))return this;for(Object v:children)if(v instanceof LinearLayout){Object found=((LinearLayout)v).findViewWithTag(t);if(found!=null)return found;}return null;}static class LayoutParams{LayoutParams(int w,int h){}}}
 class ScrollView{ScrollView(Object host){}void addView(Object v){}void setLayoutParams(Object p){}}
-class AlertDialog{Consumer<AlertDialog> dismissed;boolean visible;void setOnDismissListener(Consumer<AlertDialog> c){dismissed=c;}void show(){visible=true;}void dismiss(){visible=false;if(dismissed!=null)dismissed.accept(this);}}
+class Window{LinearLayout decor=new LinearLayout();LinearLayout getDecorView(){return decor;}}
+class AlertDialog{final Window window=new Window();Window getWindow(){return window;}Consumer<AlertDialog> dismissed;boolean visible;void setOnDismissListener(Consumer<AlertDialog> c){dismissed=c;}void show(){visible=true;}void dismiss(){visible=false;if(dismissed!=null)dismissed.accept(this);}}
 class Queue{final ArrayDeque<Runnable> tasks=new ArrayDeque<>();void execute(Runnable r){tasks.add(r);}void post(Runnable r){tasks.add(r);}void drain(){while(!tasks.isEmpty())tasks.remove().run();}}
 class Preferences{Map<String,String> values=new HashMap<>();String getString(String k,String fallback){return values.getOrDefault(k,fallback);}Preferences edit(){return this;}Preferences putString(String k,String v){values.put(k,v);return this;}void apply(){}}
 class UpdateChecker{static final String WEBSITE="https://lc.rongshangs.top";static JSONObject reply;static boolean fail;static int calls;static JSONObject check()throws Exception{calls++;if(fail)throw new Exception("offline");return new JSONObject(reply.toString());}}
 class WelcomeGuide{boolean visible;boolean showing(){return visible;}}
 class MainActivity{
- final WelcomeGuide welcome=new WelcomeGuide();
+ final WelcomeGuide welcome=new WelcomeGuide(),quickSetup=new WelcomeGuide();
  int page=3;boolean updateBusy,updateChecked,destroyed,visible=true,permissionDialogVisible,legacyDialogVisible;Object pendingLegacy;JSONObject pendingUpdate;AlertDialog updateDialog;
- final Queue network=new Queue(),ui=new Queue();final TextView updateLabel=new TextView();final Preferences prefs;final Map<String,Runnable> buttons=new LinkedHashMap<>();String opened="",notice="";int dialogs;
+ final Queue network=new Queue(),ui=new Queue();final TextView updateLabel=new TextView();final Preferences prefs;final Map<String,Runnable> buttons=new LinkedHashMap<>();String opened="",notice="";int dialogs;LinearLayout dialogBody;Map<String,LinearLayout> buttonParents=new HashMap<>();
  MainActivity(Preferences p){prefs=p;}Preferences getPreferences(int mode){return prefs;}String tr(String s){return s;}int dp(int n){return n;}void show(String s){notice=s;}void open(String url){opened=url;}
- LinearLayout column(){return new LinearLayout();}TextView text(String s,int size,int color){TextView t=new TextView();t.setText(s);return t;}int BLUE,MUTED;
- AlertDialog dialog(String title,Object body){dialogs++;buttons.clear();return new AlertDialog();}void offerLegacyModules(){}
- void button(String title,Runnable click,LinearLayout parent){buttons.put(title,click);}void dialogButton(AlertDialog d,String title,Runnable click,boolean primary){buttons.put(title,()->{d.dismiss();if(click!=null)click.run();});}
+ LinearLayout column(){return new LinearLayout();}LinearLayout row(LinearLayout parent){LinearLayout r=new LinearLayout();parent.addView(r);return r;}TextView text(String s,int size,int color){TextView t=new TextView();t.setText(s);return t;}int BLUE,MUTED;
+ AlertDialog dialog(String title,Object body){dialogs++;buttons.clear();buttonParents.clear();dialogBody=(LinearLayout)body;AlertDialog d=new AlertDialog();LinearLayout actions=new LinearLayout();actions.setTag("actions");d.window.decor.addView(actions);return d;}void offerLegacyModules(){}
+ void compact(String title,Runnable click,LinearLayout parent){buttons.put(title,click);parent.addView(title);buttonParents.put(title,parent);}void dialogButton(AlertDialog d,String title,Runnable click,boolean primary){compact(title,()->{d.dismiss();if(click!=null)click.run();},(LinearLayout)d.window.decor.findViewWithTag("actions"));}
  void complete(){network.drain();ui.drain();}
 ''' + methods + r'''}
 public class UpdateTest{
@@ -34,6 +35,10 @@ public class UpdateTest{
   for(String invalid:new String[]{"",null,"2.5.0-beta01","bad"})for(boolean manual:new boolean[]{false,true})check(!ReleasePolicy.shouldOffer(invalid,"",manual));
   Preferences prefs=new Preferences();release("2.5.0");MainActivity a=new MainActivity(prefs);a.checkUpdate(false);check(a.updateBusy&&a.updateDialog==null);a.complete();check(!a.updateBusy&&a.updateDialog.visible);
   check(a.buttons.keySet().equals(new LinkedHashSet<>(Arrays.asList("官网下载","GitHub 下载","稍后","忽略此版本"))));
+  check(a.dialogBody.children.size()==2&&a.dialogBody.children.get(1) instanceof TextView);check(((TextView)a.dialogBody.children.get(1)).minimum==320);
+  check(a.buttonParents.get("官网下载")==a.buttonParents.get("GitHub 下载"));check(a.buttonParents.get("官网下载")!=a.dialogBody);
+  check(a.buttonParents.get("稍后")==a.buttonParents.get("忽略此版本"));check(a.buttonParents.get("稍后")!=a.buttonParents.get("官网下载"));
+  check(((LinearLayout)a.updateDialog.window.decor.findViewWithTag("update-footer")).orientation==LinearLayout.VERTICAL);
   int requests=UpdateChecker.calls;a.checkUpdate(false);a.complete();check(UpdateChecker.calls==requests&&a.pendingUpdate==null);
   a.buttons.get("忽略此版本").run();check(a.updateDialog==null&&prefs.getString("ignored_update_version","").equals("2.5.0"));check(a.opened.isEmpty());
   a=new MainActivity(prefs);a.checkUpdate(false);a.complete();check(a.dialogs==0&&a.pendingUpdate==null&&a.updateLabel.value.endsWith("2.5.0"));

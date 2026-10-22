@@ -68,6 +68,14 @@ public class SceneHookTest{
   check(!SceneTuning.supported(s,3));check(SceneTuning.supported(s,4));check(SceneTuning.inactiveReason(s,3).contains("流式距离"));
   block(s,4);scene.mNeedCheckProximitySensor=true;scene.mNeedCheckAonFlare=false;check(!(Boolean)call(scene,"isNeedSkipBrightnessChange",new Class<?>[0]));scene.mNeedCheckAonFlare=true;s.scenes.stop();
   check(!impl.mUseProximityEnabled);impl.mUseProximityEnabled=true;check(SceneTuning.supported(s,3));check(SceneTuning.inactiveReason(s,3).isEmpty());
+  for(int group:new int[]{0,4,5}){
+   check(SceneTuning.inactiveReason(s,group).isEmpty());
+   String field=group==0?"mUseDrivingModeForBrt":group==4?"mTransientProximityEnabled":"mUseAonFlareEnabled";
+   java.lang.reflect.Field nativeFlag=scene.getClass().getField(field);nativeFlag.setBoolean(scene,false);
+   check(!SceneTuning.supported(s,group));check(SceneTuning.inactiveReason(s,group).contains("系统未启用"));check(!nativeFlag.getBoolean(scene));
+   SceneTuning.capabilities.get(scene.getClass()).remove(group);check(SceneTuning.inactiveReason(s,group).isEmpty());SceneTuning.capabilities.get(scene.getClass()).add(group);
+   nativeFlag.setBoolean(scene,true);check(SceneTuning.supported(s,group));check(SceneTuning.inactiveReason(s,group).isEmpty());
+  }
   System.out.println("Scene hooks/lifecycle: "+cases+" cases PASS; actual callbacks with OEM and Looper doubles, Android not tested");
  }
 }''',encoding='utf-8')

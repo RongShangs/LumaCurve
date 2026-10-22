@@ -23,7 +23,7 @@ final class OutdoorNodeBridge {
         Object clamp=HookEntry.get(dpc,"mBrightnessClamperController");if(clamp==null)return false;
         if(clamp.getClass().getMethod("getMaxBrightness").getReturnType()!=float.class)throw new NoSuchMethodException("getMaxBrightness return type");
         if(!(HookEntry.get(s.owner,"mBatteryThermalLimitBrightness") instanceof Number))throw new NoSuchFieldException("mBatteryThermalLimitBrightness type");
-        OutdoorSdrScope.resolve(s.owner.getClass());return s.hdrActive()!=null&&s.outputStrategy(dpc)!=null;
+        OutdoorSdrScope.resolve(s.owner.getClass());OutdoorOutputAccess.profile(s);return s.hdrActive()!=null;
     }
     void frame(float value){frame=value;changed();}
     void changed(){if(closed||s.closed||!s.outdoor.options.nodeBoost&&!requested||queued)return;queued=true;if(!s.handler.post(check))queued=false;}
@@ -39,7 +39,7 @@ final class OutdoorNodeBridge {
         float sdr=((Number)power.getClass().getMethod("getSdrScreenBrightness").invoke(power)).floatValue();
         Object clamp=HookEntry.get(dpc,"mBrightnessClamperController");float cap=((Number)clamp.getClass().getMethod("getMaxBrightness").invoke(clamp)).floatValue();
         float battery=((Number)HookEntry.get(s.owner,"mBatteryThermalLimitBrightness")).floatValue();
-        return frame==1f&&actual==1f&&sdr==1f&&cap==1f&&battery==1f&&"AutomaticBrightnessStrategy".equals(s.outputStrategy(dpc));
+        return frame==1f&&actual==1f&&sdr==1f&&cap==1f&&battery==1f&&"AutomaticBrightnessStrategy".equals(OutdoorOutputAccess.name(s));
     }
     void evaluate(){if(!acceptedRevision.equals(s.revision)){acceptedRevision=s.revision;failed=false;}queued=false;s.handler.removeCallbacks(check);boolean active=false;try{active=allowed();}catch(Throwable unknown){}
         if(active){requested=true;send(true,s.outdoor.options.nodeTarget);s.handler.postDelayed(check,500);}
@@ -48,7 +48,8 @@ final class OutdoorNodeBridge {
     void release(){s.handler.removeCallbacks(check);queued=false;if(requested){requested=false;send(false,0);}}
     void close(){release();closed=true;}
     synchronized void send(boolean active,int target){
-        pending="v2 "+android.os.Process.myPid()+" "+(SystemClock.uptimeMillis()+1500)+" "+target+" "+(active?1:0)+"\n";
+        long physical=OutdoorOutputAccess.physical(s);
+        pending=(physical>0?"v3 ":"v2 ")+android.os.Process.myPid()+" "+(SystemClock.uptimeMillis()+1500)+" "+target+" "+(active?1:0)+(physical>0?" "+physical:"")+"\n";
         if(writing)return;writing=true;try{executor.execute(this::drain);}catch(RuntimeException rejected){writing=false;}
     }
     void drain(){while(true){String value;synchronized(this){value=pending;pending=null;if(value==null){writing=false;return;}}

@@ -19,6 +19,8 @@ public final class FeatureCompatibility {
         case "main_sensor":choice=text(object(runtime,"main_input_compatibility"),"profile");break;
         case "dark_lock_schedule":choice=text(object(object(runtime,"brightness_control"),"dark_lock_schedule"),"profile");break;
         case "animation_override":choice=text(runtime,"animation_compatibility_profile");break;
+        case "node_output":String output=text(runtime,"outdoor_output_profile");choice=output.equals("automatic_strategy2_reason")?"automatic_strategy2_node":output.isEmpty()||output.equals("selected_strategy")?"raw_primary_output":"";break;
+        case "outdoor_node_device":String device=text(runtime,"outdoor_node_device_profile");choice=device.equals("fold_bound_node")?"fold_bound_outdoor":device.isEmpty()||device.equals("primary_node")?"primary_node_profile":"";break;
         case "assist_sensor":JSONObject binding=object(runtime,"assist_compatibility");String mode=text(binding,"state"),kind=text(binding,"binding_kind");choice=kind.equals("native_auxiliary")||kind.equals("ported_auxiliary")?kind:mode.equals("native")?"native_auxiliary":mode.equals("bound")?"ported_auxiliary":"";break;
         case "hbm":choice=text(object(runtime,"outdoor"),"hbm_tuning_profile");String controller=text(object(runtime,"outdoor"),"hbm_controller_profile");if(controller.equals("enabled_field")||controller.equals("native_support_method"))result.add(controller);break;
         case "response":case "small_response":case "low_light":case "low_threshold":case "threshold_override":case "assist_gate":case "assist_override":choice=text(runtime,"response_scene_profile");break;
@@ -26,7 +28,7 @@ public final class FeatureCompatibility {
         case "opr":case "nit_limit":choice=text(object(runtime,"outdoor"),"sdr_compatibility_profile");break;
         case "apps":JSONObject control=object(runtime,"brightness_control");if(control.has("app_multiwindow_supported"))choice=control.optBoolean("app_multiwindow_supported")?"visible_tasks":"focus_fallback";break;
         case "outdoor_range":result.add("hbm_range");JSONObject out=object(runtime,"outdoor");if(out.optBoolean("dynamic_range_supported")&&out.optBoolean("dynamic_range_enabled"))result.add("dynamic_range");return result;
-        case "main_panel_node":choice=text(entry,"node_class").equals("backlight")?"backlight_node":text(entry,"node_class").equals("leds")?"display_led_node":"";break;
+        case "main_panel_node":if(text(entry,"node_discovery").equals("fold_default_display")){choice="fold_default_display";break;}choice=text(entry,"node_class").equals("backlight")?"backlight_node":text(entry,"node_class").equals("leds")?"display_led_node":"";break;
         case "control_center_slider":if(text(object(runtime,"control_center_slider"),"kind").equals("coordinate_v2"))choice="coordinate_v2";break;
         default:if(routes.length==1&&!routes[0].id.equals("unreported"))choice=routes[0].id;
         }
@@ -44,9 +46,11 @@ public final class FeatureCompatibility {
         case "hbm":return "计时适配："+(text(out,"hbm_tuning_profile").isEmpty()?"未报告":text(out,"hbm_tuning_profile"))+"\n"+"控制器适配："+(text(out,"hbm_controller_profile").isEmpty()?"未报告":text(out,"hbm_controller_profile"))+(out.has("original_minimum_lux")?"\n原生门槛："+out.optDouble("original_minimum_lux")+" lux":"")+(out.has("original_time_window_ms")?"\n原生计时（窗口 / 最大 / 最短）："+out.optLong("original_time_window_ms")+" / "+out.optLong("original_time_max_ms")+" / "+out.optLong("original_time_min_ms")+" ms":"");
         case "response":case "small_response":case "low_light":case "low_threshold":case "threshold_override":case "assist_gate":case "assist_override":return "场景适配："+(text(runtime,"response_scene_profile").isEmpty()?"未报告":text(runtime,"response_scene_profile"))+"\n"+text(entry,"detail");
         case "outdoor":return "目标适配："+(text(out,"target_compatibility_profile").isEmpty()?"未报告":text(out,"target_compatibility_profile"))+"\n"+text(entry,"detail");
+        case "node_output":return "节点增强输出适配："+(text(runtime,"outdoor_output_profile").isEmpty()?"未报告":text(runtime,"outdoor_output_profile"))+"\n"+text(entry,"detail");
+        case "outdoor_node_device":return "节点增强设备绑定："+(text(runtime,"outdoor_node_device_profile").isEmpty()?"未报告":text(runtime,"outdoor_node_device_profile"))+"\n"+text(entry,"detail");
         case "opr":case "nit_limit":return "SDR 适配："+(text(out,"sdr_compatibility_profile").isEmpty()?"未报告":text(out,"sdr_compatibility_profile"))+(text(out,"sdr_compatibility_detail").isEmpty()?"":"\n"+text(out,"sdr_compatibility_detail"));
         case "apps":JSONObject c=object(runtime,"brightness_control");return c.has("app_multiwindow_supported")?c.optBoolean("app_multiwindow_supported")?"本机可见任务接口完整；已接入多窗口判断。":"本机仅提供已验证的焦点回退；不能保证小窗失焦时继续暂停。":"多窗口接口信息尚未报告。";
-        case "main_panel_node":return text(entry,"node_path").isEmpty()?"尚未报告具体主屏节点。":"实际节点："+text(entry,"node_path")+"\n节点上限："+entry.optInt("node_maximum");
+        case "main_panel_node":return text(entry,"node_path").isEmpty()?(text(entry,"node_detail").isEmpty()?"尚未报告具体主屏节点。":"节点状态："+text(entry,"node_detail")):"实际节点："+text(entry,"node_path")+(text(entry,"node_physical_display_id").isEmpty()?"":"\n物理屏："+text(entry,"node_physical_display_id"))+(text(entry,"node_address_profile").isEmpty()?"":"\n地址类型："+text(entry,"node_address_profile"))+(text(entry,"node_binding").isEmpty()?"":"\n节点绑定："+(text(entry,"node_binding").equals("exclusive_internal_dsi")?"默认内部屏点亮 + 唯一活动 DSI":"原生端口配对")+" · 显示端口 "+entry.optInt("node_physical_port")+" / 背光节点 "+entry.optInt("node_kernel_port"))+"\n节点上限："+entry.optInt("node_maximum");
         case "control_center_slider":return "入口隐藏；不改变已有选择。\n"+text(object(runtime,"control_center_slider"),"error");
         default:return text(entry,"detail");
         }
@@ -56,6 +60,8 @@ public final class FeatureCompatibility {
         if(!"available".equals(entry.optString("state")))return "本次未采用："+entry.optString("detail","等待实际接口检查。");
         if(chosen.isEmpty())return "本次报告未提供足够的路线信息；未确认，不推断为不支持。";
         if(id.equals("assist_sensor"))return chosen.contains("native_auxiliary")?"原生辅助槽已有效绑定，优先沿用原路径；不启用移植补位。":"原生辅助槽原为空，本次使用经检查的补位路径；保留原生优先规则。";
+        if(id.equals("node_output"))return chosen.contains("automatic_strategy2_node")?"原生策略入口不存在，本次核验独立自动对象和亮度原因。":"原生策略入口已匹配，不叠加旧对象路线。";
+        if(id.equals("outdoor_node_device"))return chosen.contains("fold_bound_outdoor")?"本次使用折叠物理租约，不使用固定主屏节点。":"当前使用原主屏节点路径，未启用折叠协作绑定。";
         if(id.equals("hbm")){if(route.id.equals("enabled_field")||route.id.equals("native_support_method"))return chosen.contains("enabled_field")?"已匹配原生启用字段，不采用旧控制器判断。":chosen.contains("native_support_method")?"本机没有启用字段，采用完整旧结构的原生支持方法。":"本次报告未提供控制器结构，尚未确认。";return chosen.contains("ambient_only")?"本机三个原生计时字段全零，没有可调整的时间预算。":"本机使用已验证的有限时间预算，不能套用零计时分支。";}
         if(id.equals("opr")||id.equals("nit_limit"))return chosen.contains("privacy_aware")?"已匹配隐私显示接口，不能降级套用传统 OPR。":"当前匹配传统 OPR 完整接口；未选中新式隐私显示分支。";
         if(id.equals("apps"))return chosen.contains("visible_tasks")?"已有完整可见任务判断，不采用精度较低的焦点回退。":"本机缺少完整可见任务能力，本次使用焦点回退。";

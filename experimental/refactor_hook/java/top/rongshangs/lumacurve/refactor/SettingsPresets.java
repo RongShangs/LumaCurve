@@ -4,7 +4,7 @@ import org.json.*;
 /** Category-local draft patches. Presets never submit settings or change another group. */
 final class SettingsPresets {
  static JSONObject patch(String group,int mode,JSONObject caps)throws JSONException {
-  if(mode<0||mode>3||mode==3&&!group.equals("outdoor"))throw new IllegalArgumentException("未知预设");
+  if(mode<0||mode>3||mode==3&&!group.equals("outdoor")&&!group.equals("thermal"))throw new IllegalArgumentException("未知预设");
   JSONObject p=new JSONObject();boolean enabled=mode!=0;
   switch(group){
    case "low":
@@ -23,7 +23,7 @@ final class SettingsPresets {
     require(caps,"response_supported",enabled);p.put("response_override",enabled).put("small_brighten_override",enabled&&caps.optBoolean("small_response_supported"));
     if(enabled)p.put("brighten_delay",mode==1?1500:3000).put("darken_delay",mode==1?2000:5000).put("small_brighten_delay",mode==1?1500:5000);return p;
    case "thermal":
-    require(caps,"thermal_supported",enabled);p.put("thermal_relax",enabled);if(enabled)p.put("thermal_ceiling",43).put("thermal_cooling",1);return p;
+    require(caps,"thermal_supported",enabled);p.put("thermal_relax",enabled);if(enabled)p.put("thermal_ceiling",mode==1?43:mode==2?46:50).put("thermal_cooling",1);return p;
    default:
     int g=-1;for(int i=0;i<AdvancedOptions.GROUPS.length;i++)if(group.equals(AdvancedOptions.GROUPS[i]))g=i;
     if(g<0)throw new IllegalArgumentException("未知预设分类");require(caps,group+"_supported",enabled);p.put(group,enabled);if(!enabled)return p;

@@ -19,6 +19,7 @@ class TextView {String value;void setText(String s){value=s;}}
 class PanelNodeDiscovery {static int maximum;static boolean available=true;static JSONObject discover(File path)throws JSONException{return new JSONObject().put("supported",available).put("maximum",maximum);}}
 class RootControl {static File DATA=new File("not-used");}
 class OutdoorNodeRoot {
+ static JSONObject discover(){return PanelNodeDiscovery.discover(new java.io.File("/sys"));}static boolean accepts(JSONObject state,JSONObject node){return node.optBoolean("supported");}static String foldIds(JSONObject node){return "";}
  static boolean supported(JSONObject state){return PanelNodeDiscovery.available&&state.optBoolean("outdoor_node_supported");}static JSONObject health(){return new JSONObject();}static int running(){return -1;}
  ANNOTATE
 }

@@ -79,6 +79,38 @@ subprocess.run(['javac','--release','8','-encoding','UTF-8','-cp',str(J),'-d',st
 import re
 result=subprocess.run(['java','-cp',str(classes)+os.pathsep+str(J),'top.rongshangs.lumacurve.refactor.TraditionalAnimationTest'],capture_output=True,text=True,check=True)
 print(result.stdout,end='');total=int(re.search(r'(\d+) cases PASS',result.stdout).group(1))
+# Execute the same eligibility, protection and rollback suite with the older
+# three-argument native wrapper. Downstream limits and coordinate system match.
+variants=dict(sources)
+variants['com/android/server/display/RampAnimator.java']=variants['com/android/server/display/RampAnimator.java'].replace('boolean idle,float lux','boolean idle')
+variants[base+'TraditionalAnimationTest.java']=variants[base+'TraditionalAnimationTest.java'].replace('float.class,float.class,boolean.class,float.class},target,rate,false,10f','float.class,float.class,boolean.class},target,rate,false')
+out=O/'three-argument';paths=[]
+for name,code in variants.items():
+ p=out/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_text(code,encoding='utf-8');paths.append(p)
+c=out/'classes';c.mkdir(exist_ok=True)
+subprocess.run(['javac','--release','8','-encoding','UTF-8','-cp',str(J),'-d',str(c),*map(str,paths),*[str(S/n) for n in production]],check=True)
+result=subprocess.run(['java','-cp',str(c)+os.pathsep+str(J),'top.rongshangs.lumacurve.refactor.TraditionalAnimationTest'],capture_output=True,text=True,check=True)
+print('three-argument wrapper: '+result.stdout.strip());total+=int(re.search(r'(\d+) cases PASS',result.stdout).group(1))
+for scenario in ['both_wrappers','malformed_preferred_with_old','static_preferred_with_old']:
+ variants=dict(sources)
+ ramp=variants['com/android/server/display/RampAnimator.java']
+ ramp=ramp.replace('public class RampAnimator{','public class RampAnimator{ public boolean setAnimationTarget(float target,float rate,boolean idle){lastTarget=target;lastRate=rate;return true;}')
+ if scenario=='malformed_preferred_with_old':ramp=ramp.replace('boolean setAnimationTarget(float target,float rate,boolean idle,float lux)','long setAnimationTarget(float target,float rate,boolean idle,float lux)').replace('return setAnimationTarget(target,rate,limit,limit);','setAnimationTarget(target,rate,limit,limit);return 1L;')
+ if scenario=='static_preferred_with_old':
+  start=ramp.index(' public boolean setAnimationTarget(float target,float rate,boolean idle,float lux)')
+  end=ramp.index(' private boolean setAnimationTarget',start)
+  ramp=ramp[:start]+' public static boolean setAnimationTarget(float target,float rate,boolean idle,float lux){return true;}\n'+ramp[end:]
+ variants['com/android/server/display/RampAnimator.java']=ramp
+ code=variants[base+'TraditionalAnimationTest.java'];start=code.index(' public static void main(')
+ expected='check(TraditionalAnimation.supported(s));check(animate(first(s),.5f,.2f)==.1f);check(first(s).mRate==.1f);' if scenario=='both_wrappers' else 'check(!TraditionalAnimation.supported(s));check(TraditionalAnimation.installed.isEmpty());'
+ variants[base+'TraditionalAnimationTest.java']=code[:start]+''' public static void main(String[] args)throws Exception{TraditionalAnimation.install(TraditionalAnimationTest.class.getClassLoader());HookRuntime s=runtime();'''+expected+'''System.out.println("Wrapper selection: "+cases+" cases PASS");}}'''
+ out=O/scenario;paths=[]
+ for name,code in variants.items():
+  p=out/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_text(code,encoding='utf-8');paths.append(p)
+ c=out/'classes';c.mkdir(exist_ok=True)
+ subprocess.run(['javac','--release','8','-encoding','UTF-8','-cp',str(J),'-d',str(c),*map(str,paths),*[str(S/n) for n in production]],check=True)
+ result=subprocess.run(['java','-cp',str(c)+os.pathsep+str(J),'top.rongshangs.lumacurve.refactor.TraditionalAnimationTest'],capture_output=True,text=True,check=True)
+ print(scenario+': '+result.stdout.strip());total+=int(re.search(r'(\d+) cases PASS',result.stdout).group(1))
 for scenario in ['wrong_first_flag','wrong_modifier','wrong_reason_result','aliased_reason']:
  variants=dict(sources)
  code=variants[base+'TraditionalAnimationTest.java'];start=code.index(' public static void main(')
