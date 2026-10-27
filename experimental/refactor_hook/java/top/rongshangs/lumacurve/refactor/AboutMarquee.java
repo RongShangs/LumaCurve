@@ -5,7 +5,7 @@ import org.json.*;
 
 /** Independent message speeds with full-height jitter and predictive headway. */
 final class AboutMarquee {
-    static final String[] TESTERS={"勿忘","灭","春暖花开","无缺"};
+    static final String[] TESTERS={"勿忘","灭","春暖花开","无缺","DickTsai","NOTTRUE"};
     interface Measure {float width(String text);}
     static final class Line {final String text;final int lane;final float width,speed,y;float x;Line(String text,int lane,float width,float x,float speed,float y){this.text=text;this.lane=lane;this.width=width;this.x=x;this.speed=speed;this.y=y;}}
     final List<Line> lines=new ArrayList<>();final List<String> cycle=new ArrayList<>();final Random random;List<String> messages=Collections.emptyList();int cursor,lanes;float width,density=1;Measure measure;
