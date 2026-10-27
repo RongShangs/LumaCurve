@@ -56,6 +56,6 @@ final class TraditionalHooks {
                 }catch(Throwable optional){}
             }}));
             installed.add(type);
-        }catch(Throwable failure){for(XC_MethodHook.Unhook h:added)h.unhook();throw new IllegalStateException("传统曲线 Hook 未建立",failure);}
+        }catch(Throwable failure){HookTransaction.rollbackAll(added);throw new IllegalStateException("传统曲线 Hook 未建立",failure);}
     }
 }

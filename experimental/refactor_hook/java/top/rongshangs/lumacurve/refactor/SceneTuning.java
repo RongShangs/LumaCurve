@@ -35,7 +35,7 @@ final class SceneTuning {
             if(group==5&&!hasSharedSceneConsumer(cls))throw new IllegalStateException("scene admission consumer unavailable");
             added.add(XposedBridge.hookMethod(m,hook(group,name)));}
         if(cap==null){cap=new HashSet<>();capabilities.put(cls,cap);}cap.add(group);
-    }catch(Throwable missing){for(XC_MethodHook.Unhook h:added)h.unhook();XposedBridge.log("HyperLux scene option "+group+" unavailable: "+missing);}}
+    }catch(Throwable missing){HookTransaction.rollbackAll(added);XposedBridge.log("HyperLux scene option "+group+" unavailable: "+missing);}}
     static boolean hasSharedSceneConsumer(Class<?> cls){Set<Integer> cap=capabilities.get(cls);return cap!=null&&cap.contains(4);}
     static String inactiveReason(HookRuntime s,int group){
         if(group==0||group==4||group==5)try{
@@ -69,6 +69,6 @@ final class SceneTuning {
             else if(name.equals("isNeedSkipBrightnessChange")&&c.enabled){Object rear=HookRuntime.optionalBoolean(p.thisObject,"mNeedCheckProximitySensor"),aon=HookRuntime.optionalBoolean(p.thisObject,"mNeedCheckAonFlare");if(rear instanceof Boolean&&aon instanceof Boolean)p.setResult((Boolean)rear&&!c.blocked(4)||(Boolean)aon&&!c.blocked(5));}
         }
     };}
-    static void save(XC_MethodHook.MethodHookParam p,String name,Object value)throws Exception{@SuppressWarnings("unchecked") Map<Field,Object> saved=(Map<Field,Object>)p.getObjectExtra("hyperlux.scene.saved");if(saved==null){saved=new LinkedHashMap<>();p.setObjectExtra("hyperlux.scene.saved",saved);}Field f=HookEntry.field(p.thisObject.getClass(),name);if(!saved.containsKey(f))saved.put(f,f.get(p.thisObject));f.set(p.thisObject,value);}
-    static void restore(XC_MethodHook.MethodHookParam p){@SuppressWarnings("unchecked") Map<Field,Object> saved=(Map<Field,Object>)p.getObjectExtra("hyperlux.scene.saved");if(saved==null)return;for(Map.Entry<Field,Object> e:saved.entrySet())try{e.getKey().set(p.thisObject,e.getValue());}catch(Throwable failed){XposedBridge.log("HyperLux scene field restoration failed: "+failed);}saved.clear();}
+    static void save(XC_MethodHook.MethodHookParam p,String name,Object value)throws Exception{@SuppressWarnings("unchecked") Map<Field,FieldOverride> saved=(Map<Field,FieldOverride>)p.getObjectExtra("hyperlux.scene.saved");if(saved==null){saved=new LinkedHashMap<>();p.setObjectExtra("hyperlux.scene.saved",saved);}Field f=HookEntry.field(p.thisObject.getClass(),name);FieldOverride scope=saved.get(f);if(scope==null)saved.put(f,FieldOverride.apply(p.thisObject,f,value));else scope.replace(value);}
+    static void restore(XC_MethodHook.MethodHookParam p){@SuppressWarnings("unchecked") Map<Field,FieldOverride> saved=(Map<Field,FieldOverride>)p.getObjectExtra("hyperlux.scene.saved");if(saved==null)return;List<FieldOverride> reverse=new ArrayList<>(saved.values());Collections.reverse(reverse);for(FieldOverride scope:reverse)try{scope.close();}catch(Throwable failed){XposedBridge.log("HyperLux scene field restoration failed: "+failed);}saved.clear();}
 }

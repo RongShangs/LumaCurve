@@ -61,7 +61,7 @@ public final class HookEntry {
         }};
         discovery.addAll(XposedBridge.hookAllMethods(ClassLoader.class,"loadClass",watch));
         new Handler(Looper.getMainLooper()).postDelayed(()->{
-            synchronized(HookEntry.class){for(XC_MethodHook.Unhook u:discovery)u.unhook();discovery.clear();}
+            synchronized(HookEntry.class){HookTransaction.rollbackAll(discovery);discovery.clear();}
             if(installed.isEmpty())InjectionStatus.write(null,"curve_incompatible","LSPosed 已加载，但尚未找到兼容的系统显示接口");
             else if(InjectionStatus.lastStage.isEmpty())InjectionStatus.write(null,"hooks_ready","LSPosed 已加载，等待读取设备曲线");
         },45000);
@@ -132,8 +132,8 @@ public final class HookEntry {
                 }));
                 InjectionStatus.write(null,"hooks_ready","系统接口已连接，等待读取设备曲线");
                 installed.add(owner);
-            }catch(Throwable error){for(XC_MethodHook.Unhook u:added)u.unhook();throw error;}
-            for(XC_MethodHook.Unhook u:discovery)u.unhook();discovery.clear();
+            }catch(Throwable error){HookTransaction.rollbackAll(added);throw error;}
+            HookTransaction.rollbackAll(discovery);discovery.clear();
             XposedBridge.log("HyperLux "+AppBuild.BUILD+": verified hooks installed");return true;
         }catch(ClassNotFoundException absent){return false;}
         catch(Throwable error){XposedBridge.log("LumaCurve incompatible Refactor interface: "+error);return false;}
@@ -160,20 +160,19 @@ public final class HookEntry {
                         if(state==null||state.closed||Looper.myLooper()!=state.handler.getLooper()||!state.relaxThermal())return;
                         float cap=((Number)get(p.thisObject,"mThermalMaxBrightness")).floatValue();
                         if(!Float.isFinite(cap)||cap<0||cap>1)return;
-                        p.setObjectExtra("luma.thermal.saved",Float.valueOf(cap));
-                        field(owner,"mThermalMaxBrightness").setFloat(p.thisObject,Float.NaN);
+                        p.setObjectExtra("luma.thermal.saved",FieldOverride.apply(p.thisObject,field(owner,"mThermalMaxBrightness"),Float.NaN));
                         state.thermalCall(cap,((Number)p.args[0]).floatValue());
                     }catch(Throwable error){XposedBridge.log("LumaCurve thermal left official: "+error);}
                 }
                 protected void afterHookedMethod(MethodHookParam p){
                     Object saved=p.getObjectExtra("luma.thermal.saved");if(saved==null)return;
-                    try{field(owner,"mThermalMaxBrightness").setFloat(p.thisObject,(Float)saved);}
+                    try{((FieldOverride)saved).close();}
                     catch(Throwable error){XposedBridge.log("LumaCurve thermal restore: "+error);}
                 }
             };
             hooks.add(XposedBridge.hookMethod(hdr,hook));hooks.add(XposedBridge.hookMethod(sdr,hook));
             thermalSupported.add(owner);
-        }catch(Throwable unavailable){for(XC_MethodHook.Unhook h:hooks)h.unhook();XposedBridge.log("LumaCurve thermal option unavailable: "+unavailable);}
+        }catch(Throwable unavailable){HookTransaction.rollbackAll(hooks);XposedBridge.log("LumaCurve thermal option unavailable: "+unavailable);}
     }
     static void attach(Object owner){
         try {

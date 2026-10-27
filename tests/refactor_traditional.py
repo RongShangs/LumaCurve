@@ -141,6 +141,6 @@ files=[]
 for name,value in sources.items():
     p=O/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_text(value,encoding='utf-8');files.append(p)
 C=O/'classes';C.mkdir(exist_ok=True)
-production=['CurvePlan','CurveBackend','SavedCurve','TraditionalCurve','TraditionalAdapter','TraditionalHooks','CurveIdentity','BackendSelection','MemoryPolicy','MemoryOptions','PersistentMemory']
+production=['hooking/HookTransaction','CurvePlan','CurveBackend','SavedCurve','TraditionalCurve','TraditionalAdapter','TraditionalHooks','CurveIdentity','BackendSelection','MemoryPolicy','MemoryOptions','PersistentMemory']
 subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(J),'-d',str(C),*[str(f) for f in files],*[str(S/(n+'.java')) for n in production]],check=True)
 subprocess.run(['java','-cp',str(C)+';'+str(J),'top.rongshangs.lumacurve.refactor.TraditionalHostTest'],check=True)

@@ -9,9 +9,7 @@ final class RootPanelBridge implements AutoCloseable {
  RootPanelBridge(Context context){this.context=context;}
  synchronized JSONObject request(JSONObject request)throws Exception{
   if(process==null||!process.isAlive()){
-   close();String path=context.getApplicationInfo().sourceDir;
-   String cmd="CLASSPATH='"+path.replace("'","'\\''")+"' /system/bin/app_process /system/bin top.rongshangs.lumacurve.refactor.RootControl serve";
-   process=new ProcessBuilder("su","-c",cmd).redirectErrorStream(true).start();
+   close();process=RootLaunch.open(context.getApplicationInfo().sourceDir);
    reader=new BufferedReader(new InputStreamReader(process.getInputStream(),StandardCharsets.UTF_8));writer=new BufferedWriter(new OutputStreamWriter(process.getOutputStream(),StandardCharsets.UTF_8));
   }
   final Process live=process;Thread timeout=new Thread(()->{try{Thread.sleep(15000);live.destroyForcibly();}catch(InterruptedException ignored){}});timeout.setDaemon(true);timeout.start();

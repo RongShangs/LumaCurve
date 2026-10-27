@@ -42,6 +42,19 @@ with tempfile.TemporaryDirectory(prefix='hyperlux-release-') as temporary:
     else:raise AssertionError('keytool failure ignored')
     check(key.read_bytes()==b'fixture')
 
+    output_guard=next(n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=='validate_output_paths')
+    target=base/'deliverables';target.mkdir();safe={'__builtins__':__builtins__}
+    exec(compile(ast.Module(body=[output_guard],type_ignores=[]),'<production output guard>','exec'),safe)
+    safe['validate_output_paths'](target,['new.apk','new.zip']);check(not any(target.iterdir()))
+    for name in ['existing.apk','existing.zip','release.md']:
+        item=target/name;item.write_bytes(b'old immutable artifact')
+        try:safe['validate_output_paths'](target,[name])
+        except FileExistsError:pass
+        else:raise AssertionError('existing deliverable accepted')
+        check(item.read_bytes()==b'old immutable artifact')
+    # Read-only verification keeps its explicit bypass; packaging must fail before SDK work.
+    check('if not args.verify_only:' in (ROOT/'tools/build_refactor_hook_test.py').read_text(encoding='utf-8'))
+
     root=base/'project';site=root/'website';out=base/'web'
     def write(path,data):
         path.parent.mkdir(parents=True,exist_ok=True)

@@ -39,7 +39,7 @@ final class LowLightTuning {
                     }}
                 }}));
             }installed.add(ring);
-        }catch(Throwable unavailable){for(XC_MethodHook.Unhook h:hooks)h.unhook();XposedBridge.log("HyperLux assist stability unavailable: "+unavailable);}
+        }catch(Throwable unavailable){HookTransaction.rollbackAll(hooks);XposedBridge.log("HyperLux assist stability unavailable: "+unavailable);}
     }
     static boolean supported(HookRuntime s){
         try{Object impl=HookEntry.get(s.owner,"mAutomaticBrightnessControllerImpl"),dual=HookEntry.get(impl,"mDualSensorPolicy");

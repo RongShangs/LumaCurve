@@ -54,7 +54,7 @@ final class AdvancedTuning {
                     }}
                 }}));
             }thresholds.add(cls);
-        }catch(Throwable unavailable){for(XC_MethodHook.Unhook h:added)h.unhook();XposedBridge.log("HyperLux threshold options unavailable: "+unavailable);}
+        }catch(Throwable unavailable){HookTransaction.rollbackAll(added);XposedBridge.log("HyperLux threshold options unavailable: "+unavailable);}
     }
     static float applyThreshold(HookRuntime s,float lux,float original,boolean bright,boolean small,boolean custom,boolean guard){
         float next=custom?AdvancedPolicy.threshold(lux,original,bright,(float)s.advanced.values[small?2:bright?0:1],small?0:(float)s.advanced.values[bright?3:4]):original;
@@ -106,7 +106,7 @@ final class AdvancedTuning {
                     }}
                 }}));
             }sunlights.add(cls);
-        }catch(Throwable unavailable){for(XC_MethodHook.Unhook h:added)h.unhook();XposedBridge.log("HyperLux sunlight options unavailable: "+unavailable);}
+        }catch(Throwable unavailable){HookTransaction.rollbackAll(added);XposedBridge.log("HyperLux sunlight options unavailable: "+unavailable);}
     }
     static boolean supported(int group,HookRuntime s){try{
         if(group==2&&TraditionalAnimation.supported(s))return s.hdrProbe!=null&&ResponseTuning.supported(s.owner);
@@ -133,10 +133,10 @@ final class AdvancedTuning {
                 try{Object impl=HookEntry.get(s.owner,"mAutomaticBrightnessControllerImpl");if(HookEntry.get(impl,"mTouchAreaHelper")!=p.thisObject)continue;
                     if(!s.normalTuningAllowed(HookEntry.get(impl,"mAutomaticBrightnessController"),impl))return;
                     int before=((Number)HookEntry.get(p.thisObject,"mTouchEventDebounce")).intValue(),chosen=(int)s.advanced.values[13];if(before==chosen)return;
-                    p.setObjectExtra("hyperlux.touch.saved",before);HookEntry.field(cls,"mTouchEventDebounce").setInt(p.thisObject,chosen);if(!s.probingScenes)s.touchAdjustments++;return;
+                    p.setObjectExtra("hyperlux.touch.saved",FieldOverride.apply(p.thisObject,HookEntry.field(cls,"mTouchEventDebounce"),chosen));if(!s.probingScenes)s.touchAdjustments++;return;
                 }catch(Throwable unavailable){return;}
             }}
-        }protected void afterHookedMethod(MethodHookParam p){Object original=p.getObjectExtra("hyperlux.touch.saved");if(original!=null)try{HookEntry.field(cls,"mTouchEventDebounce").setInt(p.thisObject,(Integer)original);}catch(Throwable failed){XposedBridge.log("HyperLux touch restoration failed: "+failed);}}});touches.add(cls);
+        }protected void afterHookedMethod(MethodHookParam p){Object original=p.getObjectExtra("hyperlux.touch.saved");if(original!=null)try{((FieldOverride)original).close();}catch(Throwable failed){XposedBridge.log("HyperLux touch restoration failed: "+failed);}}});touches.add(cls);
     }catch(Throwable missing){XposedBridge.log("HyperLux touch options unavailable: "+missing);}}
     interface JSONObjectSink{void put(String key,boolean value)throws Exception;}
     static void refreshThresholds(HookRuntime s){

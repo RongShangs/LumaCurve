@@ -11,7 +11,7 @@ public final class XposedBridge {
         void log(String text);
     }
     private static volatile Backend backend;
-    private static final Set<XC_MethodHook.Unhook> handles=Collections.newSetFromMap(new IdentityHashMap<>());
+    private static final Set<XC_MethodHook.Unhook> handles=new LinkedHashSet<>();
     public static synchronized boolean initialize(Backend value){if(backend!=null)return false;backend=value;return true;}
     public static synchronized int hookCount(){return handles.size();}
     public static XC_MethodHook.Unhook hookMethod(Method method,XC_MethodHook callback){
@@ -25,11 +25,11 @@ public final class XposedBridge {
     public static Set<XC_MethodHook.Unhook> hookAllMethods(Class<?> owner,String name,XC_MethodHook callback){
         Set<XC_MethodHook.Unhook> result=new LinkedHashSet<>();
         try{for(Method m:owner.getDeclaredMethods())if(m.getName().equals(name))result.add(hookMethod(m,callback));return result;}
-        catch(Throwable failure){for(XC_MethodHook.Unhook h:result)h.unhook();throw failure;}
+        catch(Throwable failure){HookTransaction.rollbackAll(result);throw failure;}
     }
     public static Object invokeOriginalMethod(Method method,Object receiver,Object[] args)throws Throwable {
         if(backend==null)throw new IllegalStateException("Hook backend not initialized");return backend.original(method,receiver,args);
     }
     public static void log(String text){Backend current=backend;if(current!=null)current.log(text);}
-    public static void unhookAll(){XC_MethodHook.Unhook[] all;synchronized(XposedBridge.class){all=handles.toArray(new XC_MethodHook.Unhook[0]);}for(XC_MethodHook.Unhook hook:all)hook.unhook();}
+    public static void unhookAll(){XC_MethodHook.Unhook[] all;synchronized(XposedBridge.class){all=handles.toArray(new XC_MethodHook.Unhook[0]);}HookTransaction.rollbackAll(Arrays.asList(all));}
 }

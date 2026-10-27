@@ -1,4 +1,4 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="top.rongshangs.lumacurve" android:versionCode="41100" android:versionName="4.1.1">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="top.rongshangs.lumacurve" android:versionCode="42000" android:versionName="4.2.0">
     <uses-sdk android:minSdkVersion="34" android:targetSdkVersion="34"/>
     <uses-permission android:name="android.permission.INTERNET"/>
     <queries><intent><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent></queries>
@@ -15,6 +15,7 @@
             <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
         </activity-alias>
         <activity android:name="top.rongshangs.lumacurve.refactor.BrightnessPanelActivity" android:exported="false" android:theme="@style/BrightnessPopupTheme" android:launchMode="singleTop" android:excludeFromRecents="true" android:taskAffinity=""/>
+        <provider android:name="top.rongshangs.lumacurve.refactor.DiagnosticShareProvider" android:authorities="top.rongshangs.lumacurve.diagnostics" android:exported="false" android:grantUriPermissions="true"/>
         <service android:name="top.rongshangs.lumacurve.refactor.BrightnessTileService" android:label="@string/brightness_tile_label" android:icon="@drawable/brightness_tile" android:exported="true" android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
             <intent-filter><action android:name="android.service.quicksettings.action.QS_TILE"/></intent-filter>
         </service>

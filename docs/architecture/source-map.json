@@ -3,6 +3,21 @@
   "source_root": "experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor",
   "files": [
     {
+      "file": "AboutHeroView.java",
+      "layer": "presentation",
+      "purpose": "浅蓝底色的大圆角方形图标、容器内裁剪弹幕及仅可见时运行的绘制调度"
+    },
+    {
+      "file": "AboutMarquee.java",
+      "layer": "policy",
+      "purpose": "自适应高度带、独立速度与错落位置的弹幕模型、可见范围计算和预测防重叠"
+    },
+    {
+      "file": "AboutPage.java",
+      "layer": "presentation",
+      "purpose": "首帧测量的顺排大图标与关于卡片、上大下小圆角信息卡、名称/简介/版本三行居中和无抬升紧凑操作"
+    },
+    {
       "file": "ActivePanelNode.java",
       "layer": "adapters",
       "purpose": "原生折叠布局、默认物理屏与背光节点绑定"
@@ -28,6 +43,11 @@
       "purpose": "入口与代次"
     },
     {
+      "file": "AppRootDiagnostics.java",
+      "layer": "diagnostics",
+      "purpose": "Root导出不可用时APP侧Downloads权限分析包"
+    },
+    {
       "file": "ApplicationBrightnessSettings.java",
       "layer": "presentation",
       "purpose": "界面与只读说明"
@@ -39,8 +59,8 @@
     },
     {
       "file": "AuxiliarySensorIdentity.java",
-      "layer": "policy",
-      "purpose": "策略与算子"
+      "layer": "adapters",
+      "purpose": "传感器身份、元信息及权限检查；仅核验候选，不注册监听"
     },
     {
       "file": "BackendSelection.java",
@@ -173,6 +193,26 @@
       "purpose": "只读证据与诊断"
     },
     {
+      "file": "DiagnosticShareFiles.java",
+      "layer": "diagnostics",
+      "purpose": "显式导出的诊断副本命名、路径边界与流式复制"
+    },
+    {
+      "file": "DiagnosticShareProvider.java",
+      "layer": "diagnostics",
+      "purpose": "单文件临时只读内容授权，不暴露存储目录"
+    },
+    {
+      "file": "DiagnosticSharing.java",
+      "layer": "presentation",
+      "purpose": "导出后确认打开系统分享，保留原始归档与失败提示"
+    },
+    {
+      "file": "ElasticScrollView.java",
+      "layer": "presentation",
+      "purpose": "统一隐藏滚动指示器、越界阻尼回弹和生命周期清理"
+    },
+    {
       "file": "FeatureCheckPage.java",
       "layer": "presentation",
       "purpose": "界面与只读说明"
@@ -186,6 +226,16 @@
       "file": "FeatureSelfCheck.java",
       "layer": "diagnostics",
       "purpose": "只读证据与诊断"
+    },
+    {
+      "file": "FieldOverride.java",
+      "layer": "adapters",
+      "purpose": "临时字段作用域：只恢复仍属于本次调用的值，支持嵌套与异常清理"
+    },
+    {
+      "file": "FloatingNavigation.java",
+      "layer": "presentation",
+      "purpose": "悬浮底栏、选择状态与实际手势收放"
     },
     {
       "file": "ForegroundApps.java",
@@ -218,6 +268,11 @@
       "purpose": "显示运行协调"
     },
     {
+      "file": "ImmersiveLayout.java",
+      "layer": "presentation",
+      "purpose": "系统栏、键盘与全屏教程的安全边距"
+    },
+    {
       "file": "InjectionStatus.java",
       "layer": "diagnostics",
       "purpose": "只读证据与诊断"
@@ -241,6 +296,16 @@
       "file": "LiveLimitEvidence.java",
       "layer": "diagnostics",
       "purpose": "只读证据与诊断"
+    },
+    {
+      "file": "LogCompatibilityPanel.java",
+      "layer": "presentation",
+      "purpose": "日志页可读兼容分区与完整自检入口"
+    },
+    {
+      "file": "LogCompatibilityState.java",
+      "layer": "presentation",
+      "purpose": "消费既有Root/注入/引擎证据，分别概括兼容状态"
     },
     {
       "file": "LowLightAssistEvidence.java",
@@ -316,6 +381,11 @@
       "file": "NativePanelRoot.java",
       "layer": "bridge",
       "purpose": "Root 与原生程序桥"
+    },
+    {
+      "file": "NavigationPolicy.java",
+      "layer": "policy",
+      "purpose": "界面滚动方向与悬浮导航几何，不参与亮度控制"
     },
     {
       "file": "NitBrightnessLimit.java",
@@ -473,6 +543,16 @@
       "purpose": "界面与只读说明"
     },
     {
+      "file": "RootAccess.java",
+      "layer": "diagnostics",
+      "purpose": "实际身份与权限证据；不代替逐项访问结果"
+    },
+    {
+      "file": "RootCommand.java",
+      "layer": "bridge",
+      "purpose": "有界无临时文件命令输出"
+    },
+    {
       "file": "RootControl.java",
       "layer": "bridge",
       "purpose": "Root 与原生程序桥"
@@ -481,6 +561,11 @@
       "file": "RootFeatureChecks.java",
       "layer": "diagnostics",
       "purpose": "只读证据与诊断"
+    },
+    {
+      "file": "RootLaunch.java",
+      "layer": "bootstrap",
+      "purpose": "APP与面板共用su定位；拒绝授权不重试"
     },
     {
       "file": "RootPanelBridge.java",
@@ -493,6 +578,11 @@
       "purpose": "Root 与原生程序桥"
     },
     {
+      "file": "RootWorkspace.java",
+      "layer": "bridge",
+      "purpose": "按实际权限选择安全操作目录；原生输出固定原目录"
+    },
+    {
       "file": "RuntimeFeatureChecks.java",
       "layer": "diagnostics",
       "purpose": "只读证据与诊断"
@@ -500,7 +590,7 @@
     {
       "file": "SavedCurve.java",
       "layer": "configuration",
-      "purpose": "配置、保持与迁移"
+      "purpose": "设备绑定基础曲线转存、校验与保持；新鲜物理采样仅归一4个float ULP内舍入误差，持久化输入严格校验"
     },
     {
       "file": "SceneCatalog.java",
@@ -538,6 +628,11 @@
       "purpose": "设备接口与所有权"
     },
     {
+      "file": "ScrollElasticity.java",
+      "layer": "policy",
+      "purpose": "纯界面像素阻尼与有界回弹，不改变逻辑滚动位置"
+    },
+    {
       "file": "SensorState.java",
       "layer": "diagnostics",
       "purpose": "只读证据与诊断"
@@ -546,6 +641,16 @@
       "file": "SettingsPresets.java",
       "layer": "presentation",
       "purpose": "界面与只读说明"
+    },
+    {
+      "file": "SettingsSearch.java",
+      "layer": "presentation",
+      "purpose": "实时设置筛选、清空与导航，保留草稿和查询状态"
+    },
+    {
+      "file": "SettingsSearchIndex.java",
+      "layer": "presentation",
+      "purpose": "设置搜索目的地与双语关键词目录，沿用现有入口"
     },
     {
       "file": "StatusAdvice.java",
@@ -673,7 +778,7 @@
     },
     {
       "file": "outdoor_node.h",
-      "purpose": "户外协作输出、锁和健康状态"
+      "purpose": "户外协作输出、独占锁、有界I/O重试、系统改写退让和错误阶段健康状态"
     },
     {
       "file": "outdoor_node_policy.h",

@@ -12,6 +12,8 @@ S = R / 'experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor'
 O = R / 'build/panel-access-tests'
 J = R / 'build/refactor-diagnostics/json-20240303.jar'
 files = {
+ 'top/rongshangs/lumacurve/refactor/RootWorkspace.java':'package top.rongshangs.lumacurve.refactor;final class RootWorkspace{static void requireNative(){}}',
+
     'top/rongshangs/lumacurve/refactor/ActivePanelNode.java': 'package top.rongshangs.lumacurve.refactor;class ActivePanelNode{static final String PROFILE="fold_default_display";static org.json.JSONObject discover()throws Exception{return PanelNodeDiscovery.discover(new java.io.File("/sys"));}}',
     'android/system/ErrnoException.java': '''package android.system;public class ErrnoException extends Exception{public final int errno;public ErrnoException(String op,int e){super(op+" errno="+e);errno=e;}}''',
     'android/system/StructStat.java': '''package android.system;public class StructStat{public int st_mode;public long st_dev=1,st_ino=2;}''',

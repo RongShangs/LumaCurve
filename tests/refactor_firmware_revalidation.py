@@ -23,7 +23,7 @@ public class FirmwareTest{
   System.out.println("Firmware revalidation: "+cases+" cases PASS; actual policy, Android not tested");
  }
 }''',encoding='utf-8')
-c=O/'classes';c.mkdir(exist_ok=True);subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(J),'-d',str(c),str(p),str(S/'ConfigurationCompatibility.java'),str(S/'MemoryOptions.java')],check=True)
+c=O/'classes';c.mkdir(exist_ok=True);subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(J),'-d',str(c),str(p),str(S/'ConfigurationCompatibility.java'),str(S/'OutdoorOptions.java'),str(S/'OutdoorNodeTarget.java'),str(S/'AdvancedPolicy.java'),str(S/'MemoryOptions.java')],check=True)
 subprocess.run(['java','-cp',str(c)+';'+str(J),'top.rongshangs.lumacurve.refactor.FirmwareTest'],check=True)
 fixture=R/'build/analysis-20261015-131612-99130d/state.json'
 if fixture.exists():

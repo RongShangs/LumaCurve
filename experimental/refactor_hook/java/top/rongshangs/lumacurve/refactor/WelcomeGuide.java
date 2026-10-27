@@ -34,7 +34,7 @@ final class WelcomeGuide {
             TextView brand=a.text("使用教程",19,a.INK);bar.addView(brand,new LinearLayout.LayoutParams(0,-2,1));
             bar.addView(a.text(page+" / "+TutorialContent.pages(),12,a.MUTED));
         }
-        scroll=new ScrollView(a);scroll.setFillViewport(true);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
+        scroll=new ElasticScrollView(a);scroll.setFillViewport(true);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
         LinearLayout body=a.column();body.setPadding(a.dp(24),a.dp(16),a.dp(24),a.dp(20));scroll.addView(body);
         if(page==0){
             body.setGravity(Gravity.CENTER);logo=a.image(null,88,26);logo.setContentDescription("HyperLux");body.addView(logo);startLogoFloat();

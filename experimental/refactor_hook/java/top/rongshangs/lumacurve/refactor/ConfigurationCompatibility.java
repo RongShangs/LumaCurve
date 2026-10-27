@@ -7,6 +7,7 @@ public final class ConfigurationCompatibility {
     public static JSONObject submissionValidation(JSONObject proposed,JSONObject caps,JSONObject stored,String fingerprint)throws JSONException{
         JSONObject checked=new JSONObject(proposed.toString());
         if(!canReuse(stored,caps,fingerprint))return checked;
+        if(caps.has("outdoor_node_supported")&&!caps.optBoolean("outdoor_node_supported")&&proposed.optBoolean("outdoor_node_boost")&&stored.optBoolean("outdoor_node_boost")&&OutdoorOptions.parse(proposed).same(OutdoorOptions.parse(stored)))checked.put("outdoor_node_boost",false);
         String[][] groups={{"assist_override","assist_override_supported","assist_brighten","assist_darken","assist_small"},
             {"low_light_assist_gate","low_light_assist_gate_supported","low_light_assist_wait","low_light_assist_tolerance"}};
         for(String[] group:groups){

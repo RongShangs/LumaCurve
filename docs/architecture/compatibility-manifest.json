@@ -47,7 +47,7 @@
         "RefactorProfiles.java",
         "RefactorCoefficientsAdapter.java"
       ],
-      "selector": "ABC 活动策略为准；Refactor 未就绪不得因物理映射对象存在而抢用，未知活动标记才按已验证对象选择。 Refactor内部分段锚点优先；任一旧锚点标记存在时不得回退绕过残缺旧结构；仅旧锚点整体缺失且9/22系数布局、实例字段与原生消费者签名完整时采用系数路径。",
+      "selector": "ABC 活动策略为准；Refactor 未就绪不得因物理映射对象存在而抢用，未知活动标记才按已验证对象选择。 Refactor内部分段锚点优先；任一旧锚点标记存在时不得回退绕过残缺旧结构；仅旧锚点整体缺失且9/22系数布局、实例字段与原生消费者签名完整时采用系数路径。 记忆转基础保持现有路径；仅对新鲜物理映射采样的4个float ULP以内边界/平台舍入误差归一，仍严格校验全节点、坐标与范围；Refactor锚点及持久化输入不放宽。",
       "evidence": [
         "curve_backend",
         "physical_mapper_class",
@@ -55,7 +55,7 @@
         "user_serial",
         "curve_route"
       ],
-      "cleanup": "关闭 / 故障 / OTA 基准或用户变化恢复本次应用的曲线；只按所选保持范围恢复匹配记忆。 系数路线事务快照同时保存数组内容与身份；拒绝其他所有者替换的基线，未验证的虚拟拟合参考点不冒充可移植用户锚点。",
+      "cleanup": "关闭 / 故障 / OTA 基准或用户变化恢复本次应用的曲线；只按所选保持范围恢复匹配记忆。 系数路线事务快照同时保存数组内容与身份；拒绝其他所有者替换的基线，未验证的虚拟拟合参考点不冒充可移植用户锚点。 转存前校验失败不调用配置应用，不清除当前手动点；精度归一不修改原始状态快照或其他已保存设置。",
       "tests": [
         "tests/refactor_traditional.py",
         "tests/refactor_curve_integrity.py",
@@ -64,7 +64,8 @@
         "tests/refactor_persistent_memory.py",
         "tests/refactor_memory_lifecycle.py",
         "tests/refactor_coefficient_curve.py",
-        "tests/refactor_coefficient_firmware.py"
+        "tests/refactor_coefficient_firmware.py",
+        "tests/refactor_saved_curve.py"
       ],
       "composition": "exclusive"
     },
@@ -230,15 +231,17 @@
         "touch_release"
       ],
       "owners": [
-        "AdvancedTuning.java"
+        "AdvancedTuning.java",
+        "FieldOverride.java"
       ],
       "selector": "核验触摸保护消费者及 debounce 字段；保留普通资格和遮挡保护。",
       "evidence": [
         "touch_override_supported"
       ],
-      "cleanup": "每次调用后恢复临时字段，包括原生异常。",
+      "cleanup": "每次调用后恢复临时字段，包括原生异常。 临时字段统一由FieldOverride按当前值归属逆序恢复；系统在调用期间更新后不回写旧值。",
       "tests": [
-        "tests/refactor_advanced_hooks.py"
+        "tests/refactor_advanced_hooks.py",
+        "tests/refactor_review_safety.py"
       ],
       "composition": "exclusive"
     },
@@ -270,7 +273,8 @@
       "owners": [
         "SceneTuning.java",
         "SceneController.java",
-        "SceneCatalog.java"
+        "SceneCatalog.java",
+        "FieldOverride.java"
       ],
       "selector": "各场景独立实际消费者；普通 / 流式距离分别检测。OEM 未启用普通距离时报告 inactive，不强开传感器；只能约束现有场景。",
       "evidence": [
@@ -278,12 +282,13 @@
         "scene_options",
         "feature_self_check"
       ],
-      "cleanup": "临时场景字段按调用恢复；停止取消本次确认，恢复自己的步行 / 夜间设置。",
+      "cleanup": "临时场景字段按调用恢复；停止取消本次确认，恢复自己的步行 / 夜间设置。 临时字段统一由FieldOverride按当前值归属逆序恢复；系统在调用期间更新后不回写旧值。",
       "tests": [
         "tests/refactor_scenes.py",
         "tests/refactor_scene_hooks.py",
         "tests/refactor_scene_settings.py",
-        "tests/refactor_scene_firmware.py"
+        "tests/refactor_scene_firmware.py",
+        "tests/refactor_review_safety.py"
       ],
       "composition": "per_feature"
     },
@@ -480,17 +485,19 @@
       "owners": [
         "HookEntry.java",
         "ThermalPolicy.java",
-        "HookRuntime.java"
+        "HookRuntime.java",
+        "FieldOverride.java"
       ],
       "selector": "显示层 HDR / SDR 消费者完整，严重温控与电池门槛继续有效；不改 SoC / 充电温控。",
       "evidence": [
         "thermal_supported",
         "thermal_skipped"
       ],
-      "cleanup": "每次调用恢复暂存显示限亮字段，停止恢复系统控制。",
+      "cleanup": "每次调用恢复暂存显示限亮字段，停止恢复系统控制。 临时字段统一由FieldOverride按当前值归属逆序恢复；系统在调用期间更新后不回写旧值。",
       "tests": [
         "tests/refactor_advanced_hooks.py",
-        "tests/refactor_hook_firmware.py"
+        "tests/refactor_hook_firmware.py",
+        "tests/refactor_review_safety.py"
       ],
       "composition": "exclusive"
     },
@@ -570,33 +577,58 @@
         "root_storage",
         "stored_config",
         "outdoor_node_device",
-        "native_payload"
+        "native_payload",
+        "root_identity",
+        "root_settings",
+        "root_process_identity"
       ],
       "routes": [
         "root_private_storage",
         "stored_json",
         "primary_node_profile",
         "apk_native_asset",
-        "fold_bound_outdoor"
+        "fold_bound_outdoor",
+        "root_temporary_storage",
+        "root_actual_identity",
+        "external_provider",
+        "cmd_settings",
+        "settings_cli",
+        "root_proc_identity"
       ],
       "owners": [
         "RootControl.java",
         "RootFeatureChecks.java",
         "NativePanelAsset.java",
-        "OutdoorNodeRoot.java"
+        "OutdoorNodeRoot.java",
+        "RootSettings.java",
+        "RootWorkspace.java",
+        "RootCommand.java",
+        "RootLaunch.java",
+        "RootAccess.java",
+        "AppRootDiagnostics.java"
       ],
-      "selector": "逐项检查私有存储、原始配置、当前 APK 资产和组合接口；不试写亮度，不擅自启动服务。",
+      "selector": "逐项检查私有存储、原始配置、当前 APK 资产和组合接口；不试写亮度，不擅自启动服务。 Root设置三入口互斥，原外部Provider优先；只读探测拒绝时尝试权限等价的cmd settings/settings CLI，不绕过系统权限。写入失败不重放，UID0不等于全权限。私有目录严格身份检查后才回退，原生节点不换目录。",
       "evidence": [
         "feature_self_check",
         "root_feature_self_check",
-        "outdoor_node_device_profile"
+        "outdoor_node_device_profile",
+        "outdoor_node_guard.write_attempts",
+        "outdoor_node_guard.write_errno",
+        "outdoor_node_guard.write_stage",
+        "root_access",
+        "settings_route",
+        "settings_attempts",
+        "workspace_route",
+        "workspace_attempts"
       ],
-      "cleanup": "短命 Root 桥和有界 IPC；诊断不写回用户配置，失败只禁本项。",
+      "cleanup": "短命 Root 桥和有界 IPC；诊断不写回用户配置，失败只禁本项。 节点写入错误保留自动停用锁存；只有用户主动保存并获引擎确认后，才经过原有完整校验重试启动，不重置用户设置。 Root自检只读；启动初始化操作目录。已确认核心与可选节点工具分别报告，节点失败不回滚已确认曲线。导出失败转APP Downloads并明确标记非实时不完整包。 自检显示选中目录当前失败原因和各备用目录只读结果。",
       "tests": [
         "tests/refactor_feature_self_check.py",
         "tests/refactor_native_asset.py",
         "tests/refactor_outdoor_node_settings.py",
-        "tests/refactor_outdoor_fold.py"
+        "tests/refactor_outdoor_fold.py",
+        "tests/refactor_outdoor_write_retry.py",
+        "tests/refactor_root_access.py"
       ],
       "composition": "per_feature"
     },
@@ -616,17 +648,39 @@
       "owners": [
         "MainActivity.java",
         "LauncherVisibility.java",
-        "UiPreferences.java"
+        "UiPreferences.java",
+        "NavigationPolicy.java",
+        "FloatingNavigation.java",
+        "ImmersiveLayout.java",
+        "SettingsSearchIndex.java",
+        "SettingsSearch.java",
+        "LogCompatibilityState.java",
+        "LogCompatibilityPanel.java",
+        "ScrollElasticity.java",
+        "ElasticScrollView.java",
+        "DiagnosticShareFiles.java",
+        "DiagnosticShareProvider.java",
+        "DiagnosticSharing.java",
+        "AboutMarquee.java",
+        "AboutHeroView.java",
+        "AboutPage.java"
       ],
       "selector": "独立 Launcher alias / 原偏好存储 / 私有文件权限；不使用启动组件名重新建立偏好。",
       "evidence": [
-        "APP.appFeatureReport"
+        "APP.appFeatureReport",
+        "APP.settings_search_query",
+        "APP.independent_log_connection_stages"
       ],
-      "cleanup": "别名切换保留设置、欢迎记录；APP 销毁取消 UI 回调。",
+      "cleanup": "别名切换保留设置、欢迎记录；APP 销毁取消 UI 回调。 悬浮底栏只响应设置/关于的实际滚动手势，离开时结束动画；搜索只筛选和跳转，不改配置或调用Root；日志兼容分区只消费既有报告，不探测接口。 越界回弹只平移滚动内容，归位不产生滚动事件；隐藏/尺寸变化/程序定位/移除时取消。诊断分享只授予单个压缩包临时只读权限，分享失败不重做导出或改动原包。 关于图标容器的弹幕只在前台、当前页且位于滚动视口内时推进；切页、教程、隐藏、销毁及关闭动画时停止，不建立后台服务。",
       "tests": [
         "tests/refactor_ui_preferences.py",
         "tests/refactor_app_preferences.py",
-        "tests/refactor_welcome.py"
+        "tests/refactor_welcome.py",
+        "tests/refactor_floating_search.py",
+        "tests/refactor_log_summary.py",
+        "tests/refactor_scroll_elasticity.py",
+        "tests/refactor_diagnostic_sharing.py",
+        "tests/refactor_about_page.py"
       ],
       "composition": "per_feature"
     },
@@ -1025,7 +1079,7 @@
         "legacy_v2_raw",
         "physical_v3_raw"
       ],
-      "rule": "v1/v2 继续用于原主屏路径；新增 v3 携带正数物理 ID。折叠协作仅接受在显式根进程清单内的 v3，按唯一活动 DSI 与新旧物理身份共同确认切屏，两者只变一个时等待、不写旧屏。重新绑定重置稳定确认，不跨屏恢复旧目标；未知、双亮、熄屏、原生改写或手动接管时退让。",
+      "rule": "v1/v2 继续用于原主屏路径；新增 v3 携带正数物理 ID。折叠协作仅接受在显式根进程清单内的 v3，按唯一活动 DSI 与新旧物理身份共同确认切屏，两者只变一个时等待、不写旧屏。重新绑定重置稳定确认，不跨屏恢复旧目标；未知、双亮、熄屏、原生改写或手动接管时退让。 对可恢复I/O错误最多三次写入，间隔80/160毫秒，不持有手动锁等待。每次绑定原始租约请求、重新核验PID/目标/物理身份及许可；系统有效改写进入本场景抑制。竞争退让，恢复写入只试一次，不越过原生保护。",
       "test": "tests/refactor_outdoor_fold.py"
     }
   ]

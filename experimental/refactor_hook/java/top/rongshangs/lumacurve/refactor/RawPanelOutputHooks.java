@@ -40,6 +40,6 @@ final class RawPanelOutputHooks {
     powerStates.add(power);
    }
    owners.add(owner);
-  }catch(Throwable unavailable){for(XC_MethodHook.Unhook hook:hooks)hook.unhook();XposedBridge.log("HyperLux raw output isolation unavailable: "+unavailable);}
+  }catch(Throwable unavailable){HookTransaction.rollbackAll(hooks);XposedBridge.log("HyperLux raw output isolation unavailable: "+unavailable);}
  }
 }

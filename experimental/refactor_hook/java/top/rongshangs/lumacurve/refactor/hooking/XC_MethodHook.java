@@ -13,7 +13,7 @@ public abstract class XC_MethodHook {
     public static final class Unhook {
         private Runnable remove;
         public Unhook(Runnable remove){this.remove=remove;}
-        public synchronized void unhook(){if(remove!=null){Runnable r=remove;remove=null;r.run();}}
+        public synchronized void unhook(){if(remove!=null){Runnable r=remove;r.run();remove=null;}}
     }
     public static final class MethodHookParam {
         public Object thisObject;public Object[] args;public Member method;

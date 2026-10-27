@@ -17,8 +17,13 @@ public final class HookTransaction implements AutoCloseable {
     public void commitTo(Collection<XC_MethodHook.Unhook> owner){owner.addAll(handles);commit();}
     @Override public void close(){
         if(finished)return;finished=true;
-        for(int i=handles.size()-1;i>=0;i--)try{handles.get(i).unhook();}
-        catch(Throwable failure){try{XposedBridge.log("HyperLux hook rollback failed: "+failure);}catch(Throwable loggingFailure){/* Cleanup must continue even if the framework logger fails. */}}
-        handles.clear();
+        rollbackAll(handles);handles.clear();
     }
+    /** Continue in reverse order even if one backend refuses removal. Failed handles remain retryable. */
+    public static void rollbackAll(Collection<XC_MethodHook.Unhook> owned){
+        List<XC_MethodHook.Unhook> reverse=new ArrayList<>(owned);
+        for(int i=reverse.size()-1;i>=0;i--)try{reverse.get(i).unhook();}
+        catch(Throwable failure){try{XposedBridge.log("HyperLux hook rollback failed: "+failure);}catch(Throwable loggingFailure){/* Cleanup must continue even if logging fails. */}}
+    }
+
 }

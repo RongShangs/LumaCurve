@@ -6,6 +6,30 @@ public final class UiText {
     private static final LinkedHashMap<String,String> WORDS=new LinkedHashMap<>();
     private static final List<Map.Entry<String,String>> PHRASES;
     static {
+        WORDS.put("保存的设置尚未确认生效。请在日志页查看功能自检，核对后再保存并应用；原设置仍保留。","Saved settings have not been confirmed active. Review the feature checks under Logs, then save and apply again. Your settings are retained.");
+        WORDS.put("读取检查通过；不代表写入已确认。","Read access passed; write access has not been confirmed.");
+        WORDS.put("读取不可用","Read access unavailable");
+        WORDS.put("优先路线已可读，本次没有试用此入口；写入失败不会切换入口重复提交。","The preferred route is readable, so this entry was not attempted. Failed writes are never resubmitted through another route.");
+        WORDS.put("Root 进程身份与限制","Root process identity and restrictions");
+        WORDS.put("系统设置访问","System settings access");
+        WORDS.put("系统进程身份核验","System process identity validation");
+        WORDS.put("私有操作目录","Private workspace");
+
+        WORDS.put("Root 独立操作目录","Independent root workspace");
+        WORDS.put("原目录受限时使用受验证的私有目录；不迁移原生输出程序或用户设置。","Use a verified private workspace when the original is restricted; keep native output and saved settings in place.");
+        WORDS.put("实际进程权限信息","Actual process privileges");
+        WORDS.put("记录实际UID、Capabilities及SELinux上下文，不以Root管理器名称判定权限。","Record the actual UID, capabilities and SELinux context rather than infer permissions from the root manager name.");
+        WORDS.put("原生设置接口","Original settings provider");
+        WORDS.put("优先使用原有设置服务；写入仍需系统授权与读回确认。","Prefer the original settings provider; writes still require platform authorization and readback.");
+        WORDS.put("系统设置命令服务","Settings command service");
+        WORDS.put("原入口不可读时核验cmd设置服务；不重放失败的写入。","Verify the cmd settings service when the original cannot be read; never replay a failed write.");
+        WORDS.put("系统设置命令入口","Settings command entry");
+        WORDS.put("前两条不可读时核验系统settings入口；仍遵守系统权限。","Verify the system settings command if the first two are unreadable; platform permissions still apply.");
+        WORDS.put("系统进程有效身份","Verified system process identity");
+        WORDS.put("核验当前系统进程、启动标识和构建；权限不足时不跳过校验。","Verify the current system process, start identity and build; missing permissions never bypass validation.");
+        WORDS.put("权限受限","Limited privileges");
+        WORDS.put("Root 接口受限","Root interface restricted");
+        WORDS.put("Root 权限受限","Root privileges restricted");
         WORDS.put("回答6个简单的问题让亮度更符合你的习惯","Answer 6 simple questions to make brightness suit your habits");
         WORDS.put("不选择将不会进行修改","Unselected items will not be changed");
         WORDS.put("未修改","Unchanged");
@@ -258,6 +282,9 @@ public final class UiText {
         WORDS.put("返回","Back");
         WORDS.put("返回日志","Back to logs");
         WORDS.put("功能自检","Feature self-check");
+        WORDS.put("详细兼容路线","Compatibility routes");
+        WORDS.put("兼容 HyperOS 的亮度个性化工具","Brightness personalization for HyperOS");
+        WORDS.put("默默支持","Quiet support");
         WORDS.put("重新自检","Run checks");
         WORDS.put("正在逐项检查；不试调亮度、不切换兼容路线…","Checking interfaces; brightness and compatibility routes are not changed...");
         WORDS.put("本次自检未完成；已有结果保留，可能不是当前状态。","This check did not complete. Previous results are retained and may be stale.");

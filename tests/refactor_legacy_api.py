@@ -70,6 +70,6 @@ paths=[]
 for name,body in sources.items():
     p=OUT/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_text(body,encoding='utf-8');paths.append(p)
 classes=OUT/'classes';classes.mkdir(exist_ok=True)
-production=[SRC/'LegacyEntry.java',SRC/'hooking/XC_MethodHook.java',SRC/'hooking/XposedBridge.java']
+production=[SRC/'LegacyEntry.java',SRC/'hooking/XC_MethodHook.java',SRC/'hooking/XposedBridge.java',SRC/'hooking/HookTransaction.java']
 subprocess.run(['javac','--release','8','-encoding','UTF-8','-d',str(classes),*[str(p) for p in paths+production]],check=True)
 subprocess.run(['java','-cp',str(classes),'top.rongshangs.lumacurve.refactor.LegacyTest'],check=True)

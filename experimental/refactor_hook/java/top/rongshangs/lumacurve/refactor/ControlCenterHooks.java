@@ -94,7 +94,7 @@ final class ControlCenterHooks {
             added.add(XposedBridge.hookMethod(abi.logicalProgress,displayCoordinate));added.add(XposedBridge.hookMethod(abi.inverse,displayCoordinate));
             added.add(XposedBridge.hookMethod(abi.forward,new XC_MethodHook(){protected void afterHookedMethod(MethodHookParam p){Feedback f=feedbackPosition.get();if(f==null||p.hasThrowable())return;try{p.setResult((float)f.profile.standard.toInput(ControlCenterMapping.fraction((Integer)p.args[0],f.binding.minimum,f.binding.maximum)));}catch(Exception failure){failed(failure);}}}));
             added.add(XposedBridge.hookMethod(Application.class.getDeclaredMethod("onCreate"),new XC_MethodHook(){protected void afterHookedMethod(MethodHookParam p){if(p.thisObject instanceof Application)bind((Application)p.thisObject);}}));installed=true;
-        }catch(Throwable failure){for(XC_MethodHook.Unhook h:added)h.unhook();failed(failure);}
+        }catch(Throwable failure){HookTransaction.rollbackAll(added);failed(failure);}
     }
     static void failed(Throwable failure){String next=failure.toString();if(!next.equals(error)){error=next;XposedBridge.log("HyperLux slider coordinates unavailable: "+next);publish();}}
     static void bind(Context c){

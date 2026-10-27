@@ -41,13 +41,13 @@ class SettingsNavigation{
  ScrollView settingsHomeScroll=new HomeScroll();int settingsHomeY,page=1,settingsGroup=-1;long settingsScrollRestore;boolean settingsHomeRestoring,destroyed;
  View displayedPage=settingsHomeScroll,header=new View(),bottomNav=new View();View[] settingScreens=new View[10];Container content=new Container();
  SettingsNavigation(){content.home=settingsHomeScroll;for(int i=0;i<10;i++)settingScreens[i]=new View();}
- void transitionPage(View target,int direction){displayedPage=target;}void drawCurve(){}
+ void transitionPage(View target,int direction){displayedPage=target;}void drawCurve(){}void syncPageChrome(){header.setVisibility(View.GONE);bottomNav.setVisibility(settingsGroup<0?View.VISIBLE:View.GONE);}
 ''' +settings_navigation+r'''}
 public class NavigationTest {
  static int cases;static void check(boolean b){if(!b)throw new AssertionError("case "+cases);cases++;}
  public static void main(String[] args)throws Exception{
   SettingsNavigation settings=new SettingsNavigation();ScrollView home=settings.settingsHomeScroll;
-  for(int position:new int[]{12,450,900}){home.y=position;settings.showSettingsGroup(5);check(settings.settingsHomeY==position&&settings.displayedPage==settings.settingScreens[5]);check(settings.header.visibility==View.GONE&&settings.bottomNav.visibility==View.GONE);home.y=0;settings.showSettingsGroup(-1);check(home.y==0&&settings.settingsHomeRestoring);home.tree.draw();check(home.y==position&&!settings.settingsHomeRestoring);check(home.tree.listeners.isEmpty()&&settings.header.visibility==View.VISIBLE&&settings.bottomNav.visibility==View.VISIBLE);}
+  for(int position:new int[]{12,450,900}){home.y=position;settings.showSettingsGroup(5);check(settings.settingsHomeY==position&&settings.displayedPage==settings.settingScreens[5]);check(settings.header.visibility==View.GONE&&settings.bottomNav.visibility==View.GONE);home.y=0;settings.showSettingsGroup(-1);check(home.y==0&&settings.settingsHomeRestoring);home.tree.draw();check(home.y==position&&!settings.settingsHomeRestoring);check(home.tree.listeners.isEmpty()&&settings.header.visibility==View.GONE&&settings.bottomNav.visibility==View.VISIBLE);}
   // A quick second navigation must cancel pending restoration without replacing
   // the saved home position with the temporary focus-induced offset of zero.
   home.y=680;settings.showSettingsGroup(2);settings.showSettingsGroup(-1);int moves=home.moves;settings.showSettingsGroup(7);home.tree.draw();check(home.moves==moves&&settings.settingsHomeY==680);settings.showSettingsGroup(-1);home.tree.draw();check(home.y==680);

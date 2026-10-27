@@ -32,6 +32,11 @@ public class SavedTransactionTest {
   c=ready();c.settings.config=new JSONObject(c.settings.config).put("enabled",false).toString();rejected(c);
   c=ready();c.before.put("elapsed_ms",-100000);c.after.put("elapsed_ms",-99999);rejected(c);
   c=ready();c.after.put("elapsed_ms",10001);rejected(c);
+  c=ready();float u=Math.ulp(4000f);c.after.put("curve_backend","physical_mapping").put("physical_mapping_active",true).put("max_logical_nit",4000).put("current_anchors_lux",new JSONArray("[0,30,600,1000,3000,5000]")).put("current_anchors_nit",new JSONArray(new float[]{2,100,300,4000+2*u,4000,4000-u}));
+  c.settings.config=new JSONObject(c.settings.config).put("memory_persist",true).put("memory_hold_switch",true).put("outdoor_max_nit",1800).put("sentinel",new JSONObject().put("keep",17)).toString();
+  check(c.execute("promote-memory").getBoolean("ok"));check(c.applies==1);SavedCurve physical=SavedCurve.parse(c.applied);physical.validate(1,4000,5000);check(physical.lux.length==6&&physical.nit[3]==4000&&physical.nit[4]==4000&&physical.nit[5]==4000);check(c.applied.getDouble("memory_strength")==.25&&c.applied.getBoolean("memory_persist")&&c.applied.getBoolean("memory_hold_switch"));check(c.applied.getDouble("outdoor_max_nit")==1800&&c.applied.getJSONObject("sentinel").getInt("keep")==17);check(c.applied.getJSONArray("manual_brightness_apps").getString(0).equals("com.demo.game"));
+  c=ready();c.after.put("curve_backend","physical_mapping").put("physical_mapping_active",true).put("current_anchors_nit",new JSONArray("[2,5,40,90,150,350,1000.01]"));rejected(c);
+  c=ready();c.after.put("curve_backend","physical_mapping").put("physical_mapping_active",true).put("current_anchors_nit",new JSONArray("[2,5,40,90,85,350,1000]"));rejected(c);
   System.out.println("Saved curve transaction: "+cases+" cases PASS; production root branch with transport doubles, Android not tested");
  }
 }''',encoding='utf-8')

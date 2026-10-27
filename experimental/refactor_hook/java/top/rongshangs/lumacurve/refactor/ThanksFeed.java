@@ -8,6 +8,7 @@ import org.json.*;
 /** Shared website data, parsed as text only. Keep a validated cache for offline use. */
 final class ThanksFeed {
     static final String URL="https://lc.rongshangs.top/thanks.json";
+    static String message(String value){String trimmed=value==null?"":value.trim();return trimmed.isEmpty()||trimmed.equals("[未填写]")||trimmed.equals("【未填写】")||trimmed.equals("未填写")?"默默支持":value;}
     static JSONObject parse(String raw)throws Exception{
         if(raw==null||raw.length()>65536)throw new IOException("Thanks response too large");
         JSONObject data=new JSONObject(raw);
@@ -17,6 +18,7 @@ final class ThanksFeed {
         for(int i=0;i<entries.length();i++){
             JSONObject entry=entries.getJSONObject(i);String name=entry.getString("name"),message=entry.getString("message");
             if(name.trim().isEmpty()||name.length()>80||message.length()>200||name.contains("\n")||message.contains("\n")||name.contains("\r")||message.contains("\r"))throw new IOException("Invalid thanks entry");
+            entry.put("message",message(message));
         }
         return data;
     }

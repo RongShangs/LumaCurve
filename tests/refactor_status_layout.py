@@ -38,9 +38,16 @@ public class StatusLayoutTest{
   check(StatusPageLayout.minimumHeight(1,Float.NaN)==588);check(StatusPageLayout.minimumHeight(1,3)==898);
   StatusPageLayout small=new StatusPageLayout(584,1,1),tall=new StatusPageLayout(740,1,1);
   check(small.bottom[3]-small.top[3]==tall.bottom[3]-tall.top[3]);check(small.infoHeight==tall.infoHeight);check(tall.bottom[2]-tall.top[2]-(small.bottom[2]-small.top[2])==152);
+  for(float density:new float[]{1,2.75f,4})for(float font:new float[]{1,1.3f,2})for(int available:new int[]{1,180,340,480,560,588,740,1000}){
+   int actual=Math.round(available*density);float fit=StatusPageLayout.fitScale(actual,density,font);check(fit>0&&fit<=1);int logical=Math.max(1,Math.round(actual/fit));Board b=new Board(density,font);b.onMeasure(MeasureSpec.makeMeasureSpec(Math.round(360*density/fit),MeasureSpec.EXACTLY),MeasureSpec.makeMeasureSpec(logical,MeasureSpec.EXACTLY));b.onLayout(true,0,0,b.width,b.height);check(Math.abs(b.height*fit-actual)<=1);check(Math.abs(b.width*fit-360*density)<=1);for(RectF box:b.boxes)check(box.top*fit>=0&&box.bottom*fit<=actual+1);
+  }
   System.out.println("Status page layout: "+cases+" cases PASS; actual geometry/measure/layout with doubles, Android rendering not tested");
  }
 }''',encoding='utf-8')
 classes=O/'classes';classes.mkdir(exist_ok=True)
 subprocess.run(['javac','-encoding','UTF-8','--release','8','-d',str(classes),str(S/'StatusPageLayout.java'),str(test)],check=True)
 subprocess.run(['java','-cp',str(classes),'top.rongshangs.lumacurve.refactor.StatusLayoutTest'],check=True)
+
+status=main[main.index('    void makeStatus(){'):main.index('    SeekBar parameter(')]
+assert 'ScrollView' not in status and 'fixed.addView(pipeline' in status
+print('Status viewport stays fixed and fits the physical content area: PASS')

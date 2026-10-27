@@ -16,6 +16,8 @@ public final class FeatureCompatibility {
         Route[] routes=catalogue(id);String choice="";
         if(routes[0].id.equals("refactor"))choice=curveSelection(runtime);
         else switch(id){
+        case "root_storage":choice=entry.has("workspace_route")?text(entry,"workspace_route"):"root_private_storage";break;
+        case "root_settings":choice=text(entry,"settings_route");break;
         case "main_sensor":choice=text(object(runtime,"main_input_compatibility"),"profile");break;
         case "dark_lock_schedule":choice=text(object(object(runtime,"brightness_control"),"dark_lock_schedule"),"profile");break;
         case "animation_override":choice=text(runtime,"animation_compatibility_profile");break;
@@ -56,6 +58,8 @@ public final class FeatureCompatibility {
         }
     }
     static String unused(Route route,Set<String> chosen,String id,JSONObject runtime,JSONObject entry){
+        if(id.equals("root_settings")||id.equals("root_storage")&&entry.has("workspace_attempts")){JSONArray attempts=entry.optJSONArray(id.equals("root_settings")?"settings_attempts":"workspace_attempts");if(attempts!=null)for(int i=0;i<attempts.length();i++){JSONObject attempt=attempts.optJSONObject(i);if(attempt!=null&&route.id.equals(attempt.optString("id")))return attempt.optBoolean("readable")?"读取检查通过；不代表写入已确认。":attempt.optString("detail","读取不可用");}return "优先路线已可读，本次没有试用此入口；写入失败不会切换入口重复提交。";}
+
         if("inactive".equals(entry.optString("state")))return "系统未启用此策略；保存的设置保留。";
         if(!"available".equals(entry.optString("state")))return "本次未采用："+entry.optString("detail","等待实际接口检查。");
         if(chosen.isEmpty())return "本次报告未提供足够的路线信息；未确认，不推断为不支持。";

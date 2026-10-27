@@ -1,6 +1,6 @@
 package top.rongshangs.lumacurve.refactor;
 
-/** Shared geometry for status measurement and placement. Short viewports scroll. */
+/** Shared logical geometry; the fixed status viewport scales it to fit without scrolling. */
 final class StatusPageLayout {
     final int height,gap,thresholdGap,infoHeight;final int[] top=new int[5],bottom=new int[5];
     private static int dp(float value,float density){return Math.round(value*density);}
@@ -9,6 +9,7 @@ final class StatusPageLayout {
         float scale=scale(fontScale);
         return 2*dp(80+56*(scale-1),density)+dp(88+56*(scale-1),density)+dp(120+24*(scale-1),density)+dp(32+24*(scale-1),density)+dp(108+64*(scale-1),density)+3*dp(16+6*(scale-1),density)+dp(32+12*(scale-1),density);
     }
+    static float fitScale(int availableHeight,float density,float fontScale){return Math.min(1f,Math.max(1,availableHeight)/(float)Math.max(1,minimumHeight(density,fontScale)));}
     StatusPageLayout(int availableHeight,float density,float fontScale){
         float scale=scale(fontScale);int minimum=minimumHeight(density,scale);height=Math.max(minimum,availableHeight);
         gap=dp(16+6*(scale-1),density);thresholdGap=dp(32+12*(scale-1),density);infoHeight=dp(32+24*(scale-1),density);

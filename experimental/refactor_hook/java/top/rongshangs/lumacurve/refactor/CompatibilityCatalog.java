@@ -8,7 +8,7 @@ import java.util.*;
  */
 final class CompatibilityCatalog {
     private CompatibilityCatalog(){}
-    private static final String[] FEATURES={"curve","manual_memory","saved_curve","persistent_memory","memory_mode","memory_forever","memory_reset","memory_timeout","main_sensor","assist_sensor","response","small_response","low_light","low_threshold","threshold_override","assist_gate","assist_override","animation_override","sunlight_override","touch_override","scene_night_driving","scene_step","scene_touch","scene_proximity","scene_stream_proximity","scene_reflection","scene_night_wake","scene_manual_sunlight","scene_game","dark_lock","dark_lock_schedule","manual_panel","control_center_slider","apps","thermal","outdoor","hbm","outdoor_range","opr","nit_limit","node_output","main_panel_node","root_storage","stored_config","outdoor_node_device","native_payload","launcher","preferences","app_files"};
+    private static final String[] FEATURES={"curve","manual_memory","saved_curve","persistent_memory","memory_mode","memory_forever","memory_reset","memory_timeout","main_sensor","assist_sensor","response","small_response","low_light","low_threshold","threshold_override","assist_gate","assist_override","animation_override","sunlight_override","touch_override","scene_night_driving","scene_step","scene_touch","scene_proximity","scene_stream_proximity","scene_reflection","scene_night_wake","scene_manual_sunlight","scene_game","dark_lock","dark_lock_schedule","manual_panel","control_center_slider","apps","thermal","outdoor","hbm","outdoor_range","opr","nit_limit","node_output","main_panel_node","root_storage","root_identity","root_settings","root_process_identity","stored_config","outdoor_node_device","native_payload","launcher","preferences","app_files"};
     static String[] features(){return FEATURES.clone();}
     static final class Route {
         final String id,name,condition;
@@ -45,7 +45,10 @@ final class CompatibilityCatalog {
         case "touch_override":return new Route[]{route("touch_release","系统触摸遮挡释放等待","调整 TouchCoverProtectionHelper 的移开等待，继续保留遮挡保护。")};
         case "outdoor":return new Route[]{route("override_target","系统覆盖目标入口","通过 getOverrideLimitBrightness 增强自动目标，保留原生手动接管与下游保护。"),route("legacy_custom_target","传统物理曲线目标入口","没有覆盖目标接口且旧调用结构完整；在原生自定义曲线目标返回后增强，仍经场景否决、范围裁剪及温控输出。")};
         case "main_panel_node":return new Route[]{route("fold_default_display","折叠屏当前主屏节点","原生折叠布局允许不同物理屏作为默认屏；根据实时默认屏地址、成对背光与唯一点亮 DSI 选择节点；显示端口与内核编号不一致时独立核验默认屏点亮状态，切屏释放旧接管。"),route("backlight_node","主屏 backlight 节点","扫描 backlight，验证主屏身份、真实路径及 brightness / max_brightness 配对。"),route("display_led_node","显示专用 leds 节点","仅接受明确标识为主屏背光的 leds 节点，排除通知灯、手电与背屏。")};
-        case "root_storage":return new Route[]{route("root_private_storage","Root 私有数据目录","只检查配置 / 分析目录的读写能力，不安装或启动输出程序。")};
+        case "root_storage":return new Route[]{route("root_private_storage","Root 私有数据目录","只检查配置 / 分析目录的读写能力，不安装或启动输出程序。"),route("root_temporary_storage","Root 独立操作目录","原目录受限时使用受验证的私有目录；不迁移原生输出程序或用户设置。")};
+        case "root_identity":return new Route[]{route("root_actual_identity","实际进程权限信息","记录实际UID、Capabilities及SELinux上下文，不以Root管理器名称判定权限。")};
+        case "root_settings":return new Route[]{route("external_provider","原生设置接口","优先使用原有设置服务；写入仍需系统授权与读回确认。"),route("cmd_settings","系统设置命令服务","原入口不可读时核验cmd设置服务；不重放失败的写入。"),route("settings_cli","系统设置命令入口","前两条不可读时核验系统settings入口；仍遵守系统权限。")};
+        case "root_process_identity":return new Route[]{route("root_proc_identity","系统进程有效身份","核验当前系统进程、启动标识和构建；权限不足时不跳过校验。")};
         case "stored_config":return new Route[]{route("stored_json","原始配置 JSON","读取原始配置；自检与兼容裁剪不会将默认值写回用户设置。")};
         case "outdoor_node_device":return new Route[]{route("primary_node_profile","实际主屏节点与框架输出组合","按实际节点上限、曲线映射和输出能力核验，不按机型名单放行。"),route("fold_bound_outdoor","折叠主屏节点协作绑定","当前物理主屏、原生布局和背光配对完整；用独立物理租约核验切屏，不跨屏继承目标。")};
         case "native_payload":return new Route[]{route("apk_native_asset","APK 内原生程序校验","核对当前 APK 的主屏程序资产完整性，不启动守护、不试写亮度。")};

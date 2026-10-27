@@ -48,11 +48,17 @@ final class OutdoorNodeRoot {
     }
     static void stop()throws Exception{int pid=running();if(pid>0){Os.kill(pid,15);for(int i=0;i<30&&running()==pid;i++)Thread.sleep(50);if(running()==pid)throw new IOException("节点高亮守护尚未退出，请稍后重试");}}
     static void reconcile(JSONObject state,String raw)throws Exception{
+        reconcile(state,raw,false);
+    }
+    static void reconcileAfterApply(JSONObject state,String raw)throws Exception{
+        reconcile(state,raw,true);
+    }
+    private static void reconcile(JSONObject state,String raw,boolean explicitApply)throws Exception{
         if(raw!=null&&state!=null){JSONObject config=new JSONObject(raw);if(config.optBoolean("enabled")&&config.optBoolean("outdoor_node_boost")&&state.optJSONObject("outdoor")!=null&&state.getJSONObject("outdoor").optJSONObject("options")!=null&&state.getJSONObject("outdoor").getJSONObject("options").optBoolean("outdoor_node_boost")&&"active".equals(state.optString("phase"))&&config.optString("revision").equals(state.optString("revision"))){
             String revision=config.optString("revision");JSONObject previous=health();
-            if(revision.equals(previous.optString("failure_revision")))return;
+            if(!explicitApply&&revision.equals(previous.optString("failure_revision")))return;
             String reason=previous.optString("reason");
-            if(running()<0&&(reason.equals("write_failed")||reason.equals("node_changed"))){previous.put("failure_revision",revision);Files.write(HEALTH.toPath(),previous.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));return;}
+            if(!explicitApply&&running()<0&&(reason.equals("write_failed")||reason.equals("node_changed"))){previous.put("failure_revision",revision);Files.write(HEALTH.toPath(),previous.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));return;}
             try{start(state);}catch(Exception failure){JSONObject failed=health();failed.put("failure_revision",revision).put("reason","start_failed").put("detail",failure.toString());Files.write(HEALTH.toPath(),failed.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));throw failure;}return;}}
 
         stop();

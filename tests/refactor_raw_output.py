@@ -26,5 +26,5 @@ paths=[]
 for name,text in files.items():
  p=O/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_text(text,encoding='utf8');paths.append(str(p))
 classes=O/'classes';classes.mkdir(exist_ok=True)
-subprocess.run(['javac','-encoding','UTF-8','--release','8','-d',str(classes),str(S/'RawPanelOutputHooks.java'),*paths],check=True)
+subprocess.run(['javac','-encoding','UTF-8','--release','8','-d',str(classes),str(S/'RawPanelOutputHooks.java'),*paths,str(S/'hooking/HookTransaction.java')],check=True)
 subprocess.run(['java','-cp',str(classes),'top.rongshangs.lumacurve.refactor.RawOutputTest'],check=True)

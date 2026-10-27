@@ -17,7 +17,33 @@ public class SavedCurveTest {
   float defaultAtLux(float x){return 0;}
  }
  static JSONObject runtime(SavedCurve curve)throws Exception{return new JSONObject().put("phase","active").put("curve_backend","refactor").put("memory_live_count",2).put("factory_lux",new JSONArray(new float[]{0,30,600,5000})).put("factory_logical_nit",new JSONArray(new float[]{2,100,300,1000})).put("min_logical_nit",1).put("max_logical_nit",1000).put("current_anchors_lux",new JSONArray(curve.lux)).put("current_anchors_nit",new JSONArray(curve.nit));}
+ static JSONObject physical(float[] y,float min,float max)throws Exception{return new JSONObject().put("phase","active").put("curve_backend","physical_mapping").put("physical_mapping_active",true).put("memory_live_count",1).put("factory_lux",new JSONArray(new float[]{0,30,600,5000})).put("min_logical_nit",min).put("max_logical_nit",max).put("current_anchors_lux",new JSONArray(new float[]{0,30,600,1000,3000,5000})).put("current_anchors_nit",new JSONArray(y));}
+ static void badCapture(JSONObject state)throws Exception{try{SavedCurve.capture(state);throw new AssertionError("accepted invalid capture");}catch(IllegalArgumentException expected){cases++;}}
+ static void roundingCapture()throws Exception{
+  for(float max:new float[]{1000,4000,1000000}){
+   float u=Math.ulp(max);float[] y={2,max*.1f,max*.5f,max+2*u,max,max-u};JSONObject state=physical(y,2,max);String before=state.toString();SavedCurve c=SavedCurve.capture(state);
+   check(state.toString().equals(before));check(c.lux.length==6);eq(c.nit[0],2);eq(c.nit[1],y[1]);eq(c.nit[2],y[2]);for(int i=3;i<6;i++)check(c.nit[i]==max);
+   JSONObject options=new JSONObject();c.put(options);SavedCurve copy=SavedCurve.parse(options);copy.validate(2,max,5000);CurvePlan neutral=SavedCurve.plan(copy,new float[]{0,30,600,5000},new float[]{2,100,300,max},2,max,new float[]{1,1,1,1},0);check(Arrays.equals(neutral.nits(),c.nit));check(Arrays.equals(neutral.lux(),c.lux));
+   state=physical(new float[]{2,max*.1f,max*.5f,max+4*u,max,max},2,max);check(SavedCurve.capture(state).nit[3]==max);
+   badCapture(physical(new float[]{2,max*.1f,max*.5f,max+5*u,max,max},2,max));
+   float mid=max*.5f,mu=Math.ulp(mid);state=physical(new float[]{2,max*.1f,mid,mid-4*mu,max,max},2,max);check(SavedCurve.capture(state).nit[3]==mid);
+   badCapture(physical(new float[]{2,max*.1f,mid,mid-5*mu,max,max},2,max));
+   badCapture(physical(new float[]{2,max*.1f,mid,mid-3*mu,mid-6*mu,max},2,max)); // Small adjacent drops must not accumulate into a real descent.
+  }
+  float low=2,lu=Math.ulp(low);check(SavedCurve.capture(physical(new float[]{low-4*lu,50,100,500,900,1000},low,1000)).nit[0]==low);
+  badCapture(physical(new float[]{low-5*lu,50,100,500,900,1000},low,1000));
+  float[] noisy={2,100,200,4000+Math.ulp(4000f),4000,4000};JSONObject state=physical(noisy,2,4000);
+  badCapture(new JSONObject(state.toString()).put("curve_backend","refactor")); // Refactor anchors retain their existing strict path.
+  badCapture(new JSONObject(state.toString()).put("physical_mapping_active",false));badCapture(new JSONObject(state.toString()).put("hdr_active",true));
+  bad(()->new SavedCurve(new float[]{0,30,600,1000,3000,5000},noisy));
+  JSONObject persisted=new JSONObject().put(SavedCurve.KEY,new JSONObject().put("lux",state.getJSONArray("current_anchors_lux")).put("nit",state.getJSONArray("current_anchors_nit")));
+  try{SavedCurve.parse(persisted);throw new AssertionError("persisted corruption accepted");}catch(IllegalArgumentException expected){cases++;}
+  badCapture(physical(new float[]{2,100,200,500,400,1000},2,1000));
+  state=physical(new float[]{2,100,200,500,900,1000},2,1000);state.getJSONArray("current_anchors_lux").put(2,30);badCapture(state);
+  state=physical(new float[]{2,100,200,500,900,1000},2,1000);state.getJSONArray("current_anchors_nit").put(3,"NaN");badCapture(state);
+ }
  public static void main(String[] args)throws Exception{
+  roundingCapture();
   float[] x={0,7,30,300,600,1200,5000},y={2,5,40,90,150,350,1000},one={1,1,1,1};SavedCurve c=new SavedCurve(x,y);x[1]=9;y[1]=10;check(c.lux[1]==7&&c.nit[1]==5);
   JSONObject file=new JSONObject();c.put(file);SavedCurve copy=SavedCurve.parse(file);check(SavedCurve.same(c,copy));check(SavedCurve.parse(new JSONObject())==null);c.validate(1,1000,5000);
   float[] handles={0,30,600,5000};CurvePlan plan=SavedCurve.plan(c,handles,new float[]{2,100,300,1000},1,1000,one,0);check(Arrays.equals(plan.lux(),c.lux));check(Arrays.equals(plan.nits(),c.nit));

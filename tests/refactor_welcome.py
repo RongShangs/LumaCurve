@@ -66,6 +66,7 @@ class MainActivity{
 main=(S/'MainActivity.java').read_text(encoding='utf-8')
 settings=main[main.index('    void makeRefreshSettings(){'):main.index('    JSONObject appFeatureReport')]
 files['top/rongshangs/lumacurve/refactor/MainActivity.java']=files['top/rongshangs/lumacurve/refactor/MainActivity.java'].replace('__REFRESH_SETTINGS__',settings)
+files['top/rongshangs/lumacurve/refactor/ElasticScrollView.java']='package top.rongshangs.lumacurve.refactor;class ElasticScrollView extends android.widget.ScrollView{ElasticScrollView(Object c){super(c);}}'
 files['top/rongshangs/lumacurve/refactor/WelcomeTest.java']=r'''package top.rongshangs.lumacurve.refactor;
 import android.view.*;import android.widget.*;import android.content.*;import android.os.*;import java.util.*;
 public class WelcomeTest{
@@ -169,7 +170,7 @@ assert 'button("再次查看使用教程",welcome::openTutorial,tutorial)' in ma
 assert 'visible=false;welcome.finishTransition();' in main
 assert 'if(visible&&!welcome.showing()&&!quickSetup.showing())' in main
 assert 'welcome.save(saved)' in main and 'welcome.restore(saved)' in main
-assert '勿忘 灭 春暖花开 无缺' in main and '兼容 HyperOS 的自动亮度工具。' in main
+assert '"勿忘","灭","春暖花开","无缺"' in (S/"AboutMarquee.java").read_text("utf-8") and '兼容 HyperOS 的亮度个性化工具' in (S/"AboutPage.java").read_text("utf-8")
 guide=(S/'WelcomeGuide.java').read_text(encoding='utf-8')
 assert not any(token in guide for token in ['RootControl','BrightnessControl','postDelayed','CountDown','run("apply"','putString('])
 print('Welcome integration: no settings gate, no countdown, startup ordering and no brightness writes PASS')

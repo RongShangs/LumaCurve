@@ -93,7 +93,7 @@ final class ResponseTuning {
                 }}));
             }
             installed.add(abc);
-        }catch(Throwable incompatible){for(XC_MethodHook.Unhook hook:hooks)hook.unhook();XposedBridge.log("LumaCurve response tuning unavailable: "+incompatible);}
+        }catch(Throwable incompatible){HookTransaction.rollbackAll(hooks);XposedBridge.log("LumaCurve response tuning unavailable: "+incompatible);}
     }
     static boolean supported(Object owner){try{Object impl=HookEntry.get(owner,"mAutomaticBrightnessControllerImpl"),abc=HookEntry.get(impl,"mAutomaticBrightnessController");return abc!=null&&installed.contains(abc.getClass())&&sceneAccess(impl)!=null&&HookEntry.field(abc.getClass(),"mAmbientLightHorizonLong").getType()==int.class&&HookEntry.field(abc.getClass(),"mStepModeDarkenDebounceConfig").getType()==long.class;}catch(Throwable absent){return false;}}
     static boolean smallSupported(Object owner){try{Object impl=HookEntry.get(owner,"mAutomaticBrightnessControllerImpl"),abc=HookEntry.get(impl,"mAutomaticBrightnessController");return supported(owner)&&HookEntry.field(abc.getClass(),"mSmallBrighteningLightDebounceConfig").getType()==long.class;}catch(Throwable absent){return false;}}

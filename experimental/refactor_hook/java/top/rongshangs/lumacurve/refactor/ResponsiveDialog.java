@@ -12,7 +12,7 @@ final class ResponsiveDialog extends LinearLayout {
     ResponsiveDialog(Activity host,View title,View content,LinearLayout actions){
         super(host);this.host=host;this.title=title;this.actions=actions;setOrientation(VERTICAL);
         addView(title,new LayoutParams(-1,-2));
-        body=new ScrollView(host){@Override protected void onMeasure(int w,int h){int limit=bodyLimit;if(MeasureSpec.getMode(h)!=MeasureSpec.UNSPECIFIED)limit=Math.min(limit,MeasureSpec.getSize(h));super.onMeasure(w,MeasureSpec.makeMeasureSpec(Math.max(0,limit),MeasureSpec.AT_MOST));}};
+        body=new ElasticScrollView(host){@Override protected void onMeasure(int w,int h){int limit=bodyLimit;if(MeasureSpec.getMode(h)!=MeasureSpec.UNSPECIFIED)limit=Math.min(limit,MeasureSpec.getSize(h));super.onMeasure(w,MeasureSpec.makeMeasureSpec(Math.max(0,limit),MeasureSpec.AT_MOST));}};
         body.setFillViewport(false);
         body.setTag("dialog-scroll");
         // Existing detail dialogs already supply a ScrollView. Reuse its contents,

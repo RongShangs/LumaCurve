@@ -39,12 +39,29 @@ public final class SavedCurve {
         return CurvePlan.points(xx,yy,min,max);
     }
     public static boolean same(SavedCurve a,SavedCurve b){return a==b||a!=null&&b!=null&&Arrays.equals(a.lux,b.lux)&&Arrays.equals(a.nit,b.nit);}
+    private static boolean roundingOnly(float a,float b){return Math.abs(a-b)<=4f*Math.max(Math.ulp(a),Math.ulp(b));}
+    private static float[] physicalCapture(float[] samples,float min,float max){
+        if(!Float.isFinite(min)||!Float.isFinite(max)||min<0||max<=min)throw new IllegalArgumentException("保存的基础曲线无效");
+        float[] values=samples.clone();
+        for(int i=0;i<values.length;i++){
+            float value=values[i];if(!Float.isFinite(value))throw new IllegalArgumentException("保存的基础曲线节点无效");
+            // OEM spline/conversion round trips can differ by a few float ULPs on a plateau.
+            // Only canonicalize freshly sampled physical nit; persisted input stays strict.
+            if(value<min&&roundingOnly(value,min))value=min;
+            if(value>max&&roundingOnly(value,max))value=max;
+            if(i>0&&value<values[i-1]&&roundingOnly(value,values[i-1]))value=values[i-1];
+            values[i]=value;
+        }
+        return values;
+    }
     public static SavedCurve capture(JSONObject state)throws JSONException {
         if("refactor_coefficients".equals(state.optString("curve_route")))throw new IllegalArgumentException("此系数路线尚不支持记忆转基础曲线");
         if(!"active".equals(state.optString("phase"))||state.optInt("memory_live_count")==0)throw new IllegalArgumentException("当前没有可保存的手动记忆曲线");
         String backend=state.optString("curve_backend");JSONObject pipeline=state.optJSONObject("last_pipeline");
         if(state.optBoolean("hdr_active")||"physical_mapping".equals(backend)&&!state.optBoolean("physical_mapping_active")||pipeline!=null&&!("refactor".equals(backend)&&"refactor".equals(pipeline.optString("route"))||"physical_mapping".equals(backend)&&"mapping".equals(pipeline.optString("route"))))throw new IllegalArgumentException("当前输出路径不是可保存的普通亮度曲线");
-        SavedCurve curve=new SavedCurve(numbers(state.getJSONArray("current_anchors_lux")),numbers(state.getJSONArray("current_anchors_nit")));curve.verifyBackend(backend);
-        float[] handles=numbers(state.getJSONArray("factory_lux"));curve.validate((float)state.getDouble("min_logical_nit"),(float)state.getDouble("max_logical_nit"),handles[3]);return curve;
+        float min=(float)state.getDouble("min_logical_nit"),max=(float)state.getDouble("max_logical_nit");
+        float[] samples=numbers(state.getJSONArray("current_anchors_nit"));if("physical_mapping".equals(backend))samples=physicalCapture(samples,min,max);
+        SavedCurve curve=new SavedCurve(numbers(state.getJSONArray("current_anchors_lux")),samples);curve.verifyBackend(backend);
+        float[] handles=numbers(state.getJSONArray("factory_lux"));curve.validate(min,max,handles[3]);return curve;
     }
 }

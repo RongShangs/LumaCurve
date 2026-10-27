@@ -104,7 +104,7 @@ paths=[]
 for name,body in sources.items():
     p=O/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_text(body,encoding='utf-8');paths.append(p)
 C=O/'classes';C.mkdir(exist_ok=True)
-subprocess.run(['javac','--release','8','-encoding','UTF-8','-cp',str(J),'-d',str(C),*[str(p) for p in paths],*[str(S/n) for n in ['MemoryOptions.java','BrightnessSensorAccess.java','AuxiliarySensorIdentity.java','FeatureSelfCheck.java','ConfigurationCompatibility.java','RuntimeFeatureChecks.java']]],check=True)
+subprocess.run(['javac','--release','8','-encoding','UTF-8','-cp',str(J),'-d',str(C),*[str(p) for p in paths],*[str(S/n) for n in ['MemoryOptions.java','BrightnessSensorAccess.java','AuxiliarySensorIdentity.java','FeatureSelfCheck.java','ConfigurationCompatibility.java','OutdoorOptions.java','OutdoorNodeTarget.java','AdvancedPolicy.java','RuntimeFeatureChecks.java']]],check=True)
 subprocess.run(['java','-cp',str(C)+';'+str(J),'top.rongshangs.lumacurve.refactor.SelfCheckTest'],check=True)
 hook=(S/'HookEntry.java').read_text(encoding='utf-8');ui=(S/'MainActivity.java').read_text(encoding='utf-8')
 assert 'major!=4' not in hook and 'SystemVersion.read().unsupported()' not in ui

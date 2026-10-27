@@ -80,5 +80,5 @@ public class SceneHookTest{
  }
 }''',encoding='utf-8')
 classes=O/'classes';classes.mkdir(exist_ok=True)
-subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(J),'-d',str(classes),*[str(S/(n+'.java')) for n in ['SceneOptions','ScenePolicy','SceneController','SceneTuning']],*[str(f) for f in files],str(p)],check=True)
+subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(J),'-d',str(classes),*[str(S/(n+'.java')) for n in ['SceneOptions','ScenePolicy','SceneController','SceneTuning','FieldOverride']],*[str(f) for f in files],str(p),str(S/'hooking/HookTransaction.java')],check=True)
 subprocess.run(['java','-cp',str(classes)+os.pathsep+str(J),'top.rongshangs.lumacurve.refactor.SceneHookTest'],check=True)

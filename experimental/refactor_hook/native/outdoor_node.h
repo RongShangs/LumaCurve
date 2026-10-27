@@ -5,6 +5,8 @@ static struct outdoor_fold_ids outdoor_ids;
 static uint64_t outdoor_physical;
 static char outdoor_ids_text[168];
 static char outdoor_controller[PANEL_REAL_PATH_SIZE];
+static int outdoor_attempt_errno,outdoor_report_errno,outdoor_write_attempts;
+static const char *outdoor_attempt_stage="none",*outdoor_report_stage="none";
 static int outdoor_folded(void){return outdoor_ids.count>0;}
 static int outdoor_fold_select(int port){
  char path[128],controller[PANEL_REAL_PATH_SIZE],previous_node[PANEL_NODE_PATH_SIZE],previous_max[PANEL_NODE_PATH_SIZE],previous_real[PANEL_REAL_PATH_SIZE];if(port<0||port>7)return -1;
@@ -37,23 +39,66 @@ static int outdoor_process(int pid){
 }
 static void outdoor_health(const struct outdoor_node_state *s,const char *reason){
  char temp[]=OUTDOOR_HEALTH ".new";int f=open(temp,O_WRONLY|O_CREAT|O_TRUNC|O_NOFOLLOW|O_CLOEXEC,0644);if(f<0)return;
- char b[768];int n=snprintf(b,sizeof(b),"{\"pid\":%d,\"held\":%s,\"inhibited\":%s,\"base\":%d,\"target\":%d,\"reason\":\"%s\",\"fold_route\":%s,\"fold_ids\":\"%s\",\"fold_port\":%d,\"physical_id\":%llu,\"uptime_ms\":%lld}\n",getpid(),s->held?"true":"false",s->inhibited?"true":"false",s->base,s->target,reason,outdoor_folded()?"true":"false",outdoor_ids_text,active_fold_port,(unsigned long long)outdoor_physical,(long long)clock_ms());
+ char b[1024];int n=snprintf(b,sizeof(b),"{\"pid\":%d,\"held\":%s,\"inhibited\":%s,\"base\":%d,\"target\":%d,\"reason\":\"%s\",\"fold_route\":%s,\"fold_ids\":\"%s\",\"fold_port\":%d,\"physical_id\":%llu,\"write_attempts\":%d,\"write_errno\":%d,\"write_stage\":\"%s\",\"uptime_ms\":%lld}\n",getpid(),s->held?"true":"false",s->inhibited?"true":"false",s->base,s->target,reason,outdoor_folded()?"true":"false",outdoor_ids_text,active_fold_port,(unsigned long long)outdoor_physical,outdoor_write_attempts,outdoor_report_errno,outdoor_report_stage,(long long)clock_ms());
  int ok=n>0&&n<(int)sizeof(b)&&write(f,b,(size_t)n)==n;close(f);if(ok)rename(temp,OUTDOOR_HEALTH);else unlink(temp);
 }
 static int outdoor_lock(void){
  int f=open(DIR "/main-panel.lock",O_RDWR|O_CREAT|O_NOFOLLOW|O_CLOEXEC,0600);if(f<0)return -1;
  struct stat st;if(fstat(f,&st)||!S_ISREG(st.st_mode)||st.st_uid||(st.st_mode&0077)||flock(f,LOCK_EX|LOCK_NB)){close(f);return -1;}return f;
 }
-static int outdoor_write(int expected,int target){
+/* OUTDOOR_WRITE_BEGIN: exercised with host I/O doubles. */
+static int outdoor_write_once(int expected,int target){
+ outdoor_attempt_errno=0;outdoor_attempt_stage="compare";
  /* Shared manual guard lock; do not chmod the node or stop framework output. */
  int lock=outdoor_lock();if(lock<0)return 1;
  if(outdoor_folded()&&!fold_panel_live("/sys",active_fold_port)){close(lock);return 1;}
- if(target<0||target>number(max_node)||number(node)!=expected||!same_node()){close(lock);return 1;}
- int fd=open_output();if(fd<0){close(lock);return -1;}
+ if(target<0||target>number(max_node)||!same_node()){close(lock);return 1;}
+ if(number(node)!=expected){close(lock);return 2;}
+ int fd=open_output();if(fd<0){outdoor_attempt_errno=errno;outdoor_attempt_stage="open";close(lock);return -1;}
  char b[24];int n=snprintf(b,sizeof(b),"%d",target);
- int ok=number(node)==expected&&(!outdoor_folded()||fold_panel_live("/sys",active_fold_port))&&write(fd,b,(size_t)n)==n&&number(node)==target;
- int still_live=!outdoor_folded()||fold_panel_live("/sys",active_fold_port);close(fd);close(lock);return !still_live?1:ok?0:-1;
+ int result=2;
+ if(number(node)==expected&&(!outdoor_folded()||fold_panel_live("/sys",active_fold_port))){
+  ssize_t written=write(fd,b,(size_t)n);int error=written<0?errno:EIO;
+  if(written!=n){outdoor_attempt_errno=error;outdoor_attempt_stage="write";result=-1;}
+  else{int observed=number(node);outdoor_attempt_stage="readback";
+   if(observed==target)result=0;
+   else if(observed==expected){outdoor_attempt_errno=EAGAIN;result=-1;}
+   else if(observed<0){outdoor_attempt_errno=EIO;result=-1;}
+   else result=2; /* A different valid value belongs to the system. */
+  }
+ }
+ int still_live=!outdoor_folded()||fold_panel_live("/sys",active_fold_port);close(fd);close(lock);return !still_live?1:result;
 }
+static int outdoor_write(int expected,int target,const struct outdoor_lease *permission){
+ struct outdoor_lease authorized;int raising=target>expected;
+ outdoor_write_attempts=0;outdoor_report_errno=0;outdoor_report_stage="none";
+ if(raising){if(!permission||!permission->active)return 1;authorized=*permission;}
+ for(int attempt=0;attempt<3;attempt++){
+  if(attempt){
+   struct timespec delay={0,(long)attempt*80000000L};
+   while(nanosleep(&delay,&delay)<0){if(errno!=EINTR||stopping)return 1;}
+  }
+  if(stopping&&raising)return 1;
+  if(raising){
+   struct outdoor_lease latest;
+   if(!outdoor_read(&latest)||!latest.active||!outdoor_process(latest.pid)||latest.pid!=authorized.pid||latest.raw!=authorized.raw||latest.target!=authorized.target||latest.fraction!=authorized.fraction||latest.physical!=authorized.physical)return 1;
+   if(outdoor_folded()&&!fold_panel_live("/sys",active_fold_port))return 1;
+   int observed=number(node);
+   if(!same_node())return 1;
+   if(attempt&&observed==target&&!strcmp(outdoor_report_stage,"readback")){
+    outdoor_report_errno=0;outdoor_report_stage="readback_confirmed";return 0;
+   }
+   if(observed!=expected)return 2;
+  }
+  outdoor_write_attempts++;
+  int result=outdoor_write_once(expected,target);
+  outdoor_report_errno=outdoor_attempt_errno;outdoor_report_stage=outdoor_attempt_stage;
+  if(result>=0)return result;
+  if(!raising||!(outdoor_attempt_errno==EAGAIN||outdoor_attempt_errno==EINTR||outdoor_attempt_errno==EBUSY||outdoor_attempt_errno==ETIMEDOUT||outdoor_attempt_errno==EIO))return -1;
+ }
+ return -1;
+}
+/* OUTDOOR_WRITE_END */
 static int outdoor_run(const char *path){
  struct stat dir;if(lstat(DIR,&dir)||!S_ISDIR(dir.st_mode)||dir.st_uid||(dir.st_mode&0077))return 2;
  int singleton=open(DIR "/outdoor-node.lock",O_RDWR|O_CREAT|O_NOFOLLOW|O_CLOEXEC,0600);
@@ -88,8 +133,9 @@ static int outdoor_run(const char *path){
    /* Refresh authorization immediately before a raise. Release is compare-only. */
    struct outdoor_lease latest;
    if(value>current&&(!outdoor_read(&latest)||!latest.active||latest.pid!=lease.pid||latest.until!=lease.until||latest.fraction!=lease.fraction||latest.raw!=lease.raw||latest.target!=lease.target||latest.physical!=lease.physical)){state=before;continue;}
-   int result=outdoor_write(current,value);
-   if(result==1&&outdoor_folded()){memset(&state,0,sizeof(state));outdoor_health(&state,"fold_waiting");goto wait_events;}
+   int result=outdoor_write(current,value,&lease);
+   if(result==2){state=before;state.held=0;state.inhibited=1;outdoor_health(&state,"system_override");goto wait_events;}
+   if(result==1){state=before;if(outdoor_folded())memset(&state,0,sizeof(state));outdoor_health(&state,outdoor_folded()?"fold_waiting":"write_deferred");goto wait_events;}
    if(result){state.held=before.held;state.base=before.base;state.target=before.target;state.inhibited=1;exit_reason="write_failed";outdoor_health(&state,exit_reason);break;}
   }
   if(memcmp(&before,&state,sizeof(state)))outdoor_health(&state,state.inhibited?"system_override":state.held?"boosted":"released");
@@ -98,6 +144,9 @@ wait_events: ;
   if(ms<0&&live&&lease.active)ms=0;
   struct pollfd p={.fd=events,.events=POLLIN};if(poll(&p,1,ms)>0){char b[4096];read(events,b,sizeof(b));}
  }
- if(state.held)outdoor_write(state.target,state.base);
+ /* Preserve the failed raise's diagnostics if a best-effort release also runs. */
+ int saved_errno=outdoor_report_errno,saved_attempts=outdoor_write_attempts;const char *saved_stage=outdoor_report_stage;
+ if(state.held)outdoor_write(state.target,state.base,NULL);
+ if(!strcmp(exit_reason,"write_failed")){outdoor_report_errno=saved_errno;outdoor_write_attempts=saved_attempts;outdoor_report_stage=saved_stage;}
  memset(&state,0,sizeof(state));outdoor_health(&state,exit_reason);close(events);close(singleton);return 0;
 }

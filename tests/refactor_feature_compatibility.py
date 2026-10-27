@@ -68,6 +68,11 @@ public class FeatureCompatibilityTest{
   check(originalRuntime.equals(r.toString())&&originalRoot.equals(report.toString())&&originalApp.equals(app.toString()));
   combined.getJSONObject(0).put("state","mutated");check(originalRuntime.equals(r.toString()));
   check(FeatureCompatibility.combine(null,null,null).length()==0);
+  JSONObject rootSettings=row("root_settings","available").put("settings_route","cmd_settings").put("settings_attempts",new JSONArray().put(new JSONObject().put("id","external_provider").put("readable",false).put("detail","provider denied")));
+  JSONObject rootSettingsRow=FeatureCompatibility.annotate(new JSONObject().put("features",new JSONArray().put(rootSettings)),r,"root").getJSONArray("features").getJSONObject(0);check(selected(rootSettingsRow).contains("cmd_settings"));JSONArray rootRoutes=rootSettingsRow.getJSONArray("routes");check(rootRoutes.length()==3);check(rootRoutes.getJSONObject(0).getString("reason").equals("provider denied"));check(rootRoutes.getJSONObject(2).getString("reason").contains("没有试用"));
+  JSONObject alt=row("root_storage","available").put("workspace_route","root_temporary_storage");check(selected(FeatureCompatibility.annotate(new JSONObject().put("features",new JSONArray().put(alt)),r,"root").getJSONArray("features").getJSONObject(0)).contains("root_temporary_storage"));
+  alt.put("workspace_attempts",new JSONArray().put(new JSONObject().put("id","root_private_storage").put("readable",false).put("detail","current storage denied")).put(new JSONObject().put("id","root_temporary_storage").put("readable",true)));
+  JSONObject altRow=FeatureCompatibility.annotate(new JSONObject().put("features",new JSONArray().put(alt)),r,"root").getJSONArray("features").getJSONObject(0);check(altRow.getJSONArray("routes").getJSONObject(0).getString("reason").equals("current storage denied"));
   System.out.println("Feature compatibility catalogue: "+cases+" cases PASS; actual presentation model, no device or brightness probes");
  }
 }''',encoding='utf-8')

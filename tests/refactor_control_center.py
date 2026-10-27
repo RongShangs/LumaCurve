@@ -65,7 +65,7 @@ paths=[]
 for name,text in files.items():
  p=OUT/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_text(text,encoding='utf-8');paths.append(p)
 classes=OUT/'classes';classes.mkdir(exist_ok=True);jar=ROOT/'build/refactor-diagnostics/json-20240303.jar'
-paths += [SRC/(name+'.java') for name in ['ControlCenterHooks','ControlCenterMapping','ControlCenterCurve','ControlCenterCalibration','AppBuild']]
+paths += [SRC/(name+'.java') for name in ['hooking/HookTransaction','ControlCenterHooks','ControlCenterMapping','ControlCenterCurve','ControlCenterCalibration','AppBuild']]
 paths += [SRC/'hooking'/(name+'.java') for name in ['XC_MethodHook','XposedBridge']]
 subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(jar),'-d',str(classes),*map(str,paths)],check=True)
 result=subprocess.run(['java','-cp',str(classes)+os.pathsep+str(jar),'top.rongshangs.lumacurve.refactor.InputTest'],check=True,timeout=20,capture_output=True,text=True);print(result.stdout,end='');ui_cases=int(re.search(r'(\d+) cases PASS',result.stdout).group(1))

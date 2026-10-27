@@ -67,6 +67,6 @@ final class OutdoorOpr {
                 }
             }));
             owners.add(owner);
-        }catch(Throwable unavailable){for(XC_MethodHook.Unhook hook:hooks)hook.unhook();XposedBridge.log("HyperLux outdoor OPR unavailable: "+unavailable);}
+        }catch(Throwable unavailable){HookTransaction.rollbackAll(hooks);XposedBridge.log("HyperLux outdoor OPR unavailable: "+unavailable);}
     }
 }

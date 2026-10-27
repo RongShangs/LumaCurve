@@ -1,0 +1,35 @@
+package top.rongshangs.lumacurve.refactor;
+
+import android.view.*;
+import android.widget.*;
+import org.json.*;
+
+/** One rounded icon followed by About cards in the same scrolling content. */
+final class AboutPage {
+    final MainActivity a;final FrameLayout root,icon;final ElasticScrollView scroll;final LinearLayout body,sheet;final AboutHeroView hero;int bottom;
+    AboutPage(MainActivity owner,LinearLayout body){a=owner;this.body=body;root=new FrameLayout(a){@Override protected void onMeasure(int w,int h){setSquare(View.MeasureSpec.getSize(w));super.onMeasure(w,h);}@Override protected void onLayout(boolean changed,int l,int t,int r,int b){super.onLayout(changed,l,t,r,b);exposure();}};root.setBackgroundColor(a.BG);root.setClipChildren(true);hero=new AboutHeroView(a);
+        scroll=new ElasticScrollView(a){@Override protected void onScrollChanged(int x,int y,int oldX,int oldY){super.onScrollChanged(x,y,oldX,oldY);exposure();}};scroll.setFillViewport(true);root.addView(scroll,new FrameLayout.LayoutParams(-1,-1));body.setPadding(0,0,0,0);scroll.addView(body);icon=new FrameLayout(a);LinearLayout.LayoutParams iconSize=new LinearLayout.LayoutParams(-1,1);iconSize.setMargins(a.dp(18),a.dp(10),a.dp(18),a.dp(12));body.addView(icon,iconSize);icon.addView(hero,new FrameLayout.LayoutParams(-1,1,Gravity.TOP|Gravity.CENTER_HORIZONTAL));sheet=a.column();body.addView(sheet,new LinearLayout.LayoutParams(-1,-2));inset(0);
+    }
+    void setSquare(int width){if(icon==null)return;width=Math.min(Math.max(1,width-a.dp(36)),a.dp(540));ViewGroup.LayoutParams top=icon.getLayoutParams();if(top.height!=width){top.height=width;icon.setLayoutParams(top);ViewGroup.LayoutParams logo=hero.getLayoutParams();logo.height=width;logo.width=width;hero.setLayoutParams(logo);}}
+    void exposure(){if(hero!=null&&scroll!=null&&icon!=null)hero.expose(AboutMarquee.visibleHeight(icon.getTop()+hero.getTop()-scroll.getScrollY(),hero.getHeight(),root.getHeight()));}
+    void inset(int value){bottom=value;sheet.setPadding(a.dp(18),0,a.dp(18),Math.max(0,value)+a.dp(22));}
+    void active(boolean value){hero.active(value);exposure();}
+    void dispose(){hero.dispose();}
+    Button button(String label,Runnable task,LinearLayout row){Button button=a.compact(label,task,row);button.setTextSize(13);fitButton(button);return button;}
+    void fitButton(Button button){button.setStateListAnimator(null);button.setElevation(0);button.setTranslationZ(0);button.setClipToOutline(true);ViewGroup.LayoutParams size=button.getLayoutParams();if(size!=null){size.height=-2;if(size instanceof LinearLayout.LayoutParams){((LinearLayout.LayoutParams)size).topMargin=a.dp(3);((LinearLayout.LayoutParams)size).bottomMargin=a.dp(3);}button.setLayoutParams(size);}button.setMinHeight(a.dp(40));button.setMinimumHeight(a.dp(40));button.setSingleLine(false);button.setMaxLines(2);button.setEllipsize(null);button.setPadding(a.dp(10),a.dp(6),a.dp(10),a.dp(6));}
+    void build(){
+        LinearLayout card=a.card(sheet);android.graphics.drawable.GradientDrawable cardShape=a.background(android.graphics.Color.WHITE,18);float upper=a.dp(AboutHeroView.CORNER_DP),lower=a.dp(18);cardShape.setCornerRadii(new float[]{upper,upper,upper,upper,lower,lower,lower,lower});card.setBackground(cardShape);card.setPadding(a.dp(18),a.dp(16),a.dp(18),a.dp(16));
+        TextView name=a.text("HyperLux",24,a.INK);name.setGravity(Gravity.CENTER);card.addView(name,new LinearLayout.LayoutParams(-1,-2));
+        TextView description=a.text("兼容 HyperOS 的亮度个性化工具",14,a.INK);description.setGravity(Gravity.CENTER);card.addView(description,new LinearLayout.LayoutParams(-1,-2));
+        TextView version=a.text(AppBuild.ARTIFACT_VERSION,12,a.BLUE);version.setGravity(Gravity.CENTER);card.addView(version,new LinearLayout.LayoutParams(-1,-2));LinearLayout line;
+        a.updateLabel=a.text("自动检查应用更新",12,a.BLUE);a.updateLabel.setPadding(a.dp(12),a.dp(6),a.dp(12),a.dp(6));a.updateLabel.setGravity(Gravity.CENTER);a.updateLabel.setMinimumHeight(a.dp(40));a.updateLabel.setBackground(a.ripple(0xffeef3ff,12));a.updateLabel.setClickable(true);a.updateLabel.setFocusable(true);a.updateLabel.setOnClickListener(v->a.checkUpdate(true));LinearLayout.LayoutParams updateSize=new LinearLayout.LayoutParams(-1,-2);updateSize.topMargin=a.dp(6);updateSize.bottomMargin=a.dp(4);card.addView(a.updateLabel,updateSize);
+        line=a.row(card);button("官网",()->a.open("https://lc.rongshangs.top"),line);button("GitHub",()->a.open(UpdateChecker.REPO),line);button("开源协议",()->a.open("https://www.gnu.org/licenses/gpl-3.0.html"),line);
+        LinearLayout group=a.column();group.setPadding(a.dp(12),a.dp(8),a.dp(12),a.dp(8));group.setBackground(a.ripple(0xffeef3ff,14));group.setClipToOutline(true);group.setClickable(true);group.setFocusable(true);group.setOnClickListener(v->a.copyGroupNumber());LinearLayout.LayoutParams groupSize=new LinearLayout.LayoutParams(-1,-2);groupSize.topMargin=a.dp(8);card.addView(group,groupSize);TextView groupTitle=a.text("QQ 交流群",12,a.MUTED);groupTitle.setPadding(0,0,0,a.dp(2));group.addView(groupTitle);line=a.row(group);line.setBaselineAligned(false);TextView number=a.text("314981836",20,a.BLUE);number.setPadding(0,0,0,0);number.setMaxLines(1);number.setAutoSizeTextTypeUniformWithConfiguration(12,22,1,android.util.TypedValue.COMPLEX_UNIT_SP);line.addView(number,new LinearLayout.LayoutParams(0,-2,1));TextView code=a.text("暗号：1691",12,a.MUTED);code.setPadding(0,a.dp(2),0,0);Button copyButton=a.action("复制群号",a::copyGroupNumber);copyButton.setTextSize(12);fitButton(copyButton);line.addView(copyButton,new LinearLayout.LayoutParams(a.dp(88),-2));group.addView(code);
+        card=a.card(sheet);card.addView(a.text("打赏",18,a.INK));card.addView(a.text("完全开源免费。欢迎捐赠 2.3 元支持开发。备注「昵称：想说的一句话」，总计不超过 30 个字符，将会尽快更新到感谢名单。",13,a.MUTED));line=a.row(card);button("微信",()->a.donate("微信","donate-wechat.jpg"),line);button("支付宝",()->a.donate("支付宝","donate-alipay.jpg"),line);
+        card=a.card(sheet);card.addView(a.text("感谢名单",18,a.INK));a.thanksList=a.column();card.addView(a.thanksList);a.thanksStatus=a.text("名单来自官网，联网时自动更新",11,a.MUTED);card.addView(a.thanksStatus);
+        card=a.card(sheet);card.addView(a.text("测试贡献",18,a.INK));card.addView(a.text(String.join(" ",AboutMarquee.TESTERS),14,a.INK));
+        card=a.card(sheet);card.addView(a.text("代码贡献",18,a.INK));card.addView(a.text("凌乱的风W",14,a.INK));card.addView(a.text("贡献手动接管恢复、系统进程重启与断连兜底、节点校验顺序修复，以及图片解码优化。",12,a.MUTED));
+        try{JSONObject data;try{data=ThanksFeed.parse(a.getPreferences(0).getString("thanks_cache",null));}catch(Exception absent){data=ThanksFeed.parse(ThanksFeed.read(a.getAssets().open("thanks.json")));}a.renderThanks(data);}catch(Exception ignored){a.thanksStatus.setText("暂时无法读取名单");}
+        card=a.card(sheet);line=a.row(card);line.addView(a.image("avatar.jpg",46,15));TextView author=a.text("戎Shang",19,a.INK);author.setPadding(a.dp(14),0,0,0);line.addView(author);line=a.row(card);button("作者博客",()->a.open("https://rongshangs.top"),line);button("酷安主页",()->a.open("https://www.coolapk.com/u/3261403"),line);
+    }
+}

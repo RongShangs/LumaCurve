@@ -193,5 +193,5 @@ files=[]
 for name,text in sources.items():
  f=O/name;f.parent.mkdir(parents=True,exist_ok=True);f.write_text(text,encoding='utf-8');files.append(f)
 C=O/'classes';C.mkdir(exist_ok=True)
-subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(J),'-d',str(C),*[str(f) for f in files],*[str(S/n) for n in ['AdvancedPolicy.java','AdvancedOptions.java','AdvancedTuning.java','TraditionalAnimation.java','hooking/HookTransaction.java','DelayPolicy.java','LowLightPolicy.java','LowLightThresholds.java','LowLightAssistGate.java','LowLightAssistEvidence.java','MemoryOptions.java','ResponseTuning.java','LowLightTuning.java']]],check=True)
+subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(J),'-d',str(C),*[str(f) for f in files],*[str(S/n) for n in ['AdvancedPolicy.java','AdvancedOptions.java','AdvancedTuning.java','FieldOverride.java','TraditionalAnimation.java','hooking/HookTransaction.java','DelayPolicy.java','LowLightPolicy.java','LowLightThresholds.java','LowLightAssistGate.java','LowLightAssistEvidence.java','MemoryOptions.java','ResponseTuning.java','LowLightTuning.java']]],check=True)
 subprocess.run(['java','-cp',str(C)+';'+str(J),'top.rongshangs.lumacurve.refactor.AdvancedHookTest'],check=True)

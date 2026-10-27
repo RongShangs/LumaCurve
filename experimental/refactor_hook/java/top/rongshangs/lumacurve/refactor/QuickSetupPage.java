@@ -62,7 +62,7 @@ final class QuickSetupPage {
     void render(){
         if(!showing())return;finishTransition();root.removeAllViews();choiceCards.clear();
         LinearLayout bar=a.row(root);bar.setPadding(a.dp(20),a.dp(12),a.dp(20),a.dp(12));bar.addView(start("快速设置",18,a.INK),new LinearLayout.LayoutParams(0,-2,1));bar.addView(a.text(step<QuickSetupPlan.COUNT?(step+1)+" / "+QuickSetupPlan.COUNT:"确认设置",12,a.MUTED));
-        scroll=new ScrollView(a);scroll.setFillViewport(true);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));LinearLayout body=a.column();body.setPadding(a.dp(20),a.dp(14),a.dp(20),a.dp(16));scroll.addView(body);
+        scroll=new ElasticScrollView(a);scroll.setFillViewport(true);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));LinearLayout body=a.column();body.setPadding(a.dp(20),a.dp(14),a.dp(20),a.dp(16));scroll.addView(body);
         if(step<QuickSetupPlan.COUNT){
             final int question=step;TextView title=start(QuickSetupPlan.QUESTIONS[question],22,a.INK);title.setTag("quick-question");title.setLineSpacing(a.dp(4),1);title.setPadding(0,0,0,a.dp(10));body.addView(title,new LinearLayout.LayoutParams(-1,-2));
             TextView note=start(QuickSetupPlan.NOTES[question],13,a.MUTED);note.setTag("quick-question-description");note.setLineSpacing(a.dp(3),1);note.setPadding(0,0,0,a.dp(18));body.addView(note,new LinearLayout.LayoutParams(-1,-2));
