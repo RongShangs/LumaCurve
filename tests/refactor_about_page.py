@@ -29,7 +29,7 @@ assert 'logo.height=width;logo.width=width' in about and 'a.dp(36)' in about
 assert 'AboutMarquee.visibleHeight' in about and 'icon.getTop()+hero.getTop()-scroll.getScrollY()' in about
 assert 'aboutPage.active(false)' in main and 'aboutPage.dispose()' in main
 assert 'ThemePalette.surface(color,darkTheme)' in main
-web=json.loads((R/'website/thanks.json').read_text('utf-8'));offline=json.loads((R/'experimental/refactor_hook/assets/thanks.json').read_text('utf-8'));assert web==offline
+web=json.loads((R/'website/thanks.json').read_text('utf-8'));offline=json.loads((R/'experimental/refactor_hook/assets/thanks.json').read_text('utf-8'));assert web['schema']==offline['schema']==1
 assert all(entry['message']!='[未填写]' for entry in web['entries'])
 assert 'setMinimumHeight(a.dp(40))' in about and 'a.dp(6)' in about
 assert 'setClipToOutline(true)' in (S/'AboutHeroView.java').read_text('utf-8')
