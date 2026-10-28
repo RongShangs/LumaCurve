@@ -8,6 +8,7 @@ import java.util.function.IntSupplier;
 public final class TraditionalAdapter extends CurveBackend {
     final Object mapper,owner,abc,baseline;
     final TraditionalCurve original;
+    final PhysicalCurveCalibration calibration;
     final Method setter,reset,convert,splineMethod;
     final Constructor<?> configConstructor;
     final IntSupplier user;
@@ -30,7 +31,9 @@ public final class TraditionalAdapter extends CurveBackend {
         if(method(map.getClass(),"get",int.class).invoke(map,0)!=mapper)throw new IllegalStateException("主屏默认映射对象不一致");
         baseline=read(mapper,"mConfig");if(baseline==null)throw new IllegalStateException("设备本地曲线尚未就绪");
         Object pair=method(baseline.getClass(),"getCurve").invoke(baseline);
-        original=new TraditionalCurve((float[])read(pair,"first"),(float[])read(pair,"second"));
+        TraditionalCurve raw=new TraditionalCurve((float[])read(pair,"first"),(float[])read(pair,"second"));
+        calibration=PhysicalCurveCalibration.capture(mapper,raw,min,max);
+        original=calibration.clamped?new TraditionalCurve(raw.lux(),calibration.effective(raw.nit())):raw;
         factoryLux=original.controlsLux();factoryNit=original.controlsNit();
         new CurvePlan(factoryLux,factoryNit,min,max,new float[]{1,1,1,1});
         configConstructor=baseline.getClass().getDeclaredConstructor(float[].class,float[].class,Map.class,Map.class,String.class,boolean.class,long.class,float.class,float.class);configConstructor.setAccessible(true);
@@ -52,7 +55,11 @@ public final class TraditionalAdapter extends CurveBackend {
     static float bound(Object mapper,boolean high)throws Exception{float[] n=(float[])read(mapper,"mNits");if(n==null||n.length<2)throw new IllegalArgumentException("设备亮度标定未就绪");for(int i=0;i<n.length;i++)if(!Float.isFinite(n[i])||n[i]<0||(i>0&&n[i]<=n[i-1]))throw new IllegalArgumentException("设备亮度标定无效");return high?n[n.length-1]:n[0];}
     public String name(){return "physical_mapping";}
     public void putCurveState(org.json.JSONObject status)throws Exception{
-        status.put("physical_mapping_active",read(abc,"mCurrentBrightnessMapper")==mapper).put("physical_mapper_class",mapper.getClass().getName()).put("physical_user_lux_field",userLuxField);
+        status.put("physical_mapping_active",read(abc,"mCurrentBrightnessMapper")==mapper).put("physical_mapper_class",mapper.getClass().getName()).put("physical_user_lux_field",userLuxField)
+            .put("physical_baseline_route",calibration.clamped?PhysicalCurveCalibration.CLAMPED_ROUTE:"direct")
+            .put("physical_calibration_min_nit",min).put("physical_calibration_max_nit",max)
+            .put("physical_original_min_nit",calibration.originalMinimum).put("physical_original_max_nit",calibration.originalMaximum)
+            .put("physical_clamped_points",calibration.clippedPoints);
     }
     public boolean persistentMemorySupported(){if(persistenceSupported==null)try{persistenceSupported=method(abc.getClass(),"setScreenBrightnessByUser",float.class,float.class).getReturnType()==boolean.class && method(mapper.getClass(),"getUserBrightness").getReturnType()==float.class;}catch(Exception unavailable){persistenceSupported=false;}return persistenceSupported;}
     public int manualPointCapacity(){return persistentMemorySupported()?1:0;}
@@ -96,6 +103,7 @@ public final class TraditionalAdapter extends CurveBackend {
     }
     public float[] currentNit()throws Exception{float[] x=currentLux(),n=new float[x.length];for(int i=0;i<x.length;i++)n[i]=currentAt(x[i]);return n;}
     Object configuration(float[] factors,float floor)throws Exception {
+        if(calibration.keepOriginal(factors,floor,savedBase))return baseline;
         CurvePlan saved=savedBase==null?null:proposed(factors,floor);
         return configConstructor.newInstance(saved==null?original.lux():saved.lux(),saved==null?original.reshape(min,max,factors,floor):saved.nits(),
             new HashMap<>((Map<?,?>)read(baseline,"mCorrectionsByPackageName")),new HashMap<>((Map<?,?>)read(baseline,"mCorrectionsByCategory")),
@@ -113,7 +121,7 @@ public final class TraditionalAdapter extends CurveBackend {
         if(current!=baseline&&current!=applied){active=null;applied=null;if(factors==null)return;throw new IllegalStateException("系统基准曲线已改变，请重启应用后重新读取");}
         Object desired=next==null?baseline:configuration(factors,floor);
         Object desiredCurve=method(desired.getClass(),"getCurve").invoke(desired);
-        float[] nextLux=((float[])read(desiredCurve,"first")).clone(),nextNit=((float[])read(desiredCurve,"second")).clone();
+        float[] nextLux=((float[])read(desiredCurve,"first")).clone(),nextNit=calibration.effective((float[])read(desiredCurve,"second"));
         Map<Field,Object> before=snapshot(mapper),modelBefore=snapshot(read(abc,"mShortTermModel"));
         Object model=read(abc,"mShortTermModel");CurvePlan old=active;Object oldApplied=applied;
         updating=true;

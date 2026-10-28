@@ -32,7 +32,8 @@
         "refactor",
         "refactor_coefficients",
         "miui_physical",
-        "aosp_physical"
+        "aosp_physical",
+        "aosp_physical_clamped"
       ],
       "owners": [
         "BackendSelection.java",
@@ -45,17 +46,28 @@
         "MemoryPersistence.java",
         "SavedCurve.java",
         "RefactorProfiles.java",
-        "RefactorCoefficientsAdapter.java"
+        "RefactorCoefficientsAdapter.java",
+        "PhysicalCurveCalibration.java",
+        "ThemeCurveOptions.java"
       ],
-      "selector": "ABC 活动策略为准；Refactor 未就绪不得因物理映射对象存在而抢用，未知活动标记才按已验证对象选择。 Refactor内部分段锚点优先；任一旧锚点标记存在时不得回退绕过残缺旧结构；仅旧锚点整体缺失且9/22系数布局、实例字段与原生消费者签名完整时采用系数路径。 记忆转基础保持现有路径；仅对新鲜物理映射采样的4个float ULP以内边界/平台舍入误差归一，仍严格校验全节点、坐标与范围；Refactor锚点及持久化输入不放宽。",
+      "selector": "ABC 活动策略为准；Refactor 未就绪不得因物理映射对象存在而抢用，未知活动标记才按已验证对象选择。 Refactor内部分段锚点优先；任一旧锚点标记存在时不得回退绕过残缺旧结构；仅旧锚点整体缺失且9/22系数布局、实例字段与原生消费者签名完整时采用系数路径。 记忆转基础保持现有路径；仅对新鲜物理映射采样的4个float ULP以内边界/平台舍入误差归一，仍严格校验全节点、坐标与范围；Refactor锚点及持久化输入不放宽。 原机完整单调曲线超出真实标定范围时，只对已验证系统物理映射及双向原生样条追加端点裁剪分支；其他范围内旧路径不增加探测要求，残缺标定不回退绕过。；可选深色曲线复用同一已选后端和实际设备约束，仅按系统uiMode选择独立基础配置；不开启时旧配置原样选择。",
       "evidence": [
         "curve_backend",
         "physical_mapper_class",
         "baseline_id",
         "user_serial",
-        "curve_route"
+        "curve_route",
+        "physical_baseline_route",
+        "physical_calibration_min_nit",
+        "physical_calibration_max_nit",
+        "physical_original_min_nit",
+        "physical_original_max_nit",
+        "physical_clamped_points",
+        "theme_curve_enabled",
+        "theme_curve_dark",
+        "base_curve_name"
       ],
-      "cleanup": "关闭 / 故障 / OTA 基准或用户变化恢复本次应用的曲线；只按所选保持范围恢复匹配记忆。 系数路线事务快照同时保存数组内容与身份；拒绝其他所有者替换的基线，未验证的虚拟拟合参考点不冒充可移植用户锚点。 转存前校验失败不调用配置应用，不清除当前手动点；精度归一不修改原始状态快照或其他已保存设置。",
+      "cleanup": "关闭 / 故障 / OTA 基准或用户变化恢复本次应用的曲线；只按所选保持范围恢复匹配记忆。 系数路线事务快照同时保存数组内容与身份；拒绝其他所有者替换的基线，未验证的虚拟拟合参考点不冒充可移植用户锚点。 转存前校验失败不调用配置应用，不清除当前手动点；精度归一不修改原始状态快照或其他已保存设置。 新分支中性参数保持原配置对象，编辑只提交有效标定范围内的节点；停用恢复未裁剪原始对象，元数据/记忆清理及失败回滚沿用旧事务。；启用独立曲线后真实主题切换在显示Handler事务内撤销待保存/恢复、清除活跃与归档记忆；永久保持不能复活旧主题记忆。关闭功能不删除两条基础配置。",
       "tests": [
         "tests/refactor_traditional.py",
         "tests/refactor_curve_integrity.py",
@@ -65,7 +77,10 @@
         "tests/refactor_memory_lifecycle.py",
         "tests/refactor_coefficient_curve.py",
         "tests/refactor_coefficient_firmware.py",
-        "tests/refactor_saved_curve.py"
+        "tests/refactor_saved_curve.py",
+        "tests/refactor_physical_calibration.py",
+        "tests/refactor_physical_calibration_firmware.py",
+        "tests/refactor_theme_curve.py"
       ],
       "composition": "exclusive"
     },
@@ -686,30 +701,67 @@
     },
     {
       "id": "control_center",
-      "name": "控制中心节点映射（入口隐藏）",
+      "name": "控制中心节点映射",
       "features": [
-        "control_center_slider"
+        "control_center_slider",
+        "control_center_raw",
+        "control_center_partition"
       ],
       "routes": [
-        "coordinate_v2"
+        "coordinate_v2",
+        "coordinate_v2_calibrated",
+        "raw_node_v3",
+        "partition_node_v4",
+        "partition_ddc_hbm",
+        "partition_hbm_normal"
       ],
       "owners": [
         "ControlCenterCalibration.java",
         "ControlCenterEngine.java",
         "ControlCenterHooks.java",
-        "ControlCenterRoot.java"
+        "ControlCenterRoot.java",
+        "BrightnessControlOptions.java",
+        "BrightnessControl.java",
+        "ControlCenterCurve.java",
+        "ControlCenterNodes.java",
+        "ControlCenterPartition.java",
+        "ControlCenterDemo.java",
+        "ControlCenterDemoState.java",
+        "ControlCenterSettings.java",
+        "ControlCenterStatus.java"
       ],
-      "selector": "实际双向单调转换、进程代次、显示身份与对应 UI ABI 同时通过；本版不展示入口，保留原选择。",
+      "selector": "原mode=0/1/2保持原义：全区间严格单调坐标优先；端点平台仅在实际标定数组、原生双向样条和端点裁剪证明完整时使用有效域，逻辑101点表独立核验。独立mode=3/raw_node_v3复用标准坐标进行回显，并核验主屏输出隔离、物理ID、Root实际可写节点及监听进程；不按机型或版本放行，未知动态折叠监听不套用。只有显式拖动才接管完整节点，不在升级时迁移旧选择。 mode=4追加分区路线，读取DDC原始HBM transitionPoint或控制器普通亮度上限，在真实标定中转成节点比例；未知或无额外区间拒绝分区，不影响完整节点控制。 分区呈现普通75%/增强25%；普通物理边界仍读原机接口，独立上界默认真实max_brightness。配置上界只约束用户节点目标，不修改自动HBM范围。",
       "evidence": [
         "control_center_slider.kind",
-        "control_center_slider.error"
+        "control_center_slider.error",
+        "hyperlux_control_center_tables_v2.enabled",
+        "hyperlux_control_center_tables_v2.revision",
+        "hyperlux_control_center_tables_v2.user_serial",
+        "control_center_slider.calibration_profile",
+        "control_center_slider.compatibility_state",
+        "control_center_slider.oem_v1_ready",
+        "control_center_raw_supported",
+        "control_center_slider.raw_ready",
+        "control_center_slider.raw_control",
+        "control_center_node_detail",
+        "control_center_partition_supported",
+        "control_center_slider.partition",
+        "control_center_slider.partition_error",
+        "hyperlux_control_center_tables_v2.partition_maximum"
       ],
-      "cleanup": "进程 / 用户 / 模式 / 失联变化丢弃旧 profile，不借映射改变系统自动模式。",
+      "cleanup": "旧坐标路线不拥有模式/输出；停用、用户、配置、进程或对象变化撤销旧profile。mode=3拖动经既有raw_panel退出暗光锁定并关闭自动亮度，共用原生程序/租约/健康检查/锁屏暂停和解锁恢复；重开自动亮度清租约，auto_epoch拒绝此前排队手势。同节点且只更新其他设置时保留保持；关闭引擎复用原始所有权恢复。Root暂缺保留原配置，不阻止保存其他设置；不清理其他弹窗的会话。 普通段调用原系统回调以保留开启中的自动亮度和学习，超出段共用raw_panel且不学习；三秒内需先结束首笔再上滑。返回普通段按独立保存选项恢复自动或继续手动，超时/代次/范围/自动模式变化清确认。 首笔同步源滑块，在mExternalChange保护下setValue(position,null)封顶；系统自动反馈不进手势门禁、不写节点。自动高亮已在增强区时，明确新手势可直接接管，系统端以原FrameworkBrightness实际值和标定二次确认；失效证据不放行。动画仅当前可见设置页运行，暂停/切页/移除停止，不新增采样或守护。",
       "tests": [
         "tests/refactor_control_center.py",
-        "tests/refactor_control_center_root.py"
+        "tests/refactor_control_center_root.py",
+        "tests/refactor_brightness_control.py",
+        "tests/refactor_feature_self_check.py",
+        "tests/refactor_control_center_calibration.py",
+        "tests/refactor_control_center_nodes.py",
+        "tests/refactor_control_center_partition.py",
+        "tests/refactor_control_center_settings.py",
+        "tests/refactor_control_center_demo.py"
       ],
-      "composition": "exclusive"
+      "composition": "per_feature"
     },
     {
       "id": "dark_lock_schedule",
@@ -740,6 +792,29 @@
         "tests/refactor_configuration.py"
       ],
       "composition": "exclusive"
+    },
+    {
+      "id": "dim_aod",
+      "name": "熄屏前降亮与息屏显示协调",
+      "features": [
+        "dim_aod"
+      ],
+      "routes": [
+        "automatic_dim_aod_cap"
+      ],
+      "owners": [
+        "DimAodCompatibility.java"
+      ],
+      "selector": "实际完整SDR入口、DIM子阶段、主屏DPC/电源请求/原因及全屏AOD策略同时匹配；不按机型或版本放行。子阶段仅在当前自动DIM调用及活动用户和显示线程内参与，缺接口或异常独立跳过，不回退改写其他阶段。",
+      "evidence": [
+        "dim_aod_compatibility",
+        "feature_self_check"
+      ],
+      "composition": "additive",
+      "cleanup": "只在当前同步调用中限制AOD子阶段抬高DIM输入，原生后续保护完整执行；外层调用无论正常或异常都释放嵌套上下文，安装失败撤销本组全部钩子。不改用户设置、不留节点或模式接管。",
+      "tests": [
+        "tests/refactor_dim_aod.py"
+      ]
     }
   ],
   "abi_variants": [
@@ -1015,6 +1090,36 @@
       ],
       "rule": "灰阶/nit表字段整组不存在才沿用原映射范围；实际对象上的完整表最高档经物理nit换算限定本模块增加量，不能把换算末端当原生OPR高亮档；字段部分存在、非实例/类型错、顺序/形状错、未启用或换算失败均保留原生结果。不写原生灰阶、色彩、映射表或用户设置。未触发额外放宽前保持unconfirmed。",
       "test": "tests/refactor_opr_envelope.py"
+    },
+    {
+      "id": "physical_baseline_calibration",
+      "owner": "PhysicalCurveCalibration.java",
+      "alternatives": [
+        "in_range_original_route",
+        "aosp_verified_endpoint_clamp"
+      ],
+      "rule": "只有实际默认曲线越过标定边界才检查双向原生LinearSpline/MonotoneCubicSpline、坐标对应、未调整的范围、纯换算端点；严格拒绝错误、动态标定、非单调或不匹配对象。中性保留原始曲线，编辑使用标定端点，不扩大硬件上限。",
+      "test": "tests/refactor_physical_calibration.py"
+    },
+    {
+      "id": "slider_calibration_domain",
+      "owner": "ControlCenterCalibration.java",
+      "alternatives": [
+        "full_unit_domain",
+        "verified_native_endpoints"
+      ],
+      "rule": "原全域校验不新增接口要求；端点平台分支仅匹配完整本机标定，排除中间平台、残缺结构和活动额外低亮度标定。范围随转换表传输，不扩展硬件或自动亮度允许范围。",
+      "test": "tests/refactor_control_center_calibration.py"
+    },
+    {
+      "id": "partition_manual_ceiling",
+      "owner": "ControlCenterPartition.java",
+      "alternatives": [
+        "ddc_hbm_transition",
+        "hbm_normal_ceiling"
+      ],
+      "rule": "优先原始DDC HBM过渡点；入口不存在或合法无HBM数据才用实际控制器普通上限。残缺/类型错/坏数据不回退，不用固定百分比或机型表；边界不能证明时只停分区。",
+      "test": "tests/refactor_control_center_partition.py"
     }
   ],
   "native_variants": [

@@ -3,15 +3,15 @@ from pathlib import Path
 import subprocess
 R=Path(__file__).resolve().parents[1];S=R/'experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor';O=R/'build/refactor-saved-transaction-tests';O.mkdir(exist_ok=True);J=R/'build/refactor-diagnostics/json-20240303.jar'
 source=(S/'RootControl.java').read_text(encoding='utf-8');start=source.index('    JSONObject refreshedLive()');refresh=source[start:source.index('    JSONObject inspect()',start)]
-start=source.index('            if(command.equals("promote-memory"))');promotion=source[start:source.index('            if(command.equals("stop"))',start)]
+start=source.index('            if(command.equals("promote-memory"))');promotion=source[start:source.index('            if(command.equals("restore-defaults"))',start)]
 p=O/'SavedTransactionTest.java'
 p.write_text(r'''package top.rongshangs.lumacurve.refactor;
 import org.json.*;import java.util.*;import java.io.*;import java.nio.charset.StandardCharsets;
 class RootControl {
- boolean selfCheckNext;String selfCheckReason="manual";static final String CONFIG="config",REFRESH="refresh";JSONObject before,after,applied;boolean respond=true,requested;int applies;
+ boolean selfCheckNext;String selfCheckReason="manual";static final String CONFIG="config",REFRESH="refresh";JSONObject before,after,applied;boolean respond=true,requested,themeRace;int applies;
  final Store settings=new Store();class Store {String config;String get(String key){return config;}boolean put(String k,String v){if(k.equals(REFRESH))requested=true;return true;}}
  JSONObject live(){return requested&&respond?after:before;}
- JSONObject apply(String payload)throws Exception{applies++;applied=new JSONObject(new String(Base64.getDecoder().decode(payload),StandardCharsets.UTF_8));return new JSONObject().put("ok",true);}
+ JSONObject apply(String payload)throws Exception{JSONObject options=new JSONObject(new String(Base64.getDecoder().decode(payload),StandardCharsets.UTF_8)),state=new JSONObject(after.toString());if(themeRace)state.put("theme_curve_dark",!state.optBoolean("theme_curve_dark"));if(options.has("captured_theme_dark")&&options.getBoolean("captured_theme_dark")!=state.optBoolean("theme_curve_dark"))throw new IOException("深浅色模式已变化，请重新保存当前曲线");applies++;applied=options;return new JSONObject().put("ok",true);}
 '''+refresh+r'''
  JSONObject execute(String command)throws Exception{
 '''+promotion+r'''
@@ -37,10 +37,14 @@ public class SavedTransactionTest {
   check(c.execute("promote-memory").getBoolean("ok"));check(c.applies==1);SavedCurve physical=SavedCurve.parse(c.applied);physical.validate(1,4000,5000);check(physical.lux.length==6&&physical.nit[3]==4000&&physical.nit[4]==4000&&physical.nit[5]==4000);check(c.applied.getDouble("memory_strength")==.25&&c.applied.getBoolean("memory_persist")&&c.applied.getBoolean("memory_hold_switch"));check(c.applied.getDouble("outdoor_max_nit")==1800&&c.applied.getJSONObject("sentinel").getInt("keep")==17);check(c.applied.getJSONArray("manual_brightness_apps").getString(0).equals("com.demo.game"));
   c=ready();c.after.put("curve_backend","physical_mapping").put("physical_mapping_active",true).put("current_anchors_nit",new JSONArray("[2,5,40,90,150,350,1000.01]"));rejected(c);
   c=ready();c.after.put("curve_backend","physical_mapping").put("physical_mapping_active",true).put("current_anchors_nit",new JSONArray("[2,5,40,90,85,350,1000]"));rejected(c);
+  c=ready();JSONObject darkOptions=new JSONObject(c.settings.config);ThemeCurveOptions theme=new ThemeCurveOptions();theme.enabled=true;theme.factors=new float[]{1,.8f,.9f,1};theme.put(darkOptions);c.settings.config=darkOptions.toString();c.after.put("theme_curve_dark",true);
+  check(c.execute("promote-memory").getBoolean("ok"));check(c.applied.getString("factors").equals("1,1.2,1,1")&&!c.applied.has(SavedCurve.KEY));ThemeCurveOptions promoted=ThemeCurveOptions.parse(c.applied);check(promoted.enabled&&promoted.saved.lux.length==7&&promoted.factors[1]==1&&promoted.floor==0);check(c.applied.getDouble("memory_strength")==.25);
+  c=ready();theme.put(darkOptions=new JSONObject(c.settings.config));c.settings.config=darkOptions.toString();check(c.execute("promote-memory").getBoolean("ok"));check(ThemeCurveOptions.parse(c.applied).factors[1]==.8f&&SavedCurve.parse(c.applied)!=null);
+  c=ready();c.themeRace=true;rejected(c);
   System.out.println("Saved curve transaction: "+cases+" cases PASS; production root branch with transport doubles, Android not tested");
  }
 }''',encoding='utf-8')
 clock=O/'android/os/SystemClock.java';clock.parent.mkdir(parents=True,exist_ok=True);clock.write_text('package android.os;public class SystemClock{public static long elapsedRealtime(){return 10000;}}',encoding='utf-8')
 C=O/'classes';C.mkdir(exist_ok=True)
-subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(J),'-d',str(C),str(S/'SavedCurve.java'),str(S/'CurvePlan.java'),str(clock),str(p)],check=True)
+subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(J),'-d',str(C),str(S/'ThemeCurveOptions.java'),str(S/'SavedCurve.java'),str(S/'CurvePlan.java'),str(clock),str(p)],check=True)
 subprocess.run(['java','-cp',str(C)+';'+str(J),'top.rongshangs.lumacurve.refactor.SavedTransactionTest'],check=True)

@@ -123,14 +123,24 @@
       "purpose": "策略与算子"
     },
     {
+      "file": "ControlCenterDemo.java",
+      "layer": "presentation",
+      "purpose": "分区75/25示意：60dp宽14dp圆角矩形、主题内固定色的实心手指圆，不显示倒计时，仅当前设置页运行"
+    },
+    {
+      "file": "ControlCenterDemoState.java",
+      "layer": "policy",
+      "purpose": "纯演示状态：首笔封顶、松手、快速二次上滑、返回和自动高亮，无倒计时或亮度输出"
+    },
+    {
       "file": "ControlCenterEngine.java",
       "layer": "bridge",
-      "purpose": "Root 与原生程序桥"
+      "purpose": "控制中心坐标标定、进程/配置元数据及完整节点桥生命周期；同步接管/暂停快照，旧v1不执行"
     },
     {
       "file": "ControlCenterHooks.java",
       "layer": "adapters",
-      "purpose": "设备接口与所有权"
+      "purpose": "SystemUI原比例映射及独立v3整节点手势入口；真实节点回显、末端目标合并发送和代次隔离"
     },
     {
       "file": "ControlCenterMapping.java",
@@ -138,9 +148,29 @@
       "purpose": "策略与算子"
     },
     {
+      "file": "ControlCenterNodes.java",
+      "layer": "adapters",
+      "purpose": "v3完整节点手势校验与主屏raw_panel接管桥；复用原租约和锁屏/自动恢复，不接收旧v1手势"
+    },
+    {
+      "file": "ControlCenterPartition.java",
+      "layer": "adapters",
+      "purpose": "读取实际普通亮度边界；一秒内独立二次上滑准入与有界提示策略，不复制节点保持程序"
+    },
+    {
       "file": "ControlCenterRoot.java",
       "layer": "bridge",
-      "purpose": "Root 与原生程序桥"
+      "purpose": "集中核验Root节点绑定和写入能力，保留暂不可用的已有完整节点选择，准备共用节点监听并发布绑定profile"
+    },
+    {
+      "file": "ControlCenterSettings.java",
+      "layer": "presentation",
+      "purpose": "明确选中的模式卡片、分区返回行为与紧凑节点编辑；兼容详情统一在日志页，不主动写亮度"
+    },
+    {
+      "file": "ControlCenterStatus.java",
+      "layer": "policy",
+      "purpose": "只读可见模式与可选能力；隐藏旧选项但不迁移配置，不生成已保存状态条"
     },
     {
       "file": "CurveBackend.java",
@@ -208,6 +238,11 @@
       "purpose": "导出后确认打开系统分享，保留原始归档与失败提示"
     },
     {
+      "file": "DimAodCompatibility.java",
+      "layer": "adapters",
+      "purpose": "按实际DIM/AOD接口与当前调用原因协调主屏熄屏前降亮，不改息屏、采样和节点所有权"
+    },
+    {
       "file": "ElasticScrollView.java",
       "layer": "presentation",
       "purpose": "统一隐藏滚动指示器、越界阻尼回弹和生命周期清理"
@@ -270,7 +305,7 @@
     {
       "file": "ImmersiveLayout.java",
       "layer": "presentation",
-      "purpose": "系统栏、键盘与全屏教程的安全边距"
+      "purpose": "主页面/二级页统一透明系统栏，安全距离在二级滚动尾部保留，键盘与教学兄弟层边距独立"
     },
     {
       "file": "InjectionStatus.java",
@@ -466,6 +501,11 @@
       "file": "PersistentMemory.java",
       "layer": "orchestration",
       "purpose": "显示运行协调"
+    },
+    {
+      "file": "PhysicalCurveCalibration.java",
+      "layer": "adapters",
+      "purpose": "验证物理曲线超出标定范围时的双向样条/端点裁剪契约，保留中性原始对象与实际标定边界"
     },
     {
       "file": "PipelineHistory.java",
@@ -691,6 +731,11 @@
       "file": "ThanksFeed.java",
       "layer": "network",
       "purpose": "更新与名单网络客户端"
+    },
+    {
+      "file": "ThemeCurveOptions.java",
+      "layer": "configuration",
+      "purpose": "可选深色基础曲线的设备约束、配置选择与手动记忆作用域隔离"
     },
     {
       "file": "ThemePalette.java",

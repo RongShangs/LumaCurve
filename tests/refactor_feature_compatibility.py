@@ -18,10 +18,14 @@ public class FeatureCompatibilityTest{
  public static void main(String[] args)throws Exception{
   JSONObject r=new JSONObject().put("curve_backend","refactor");
   String[] memory={"curve","manual_memory","saved_curve","persistent_memory","memory_mode","memory_forever","memory_reset","memory_timeout"};
-  for(String id:memory){picked(id,r,"refactor");JSONObject row=enrich(id,"available",r);check(row.getJSONArray("routes").length()==4);}
+  for(String id:memory){picked(id,r,"refactor");JSONObject row=enrich(id,"available",r);check(row.getJSONArray("routes").length()==5);}
   r.put("curve_route","refactor_coefficients");picked("curve",r,"refactor_coefficients");check(selected(enrich("persistent_memory","unsupported",r)).isEmpty());r.put("curve_route","unknown");check(selected(enrich("curve","available",r)).isEmpty());r.remove("curve_route");
   r.put("curve_backend","physical_mapping").put("physical_mapper_class","com.android.server.display.MiuiPhysicalBrightnessMappingStrategy");for(String id:memory)picked(id,r,"miui_physical");
   r.put("physical_mapper_class","com.android.server.display.BrightnessMappingStrategy$PhysicalMappingStrategy");for(String id:memory)picked(id,r,"aosp_physical");
+  r.put("physical_baseline_route","direct");picked("curve",r,"aosp_physical");
+  r.put("physical_baseline_route","aosp_physical_clamped").put("physical_original_min_nit",4.2).put("physical_original_max_nit",1000).put("physical_calibration_min_nit",1).put("physical_calibration_max_nit",550);for(String id:memory)picked(id,r,"aosp_physical_clamped");
+  check(enrich("curve","available",r).getString("evidence").contains("550"));check(enrich("curve","available",r).getString("evidence").contains("1000"));
+  r.put("physical_baseline_route","unknown");check(selected(enrich("curve","available",r)).isEmpty());r.remove("physical_baseline_route");
   r.remove("physical_mapper_class");check(selected(enrich("curve","available",r)).isEmpty());check(enrich("curve","available",r).getString("route_name").contains("未确认"));r.put("curve_backend","unknown");check(selected(enrich("curve","available",r)).isEmpty());
   check(selected(enrich("main_sensor","available",r)).isEmpty());
   r.put("main_input_compatibility",new JSONObject().put("profile","oem_selected_secondary").put("source","automatic_brightness_controller").put("sensor_name","selected").put("sensor_string_type","xiaomi.sensor.light_secondary"));picked("main_sensor",r,"oem_selected_secondary");
@@ -68,6 +72,8 @@ public class FeatureCompatibilityTest{
   check(originalRuntime.equals(r.toString())&&originalRoot.equals(report.toString())&&originalApp.equals(app.toString()));
   combined.getJSONObject(0).put("state","mutated");check(originalRuntime.equals(r.toString()));
   check(FeatureCompatibility.combine(null,null,null).length()==0);
+  JSONObject slider=new JSONObject().put("kind","coordinate_v2").put("calibration_profile","coordinate_v2_calibrated");r.put("control_center_slider",slider);picked("control_center_slider",r,"coordinate_v2_calibrated");check(enrich("control_center_slider","available",r).getString("evidence").contains("coordinate_v2_calibrated"));
+  for(String state:new String[]{"pending","unsupported","inactive"})check(selected(enrich("control_center_slider",state,r)).isEmpty());slider.put("calibration_profile","unknown");check(selected(enrich("control_center_slider","available",r)).isEmpty());slider.remove("calibration_profile");picked("control_center_slider",r,"coordinate_v2");
   JSONObject rootSettings=row("root_settings","available").put("settings_route","cmd_settings").put("settings_attempts",new JSONArray().put(new JSONObject().put("id","external_provider").put("readable",false).put("detail","provider denied")));
   JSONObject rootSettingsRow=FeatureCompatibility.annotate(new JSONObject().put("features",new JSONArray().put(rootSettings)),r,"root").getJSONArray("features").getJSONObject(0);check(selected(rootSettingsRow).contains("cmd_settings"));JSONArray rootRoutes=rootSettingsRow.getJSONArray("routes");check(rootRoutes.length()==3);check(rootRoutes.getJSONObject(0).getString("reason").equals("provider denied"));check(rootRoutes.getJSONObject(2).getString("reason").contains("没有试用"));
   JSONObject alt=row("root_storage","available").put("workspace_route","root_temporary_storage");check(selected(FeatureCompatibility.annotate(new JSONObject().put("features",new JSONArray().put(alt)),r,"root").getJSONArray("features").getJSONObject(0)).contains("root_temporary_storage"));

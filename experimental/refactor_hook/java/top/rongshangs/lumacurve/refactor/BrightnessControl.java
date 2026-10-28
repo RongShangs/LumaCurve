@@ -137,7 +137,7 @@ final class BrightnessControl implements SensorEventListener {
     String rawPhysicalId="";boolean rawWasAuto,rawPaused,rawConfirmed,rawScreenOff;int rawTarget=-1;long rawLeaseUntil,rawBlockedWrites;final Runnable rawRenew=()->renewRaw();
     boolean unlocked(){try{android.app.KeyguardManager keyguard=(android.app.KeyguardManager)s.context.getSystemService(Context.KEYGUARD_SERVICE);return keyguard!=null&&!keyguard.isKeyguardLocked();}catch(Throwable missing){return false;}}
     boolean rawIdentityCurrent(){if(rawPhysicalId.isEmpty())return true;try{return rawPhysicalId.equals(HookEntry.get(HookEntry.get(s.owner,"mDisplayPowerController"),"mUniqueDisplayId"));}catch(Throwable missing){return false;}}
-    boolean rawOutputBlocked(float value){return rawIdentityCurrent()&&owner.equals("raw_panel")&&rawConfirmed&&!rawPaused&&!rawScreenOff&&Float.isFinite(value)&&value>0&&rawTarget>=10&&SystemClock.uptimeMillis()<rawLeaseUntil&&enabled()&&!auto()&&awake()&&unlocked();}
+    boolean rawOutputBlocked(float value){return rawIdentityCurrent()&&owner.equals("raw_panel")&&rawConfirmed&&(!session.startsWith("cc_")||Boolean.FALSE.equals(s.hdrActive())&&s.thermalSeverity>=0&&s.thermalSeverity<3)&&!rawPaused&&!rawScreenOff&&Float.isFinite(value)&&value>0&&rawTarget>=10&&SystemClock.uptimeMillis()<rawLeaseUntil&&enabled()&&!auto()&&awake()&&unlocked();}
     void screenOn(){if(screenCleanupQueued){s.handler.removeCallbacks(screenCleanup);screenCleanup.run();}if(!registered&&!s.closed)start();if(!options.manualApps.isEmpty())ForegroundApps.attach(this);if(owner.equals("raw_panel")){rawScreenOff=false;renewRaw();}else tick();}
     BrightnessControl(HookRuntime state){
         s=state;schedule=new DarkLockSchedule(s.owner.getClass().getClassLoader(),s.handler,()->{if(!s.closed){tick();s.queueControlPublish();}});timer=()->tick();snapshot=()->{try{
@@ -197,7 +197,7 @@ final class BrightnessControl implements SensorEventListener {
         }catch(Throwable failure){unregisterObservers();fail(failure);}
     }
     void configure(BrightnessControlOptions next){
-        if(!options.same(next))relinquish("settings_changed",true);
+        if(!options.sameOwnership(next))relinquish("settings_changed",true);
         if(next.manualApps.isEmpty()){appExemptions.clear();appSuppressionPending=false;syncApplicationSuppression();}
         options=next;failed=false;error="";if(!registered)start();try{s.memoryModeKnown(auto());}catch(Throwable unavailable){s.log("记忆保持等待模式状态就绪");}tick();
         if(options.manualApps.isEmpty())ForegroundApps.detach(this);else ForegroundApps.attach(this);
@@ -318,6 +318,7 @@ final class BrightnessControl implements SensorEventListener {
         try{
             if(!rawIdentityCurrent()){relinquish("fold_display_changed",true);return;}
             if(!enabled()||auto()){relinquish("raw_mode_changed",false);return;}
+            if(session.startsWith("cc_")&&(!Boolean.FALSE.equals(s.hdrActive())||s.thermalSeverity<0||s.thermalSeverity>=3)){relinquish("raw_protection",false);return;}
             if(!RawPanelLease.healthy(session))throw new IllegalStateException("主屏节点守护已退出");
             boolean paused=rawScreenOff||!awake()||!unlocked(),changed=rawPaused!=paused;
             rawPaused=paused;reason=paused?"raw_screen_paused":"manual_panel";writeRawLease(!paused);
@@ -333,6 +334,7 @@ final class BrightnessControl implements SensorEventListener {
         // ownership before relinquishing it, so a failed raw transaction can recover.
         boolean wasAuto=owner.equals("raw_panel")?rawWasAuto:owner.equals("dark")||owner.equals("app")||auto();
         s.outdoorNode.release();if(!owner.equals("raw_panel"))relinquish("raw_panel",false);
+        if(token.startsWith("cc_"))suppressApplication();
         busy=true;
         try{
             mark(new JSONObject().put("owner","raw_panel").put("user",0).put("was_auto",wasAuto).put("session",token).toString());

@@ -160,10 +160,14 @@ public class ConfigHostTest{
    scheduledRead=ConfigurationFile.read(scheduled.toString(),s,c);check(scheduledRead.options.getBoolean("dark_lock_sunset_only")==sunset&&!scheduledRead.options.getBoolean("dark_lock_enabled"));
   }
   JSONObject malformedSchedule=clone(file);malformedSchedule.getJSONObject("options").put("dark_lock_sunset_only",1);bad(malformedSchedule,s,c);
+  ThemeCurveOptions theme=new ThemeCurveOptions();theme.enabled=true;theme.factors=new float[]{1,.8f,.9f,1};JSONObject themed=clone(c);theme.put(themed);JSONObject themedFile=ConfigurationFile.export(themed,s,false,2,true);
+  ConfigurationFile.Imported themedRead=ConfigurationFile.read(themedFile.toString(),s,c);check(ThemeCurveOptions.parse(themedRead.options).enabled&&ThemeCurveOptions.parse(themedRead.options).factors[1]==.8f);check(java.util.Arrays.equals(CurvePlan.factors(themedRead.options.getString("factors")),CurvePlan.factors(c.getString("factors"))));
+  themedRead=ConfigurationFile.read(new JSONObject(themedFile.toString()).put("baseline_id","foreign").toString(),s,c);check(!ThemeCurveOptions.parse(themedRead.options).enabled);check(!ThemeCurveOptions.parse(ConfigurationFile.read(file.toString(),s,c).options).enabled);
+  theme.enabled=false;theme.put(themed);themedRead=ConfigurationFile.read(ConfigurationFile.export(themed,s,false,2,true).toString(),s,c);check(!ThemeCurveOptions.parse(themedRead.options).enabled&&ThemeCurveOptions.parse(themedRead.options).factors[1]==.8f);
   System.out.println("Configuration migration: "+cases+" cases PASS; cross-version settings and curve identity, Android not tested");
  }
 }''',encoding='utf-8')
 classes=O/'classes';classes.mkdir(exist_ok=True)
-names=['SceneOptions','BrightnessControlOptions','ConfigurationFile','SavedCurve','CurvePlan','AdvancedOptions','AdvancedPolicy','OutdoorNodeTarget','OutdoorOptions','ThermalPolicy','MemoryPolicy','MemoryOptions','DelayPolicy','LowLightPolicy','LowLightThresholds','LowLightAssistGate','SettingsPresets','AppBuild']
+names=['SceneOptions','BrightnessControlOptions','ConfigurationFile','SavedCurve','ThemeCurveOptions','CurvePlan','AdvancedOptions','AdvancedPolicy','OutdoorNodeTarget','OutdoorOptions','ThermalPolicy','MemoryPolicy','MemoryOptions','DelayPolicy','LowLightPolicy','LowLightThresholds','LowLightAssistGate','SettingsPresets','AppBuild']
 subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(J),'-d',str(classes),*[str(S/(n+'.java')) for n in names],str(package/'RootControl.java'),str(package/'ConfigHostTest.java')],check=True)
 subprocess.run(['java','-cp',str(classes)+';'+str(J),'top.rongshangs.lumacurve.refactor.ConfigHostTest'],check=True)

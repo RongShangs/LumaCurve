@@ -23,6 +23,7 @@ final class RuntimeFeatureChecks {
         checkedHbm=null;
         FeatureSelfCheck f=new FeatureSelfCheck();
         f.check("curve","基础曲线",null,false,()->{new CurvePlan(s.kernel.factoryLux,s.kernel.factoryNit,s.kernel.min,s.kernel.max,new float[]{1,1,1,1});return true;});
+        f.check("dim_aod","熄屏前降亮协调",null,DimAodCompatibility.matched(s.owner.getClass()),()->DimAodCompatibility.supported(s.owner));
         f.check("main_sensor","主光感",null,true,()->sensor(false));
         boolean missingAssist=assistAbsent();
         if(missingAssist)f.inactive("assist_sensor","辅助光感",null,"当前系统未接入辅助光感，沿用主光感输入；不能据此认定硬件不存在。其他功能独立检查，用户设置保留。");
@@ -37,7 +38,12 @@ final class RuntimeFeatureChecks {
         f.check("dark_lock","暗光锁定","dark_lock_supported",true,()->s.receiverRegistered&&s.brightnessControl.available()&&darkSensors());
         f.check("dark_lock_schedule","日落后暗光锁定","dark_lock_schedule_supported",true,()->DarkLockSchedule.supported(s.owner.getClass().getClassLoader()));
         f.check("manual_panel","主屏手动亮度","manual_panel_supported",true,()->s.receiverRegistered&&RawPanelOutputHooks.supports(s.owner.getClass()));
-        f.check("control_center_slider","控制中心节点映射","control_center_slider_supported",true,()->s.receiverRegistered&&s.controlCenter.supported());
+        f.check("control_center_slider","控制中心节点映射","control_center_slider_supported",s.controlCenter.waiting(),()->s.receiverRegistered&&s.controlCenter.supported());
+        f.check("control_center_raw","控制中心完整节点控制","control_center_raw_supported",s.controlCenter.waiting()&&s.controlCenter.nodes.registered,()->s.receiverRegistered&&s.controlCenter.nodes.supported());
+        f.check("control_center_partition","控制中心分区节点控制","control_center_partition_supported",s.controlCenter.waiting()&&s.controlCenter.nodes.registered,()->s.receiverRegistered&&s.controlCenter.nodes.supported()&&s.controlCenter.partition!=null);
+        if(!s.controlCenter.partitionError.isEmpty())f.explain("control_center_partition",s.controlCenter.partitionError);
+        if(!s.controlCenter.nodes.error.isEmpty())f.explain("control_center_raw",s.controlCenter.nodes.error);
+        if(!s.controlCenter.error.isEmpty())f.explain("control_center_slider",s.controlCenter.error);
         f.check("apps","暂停自动亮度名单","app_auto_supported",true,()->s.receiverRegistered&&ForegroundApps.supported());
         f.check("thermal","温控调整","thermal_supported",true,()->s.receiverRegistered&&s.thermalRegistered&&HookEntry.thermalSupported.contains(s.owner.getClass()));
         f.check("response","变化确认","response_supported",false,()->ResponseTuning.supported(s.owner));

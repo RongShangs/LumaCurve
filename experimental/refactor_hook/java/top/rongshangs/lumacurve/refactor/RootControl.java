@@ -155,8 +155,9 @@ public final class RootControl implements AutoCloseable {
         String previous=settings.get(CONFIG);JSONObject stored=null;
         if(previous!=null&&!previous.equals("null"))try{stored=new JSONObject(previous);}catch(JSONException invalid){/* Invalid storage cannot authorize a dormant preference. */}
         JSONObject validation=ConfigurationCompatibility.submissionValidation(options,state,stored,Build.FINGERPRINT);
+        if(options.has("captured_theme_dark")&&options.getBoolean("captured_theme_dark")!=state.optBoolean("theme_curve_dark"))throw new IOException("深浅色模式已变化，请重新保存当前曲线");
         String factors=options.getString("factors");
-        OutdoorNodeRoot.annotate(state);BrightnessControlOptions controls=BrightnessControlOptions.parseStored(options);controls.verify(state);
+        OutdoorNodeRoot.annotate(state);BrightnessControlOptions controls=BrightnessControlOptions.parseStored(options);BrightnessControlOptions.parseStored(validation).verify(state);
         SceneOptions sceneOptions=SceneOptions.parse(options);sceneOptions.verify(state);
         AdvancedOptions advanced=AdvancedOptions.parse(options);AdvancedOptions.parse(validation).verify(state);
         OutdoorOptions outdoor=OutdoorOptions.parse(options);if(outdoor.nodeBoost&&state.optBoolean("outdoor_node_supported"))outdoor.nodeTarget=OutdoorNodeTarget.stored(outdoor.nodeTarget,state.optInt("outdoor_node_maximum"));OutdoorOptions.parse(ConfigurationCompatibility.submissionValidation(options,state,stored,Build.FINGERPRINT)).verify(state);
@@ -182,6 +183,8 @@ public final class RootControl implements AutoCloseable {
         if(saved!=null)saved.verifyBackend(state.optString("curve_backend"));
         SavedCurve.plan(saved,numbers(state.getJSONArray("factory_lux")),numbers(state.getJSONArray("factory_logical_nit")),
             (float)state.getDouble("min_logical_nit"),(float)state.getDouble("max_logical_nit"),f,floor);
+        ThemeCurveOptions theme=ThemeCurveOptions.parse(options);
+        theme.verify(state.optString("curve_backend"),numbers(state.getJSONArray("factory_lux")),numbers(state.getJSONArray("factory_logical_nit")),(float)state.getDouble("min_logical_nit"),(float)state.getDouble("max_logical_nit"));
         boolean wasActive=state.optString("phase").equals("active");
         String revision=UUID.randomUUID().toString();
         JSONObject config=new JSONObject().put("schema",1).put("enabled",true).put("revision",revision)
@@ -194,8 +197,11 @@ public final class RootControl implements AutoCloseable {
         lowThresholds.put(config);
         assistGate.put(config);
         sceneOptions.put(config);advanced.put(config);outdoor.put(config);controls.put(config);config.put("curve_floor_nit",floor);
-        if(controls.nodeSliderMode>0){JSONObject primary=NativePanelRoot.status();if(!primary.optBoolean("supported")||!state.optBoolean("control_center_slider_supported"))throw new IOException("主屏节点或亮度坐标转换尚未就绪");config.put("control_center_node_maximum",primary.getInt("maximum")).put("control_center_node_path",primary.getString("canonical_path"));}
-        if(saved!=null)saved.put(config);
+        if(controls.nodeSliderMode>0){
+            if(validation.optInt("control_center_node_mode")>0){ControlCenterRoot.captureBinding(config,state,stored,controls.nodeSliderMode);}
+            else if(stored!=null){if(stored.has("control_center_node_maximum"))config.put("control_center_node_maximum",stored.get("control_center_node_maximum"));if(stored.has("control_center_node_path"))config.put("control_center_node_path",stored.get("control_center_node_path"));}
+        }
+        if(saved!=null)saved.put(config);theme.put(config);
         if(options.has("reset_anchors")){String reset=options.getString("reset_anchors");if(!reset.matches("[A-Za-z0-9_-]{1,80}"))throw new IOException("记忆清除标识无效");config.put("reset_anchors",reset);}
         if(config.toString().getBytes(StandardCharsets.UTF_8).length>28000)throw new IOException("配置超过安全保存范围，请减少应用名单或曲线节点");
         try {
@@ -240,6 +246,15 @@ public final class RootControl implements AutoCloseable {
         if(connected && !waitFor(revision,false))throw new IOException("关闭请求已保存，但系统尚未确认恢复；请重启，暂不恢复旧引擎");
         if(connected)resumeOld();
         return new JSONObject().put("ok",true).put("message",connected?"已恢复官方基础曲线，并恢复由本应用暂停的旧模块":"关闭请求已保存；请重启后再点停用，确认恢复并解除旧模块暂停");
+    }
+    JSONObject restoreDefaults()throws Exception {
+        if(live()==null)throw new IOException("请先连接亮度引擎，确认恢复后才会清除本地草稿");
+        if(!settings.put(ControlCenterRoot.PROFILE,null))throw new IOException("控制中心映射暂停失败");
+        OutdoorNodeRoot.stop();NativePanelRoot.stop();
+        String revision=UUID.randomUUID().toString();JSONObject disabled=new JSONObject().put("schema",1).put("enabled",false).put("revision",revision).put("restore_system_defaults",true).put("reset_anchors",UUID.randomUUID().toString());
+        if(!settings.put(CONFIG,disabled.toString())||!waitFor(revision,false))throw new IOException("恢复请求已保存，系统尚未确认；请刷新后重试，本地设置仍保留");
+        // Deliberately do not resume obsolete third-party brightness modules.
+        return new JSONObject().put("ok",true).put("message","已恢复系统默认亮度设置，并清除当前与已保存的手动记忆");
     }
     String export()throws Exception {
         String name="LumaCurve-analysis-"+new SimpleDateFormat("yyyyMMdd-HHmmss",Locale.ROOT).format(new Date())+"-"+UUID.randomUUID().toString().substring(0,6)+".zip";
@@ -376,10 +391,14 @@ public final class RootControl implements AutoCloseable {
                 JSONObject state=refreshedLive(true);if(state==null)throw new IOException("尚未连接当前系统曲线");long age=android.os.SystemClock.elapsedRealtime()-state.optLong("elapsed_ms",-1);if(age<0||age>15000)throw new IOException("曲线状态已过期，请刷新后重试");SavedCurve curve=SavedCurve.capture(state);
                 String raw=settings.get(CONFIG);if(raw==null)throw new IOException("请先保存并应用当前设置");JSONObject options=new JSONObject(raw);
                 if(!options.optBoolean("enabled")||!state.optString("revision").equals(options.optString("revision")))throw new IOException("配置正在变化，请刷新后重试");
-                curve.put(options);options.put("factors","1.0,1.0,1.0,1.0").put("curve_floor_nit",0).put("reset_anchors",UUID.randomUUID().toString());
+                ThemeCurveOptions theme=ThemeCurveOptions.parse(options);
+                if(theme.enabled&&state.optBoolean("theme_curve_dark")){theme.saved=curve;theme.factors=new float[]{1,1,1,1};theme.floor=0;theme.put(options);}
+                else{curve.put(options);options.put("factors","1.0,1.0,1.0,1.0").put("curve_floor_nit",0);}
+                options.put("captured_theme_dark",state.optBoolean("theme_curve_dark")).put("reset_anchors",UUID.randomUUID().toString());
                 JSONObject result=apply(Base64.getEncoder().encodeToString(options.toString().getBytes(StandardCharsets.UTF_8)));
                 result.put("message","已将当前手动记忆曲线保存为基础曲线，手动记忆可继续学习");return result;
             }
+            if(command.equals("restore-defaults"))return restoreDefaults();
             if(command.equals("stop"))return stop();
             if(command.equals("reset-memory")){
                 JSONObject state=live();if(state==null||!state.has("factory_lux"))throw new IOException("尚未连接兼容的系统曲线");

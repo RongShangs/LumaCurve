@@ -1,6 +1,6 @@
 """Verify observer parsing, restart detection, bounded output and read-only calls."""
 from pathlib import Path
-from tempfile import TemporaryDirectory
+from workspace_scratch import scratch_directory
 import importlib.util
 import json
 import subprocess
@@ -28,7 +28,7 @@ check(module.process_stat(stat(12, 13, 2)) == {'cpu_ticks': 25, 'start_ticks': 2
 zero = module.summarize({'assist_fast_lux': 0, 'assist_valid': True,
                          'system_scene': {'night_driving': False, 'private': 'omit'}})
 check(zero['assist_fast_lux'] == 0 and zero['assist_valid'] and zero['scene']['night_driving'] is False and 'private' not in zero['scene'])
-with TemporaryDirectory() as directory:
+with scratch_directory(prefix="observer-") as directory:
     observer = module.Observer('adb', None, directory)
     calls = []
     uptime, cpu, start, pid = 10, 100, 2, 42

@@ -1,12 +1,13 @@
 """Exercise production node discovery against filesystem fixtures and native record parsing."""
 from pathlib import Path
-import json, os, subprocess, tempfile
+from workspace_scratch import make_scratch
+import json, os, subprocess
 import re
 
 R=Path(__file__).resolve().parents[1]
 S=R/'experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor'
 O=R/'build/panel-node-tests';O.mkdir(parents=True,exist_ok=True)
-F=Path(tempfile.mkdtemp(prefix='fixtures-',dir=O))
+F=Path(make_scratch(prefix='fixtures-',dir=O))
 J=R/'build/refactor-diagnostics/json-20240303.jar'
 fixtures=[]
 def case(name,nodes,expected,selected=None):

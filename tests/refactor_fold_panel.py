@@ -1,9 +1,10 @@
 """Run actual fold resolver and native gates against filesystem fixtures, not a device."""
 from pathlib import Path
-import os,subprocess,tempfile
+from workspace_scratch import make_scratch
+import os,subprocess
 R=Path(__file__).resolve().parents[1];S=R/'experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor'
 O=R/'build/fold-panel-tests';O.mkdir(exist_ok=True)
-F=Path(tempfile.mkdtemp(prefix='sys-',dir=O));J=R/'build/refactor-diagnostics/json-20240303.jar'
+F=Path(make_scratch(prefix='sys-',dir=O));J=R/'build/refactor-diagnostics/json-20240303.jar'
 for port in [0,1]:
  device=F/f'devices/controller/backlight/panel{port}-backlight';device.mkdir(parents=True)
  (device/'brightness').write_text('100');(device/'max_brightness').write_text('16383')

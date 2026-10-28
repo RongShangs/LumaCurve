@@ -11,6 +11,7 @@ import java.util.*;
 import java.text.SimpleDateFormat;
 
 final class HookRuntime {
+    final DimAodCompatibility.Counters dimAod=new DimAodCompatibility.Counters();
     final ControlCenterEngine controlCenter;
     static final String BUILD=AppBuild.BUILD,CONFIG="lumacurve_refactor_config_v1",STATUS="lumacurve_refactor_status_v1",REFRESH="lumacurve_refactor_refresh_v1";
     final Object owner; final CurveBackend kernel; final Handler handler; final Context context;
@@ -66,6 +67,7 @@ final class HookRuntime {
         power=(PowerManager)context.getSystemService(Context.POWER_SERVICE);
         thermalListener=level->{if(closed)return;thermalSeverity=level;environmentChanged();};
         batteryListener=new BroadcastReceiver(){public void onReceive(Context c,Intent intent){if(closed)return;
+            if(Intent.ACTION_CONFIGURATION_CHANGED.equals(intent.getAction())){themeChanged();return;}
             if(Intent.ACTION_SCREEN_OFF.equals(intent.getAction())){outdoorNode.release();persistentMemory.screenOff();assistGate.reset();brightnessControl.screenOff();return;}
             if(Intent.ACTION_SCREEN_ON.equals(intent.getAction())){persistentMemory.screenOn();handler.post(brightnessControl::screenOn);return;}
             if(Intent.ACTION_TIME_CHANGED.equals(intent.getAction())||Intent.ACTION_TIMEZONE_CHANGED.equals(intent.getAction())){brightnessControl.schedule.refresh();brightnessControl.tick();return;}
@@ -83,12 +85,13 @@ final class HookRuntime {
     final AssistSensorCompat assistCompat=new AssistSensorCompat(this);
     void start(){
         try{
+            DimAodCompatibility.install(owner.getClass());
             refreshUserIdentity();memoryLifecycle.attach();brightnessControl.start();controlCenter.start();
             lastReset=Settings.Global.getString(context.getContentResolver(),"lumacurve_manual_memory_reset_v1");if(lastReset==null)lastReset="";
             context.getContentResolver().registerContentObserver(Settings.Global.getUriFor(CONFIG),false,observer);
             context.getContentResolver().registerContentObserver(Settings.Global.getUriFor(REFRESH),false,refresh);
             try{if(power!=null){thermalSeverity=power.getCurrentThermalStatus();power.addThermalStatusListener(command->handler.post(command),thermalListener);thermalRegistered=true;}}catch(Throwable unavailable){thermalSeverity=-1;log("温控事件未就绪，其他功能继续检查："+unavailable.getClass().getSimpleName());}
-            IntentFilter batteryAndScreen=new IntentFilter(Intent.ACTION_BATTERY_CHANGED);batteryAndScreen.addAction(Intent.ACTION_SCREEN_OFF);batteryAndScreen.addAction(Intent.ACTION_SCREEN_ON);batteryAndScreen.addAction(Intent.ACTION_USER_PRESENT);batteryAndScreen.addAction(Intent.ACTION_TIME_CHANGED);batteryAndScreen.addAction(Intent.ACTION_TIMEZONE_CHANGED);
+            IntentFilter batteryAndScreen=new IntentFilter(Intent.ACTION_BATTERY_CHANGED);batteryAndScreen.addAction(Intent.ACTION_SCREEN_OFF);batteryAndScreen.addAction(Intent.ACTION_SCREEN_ON);batteryAndScreen.addAction(Intent.ACTION_USER_PRESENT);batteryAndScreen.addAction(Intent.ACTION_TIME_CHANGED);batteryAndScreen.addAction(Intent.ACTION_TIMEZONE_CHANGED);batteryAndScreen.addAction(Intent.ACTION_CONFIGURATION_CHANGED);
             try{Intent initial=context.registerReceiver(batteryListener,batteryAndScreen,null,handler,Context.RECEIVER_EXPORTED);receiverRegistered=true;if(initial!=null)batteryListener.onReceive(context,initial);}catch(Throwable unavailable){log("电池与屏幕事件未就绪，暂停依赖该事件的控制："+unavailable.getClass().getSimpleName());}
             InjectionStatus.write(context,"attached","已读取设备本地曲线："+kernel.name());
             log("系统曲线已连接："+kernel.name()+"；使用此设备本地基准");reload();scheduleReadinessChecks();
@@ -146,6 +149,7 @@ final class HookRuntime {
         if(closed||changing)return;
         try{String current=Settings.Global.getString(context.getContentResolver(),CONFIG);
             if(!configProcessed||!Objects.equals(current,processedConfig))reload();
+            else if(themeCurveEnabled&&themeCurveDark!=systemDark())themeChanged();
             else publishAcknowledgement();
         }catch(Throwable error){XposedBridge.log("HyperLux configuration refresh: "+error);}
     }
@@ -165,6 +169,10 @@ final class HookRuntime {
         final long generation=++selfCheckGeneration;
         for(long delay:new long[]{1000,5000,15000})handler.postDelayed(()->{if(!closed&&generation==selfCheckGeneration&&featureChecks.pending())checkFeatures("startup-readiness");},delay);
     }
+    boolean themeCurveEnabled,themeCurveDark;
+    String themeMemoryScope="";
+    boolean systemDark(){return (context.getResources().getConfiguration().uiMode&android.content.res.Configuration.UI_MODE_NIGHT_MASK)==android.content.res.Configuration.UI_MODE_NIGHT_YES;}
+    void themeChanged(){if(!closed&&themeCurveEnabled&&themeCurveDark!=systemDark()){configProcessed=false;reload();}}
     void reload(){
         if(closed||changing)return;changing=true;
         try{
@@ -207,11 +215,18 @@ final class HookRuntime {
                     LowLightThresholds nextLowThresholds=LowLightThresholds.parse(config);nextLowThresholds.verify(config.optBoolean("low_light_stability",false),AdvancedTuning.supported(0,this));
                     LowLightAssistGate nextAssistGate=new LowLightAssistGate();nextAssistGate.configure(config);if(config.optBoolean("low_light_stability",false)&&nextAssistGate.enabled&&!LowLightAssistEvidence.supported(this))throw new IllegalArgumentException("辅助光感暗光闸门接口暂未兼容");
                     if(thermal&&!HookEntry.thermalSupported.contains(owner.getClass()))throw new IllegalArgumentException("此固件的温控亮度接口尚未兼容");
-                    float[] factors=CurvePlan.factors(config.getString("factors"));
-                    float floor=CurvePlan.floor(config.has("curve_floor_nit")?config.opt("curve_floor_nit"):null);
-                    SavedCurve nextBase=SavedCurve.parse(config);if(nextBase!=null)nextBase.verifyBackend(kernel.name());CurvePlan nextPlan=SavedCurve.plan(nextBase,kernel.factoryLux,kernel.factoryNit,kernel.min,kernel.max,factors,floor);
+                    ThemeCurveOptions theme=ThemeCurveOptions.parse(config);
+                    theme.verify(kernel.name(),kernel.factoryLux,kernel.factoryNit,kernel.min,kernel.max);
+                    boolean nextDark=systemDark(),themeSwitch=themeCurveEnabled&&theme.enabled&&themeCurveDark!=nextDark;
+                    JSONObject selected=theme.select(config,nextDark);
+                    float[] factors=CurvePlan.factors(selected.getString("factors"));
+                    float floor=CurvePlan.floor(selected.has("curve_floor_nit")?selected.opt("curve_floor_nit"):null);
+                    SavedCurve nextBase=SavedCurve.parse(selected);if(nextBase!=null)nextBase.verifyBackend(kernel.name());CurvePlan nextPlan=SavedCurve.plan(nextBase,kernel.factoryLux,kernel.factoryNit,kernel.min,kernel.max,factors,floor);
                     boolean curveChanged=kernel.plan()==null||!SavedCurve.same(kernel.savedBase,nextBase)||!Arrays.equals(kernel.plan().nits(),nextPlan.nits())||!Arrays.equals(kernel.plan().lux(),nextPlan.lux());
+                    // Clear queued archive restores before changing scope, including permanent retention.
+                    if(themeSwitch){persistentMemory.clear();kernel.clearMemory();memoryPolicy.reset();}
                     if(curveChanged)kernel.configure(factors,floor,nextBase);
+                    themeCurveEnabled=theme.enabled;themeCurveDark=nextDark;themeMemoryScope=ThemeCurveOptions.scope(theme.enabled,nextDark);
                     AdvancedTuning.restoreAnimation(this);advanced=proposed;
                     boundUser=config.getInt("user_serial");thermalCeiling=ceiling;thermalEnabled=thermal;memoryStrength=strength;
                     if(memoryWindow!=memoryMs||memoryLuxRange!=memoryRange)memoryPolicy.configure(memoryMs,memoryRange);memoryWindow=memoryMs;memoryLuxRange=memoryRange;thermalCooling=cooling;thermalGate.configure(cooling);
@@ -228,9 +243,10 @@ final class HookRuntime {
                     if(kernel.name().equals("refactor"))kernel.reconcile();
                     if(compatibilityPaused.length()>0)message+="；已暂停不可用选项："+compatibilityPaused.toString();
                     persistentMemory.configure(memoryOptions,curveChanged);
+                    if(themeSwitch){persistentMemory.clear();log("深浅色模式已切换，清除手动记忆并使用"+(nextDark?"深色模式基础曲线":"基础曲线"));}
                     log(curveChanged?"曲线已应用，重新建立基础锚点":"设置已更新，保留当前手动锚点");
                 }else{
-                    if(kernel.plan()!=null)kernel.configure(null);disableOverrides();memoryStrength=1;phase="attached";message="已恢复官方曲线与温控策略";log(message);
+                    if(kernel.plan()!=null)kernel.configure(null);disableOverrides();if(config.optBoolean("restore_system_defaults"))persistentMemory.configure(new MemoryOptions(false,30),false);memoryStrength=1;phase="attached";message="已恢复官方曲线与温控策略";log(message);
                 }
                 String reset=config.optString("reset_anchors","");
                 if(!reset.isEmpty()&&!reset.equals(lastReset)){
@@ -269,7 +285,8 @@ final class HookRuntime {
         handler.post(()->{if(closed)return;try{kernel.configure(null);}catch(Throwable ignored){}
             phase="error";message="接入异常，已尝试恢复官方："+error;log(message);publish();faultPending=false;});
     }
-    void disableOverrides(){outdoorNode.release();scenes.stop();brightnessControl.stop();assistCompat.restore();assistGate.reset();outdoor.stop();thermalEnabled=false;responseEnabled=false;smallResponseEnabled=false;lowLightEnabled=false;memoryStrength=1;advanced=new AdvancedOptions();AdvancedTuning.restoreAnimation(this);AdvancedTuning.refreshThresholds(this);}
+    void disableOverrides(){
+        themeCurveEnabled=false;themeCurveDark=false;themeMemoryScope="";controlCenter.deactivate();outdoorNode.release();scenes.stop();brightnessControl.stop();assistCompat.restore();assistGate.reset();outdoor.stop();thermalEnabled=false;responseEnabled=false;smallResponseEnabled=false;lowLightEnabled=false;memoryStrength=1;advanced=new AdvancedOptions();AdvancedTuning.restoreAnimation(this);AdvancedTuning.refreshThresholds(this);}
     void memorySettingChanged(boolean automatic){persistentMemory.modeSettingChanged(automatic);}
     void memoryModeKnown(boolean automatic){persistentMemory.modeSettingKnown(automatic);}
     boolean onDisplayThread(){return !closed&&Looper.myLooper()==handler.getLooper();}
@@ -310,14 +327,14 @@ final class HookRuntime {
                 .put("factory_lux",array(kernel.factoryLux)).put("factory_logical_nit",array(kernel.factoryNit)).put("min_logical_nit",kernel.min).put("max_logical_nit",kernel.max)
                 .put("thermal_supported",HookEntry.thermalSupported.contains(owner.getClass())).put("thermal_relax",thermalEnabled)
                 .put("thermal_permitted",relaxThermal()).put("thermal_ceiling",thermalCeiling).put("thermal_severity",thermalSeverity)
-                .put("thermal_skipped",thermalSkipped).put("logs",new JSONArray(logs)).put("feature_self_check",featureChecks.report).put("main_input_compatibility",BrightnessSensorAccess.evidence(owner)).put("compatibility_paused",compatibilityPaused)
+                .put("thermal_skipped",thermalSkipped).put("logs",new JSONArray(logs)).put("feature_self_check",featureChecks.report).put("dim_aod_compatibility",DimAodCompatibility.status(this)).put("main_input_compatibility",BrightnessSensorAccess.evidence(owner)).put("compatibility_paused",compatibilityPaused)
                 .put("response_scene_profile",ResponseTuning.sceneProfile(owner));
             AdvancedTuning.capabilities((key,value)->status.put(key,value),this);JSONObject settings=new JSONObject();advanced.put(settings);status.put("advanced_options",settings)
                 .put("threshold_adjustments",thresholdAdjustments).put("assist_adjustments",assistAdjustments).put("animation_adjustments",animationAdjustments).put("sunlight_adjustments",sunlightAdjustments).put("touch_adjustments",touchAdjustments).put("delay_window_clamps",delayWindowClamps);
             if(lastAnimationSeconds>0)status.put("last_animation_seconds",lastAnimationSeconds);
             status.put("animation_compatibility_profile",AdvancedTuning.animationProfile(this));
             if(lastMainBrighten>=0)status.put("last_main_brighten_ms",lastMainBrighten);if(lastMainDarken>=0)status.put("last_main_darken_ms",lastMainDarken);if(lastMainSmall>=0)status.put("last_main_small_ms",lastMainSmall);status.put("last_main_extra_ms",lastMainExtra);
-            status.put("curve_backend",kernel.name()).put("curve_route",kernel.compatibilityRoute()).put("baseline_id",baselineId()).put("curve_coordinate",kernel.name().equals("refactor")?"logical_nit":"physical_nit")
+            status.put("theme_curve_enabled",themeCurveEnabled).put("theme_curve_dark",themeCurveEnabled&&themeCurveDark).put("base_curve_name",themeCurveEnabled&&themeCurveDark?"深色模式基础曲线":"基础曲线").put("curve_backend",kernel.name()).put("curve_route",kernel.compatibilityRoute()).put("baseline_id",baselineId()).put("curve_coordinate",kernel.name().equals("refactor")?"logical_nit":"physical_nit")
                 .put("factory_full_lux",array(kernel.fullLux())).put("factory_full_nit",array(kernel.fullNit()));
             if(kernel instanceof TraditionalAdapter)status.put("user_identity_source",HookEntry.currentUser.source()).put("user_identity_ready",kernel.integer("mUserSerial")>=0);
             status.put("memory_strength",memoryStrength).put("memory_events",memoryEvents);persistentMemory.put(status);

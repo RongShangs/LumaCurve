@@ -1,0 +1,67 @@
+"""Full node gestures: actual Java bridge, raw ownership and immutable legacy modes."""
+from pathlib import Path
+import subprocess
+R=Path(__file__).resolve().parents[1];S=R/'experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor';O=R/'build/refactor-brightness-control-tests';J=R/'build/refactor-diagnostics/json-20240303.jar'
+# Generate the same service doubles and run every old mode/lease regression first.
+subprocess.run(['python',str(R/'tests/refactor_brightness_control.py')],check=True)
+f=O/'NodeGestureTest.java'
+f.write_text(r'''package top.rongshangs.lumacurve.refactor;
+import android.os.*;import android.provider.Settings;import org.json.*;
+public class NodeGestureTest{
+ static int cases;static void check(boolean b){if(!b)throw new AssertionError("node case "+cases);cases++;}
+ static JSONObject request(ControlCenterNodes n,int target,String id)throws Exception{return n.generation().put("id",id).put("session","cc_test").put("target",target).put("elapsed",SystemClock.elapsedRealtime());}
+ static void send(ControlCenterNodes n,int target,String id)throws Exception{Settings.Global.putString(n.s.context.getContentResolver(),ControlCenterNodes.REQUEST,request(n,target,id).toString());}
+ static void rejects(JSONObject r,JSONObject g,long now,long auto)throws Exception{try{ControlCenterNodes.validate(r,g,now,auto);throw new AssertionError("accepted invalid request");}catch(IllegalArgumentException expected){cases++;}}
+ public static void main(String[] args)throws Exception{
+  for(int max:new int[]{255,4095,8191,16383,65535}){
+   check(ControlCenterMapping.target(1,max)==max);check(ControlCenterMapping.target(.5,max)==Math.round(max*.5));check(ControlCenterMapping.target(0,max)==10);
+   JSONObject g=new JSONObject().put("build",AppBuild.BUILD).put("pid",123).put("process_start","s").put("boot_count","1").put("revision","r").put("physical","panel-a").put("user_serial",0).put("maximum",max);
+   JSONObject r=new JSONObject(g.toString()).put("id","gesture").put("session","cc_test").put("target",max).put("elapsed",100);
+   check(ControlCenterNodes.validate(r,g,100,0)==max);
+   for(String key:new String[]{"build","process_start","boot_count","revision","physical"})rejects(new JSONObject(r.toString()).put(key,"stale"),g,100,0);
+   for(String key:new String[]{"pid","maximum","user_serial"})rejects(new JSONObject(r.toString()).put(key,-1),g,100,0);
+   for(double bad:new double[]{-1,0,9,max+1,max-.5})rejects(new JSONObject(r.toString()).put("target",bad),g,100,0);
+   rejects(new JSONObject(r.toString()).put("target","10"),g,100,0);rejects(new JSONObject(r.toString()).put("auto_epoch",1),new JSONObject(g.toString()).put("auto_epoch",2),100,100);rejects(r,g,99,0);rejects(r,g,3101,0);rejects(r,g,100,101);rejects(new JSONObject(r.toString()).put("session","legacy_v1"),g,100,0);
+  }
+  for(int mode=0;mode<=3;mode++){JSONObject input=new JSONObject().put("control_center_node_mode",mode);BrightnessControlOptions o=BrightnessControlOptions.parseStored(input);JSONObject saved=new JSONObject();o.put(saved);check(saved.getInt("control_center_node_mode")==mode);check(o.nodeSliderMode==mode);}
+  for(int mode=0;mode<=4;mode++){JSONObject input=new JSONObject().put("control_center_node_mode",mode).put("control_center_partition_maximum",12000).put("control_center_partition_restore_auto",false);String original=input.toString();BrightnessControlOptions o=BrightnessControlOptions.parseStored(input);JSONObject output=new JSONObject();o.put(output);check(output.getInt("control_center_partition_maximum")==12000&&output.getInt("control_center_node_mode")==mode&&!output.getBoolean("control_center_partition_restore_auto")&&input.toString().equals(original));BrightnessControlOptions other=BrightnessControlOptions.parseStored(output);other.partitionMaximum=16000;check(o.sameOwnership(other)&&!o.same(other));}
+  BrightnessControl c=BrightnessControlHostTest.controller();Settings.Global.values.put("boot_count","1");ControlCenterEngine e=new ControlCenterEngine(c.s);e.start();e.calibration=new JSONObject();e.configure(new JSONObject().put("enabled",true).put("revision","r").put("user_serial",0).put("control_center_node_mode",3).put("control_center_node_maximum",16383).put("control_center_node_path","primary"));c.options.nodeSliderMode=3;
+  check(c.auto()&&c.owner.equals("none"));SystemClock.now=100;send(e.nodes,16383,"first");check(!c.auto()&&c.owner.equals("raw_panel")&&c.rawTarget==16383&&RawPanelLease.target==16383&&c.rawPhysicalId.equals("panel-a"));e.nodes.confirm();check(c.rawConfirmed&&c.rawOutputBlocked(.2f));check(!c.rawOutputBlocked(0));
+  SystemClock.now=110;send(e.nodes,8192,"second");check(c.rawTarget==8192&&c.rawConfirmed&&RawPanelLease.target==8192);e.configure(new JSONObject().put("enabled",true).put("revision","updated").put("user_serial",0).put("control_center_node_mode",3).put("control_center_node_maximum",16383).put("control_center_node_path","primary"));check(c.owner.equals("raw_panel")&&!c.auto()&&c.rawTarget==8192&&c.rawConfirmed);
+  long count=e.nodes.accepted;e.nodes.request();check(e.nodes.accepted==count);
+  c.screenOff();e.status();check(!new JSONObject(c.s.stateWriter.last.get(ControlCenterEngine.TABLES)).getJSONObject("raw_control").getBoolean("active"));check(c.rawPaused&&RawPanelLease.active==0&&!c.auto());c.screenOn();check(!c.rawPaused&&RawPanelLease.active==1&&c.rawTarget==8192);
+  JSONObject stale=request(e.nodes,16383,"stale");SystemClock.now=120;Settings.System.putInt(c.s.context.getContentResolver(),"mode",1);check(c.owner.equals("none")&&c.auto()&&RawPanelLease.active==0&&!c.rawOutputBlocked(.2f));Settings.Global.putString(c.s.context.getContentResolver(),ControlCenterNodes.REQUEST,stale.toString());check(c.auto()&&c.owner.equals("none")&&e.nodes.rejected>0);
+  // Dark lock's normal manual-adjustment preference cannot retain the lock here.
+  c.claim("dark","dark",.2f);check(!c.auto()&&c.owner.equals("dark")&&!c.options.manualExit);SystemClock.now=130;send(e.nodes,16383,"dark_exit");check(c.owner.equals("raw_panel")&&!c.auto()&&c.rawTarget==16383);e.nodes.confirm();
+  c.s.owner.mDisplayPowerController.mUniqueDisplayId="panel-b";check(!c.rawOutputBlocked(.2f));c.renewRaw();check(c.owner.equals("none"));c.s.owner.mDisplayPowerController.mUniqueDisplayId="panel-a";
+  c.s.hdr=true;SystemClock.now=140;send(e.nodes,16383,"hdr");check(c.owner.equals("none"));c.s.hdr=false;c.s.thermalSeverity=3;send(e.nodes,16383,"thermal");check(c.owner.equals("none"));c.s.thermalSeverity=0;
+  c.options.nodeSliderMode=2;send(e.nodes,16383,"legacy_mode");check(c.owner.equals("none"));c.options.nodeSliderMode=3;send(e.nodes,16383,"active");check(c.owner.equals("raw_panel"));e.deactivate();check(c.owner.equals("none")&&RawPanelLease.active==0&&c.auto());
+  // Disabling native node capability never changes an existing saved preference.
+  BrightnessControlOptions old=BrightnessControlOptions.parseStored(new JSONObject().put("control_center_node_mode",2));old.verify(new JSONObject().put("control_center_slider_supported",true));check(old.nodeSliderMode==2);
+  // Both front ends replace the SAME raw_panel lease; disabling mapping cannot clear the other panel's ownership.
+  e.configure(new JSONObject().put("enabled",true).put("revision","r").put("user_serial",0).put("control_center_node_mode",3).put("control_center_node_maximum",16383).put("control_center_node_path","primary"));c.options.nodeSliderMode=3;SystemClock.now=200;send(e.nodes,16383,"cc_handover");check(c.owner.equals("raw_panel")&&RawPanelLease.token.equals("cc_test"));
+  check(BrightnessControlHostTest.command(c,"raw_begin","popup_session",2345).getBoolean("ok"));check(c.session.equals("popup_session")&&RawPanelLease.target==2345);e.nodes.deactivate();check(c.owner.equals("raw_panel")&&RawPanelLease.token.equals("popup_session"));
+  SystemClock.now=210;send(e.nodes,4095,"back_to_cc");check(c.session.equals("cc_test")&&RawPanelLease.target==4095);e.close();check(c.owner.equals("none")&&RawPanelLease.active==0&&c.auto());
+  c.close();
+  // The partitioned path never writes in the ordinary range, and requires a timely second-stroke proof.
+  c=BrightnessControlHostTest.controller();Settings.Global.values.put("boot_count","1");e=new ControlCenterEngine(c.s);e.start();ControlCenterEngine.IO.submit(()->{}).get();c.options.nodeSliderMode=4;e.configure(new JSONObject().put("enabled",true).put("revision","p").put("user_serial",0).put("control_center_node_mode",4).put("control_center_node_maximum",16383).put("control_center_node_path","primary"));SystemClock.now=100;send(e.nodes,16383,"no_confirmation");check(c.auto()&&c.owner.equals("none"));
+  JSONObject authorized=request(e.nodes,16383,"partition_enter").put("partition_since",0).put("partition_confirmed",50);Settings.Global.putString(c.s.context.getContentResolver(),ControlCenterNodes.REQUEST,authorized.toString());check(!c.auto()&&c.rawTarget==16383&&c.owner.equals("raw_panel"));
+  SystemClock.now=110;JSONObject release=request(e.nodes,2000,"partition_return_auto").put("action","release");Settings.Global.putString(c.s.context.getContentResolver(),ControlCenterNodes.REQUEST,release.toString());check(c.auto()&&c.owner.equals("none")&&RawPanelLease.active==0);
+  SystemClock.now=200;c.options.partitionRestoreAuto=false;authorized=request(e.nodes,16383,"partition_enter_manual").put("partition_since",100).put("partition_confirmed",150);Settings.Global.putString(c.s.context.getContentResolver(),ControlCenterNodes.REQUEST,authorized.toString());check(!c.auto()&&c.owner.equals("raw_panel"));SystemClock.now=210;release=request(e.nodes,2000,"partition_return_manual").put("action","release");Settings.Global.putString(c.s.context.getContentResolver(),ControlCenterNodes.REQUEST,release.toString());check(!c.auto()&&c.owner.equals("none")&&RawPanelLease.active==0);
+  JSONObject kept=new JSONObject();c.options.put(kept);check(!BrightnessControlOptions.parseStored(kept).partitionRestoreAuto&&BrightnessControlOptions.parseStored(kept).nodeSliderMode==4);check(new BrightnessControlOptions().partitionRestoreAuto);
+  // A fresh ordinary-range gesture can end the popup lease it actually observed, never a replacement session.
+  BrightnessControlHostTest.command(c,"raw_begin","popup_shared",5000);e.status();check(new JSONObject(c.s.stateWriter.last.get(ControlCenterEngine.TABLES)).getJSONObject("raw_control").getString("session").equals("popup_shared"));
+  SystemClock.now=220;release=request(e.nodes,2000,"popup_stale_return").put("action","release").put("previous_session","old_popup");Settings.Global.putString(c.s.context.getContentResolver(),ControlCenterNodes.REQUEST,release.toString());check(c.session.equals("popup_shared"));
+  SystemClock.now=230;release=request(e.nodes,2000,"popup_observed_return").put("action","release").put("previous_session","popup_shared");Settings.Global.putString(c.s.context.getContentResolver(),ControlCenterNodes.REQUEST,release.toString());check(c.owner.equals("none")&&!c.auto());
+  c.options.partitionMaximum=10000;e.partitionMaximum=10000;SystemClock.now=240;authorized=request(e.nodes,10001,"ceiling_reject").put("partition_since",200).put("partition_confirmed",220);Settings.Global.putString(c.s.context.getContentResolver(),ControlCenterNodes.REQUEST,authorized.toString());check(c.owner.equals("none"));authorized.put("id","ceiling_exact").put("target",10000);Settings.Global.putString(c.s.context.getContentResolver(),ControlCenterNodes.REQUEST,authorized.toString());check(c.rawTarget==10000);
+  e.nodes.deactivate(true);c.setAuto(true);e.calibration=new JSONObject().put("standard",ControlCenterCurve.sample(x->x).json());SystemClock.now=300;android.hardware.display.DisplayManagerGlobal.instance.info.brightness=.9f;
+  JSONObject high=request(e.nodes,9000,"automatic_high_takeover").put("partition_since",300).put("partition_confirmed",300).put("partition_automatic_high",true);Settings.Global.putString(c.s.context.getContentResolver(),ControlCenterNodes.REQUEST,high.toString());check(!c.auto()&&c.rawTarget==9000&&c.owner.equals("raw_panel"));
+  e.nodes.deactivate(true);c.setAuto(true);android.hardware.display.DisplayManagerGlobal.instance.info.brightness=.2f;high.put("id","stale_automatic_high");Settings.Global.putString(c.s.context.getContentResolver(),ControlCenterNodes.REQUEST,high.toString());check(c.auto()&&c.owner.equals("none"));
+  android.hardware.display.DisplayManagerGlobal.instance.info.brightness=.9f;c.setAuto(false);high.put("id","manual_is_not_automatic_high");Settings.Global.putString(c.s.context.getContentResolver(),ControlCenterNodes.REQUEST,high.toString());check(!c.auto()&&c.owner.equals("none"));
+  e.close();c.close();ControlCenterEngine.IO.shutdownNow();
+  System.out.println("Control center full nodes: "+cases+" cases PASS; host model, Android not tested");
+ }
+}''',encoding='utf-8')
+C=O/'classes'
+subprocess.run(['javac','--release','8','-encoding','UTF-8','-cp',str(C)+';'+str(J),'-d',str(C),str(f)],check=True)
+subprocess.run(['java','-cp',str(C)+';'+str(J),'top.rongshangs.lumacurve.refactor.NodeGestureTest'],check=True)

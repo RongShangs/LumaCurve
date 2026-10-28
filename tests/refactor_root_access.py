@@ -169,7 +169,7 @@ config_test={P+'ConfigRootTest.java':r'''package top.rongshangs.lumacurve.refact
 +'''.replace('\n+','\n')}
 source=(S/'RootControl.java').read_text('utf-8');start=source.index('    JSONObject afterApply(');end=source.index('    JSONObject stop()',start)
 config_test[P+'ConfigRootTest.java']=config_test[P+'ConfigRootTest.java'].replace('AFTER_APPLY',source[start:end])
-total+=run_java('ConfigRootTest',['ConfigurationCompatibility.java','MemoryOptions.java','OutdoorOptions.java','OutdoorNodeTarget.java','AdvancedPolicy.java'],config_test,'configuration')
+total+=run_java('ConfigRootTest',['BrightnessControlOptions.java','ConfigurationCompatibility.java','MemoryOptions.java','OutdoorOptions.java','OutdoorNodeTarget.java','AdvancedPolicy.java'],config_test,'configuration')
 
 # Production call sites retain independent optional-tool failures and no write on probe.
 control=(S/'RootControl.java').read_text('utf-8')

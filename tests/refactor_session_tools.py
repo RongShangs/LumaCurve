@@ -19,8 +19,8 @@ public static void main(String[] args)throws Exception{
  for(int bad:new int[]{-1,0,10,65536})try{ControlCenterMapping.target(.5,bad);throw new AssertionError();}catch(IllegalArgumentException expected){cases++;}
  check(ControlCenterMapping.fraction(500,0,1000)==.5);check(ControlCenterMapping.fraction(60,10,110)==.5);check(ControlCenterMapping.fraction(0,0,65535)==0);check(ControlCenterMapping.fraction(65535,0,65535)==1);
  for(int[] bad:new int[][]{{0,0,0},{5,10,100},{101,0,100}})try{ControlCenterMapping.fraction(bad[0],bad[1],bad[2]);throw new AssertionError();}catch(IllegalArgumentException expected){cases++;}
- check(BrightnessControlOptions.parse(new JSONObject()).nodeSliderMode==0);for(int n=0;n<=2;n++){JSONObject j=new JSONObject().put("control_center_node_mode",n);BrightnessControlOptions o=BrightnessControlOptions.parse(j);check(o.nodeSliderMode==n);JSONObject exported=new JSONObject();o.put(exported);check(BrightnessControlOptions.parse(exported).nodeSliderMode==n);}
- for(Object bad:new Object[]{-1,3,.5,"1",true})try{BrightnessControlOptions.parse(new JSONObject().put("control_center_node_mode",bad));throw new AssertionError();}catch(IllegalArgumentException expected){cases++;}
+ check(BrightnessControlOptions.parse(new JSONObject()).nodeSliderMode==0);for(int n=0;n<=4;n++){JSONObject j=new JSONObject().put("control_center_node_mode",n);BrightnessControlOptions o=BrightnessControlOptions.parse(j);check(o.nodeSliderMode==n);JSONObject exported=new JSONObject();o.put(exported);check(BrightnessControlOptions.parse(exported).nodeSliderMode==n);}
+ for(Object bad:new Object[]{-1,5,.5,"1",true})try{BrightnessControlOptions.parse(new JSONObject().put("control_center_node_mode",bad));throw new AssertionError();}catch(IllegalArgumentException expected){cases++;}
  System.out.println("Session tools: "+cases+" cases PASS; production policies, Android service doubles");
 }}'''
 }

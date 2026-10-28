@@ -10,7 +10,7 @@ public final class FeatureCompatibility {
     static JSONObject object(JSONObject parent,String key){JSONObject value=parent==null?null:parent.optJSONObject(key);return value==null?new JSONObject():value;}
     static String text(JSONObject parent,String key){return parent==null?"":parent.optString(key,"");}
     static Route[] catalogue(String id){return CompatibilityCatalog.catalogue(id);}
-    static String curveSelection(JSONObject runtime){String backend=text(runtime,"curve_backend");if(backend.equals("refactor")){String route=text(runtime,"curve_route");return route.isEmpty()?"refactor":route.equals("refactor")||route.equals("refactor_coefficients")?route:"";}if(!backend.equals("physical_mapping"))return "";String cls=text(runtime,"physical_mapper_class");if(cls.equals("com.android.server.display.MiuiPhysicalBrightnessMappingStrategy"))return "miui_physical";if(cls.equals("com.android.server.display.BrightnessMappingStrategy$PhysicalMappingStrategy"))return "aosp_physical";return "";}
+    static String curveSelection(JSONObject runtime){String backend=text(runtime,"curve_backend");if(backend.equals("refactor")){String route=text(runtime,"curve_route");return route.isEmpty()?"refactor":route.equals("refactor")||route.equals("refactor_coefficients")?route:"";}if(!backend.equals("physical_mapping"))return "";String cls=text(runtime,"physical_mapper_class");if(cls.equals("com.android.server.display.MiuiPhysicalBrightnessMappingStrategy"))return "miui_physical";if(cls.equals("com.android.server.display.BrightnessMappingStrategy$PhysicalMappingStrategy")){String range=text(runtime,"physical_baseline_route");return range.equals("aosp_physical_clamped")?range:range.isEmpty()||range.equals("direct")?"aosp_physical":"";}return "";}
     static Set<String> selected(String id,JSONObject runtime,JSONObject entry){
         Set<String> result=new LinkedHashSet<>();if(!"available".equals(entry.optString("state")))return result;
         Route[] routes=catalogue(id);String choice="";
@@ -18,6 +18,7 @@ public final class FeatureCompatibility {
         else switch(id){
         case "root_storage":choice=entry.has("workspace_route")?text(entry,"workspace_route"):"root_private_storage";break;
         case "root_settings":choice=text(entry,"settings_route");break;
+        case "dim_aod":choice=text(object(runtime,"dim_aod_compatibility"),"profile");break;
         case "main_sensor":choice=text(object(runtime,"main_input_compatibility"),"profile");break;
         case "dark_lock_schedule":choice=text(object(object(runtime,"brightness_control"),"dark_lock_schedule"),"profile");break;
         case "animation_override":choice=text(runtime,"animation_compatibility_profile");break;
@@ -31,15 +32,17 @@ public final class FeatureCompatibility {
         case "apps":JSONObject control=object(runtime,"brightness_control");if(control.has("app_multiwindow_supported"))choice=control.optBoolean("app_multiwindow_supported")?"visible_tasks":"focus_fallback";break;
         case "outdoor_range":result.add("hbm_range");JSONObject out=object(runtime,"outdoor");if(out.optBoolean("dynamic_range_supported")&&out.optBoolean("dynamic_range_enabled"))result.add("dynamic_range");return result;
         case "main_panel_node":if(text(entry,"node_discovery").equals("fold_default_display")){choice="fold_default_display";break;}choice=text(entry,"node_class").equals("backlight")?"backlight_node":text(entry,"node_class").equals("leds")?"display_led_node":"";break;
-        case "control_center_slider":if(text(object(runtime,"control_center_slider"),"kind").equals("coordinate_v2"))choice="coordinate_v2";break;
+        case "control_center_partition":result.add("partition_node_v4");String boundary=text(object(object(runtime,"control_center_slider"),"partition"),"profile");choice=boundary.equals("ddc_hbm_transition")?"partition_ddc_hbm":boundary.equals("hbm_normal_ceiling")?"partition_hbm_normal":"";break;
+        case "control_center_slider":JSONObject slider=object(runtime,"control_center_slider");if(text(slider,"kind").equals("coordinate_v2")){String selected=text(slider,"calibration_profile");choice=selected.isEmpty()?"coordinate_v2":selected;}break;
         default:if(routes.length==1&&!routes[0].id.equals("unreported"))choice=routes[0].id;
         }
         for(Route route:routes)if(route.id.equals(choice))result.add(choice);return result;
     }
     static String evidence(String id,JSONObject runtime,JSONObject entry){
         String backend=text(runtime,"curve_backend");JSONObject out=object(runtime,"outdoor"),assist=object(runtime,"assist_compatibility");
-        if(catalogue(id)[0].id.equals("refactor")){String mapper=text(runtime,"physical_mapper_class");return "曲线后端："+(backend.isEmpty()?"未报告":backend)+(text(runtime,"curve_route").isEmpty()?"":"\n曲线路线："+text(runtime,"curve_route"))+(mapper.isEmpty()?"":"\n映射器："+mapper);}
+        if(catalogue(id)[0].id.equals("refactor")){String mapper=text(runtime,"physical_mapper_class");return "曲线后端："+(backend.isEmpty()?"未报告":backend)+(text(runtime,"curve_route").isEmpty()?"":"\n曲线路线："+text(runtime,"curve_route"))+(text(runtime,"base_curve_name").isEmpty()?"":"\n当前基础曲线："+text(runtime,"base_curve_name"))+(mapper.isEmpty()?"":"\n映射器："+mapper)+(text(runtime,"physical_baseline_route").equals("aosp_physical_clamped")?"\n原机曲线范围："+runtime.optDouble("physical_original_min_nit")+"～"+runtime.optDouble("physical_original_max_nit")+" nit\n实际标定范围："+runtime.optDouble("physical_calibration_min_nit")+"～"+runtime.optDouble("physical_calibration_max_nit")+" nit\n按原生端点裁剪理解基线；不提高标定或节点上限。":"");}
         switch(id){
+        case "dim_aod":JSONObject dim=object(runtime,"dim_aod_compatibility");return "DIM / AOD："+text(dim,"profile")+"\n"+text(dim,"detail")+"\n"+text(dim,"runtime_error")+"\n"+text(entry,"detail");
         case "main_sensor":JSONObject main=object(runtime,"main_input_compatibility");return "主光感来源："+text(main,"source")+"\n"+text(main,"sensor_name")+(text(main,"sensor_string_type").isEmpty()?"":" · "+text(main,"sensor_string_type"))+"\n配置光感："+text(main,"configured_sensor_name")+"\n选择方式："+text(main,"binding_source")+"\n"+text(main,"detail");
         case "animation_override":return "过渡适配："+(text(runtime,"animation_compatibility_profile").isEmpty()?"未报告":text(runtime,"animation_compatibility_profile"))+"\n仅调整普通自动亮度过渡；温控、唤醒、手动及其他特殊原因沿用系统。";
         case "assist_sensor":return "辅助绑定："+(text(assist,"state").isEmpty()?"未报告":text(assist,"state"))+(text(assist,"sensor_name").isEmpty()?"":"\n传感器："+text(assist,"sensor_name"))+(text(assist,"sensor_string_type").isEmpty()?"":" · "+text(assist,"sensor_string_type"))+(assist.has("dual_policy_cached")?"\n双光感能力缓存："+assist.optBoolean("dual_policy_cached"):"");
@@ -53,7 +56,9 @@ public final class FeatureCompatibility {
         case "opr":case "nit_limit":return "SDR 适配："+(text(out,"sdr_compatibility_profile").isEmpty()?"未报告":text(out,"sdr_compatibility_profile"))+(text(out,"sdr_compatibility_detail").isEmpty()?"":"\n"+text(out,"sdr_compatibility_detail"))+(id.equals("opr")&&!text(out,"opr_envelope_profile").isEmpty()?"\nOPR 放宽范围："+text(out,"opr_envelope_profile")+(out.has("opr_envelope_max_nit")?" · "+out.optDouble("opr_envelope_max_nit")+" nit":"")+(text(out,"opr_envelope_detail").isEmpty()?"":"\n"+text(out,"opr_envelope_detail")):"");
         case "apps":JSONObject c=object(runtime,"brightness_control");return c.has("app_multiwindow_supported")?c.optBoolean("app_multiwindow_supported")?"本机可见任务接口完整；已接入多窗口判断。":"本机仅提供已验证的焦点回退；不能保证小窗失焦时继续暂停。":"多窗口接口信息尚未报告。";
         case "main_panel_node":return text(entry,"node_path").isEmpty()?(text(entry,"node_detail").isEmpty()?"尚未报告具体主屏节点。":"节点状态："+text(entry,"node_detail")):"实际节点："+text(entry,"node_path")+(text(entry,"node_physical_display_id").isEmpty()?"":"\n物理屏："+text(entry,"node_physical_display_id"))+(text(entry,"node_address_profile").isEmpty()?"":"\n地址类型："+text(entry,"node_address_profile"))+(text(entry,"node_binding").isEmpty()?"":"\n节点绑定："+(text(entry,"node_binding").equals("exclusive_internal_dsi")?"默认内部屏点亮 + 唯一活动 DSI":"原生端口配对")+" · 显示端口 "+entry.optInt("node_physical_port")+" / 背光节点 "+entry.optInt("node_kernel_port"))+"\n节点上限："+entry.optInt("node_maximum");
-        case "control_center_slider":return "入口隐藏；不改变已有选择。\n"+text(object(runtime,"control_center_slider"),"error");
+        case "control_center_partition":JSONObject split=object(object(runtime,"control_center_slider"),"partition");return "普通区间边界："+text(split,"profile")+"\n"+text(object(runtime,"control_center_slider"),"partition_error");
+        case "control_center_raw":return "完整节点控制（独立启用）：运行接口就绪不等于 Root 写入成功。\n"+text(object(object(runtime,"control_center_slider"),"raw_control"),"error")+"\n"+text(runtime,"control_center_node_detail");
+        case "control_center_slider":JSONObject coordinates=object(runtime,"control_center_slider");return "设备坐标映射；不直接写节点，不改变自动亮度或暗光锁定的控制权。\n"+text(coordinates,"calibration_profile")+"\n"+text(coordinates,"error")+"\n"+text(coordinates,"oem_v1_detail");
         default:return text(entry,"detail");
         }
     }
@@ -63,6 +68,7 @@ public final class FeatureCompatibility {
         if("inactive".equals(entry.optString("state")))return "系统未启用此策略；保存的设置保留。";
         if(!"available".equals(entry.optString("state")))return "本次未采用："+entry.optString("detail","等待实际接口检查。");
         if(chosen.isEmpty())return "本次报告未提供足够的路线信息；未确认，不推断为不支持。";
+        if(id.equals("control_center_partition"))return chosen.contains("partition_ddc_hbm")?"已读取原机HBM过渡点，不使用控制器补位。":"原机未提供该边界，采用已验证的普通亮度上限接口。";
         if(id.equals("assist_sensor"))return chosen.contains("native_auxiliary")?"原生辅助槽已有效绑定，优先沿用原路径；不启用移植补位。":"原生辅助槽原为空，本次使用经检查的补位路径；保留原生优先规则。";
         if(id.equals("node_output"))return chosen.contains("automatic_strategy2_node")?"原生策略入口不存在，本次核验独立自动对象和亮度原因。":"原生策略入口已匹配，不叠加旧对象路线。";
         if(id.equals("outdoor_node_device"))return chosen.contains("fold_bound_outdoor")?"本次使用折叠物理租约，不使用固定主屏节点。":"当前使用原主屏节点路径，未启用折叠协作绑定。";

@@ -167,7 +167,8 @@ assert 'SettingsNotice' not in main and 'settingsNotice' not in main
 assert 'welcome.resume();quickSetup.resume();if(!welcome.showing()&&!quickSetup.showing())resumeRuntime()' in main
 assert 'if(welcome.back())return;' in main
 assert 'button("再次查看使用教程",welcome::openTutorial,tutorial)' in main
-assert 'visible=false;welcome.finishTransition();' in main
+pause=main[main.index('@Override public void onPause()'):]
+assert pause.index('visible=false;')<pause.index('welcome.finishTransition();')<pause.index('super.onPause();')
 assert 'if(visible&&!welcome.showing()&&!quickSetup.showing())' in main
 assert 'welcome.save(saved)' in main and 'welcome.restore(saved)' in main
 assert '"勿忘","灭","春暖花开","无缺"' in (S/"AboutMarquee.java").read_text("utf-8") and '兼容 HyperOS 的亮度个性化工具' in (S/"AboutPage.java").read_text("utf-8")

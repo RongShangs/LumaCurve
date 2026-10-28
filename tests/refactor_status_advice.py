@@ -55,6 +55,7 @@ public class StatusAdviceTest {
   s.put("memory_live_count",1);StatusAdvice learned=StatusAdvice.guidance(s,1000);check(learned.detail.contains("已学习"));check(learned.actions.size()==1);action(learned,"手动记忆",1,"memory");
   s.put("current_anchors_nit",s.optJSONArray("active_logical_nit"));check(!StatusAdvice.guidance(s,1000).detail.contains("已学习"));
   s.put("active_logical_nit",s.optJSONArray("factory_logical_nit")).put("current_anchors_nit",s.optJSONArray("factory_logical_nit"));check(StatusAdvice.guidance(s,1000).detail.contains("系统默认曲线"));
+  JSONObject themed=new JSONObject(s.toString()).put("theme_curve_dark",true);StatusAdvice themeAdvice=StatusAdvice.guidance(themed,1000);check(themeAdvice.detail.contains("深色模式基础曲线")&&themeAdvice.actions.get(0).target.equals("dark_curve"));check(UiText.translate(themeAdvice.detail,true).contains("Dark mode"));
   for(JSONObject snapshot:new JSONObject[]{null,state(),s.put("elapsed_ms",-1)}){check(StatusAdvice.guidance(snapshot,1000).actions.isEmpty());check(StatusAdvice.guidance(snapshot,1000).detail.contains("尚未取得"));}
   s.put("elapsed_ms",1000).put("last_pipeline",new JSONObject().put("route","good_curve"));check(StatusAdvice.guidance(s,1000).actions.isEmpty());
   LiveLimitEvidence live=new LiveLimitEvidence();live.record("adjustBrightnessByThermal",1,.5f,1000);check(live.snapshot(1000).length()==1);check(live.snapshot(6000).length()==1);check(live.snapshot(6001).length()==0);check(live.snapshot(999).length()==0);

@@ -21,7 +21,7 @@ sources['top/rongshangs/lumacurve/refactor/hooking/XposedBridge.java']='''packag
 }'''
 sources['top/rongshangs/lumacurve/refactor/HookRuntime.java']='''package top.rongshangs.lumacurve.refactor;import android.os.*;import android.content.*;class HookRuntime {
  CurveBackend kernel;Handler handler=new Handler();Context context=new Context();PowerManager power=new PowerManager();Object owner;
- String fingerprint="firmware",phase="active";boolean closed,changing,user=true,onThread=true,hdr;float memoryStrength=1;int logs;
+ String themeMemoryScope="";String fingerprint="firmware",phase="active";boolean closed,changing,user=true,onThread=true,hdr;float memoryStrength=1;int logs;
  final MemoryLifecycle memoryLifecycle;final MemoryPersistence persistentMemory;
  HookRuntime(CurveBackend k,Object owner){kernel=k;this.owner=owner;memoryLifecycle=new MemoryLifecycle(this);persistentMemory=new MemoryPersistence(this);}
  String baselineId(){return "device";}boolean appliesToUser(){return user;}boolean onDisplayThread(){return onThread;}Boolean hdrActive(){return hdr;}void log(String m){logs++;}void queuePublish(){}void requestRecalculation(){}
@@ -72,6 +72,6 @@ files=[]
 for name,source in sources.items():
     p=O/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_text(source,encoding='utf-8');files.append(p)
 C=O/'classes';C.mkdir(exist_ok=True)
-names=['MemoryScene','MemoryOptions','PersistentMemory','MemoryPersistence','MemoryLifecycle','CurveBackend','SavedCurve','CurvePlan','CurveIdentity','RefactorAdapter','TraditionalAdapter','TraditionalCurve']
+names=['MemoryScene','MemoryOptions','PersistentMemory','MemoryPersistence','MemoryLifecycle','CurveBackend','SavedCurve','CurvePlan','CurveIdentity','RefactorAdapter','PhysicalCurveCalibration','TraditionalAdapter','TraditionalCurve']
 subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(J),'-d',str(C),*[str(S/(n+'.java')) for n in names],*map(str,files)],check=True)
 subprocess.run(['java','-cp',str(C)+';'+str(J),'top.rongshangs.lumacurve.refactor.LifecycleHostTest'],check=True)

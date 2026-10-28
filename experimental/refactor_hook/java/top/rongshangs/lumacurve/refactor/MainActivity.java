@@ -28,6 +28,7 @@ public final class MainActivity extends Activity {
     float factors[]={1,1,1,1},factoryLux[],factoryNit[],minimum,maximum,thermalCeiling=43,memoryStrength=1;boolean thermalRelax,memoryEnabled=true,busy,visible,dirty,destroyed;
     Switch memorySwitch;SeekBar memorySlider;PipelineBoard pipeline;boolean english,rereadPending,legacyChecked;String permissionNotice="",loadedBaseline="";boolean permissionDialogVisible,permissionBlocked;ScrollView logScroller;
     JSONObject runtime,lastAnswer;CurveView stateGraph,settingsGraph,memoryGraph;int page;
+    ThemeCurveOptions themeCurve=new ThemeCurveOptions();Switch themeCurveSwitch;LinearLayout darkCurveCard;CurveView darkCurveGraph;TextView darkCurveHint;
     SavedCurve savedBase;ApplicationBrightnessSettings appBrightnessSettings;Switch darkManualExitSwitch;TextView darkManualExitDescription;
     Button saveMemoryBaseButton,restoreMemoryBaseButton;
     AlertDialog curveSaveProgress;
@@ -151,7 +152,7 @@ public final class MainActivity extends Activity {
     void quickPreset(String group,int mode){if(busy){show("另一项操作还在执行");return;}try{if(runtime==null)throw new IllegalStateException("连接后读取曲线");JSONObject next=SettingsPresets.merge(configuration(),SettingsPresets.patch(group,mode,runtime));loadOptions(next);dirty=true;drawCurve();show("预设已选中，保存并应用后生效");}catch(Exception error){show(error.getMessage());}}
     void quickPresetRow(LinearLayout parent,String group,String first,String second){LinearLayout r=row(parent);compact("系统默认",()->quickPreset(group,0),r);compact(first,()->quickPreset(group,1),r);compact(second,()->quickPreset(group,2),r);}
     void makeSettings(){
-        LinearLayout b=card(pages[1]);settingsActions=b;b.setPadding(dp(16),dp(13),dp(16),dp(13));unsavedHint=text("有未保存的设置",12,0xffbd3434);unsavedHint.setIncludeFontPadding(false);unsavedHint.setGravity(Gravity.CENTER);b.addView(unsavedHint,new LinearLayout.LayoutParams(-1,-2));unsavedHint.setVisibility(View.GONE);LinearLayout r=row(b);apply=compact("保存并应用",this::submit,r);stop=compact("停用并恢复",()->run("stop",null),r);
+        LinearLayout b=card(pages[1]);settingsActions=b;b.setPadding(dp(16),dp(13),dp(16),dp(13));unsavedHint=text("有未保存的设置",12,0xffbd3434);unsavedHint.setIncludeFontPadding(false);unsavedHint.setGravity(Gravity.CENTER);b.addView(unsavedHint,new LinearLayout.LayoutParams(-1,-2));unsavedHint.setVisibility(View.GONE);LinearLayout r=row(b);apply=compact("保存并应用",this::submit,r);stop=compact("恢复系统默认",this::confirmRestoreDefaults,r);
         LinearLayout files=row(b);compact("导出配置",this::exportConfiguration,files);compact("导入配置",this::importConfiguration,files);
         settingsHome=column();pages[1].addView(settingsHome);
         LinearLayout quickEntry=card(settingsHome);quickEntry.setBackground(ripple(0xffedf3ff,18));quickEntry.setClickable(true);quickEntry.setFocusable(true);quickEntry.setOnClickListener(v->quickSetup.open());LinearLayout quickLine=row(quickEntry);LinearLayout quickCopy=column();quickLine.addView(quickCopy,new LinearLayout.LayoutParams(0,-2,1));quickCopy.addView(text("快速设置",17,BLUE));quickCopy.addView(text("回答6个简单的问题，找到适合自己的亮度预设",12,MUTED));quickLine.addView(new NavigationArrow(false),new LinearLayout.LayoutParams(dp(28),dp(40)));
@@ -193,7 +194,7 @@ public final class MainActivity extends Activity {
         if(action.group<0||action.group>=settingScreens.length)return;
         select(1);showSettingsGroup(action.group);
         Runnable expand=detailOpeners.get(action.target.startsWith("scene_")?action.target:action.group==2?"outdoor":action.target.equals("low_light")?"low":"");if(expand!=null)expand.run();
-        View target=action.target.equals("range")?rangeSwitch:action.target.equals("opr")?oprSwitch:action.target.equals("thermal")?thermalSwitch:action.target.equals("dark_lock")?darkLockSwitch:action.target.equals("low_light")?lowLightSwitch:action.target.equals("curve")?settingsGraph:action.target.equals("memory")?memorySwitch:sceneSettings==null?null:sceneSettings.find(action.target);
+        View target=action.target.equals("range")?rangeSwitch:action.target.equals("opr")?oprSwitch:action.target.equals("thermal")?thermalSwitch:action.target.equals("dark_lock")?darkLockSwitch:action.target.equals("low_light")?lowLightSwitch:action.target.equals("dark_curve")?themeCurve.enabled?darkCurveCard:themeCurveSwitch:action.target.equals("node_mapping")?controlCenterChoice:action.target.equals("curve")?settingsGraph:action.target.equals("memory")?memorySwitch:sceneSettings==null?null:sceneSettings.find(action.target);
         ScrollView scroll=settingsScrollers[action.group];if(target!=null&&scroll!=null){scroll.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener(){public boolean onPreDraw(){if(scroll.getViewTreeObserver().isAlive())scroll.getViewTreeObserver().removeOnPreDrawListener(this);if(!destroyed&&displayedPage==settingScreens[action.group]&&target.isShown()){Rect rect=new Rect();target.getDrawingRect(rect);scroll.offsetDescendantRectToMyCoords(target,rect);scroll.smoothScrollTo(0,Math.max(0,rect.top-dp(16)));if(!action.target.startsWith("scene_"))target.requestFocus();}return true;}});scroll.invalidate();}
     }
     android.text.SpannableStringBuilder adviceText(StatusAdvice advice){
@@ -214,8 +215,12 @@ public final class MainActivity extends Activity {
     }
     void finishPageTransition(){++pageTransition;for(int i=0;i<content.getChildCount();i++){View child=content.getChildAt(i);child.animate().cancel();child.animate().setListener(null).withEndAction(null);child.setAlpha(1);child.setTranslationX(0);child.setVisibility(child==displayedPage?View.VISIBLE:View.GONE);}}
     @Override public void onBackPressed(){if(quickSetup.back())return;if(welcome.back())return;if(featureChecksVisible){closeFeatureChecks();return;}if(page==1&&settingsGroup>=0){showSettingsGroup(-1);return;}super.onBackPressed();}
+    void confirmRestoreDefaults(){
+        if(busy)return;AlertDialog d=dialog("恢复系统默认",text("撤销已应用的曲线、暗光锁定、户外增强、温控调整和应用暂停等亮度设置，并清除手动记忆。\n\n自定义预设、界面偏好和教程记录会保留。",14,MUTED));d.show();dialogButton(d,"取消",null,false);dialogButton(d,"恢复",()->run("restore-defaults",null),true);
+    }
     void makeCurveSettings(){
-        LinearLayout b=card(settingsTarget);b.addView(text("照度与亮度曲线",18,INK));
+        LinearLayout b=card(settingsTarget);b.addView(text("基础曲线",18,INK));
+        b.addView(text("未启用独立曲线时，深浅色模式共用此曲线；启用后，此处用于浅色模式。",12,MUTED));
         LinearLayout presets=row(b);compact("柔和",()->preset(new float[]{.7f,.8f,.95f,1}),presets);compact("系统默认",()->preset(new float[]{1,1,1,1}),presets);compact("稍亮",()->preset(new float[]{1.2f,1.15f,1.05f,1}),presets);
         settingsGraph=new CurveView(true);b.addView(settingsGraph,new LinearLayout.LayoutParams(-1,dp(235)));
         b.addView(curveLegend("灰线：系统默认 · 蓝线：基础曲线"));curveHint=text("连接后显示节点范围",12,MUTED);b.addView(curveHint);
@@ -223,6 +228,13 @@ public final class MainActivity extends Activity {
         b.addView(text("实际生效曲线会受到手动记忆影响，可在「手动记忆」页查看。",12,0xffbd3434));
         b.addView(text("左端可设置暗处亮度下限。若调不上去，先提高相邻节点；手动选择和温控仍优先。",12,MUTED));
         presets=row(b);compact("保存为预设",this::savePreset,presets);compact("我的预设",this::pickPreset,presets);
+        LinearLayout theme=card(settingsTarget);themeCurveSwitch=new Switch(this);themeCurveSwitch.setText(tr("深色模式独立亮度曲线"));themeCurveSwitch.setTextSize(14);theme.addView(themeCurveSwitch,new LinearLayout.LayoutParams(-1,-2));
+        theme.addView(text("开启后，每次切换深浅色模式都会清除手动记忆，包括已保存或永久保持的记忆。两条基础曲线会保留。",12,MUTED));
+        themeCurveSwitch.setOnCheckedChangeListener((v,on)->{if(on==themeCurve.enabled)return;if(on&&factoryLux==null){themeCurveSwitch.setChecked(false);show("连接后读取曲线");return;}try{if(on&&!themeCurve.initialized){themeCurve.factors=factors.clone();themeCurve.floor=curveFloor;themeCurve.saved=savedBase;themeCurve.initialized=true;}themeCurve.enabled=on;dirty=true;drawCurve();}catch(Exception e){show(e.getMessage());}});
+        darkCurveCard=card(settingsTarget);darkCurveCard.addView(text("深色模式基础曲线",18,INK));
+        LinearLayout darkPresets=row(darkCurveCard);compact("柔和",()->darkPreset(new float[]{.7f,.8f,.95f,1}),darkPresets);compact("系统默认",()->darkPreset(new float[]{1,1,1,1}),darkPresets);compact("稍亮",()->darkPreset(new float[]{1.2f,1.15f,1.05f,1}),darkPresets);
+        darkCurveGraph=new CurveView(true,false,true);darkCurveCard.addView(darkCurveGraph,new LinearLayout.LayoutParams(-1,dp(235)));
+        darkCurveCard.addView(curveLegend("灰线：系统默认 · 蓝线：深色模式基础曲线"));darkCurveHint=text("拖动或点击节点，保存并应用后在系统深色模式下生效。",12,MUTED);darkCurveCard.addView(darkCurveHint);darkCurveCard.setVisibility(View.GONE);
     }
     SeekBar nodeTargetSlider;TextView nodeTargetLabel;
     void makeOutdoorSettings(){
@@ -373,7 +385,7 @@ public final class MainActivity extends Activity {
             AlertDialog d=dialog("保存为基础曲线",text("将系统当前的绿色曲线设为新的蓝色基础曲线，清除已转入基础的手动点，避免重复叠加。之后仍可继续学习新的手动调整。",14,MUTED));d.show();dialogButton(d,"取消",null,false);dialogButton(d,"保存",()->run("promote-memory",options),true);
         }catch(Exception unavailable){show(unavailable.getMessage());}
     }
-    void restoreOriginalBaseline(){if(runtime==null||factoryLux==null||busy)return;try{savedBase=null;factoryNit=RootControl.numbers(runtime.getJSONArray("factory_logical_nit"));factors=new float[]{1,1,1,1};curveFloor=0;dirty=true;drawCurve();show("已选用设备原始基础曲线，点击保存并应用后生效");}catch(Exception unavailable){show(unavailable.getMessage());}}
+    void restoreOriginalBaseline(){if(runtime==null||factoryLux==null||busy)return;try{if(themeCurve.enabled&&runtime.optBoolean("theme_curve_dark")){themeCurve.saved=null;themeCurve.factors=new float[]{1,1,1,1};themeCurve.floor=0;}else{savedBase=null;factoryNit=RootControl.numbers(runtime.getJSONArray("factory_logical_nit"));factors=new float[]{1,1,1,1};curveFloor=0;}dirty=true;drawCurve();show("已选用设备原始基础曲线，点击保存并应用后生效");}catch(Exception unavailable){show(unavailable.getMessage());}}
     void makeThermalSettings(){
         LinearLayout b=card(settingsTarget);b.addView(text("温控",18,INK));LinearLayout thermalPresets=row(b);compact("系统默认",()->quickPreset("thermal",0),thermalPresets);compact("略微放宽",()->quickPreset("thermal",1),thermalPresets);LinearLayout moreThermal=row(b);compact("更多放宽",()->quickPreset("thermal",2),moreThermal);compact("最大放宽",()->quickPreset("thermal",3),moreThermal);thermalSwitch=new Switch(this);thermalSwitch.setText(tr("减少温控降亮"));thermalSwitch.setTextSize(14);thermalSwitch.setShowText(false);b.addView(thermalSwitch,new LinearLayout.LayoutParams(-1,dp(48)));
         thermalSwitch.setOnCheckedChangeListener((v,on)->{if(on!=thermalRelax){thermalRelax=on;dirty=true;drawCurve();}});
@@ -437,39 +449,15 @@ public final class MainActivity extends Activity {
         int[] maximums={29,29,99,29},initial={4,4,5,4};for(int i=0;i<4;i++){final int key=i;controlLabels[i]=text("",13,INK);details.addView(controlLabels[i]);controlSliders[i]=parameter(details,maximums[i],initial[i],n->{if(key==0){controls.enterLux=1+n;controls.exitLux=Math.max(controls.exitLux,controls.enterLux+5);}else if(key==1)controls.minutes=1+n;else if(key==2)controls.exitLux=Math.max(controls.enterLux+5,5+n*5);else controls.exitSeconds=1+n;});}
     }
     void makeManualPanelSettings(){
-        LinearLayout b=card(settingsTarget);b.addView(text("主屏手动亮度",18,INK));manualPanelSwitch=new Switch(this);manualPanelSwitch.setText(tr("允许磁贴手动调节"));b.addView(manualPanelSwitch,new LinearLayout.LayoutParams(-1,dp(48)));manualPanelSwitch.setOnCheckedChangeListener((v,on)->{if(on!=controls.manualPanel){controls.manualPanel=on;dirty=true;drawCurve();}});
-        b.addView(text("点击打开独立弹窗，直接写主屏背光节点；滑动关闭自动亮度，重新开启自动亮度即退让。",12,MUTED));
-        b.addView(text("滑条上限读取主屏 max_brightness，可超过系统普通滑条。小型 C 守护保持目标；锁屏期间释放节点，解锁后恢复，开启自动亮度结束保持。",12,MUTED));
-        b.addView(text("拖动按相对距离调节。锁屏暂停，解锁恢复；开启自动亮度结束保持。",12,MUTED));
+        controlCenterSettings=new ControlCenterSettings(this,settingsTarget);controlCenterChoice=controlCenterSettings.heading;
+        LinearLayout b=card(settingsTarget);b.addView(text("主屏手动亮度",18,INK));manualPanelSwitch=new Switch(this);manualPanelSwitch.setText(tr("允许磁贴手动调节"));manualPanelSwitch.setTextSize(14);manualPanelSwitch.setMinimumHeight(dp(48));b.addView(manualPanelSwitch,new LinearLayout.LayoutParams(-1,-2));manualPanelSwitch.setOnCheckedChangeListener((v,on)->{if(on!=controls.manualPanel){controls.manualPanel=on;dirty=true;drawCurve();}});
+        b.addView(text("打开独立面板直接调节主屏背光；拖动后切为手动亮度。",12,MUTED));
+        b.addView(text("锁屏期间暂停接管，解锁后恢复；重新开启自动亮度结束保持。",12,MUTED));
         b.addView(text("100% 为驱动公布的节点上限，不是 nit；实际亮度仍受面板限制，高亮会增加发热与耗电。",12,MUTED));
-        // 3.2.0 hides the experimental entry; keep its code and saved selection intact.
-        LinearLayout mapping=column();mapping.setVisibility(View.GONE);b.addView(mapping);
-        mapping.addView(text("控制中心亮度条节点映射",15,INK));
-        TextView sliderChoice=text("",13,BLUE);sliderChoice.setMinHeight(dp(48));sliderChoice.setGravity(Gravity.CENTER_VERTICAL);sliderChoice.setPadding(dp(12),dp(10),dp(12),dp(10));sliderChoice.setBackground(ripple(0xffeef3ff,12));mapping.addView(sliderChoice,new LinearLayout.LayoutParams(-1,-2));controlCenterChoice=sliderChoice;
-        sliderChoice.setOnClickListener(v->showControlCenterMapping());
-        mapping.addView(text("亮度条按设备节点比例显示和调节。自动亮度继续运行，拖动仍参与原有手动记忆；系统未开放的范围无法通过映射解锁。",12,MUTED));
-        mapping.addView(text("需勾选 LSPosed 的系统界面作用域并重启。按本机实际接口适配，不额外运行节点守护进程；未知转换链路沿用系统亮度条。",12,MUTED));
         button("打开主屏亮度面板",this::showManualPanel,b);button("添加控制中心磁贴",this::addBrightnessTile,b);
     }
-    void showControlCenterMapping(){
-        String[] labels={"关闭","仅手动亮度","手动和自动亮度"};
-        String[] details={"沿用系统亮度条。","仅手动模式按节点比例显示和调节；自动模式沿用系统亮度条。","两种模式均按节点比例显示和调节。自动亮度保持开启，拖动继续沿用原有记忆与保护。"};
-        int[] selected={controls.nodeSliderMode};LinearLayout body=column();
-        TextView intro=text("选择控制中心亮度条的调节方式。",13,MUTED);intro.setPadding(0,0,0,dp(6));body.addView(intro);
-        LinearLayout[] cards=new LinearLayout[3];TextView[] marks=new TextView[3];
-        Runnable render=()->{for(int i=0;i<cards.length;i++){boolean active=selected[0]==i;cards[i].setSelected(active);cards[i].setBackground(ripple(active?(darkTheme?0xff24334e:0xffe9f0ff):(darkTheme?0xff202630:0xfff1f3f7),16));marks[i].setText(active?tr("已选中"):"");cards[i].setContentDescription(tr(labels[i])+"，"+tr(details[i])+(active?"，"+tr("已选中"):""));}};
-        for(int i=0;i<cards.length;i++){
-            final int mode=i;LinearLayout option=column();cards[i]=option;option.setPadding(dp(14),dp(12),dp(14),dp(12));option.setMinimumHeight(dp(82));option.setFocusable(true);option.setClickable(true);
-            LinearLayout heading=new LinearLayout(this);heading.setGravity(Gravity.CENTER_VERTICAL);heading.setBaselineAligned(false);option.addView(heading,new LinearLayout.LayoutParams(-1,-2));
-            heading.addView(text(labels[i],15,BLUE),new LinearLayout.LayoutParams(0,-2,1));marks[i]=text("",12,BLUE);marks[i].setGravity(Gravity.END);heading.addView(marks[i],new LinearLayout.LayoutParams(-2,-2));
-            TextView description=text(details[i],12,MUTED);description.setPadding(0,dp(5),0,0);option.addView(description,new LinearLayout.LayoutParams(-1,-2));
-            LinearLayout.LayoutParams layout=new LinearLayout.LayoutParams(-1,-2);layout.topMargin=dp(10);body.addView(option,layout);option.setOnClickListener(v->{selected[0]=mode;render.run();});
-        }
-        TextView note=text("100% 对应本机节点上限，不是 nit。确认后需保存并应用。",12,MUTED);note.setPadding(0,dp(14),0,0);body.addView(note);render.run();
-        ScrollView scroll=new ElasticScrollView(this);scroll.setFillViewport(false);scroll.addView(body);AlertDialog d=dialog("控制中心节点映射",scroll);d.show();dialogButton(d,"取消",null,false);dialogButton(d,"确定",()->{if(controls.nodeSliderMode!=selected[0]){controls.nodeSliderMode=selected[0];dirty=true;drawCurve();}},true);
-    }
-    TextView controlCenterChoice;
-    void drawControls(){if(controlCenterChoice!=null)controlCenterChoice.setText(tr(new String[]{"关闭","仅手动亮度","手动和自动亮度"}[controls.nodeSliderMode]));if(darkLockSwitch==null||manualPanelSwitch==null)return;boolean supported=runtime!=null&&runtime.optBoolean("dark_lock_supported");darkLockSwitch.setChecked(controls.darkLock);darkLockSwitch.setEnabled(supported||controls.darkLock);manualPanelSwitch.setChecked(controls.manualPanel);manualPanelSwitch.setEnabled(runtime!=null&&runtime.optBoolean("manual_panel_supported"));
+    ControlCenterSettings controlCenterSettings;View controlCenterChoice;
+    void drawControls(){if(controlCenterSettings!=null)controlCenterSettings.refresh();if(darkLockSwitch==null||manualPanelSwitch==null)return;boolean supported=runtime!=null&&runtime.optBoolean("dark_lock_supported");darkLockSwitch.setChecked(controls.darkLock);darkLockSwitch.setEnabled(supported||controls.darkLock);manualPanelSwitch.setChecked(controls.manualPanel);manualPanelSwitch.setEnabled(runtime!=null&&runtime.optBoolean("manual_panel_supported"));
         if(darkSunsetSwitch!=null){darkSunsetSwitch.setChecked(controls.sunsetOnly);darkSunsetSwitch.setEnabled(controls.darkLock);}
         if(darkManualExitSwitch!=null){darkManualExitSwitch.setChecked(controls.manualExit);darkManualExitSwitch.setEnabled(supported||controls.manualExit);darkManualExitDescription.setText(controls.manualExit?"当前方案：手动调整即结束锁定，保持手动亮度；环境变亮后也不自动开启。":"当前方案：保留新亮度并继续锁定；任一光感持续达到退出阈值后恢复自动亮度。");}
         String[] labels={"进入照度："+format(controls.enterLux)+" lux","等待时间："+controls.minutes+" 分钟","退出照度："+format(controls.exitLux)+" lux","退出确认："+controls.exitSeconds+" 秒"};int[] p={Math.round(controls.enterLux)-1,controls.minutes-1,Math.round((controls.exitLux-5)/5),controls.exitSeconds-1};for(int i=0;i<4;i++){controlSliders[i].setProgress(p[i]);controlLabels[i].setText(labels[i]);enableParameter(controlSliders[i],controlLabels[i],supported&&controls.darkLock);}
@@ -608,6 +596,12 @@ public final class MainActivity extends Activity {
         if(bottomNav!=null)bottomNav.setVisibility(secondary?View.GONE:View.VISIBLE);
         if(floatingNavigation!=null){floatingNavigation.present(!secondary);floatingNavigation.show(true);}if(viewport!=null)viewport.refresh();if(aboutPage!=null)aboutPage.active(visible&&page==3&&!secondary);
     }
+    // Keep the viewport behind system navigation; reserve safety inside its scrollable tail.
+    void updateSecondaryInsets(int bottom){
+        int inset=Math.max(0,bottom);
+        for(ScrollView scroll:settingsScrollers)if(scroll!=null){scroll.setClipToPadding(false);if(scroll.getPaddingBottom()!=inset)scroll.setPadding(0,0,0,inset);}
+        if(featureCheckPage!=null){ScrollView scroll=featureCheckPage.scroll;scroll.setClipToPadding(false);if(scroll.getPaddingBottom()!=inset)scroll.setPadding(0,0,0,inset);}
+    }
     void updatePageInsets(int reserve){
         for(int i=0;i<pages.length;i++)if(pages[i]!=null){if(i==3&&aboutPage!=null){pages[i].setPadding(0,0,0,0);aboutPage.inset(reserve);}else pages[i].setPadding(dp(i==2?16:18),dp(i==2?6:i==0?8:10),dp(i==2?16:18),Math.max(0,reserve-dp(i==0||i==2?12:0))+dp(i==0?8:i==2?6:22));}
     }
@@ -618,6 +612,7 @@ public final class MainActivity extends Activity {
         permissionNotice=key;permissionDialogVisible=true;LinearLayout body=column();TextView icon=text(key.equals("root")?"ROOT":key.equals("lsp")?"LSPosed":key.equals("os")?"HyperOS":"接口检查",14,BLUE);icon.setPadding(dp(12),dp(8),dp(12),dp(8));icon.setBackground(background(0xffedf3ff,12));body.addView(icon);body.addView(text(message,14,MUTED));
         AlertDialog d=dialog(title,body);d.setOnDismissListener(v->{permissionDialogVisible=false;ui.post(()->{offerLegacyModules();offerUpdate();});});d.show();dialogButton(d,"稍后",null,false);dialogButton(d,"重新检测",()->{permissionNotice="";permissionBlocked=false;ui.postDelayed(()->run("inspect",null),150);},true);
     }
+    void darkPreset(float[] next){if(factoryLux==null)return;try{float[] nit=RootControl.numbers(runtime.getJSONArray("factory_logical_nit"));themeCurve.factors=CurveEditor.preset(next,nit,minimum,maximum);themeCurve.floor=0;themeCurve.saved=null;dirty=true;drawCurve();}catch(Exception e){show(e.getMessage());}}
     void preset(float[] next){
         if(factoryLux==null){show("连接后读取曲线");return;}
         try{savedBase=null;factoryNit=RootControl.numbers(runtime.getJSONArray("factory_logical_nit"));float[] adjusted=CurveEditor.preset(next,factoryNit,minimum,maximum);
@@ -628,6 +623,7 @@ public final class MainActivity extends Activity {
         drawAdvanced();drawOutdoor();drawControls();if(sceneSettings!=null)sceneSettings.refresh();if(appBrightnessSettings!=null)appBrightnessSettings.refresh();
 
         drawMemory();
+        if(themeCurveSwitch!=null){themeCurveSwitch.setChecked(themeCurve.enabled);darkCurveCard.setVisibility(themeCurve.enabled?View.VISIBLE:View.GONE);darkCurveGraph.invalidate();}
         thermalSwitch.setChecked(thermalRelax);ceilingSlider.setProgress(Math.round(thermalCeiling)-38);ceilingText.setText("电池温度阈值："+Math.round(thermalCeiling)+"℃"+(Math.round(thermalCeiling)==43?"（建议）":""));stateGraph.invalidate();settingsGraph.invalidate();
         memorySwitch.setChecked(memoryEnabled);memorySlider.setProgress(Math.round(memoryStrength*100)-1);memoryText.setText("记忆强度 "+Math.round(memoryStrength*100)+"%"+(memoryStrength==1?" · 完整记忆":" · 缓慢记忆"));pipeline.invalidate();
         memoryWindowSlider.setProgress((int)(memoryWindow-500)/500);memoryWindowLabel.setText("连续调节间隔："+format(memoryWindow/1000d)+" 秒");memoryRangeSlider.setProgress(Math.round((memoryLuxRange-.1f)/.05f));memoryRangeLabel.setText("拖动分组照度容差：±"+Math.round(memoryLuxRange*100)+"%");
@@ -658,13 +654,13 @@ public final class MainActivity extends Activity {
             options.put("low_light_stability",lowLightStability).put("low_light_limit",lowLightLimit).put("low_light_brighten",lowLightBrighten).put("low_light_darken",lowLightDarken);
             lowThresholds.put(options);
             assistGateOptions.put(options);
-            memoryOptions.put(options);options.put("curve_floor_nit",curveFloor);if(savedBase!=null)savedBase.put(options);return options;
+            memoryOptions.put(options);options.put("curve_floor_nit",curveFloor);if(savedBase!=null)savedBase.put(options);themeCurve.verify(runtime.optString("curve_backend"),factoryLux,RootControl.numbers(runtime.getJSONArray("factory_logical_nit")),minimum,maximum);themeCurve.put(options);return options;
     }
     void exportConfiguration(){if(busy){show("另一项操作还在执行");return;}try{JSONObject file=ConfigurationFile.export(configuration(),runtime,dirty,refreshSeconds,autoScroll);run("export-config",Base64.getEncoder().encodeToString(file.toString().getBytes(StandardCharsets.UTF_8)));}catch(Exception error){show(error.getMessage());}}
     void importConfiguration(){if(factoryLux==null){show("连接后读取曲线");return;}if(busy){show("另一项操作还在执行");return;}try{Intent picker=new Intent(Intent.ACTION_OPEN_DOCUMENT);picker.addCategory(Intent.CATEGORY_OPENABLE);picker.setType("*/*");picker.putExtra(Intent.EXTRA_MIME_TYPES,new String[]{"application/json","text/plain","application/octet-stream"});startActivityForResult(picker,501);}catch(ActivityNotFoundException unavailable){show("未找到文件选择器");}}
     @Override protected void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);if(request!=501||result!=RESULT_OK||data==null||data.getData()==null)return;Uri uri=data.getData();worker.execute(()->{try(InputStream input=getContentResolver().openInputStream(uri);ByteArrayOutputStream out=new ByteArrayOutputStream()){if(input==null)throw new IOException("无法读取配置文件");byte[] buffer=new byte[4096];int count;while((count=input.read(buffer))!=-1){if(out.size()+count>ConfigurationFile.LIMIT)throw new IOException("配置文件过大");out.write(buffer,0,count);}String content=new String(out.toByteArray(),StandardCharsets.UTF_8);ui.post(()->previewConfiguration(content));}catch(Exception error){ui.post(()->show(error.getMessage()));}});}
     void previewConfiguration(String text){if(destroyed)return;try{if(runtime==null)throw new IllegalStateException("连接后读取曲线");ConfigurationFile.Imported imported=ConfigurationFile.read(text,runtime,configuration());String message="导入后先检查设置，再点击保存并应用。旧版本缺少的新选项使用默认值。";if(dirty)message+="\n\n导入会替换当前尚未保存的设置。";if(!imported.notes.isEmpty())message+="\n\n"+String.join("\n",imported.notes);ScrollView scroll=new ElasticScrollView(this);scroll.addView(MainActivity.this.text(message,14,MUTED));scroll.setLayoutParams(new LinearLayout.LayoutParams(-1,dp(240)));AlertDialog d=dialog("导入配置",scroll);d.show();dialogButton(d,"取消",null,false);dialogButton(d,"导入",()->{try{ConfigurationFile.Imported checked=ConfigurationFile.read(text,runtime,configuration());loadOptions(checked.options);if(checked.ui.has("refresh_seconds"))refreshSeconds=checked.ui.getInt("refresh_seconds");if(checked.ui.has("log_auto_scroll"))autoScroll=checked.ui.getBoolean("log_auto_scroll");getPreferences(0).edit().putInt("refresh_seconds",refreshSeconds).putBoolean("log_auto_scroll",autoScroll).apply();dirty=true;logFollow.setChecked(autoScroll);drawCurve();show("配置已导入，检查后点击保存并应用");}catch(Exception error){show(error.getMessage());}},true);}catch(Exception error){show(error.getMessage());}}
-    void loadOptions(JSONObject config)throws Exception{SavedCurve nextBase=SavedCurve.parse(config);float[] officialNit=RootControl.numbers(runtime.getJSONArray("factory_logical_nit"));float[] editableNit=nextBase==null?officialNit:nextBase.controls(factoryLux);SceneOptions nextScenes=SceneOptions.parse(config);controls=BrightnessControlOptions.parseStored(config);LowLightAssistGate nextAssistGate=new LowLightAssistGate();nextAssistGate.configure(config);LowLightThresholds nextLowThresholds=LowLightThresholds.parse(config);MemoryOptions nextMemory=MemoryOptions.parse(config);float[] next=CurvePlan.factors(config.getString("factors"));float floor=CurvePlan.floor(config.has("curve_floor_nit")?config.opt("curve_floor_nit"):null);SavedCurve.plan(nextBase,factoryLux,officialNit,minimum,maximum,next,floor);savedBase=nextBase;factoryNit=editableNit;AdvancedOptions a=AdvancedOptions.parse(config);OutdoorOptions o=OutdoorOptions.parse(config);sceneOptions=nextScenes;memoryOptions=nextMemory;lowThresholds=nextLowThresholds;assistGateOptions=nextAssistGate;factors=next;curveFloor=floor;advanced=a;outdoorOptions=o;thermalRelax=config.optBoolean("thermal_relax");thermalCeiling=(float)config.optDouble("thermal_ceiling",43);float memory=(float)config.optDouble("memory_strength",1);memoryEnabled=memory>0;if(memoryEnabled)memoryStrength=memory;memoryWindow=config.optLong("memory_window",1500);memoryLuxRange=(float)config.optDouble("memory_lux_range",.3);thermalCooling=(float)config.optDouble("thermal_cooling",1);responseOverride=config.optBoolean("response_override");brightenDelay=config.optLong("brighten_delay",1500);darkenDelay=config.optLong("darken_delay",5000);smallBrightenOverride=config.optBoolean("small_brighten_override");smallBrightenDelay=config.optLong("small_brighten_delay",5000);lowLightStability=config.optBoolean("low_light_stability");lowLightLimit=(float)config.optDouble("low_light_limit",50);lowLightBrighten=config.optLong("low_light_brighten",3000);lowLightDarken=config.optLong("low_light_darken",4000);}
+    void loadOptions(JSONObject config)throws Exception{ThemeCurveOptions nextTheme=ThemeCurveOptions.parse(config);nextTheme.verify(runtime.optString("curve_backend"),factoryLux,RootControl.numbers(runtime.getJSONArray("factory_logical_nit")),minimum,maximum);themeCurve=nextTheme;SavedCurve nextBase=SavedCurve.parse(config);float[] officialNit=RootControl.numbers(runtime.getJSONArray("factory_logical_nit"));float[] editableNit=nextBase==null?officialNit:nextBase.controls(factoryLux);SceneOptions nextScenes=SceneOptions.parse(config);controls=BrightnessControlOptions.parseStored(config);LowLightAssistGate nextAssistGate=new LowLightAssistGate();nextAssistGate.configure(config);LowLightThresholds nextLowThresholds=LowLightThresholds.parse(config);MemoryOptions nextMemory=MemoryOptions.parse(config);float[] next=CurvePlan.factors(config.getString("factors"));float floor=CurvePlan.floor(config.has("curve_floor_nit")?config.opt("curve_floor_nit"):null);SavedCurve.plan(nextBase,factoryLux,officialNit,minimum,maximum,next,floor);savedBase=nextBase;factoryNit=editableNit;AdvancedOptions a=AdvancedOptions.parse(config);OutdoorOptions o=OutdoorOptions.parse(config);sceneOptions=nextScenes;memoryOptions=nextMemory;lowThresholds=nextLowThresholds;assistGateOptions=nextAssistGate;factors=next;curveFloor=floor;advanced=a;outdoorOptions=o;thermalRelax=config.optBoolean("thermal_relax");thermalCeiling=(float)config.optDouble("thermal_ceiling",43);float memory=(float)config.optDouble("memory_strength",1);memoryEnabled=memory>0;if(memoryEnabled)memoryStrength=memory;memoryWindow=config.optLong("memory_window",1500);memoryLuxRange=(float)config.optDouble("memory_lux_range",.3);thermalCooling=(float)config.optDouble("thermal_cooling",1);responseOverride=config.optBoolean("response_override");brightenDelay=config.optLong("brighten_delay",1500);darkenDelay=config.optLong("darken_delay",5000);smallBrightenOverride=config.optBoolean("small_brighten_override");smallBrightenDelay=config.optLong("small_brighten_delay",5000);lowLightStability=config.optBoolean("low_light_stability");lowLightLimit=(float)config.optDouble("low_light_limit",50);lowLightBrighten=config.optLong("low_light_brighten",3000);lowLightDarken=config.optLong("low_light_darken",4000);}
     void submit(){
         if(factoryLux==null)return;
         try{JSONObject options=configuration();
@@ -723,9 +719,11 @@ public final class MainActivity extends Activity {
     }
     static String pretty(JSONObject object){try{return object.toString(2);}catch(Exception ignored){return object.toString();}}
     void donate(String name,String file){try{ImageView v=image(file,240,12);v.setScaleType(ImageView.ScaleType.FIT_CENTER);LinearLayout box=column();box.setGravity(Gravity.CENTER_HORIZONTAL);box.addView(v);TextView reminder=text("记得备注[昵称：想说的话]噢",13,MUTED);reminder.setGravity(Gravity.CENTER);box.addView(reminder);AlertDialog d=dialog(tr(name)+" · "+tr("打赏"),box);d.show();dialogButton(d,"关闭",null,false);}catch(Exception error){show(error.toString());}}
-    void editPoint(int point){
+    void editPoint(int point){editPoint(point,false);}
+    void editPoint(int point,boolean darkProfile){
+        float[] factors=darkProfile?themeCurve.factors:this.factors;float[] factoryNit=darkProfile?darkCurveGraph.editNit():this.factoryNit;float curveFloor=darkProfile?themeCurve.floor:this.curveFloor;
         if(factoryLux==null)return;if(point==3){show("最高照度节点保持设备原始值");return;}
-        if(point==0){editFloor();return;}try{float[] range=CurveEditor.bounds(point,factoryNit,minimum,maximum,factors,curveFloor);LinearLayout body=column();body.addView(text(format(factoryLux[point])+" lux · 节点强度",13,MUTED));
+        if(point==0){editFloor(darkProfile);return;}try{float[] range=CurveEditor.bounds(point,factoryNit,minimum,maximum,factors,curveFloor);LinearLayout body=column();body.addView(text(format(factoryLux[point])+" lux · 节点强度",13,MUTED));
             body.addView(text("可调范围："+format(range[0]*100)+"% ～ "+format(range[1]*100)+"%",13,BLUE));body.addView(text("100% 为系统基础值。范围由系统亮度上下限及相邻节点决定。",12,MUTED));
             EditText number=input("输入百分比");number.setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);number.setText(format(factors[point]*100));body.addView(number);
             TextView error=text("",12,0xffad5426);body.addView(error);AlertDialog d=dialog("编辑曲线节点",body);d.show();dialogButton(d,"取消",null,false);
@@ -734,7 +732,8 @@ public final class MainActivity extends Activity {
                 factors[point]=CurveEditor.clamp(point,value,factoryNit,minimum,maximum,factors,curveFloor);dirty=true;drawCurve();d.dismiss();}catch(Exception ex){error.setText("请输入有效数字");}},actions);confirm.setTextColor(darkTheme?BG:Color.WHITE);confirm.setBackground(ripple(BLUE,12));
         }catch(Exception error){show(error.getMessage());}
     }
-    void editFloor(){try{float[] bounds=CurveEditor.floorBounds(factoryNit,minimum,maximum,factors);float current=new CurvePlan(factoryLux,factoryNit,minimum,maximum,factors,curveFloor).nits()[0];LinearLayout body=column();body.addView(text("暗处亮度下限",16,INK));body.addView(text("按本机曲线范围输入百分比，不是控制中心滑块的百分比。仅调整基础曲线，手动选择和温控仍优先。",12,MUTED));body.addView(text("可调范围："+curvePercent(bounds[0]/maximum*100)+"% ～ "+curvePercent(bounds[1]/maximum*100)+"%",13,BLUE));EditText number=input("输入百分比");number.setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);number.setText(String.format(Locale.ROOT,"%.4f",current/maximum*100));body.addView(number);TextView error=text("",12,0xffad5426);body.addView(error);AlertDialog d=dialog("编辑最低照度节点",body);d.show();dialogButton(d,"取消",null,false);LinearLayout actions=(LinearLayout)d.getWindow().getDecorView().findViewWithTag("actions");Button confirm=compact("确定",()->{try{float value=Float.parseFloat(number.getText().toString())/100*maximum;if(!Float.isFinite(value)||value<bounds[0]-.0001f||value>bounds[1]+.0001f){error.setText("请输入范围内的数值");return;}curveFloor=Math.max(bounds[0],Math.min(bounds[1],value));dirty=true;drawCurve();d.dismiss();}catch(Exception failure){error.setText("请输入有效数字");}},actions);confirm.setTextColor(darkTheme?BG:Color.WHITE);confirm.setBackground(ripple(BLUE,12));}catch(Exception error){show(error.getMessage());}}
+    void editFloor(){editFloor(false);}
+    void editFloor(boolean darkProfile){float[] factors=darkProfile?themeCurve.factors:this.factors;float[] factoryNit=darkProfile?darkCurveGraph.editNit():this.factoryNit;float curveFloor=darkProfile?themeCurve.floor:this.curveFloor;try{float[] bounds=CurveEditor.floorBounds(factoryNit,minimum,maximum,factors);float current=new CurvePlan(factoryLux,factoryNit,minimum,maximum,factors,curveFloor).nits()[0];LinearLayout body=column();body.addView(text("暗处亮度下限",16,INK));body.addView(text("按本机曲线范围输入百分比，不是控制中心滑块的百分比。仅调整基础曲线，手动选择和温控仍优先。",12,MUTED));body.addView(text("可调范围："+curvePercent(bounds[0]/maximum*100)+"% ～ "+curvePercent(bounds[1]/maximum*100)+"%",13,BLUE));EditText number=input("输入百分比");number.setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);number.setText(String.format(Locale.ROOT,"%.4f",current/maximum*100));body.addView(number);TextView error=text("",12,0xffad5426);body.addView(error);AlertDialog d=dialog("编辑最低照度节点",body);d.show();dialogButton(d,"取消",null,false);LinearLayout actions=(LinearLayout)d.getWindow().getDecorView().findViewWithTag("actions");Button confirm=compact("确定",()->{try{float value=Float.parseFloat(number.getText().toString())/100*maximum;if(!Float.isFinite(value)||value<bounds[0]-.0001f||value>bounds[1]+.0001f){error.setText("请输入范围内的数值");return;}if(darkProfile)themeCurve.floor=Math.max(bounds[0],Math.min(bounds[1],value));else this.curveFloor=Math.max(bounds[0],Math.min(bounds[1],value));dirty=true;drawCurve();d.dismiss();}catch(Exception failure){error.setText("请输入有效数字");}},actions);confirm.setTextColor(darkTheme?BG:Color.WHITE);confirm.setBackground(ripple(BLUE,12));}catch(Exception error){show(error.getMessage());}}
     void open(String url){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(url)).addCategory(Intent.CATEGORY_BROWSABLE));}catch(ActivityNotFoundException error){show("未找到浏览器，可复制网址打开");android.content.ClipboardManager cm=(android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE);cm.setPrimaryClip(ClipData.newPlainText("网址",url));}}
     static String quote(String value){return "'"+value.replace("'","'\\''")+"'";}
     synchronized void closeBridge(){
@@ -765,7 +764,7 @@ public final class MainActivity extends Activity {
     void run(String command,String payload){
         if(busy||destroyed)return;busy=true;apply.setEnabled(false);stop.setEnabled(false);drawDraftState();
         if(command.equals("promote-memory")){curveSaveProgress=dialog("保存为基础曲线",text("正在保存手动记忆曲线…",14,MUTED));curveSaveProgress.setCancelable(false);curveSaveProgress.setCanceledOnTouchOutside(false);curveSaveProgress.show();}
-        if(!(command.equals("inspect")||command.equals("self-check")))show(command.equals("apply")?"正在应用曲线和温控选项…":command.equals("stop")?"正在恢复官方策略…":command.equals("reset-memory")?"正在清除手动记忆…":command.equals("promote-memory")?"正在保存手动记忆曲线…":command.equals("export-config")?"正在导出配置…":"正在导出分析包…");
+        if(!(command.equals("inspect")||command.equals("self-check")))show(command.equals("apply")?"正在应用曲线和温控选项…":(command.equals("stop")||command.equals("restore-defaults"))?"正在恢复系统默认…":command.equals("reset-memory")?"正在清除手动记忆…":command.equals("promote-memory")?"正在保存手动记忆曲线…":command.equals("export-config")?"正在导出配置…":"正在导出分析包…");
         worker.execute(()->{
             try{
                 JSONObject received;
@@ -781,8 +780,11 @@ public final class MainActivity extends Activity {
                         prefs.putBoolean("legacy_imported",true).apply();
                     }}catch(Exception ignored){}
                 }
-                JSONObject state=(command.equals("inspect")||command.equals("self-check"))?result:(command.equals("apply")||command.equals("promote-memory")||command.equals("stop")||command.equals("reset-memory"))?request("inspect",null):null;
+                JSONObject state=(command.equals("inspect")||command.equals("self-check"))?result:(command.equals("apply")||command.equals("promote-memory")||command.equals("stop")||command.equals("restore-defaults")||command.equals("reset-memory"))?request("inspect",null):null;
                 ui.post(()->{if(destroyed)return;finishCurveSaveProgress();busy=false;stop.setEnabled(true);if(command.equals("apply")||command.equals("promote-memory")){dirty=!draftStillMatches(payload);}
+                    if(command.equals("restore-defaults")){
+                        try{loadOptions(new JSONObject().put("factors","1,1,1,1"));dirty=false;getPreferences(0).edit().remove("draft").remove("draft_floor").remove("draft_baseline").putBoolean("legacy_imported",true).apply();}catch(Exception failure){show(failure.getMessage());}
+                    }
                     if(state!=null)render(state);else apply.setEnabled(runtime!=null&&factoryLux!=null);drawDraftState();offerLegacyModules();offerUpdate();quickSetup.resume();quickSetup.invite();quickSetup.refreshed(command,true);finishFeatureCheckRequest(command,result);if(logCompatibility!=null&&(command.equals("inspect")||command.equals("self-check")))logCompatibility.update(lastAnswer,rootFeatureReport);
                     if(featureCheckRefreshPending&&featureChecksVisible){rereadPending=false;ui.post(this::refreshFeatureChecks);}else if(rereadPending){rereadPending=false;ui.post(()->run("inspect",null));}
                     if(!(command.equals("inspect")||command.equals("self-check"))){String message=result.optString("message",result.has("path")?"已导出："+result.optString("path"):"操作完成");show(message);
@@ -810,7 +812,7 @@ public final class MainActivity extends Activity {
             runtime=answer.getJSONObject("runtime");if(!runtime.has("factory_lux")){factoryLux=factoryNit=null;badge.setText("不兼容");show("");apply.setEnabled(false);thermalSwitch.setEnabled(false);memorySwitch.setEnabled(false);permissionPrompt("abi","系统接口尚未兼容",runtime.optString("message"));return;}
             factoryLux=RootControl.numbers(runtime.getJSONArray("factory_lux"));factoryNit=RootControl.numbers(runtime.getJSONArray("factory_logical_nit"));minimum=(float)runtime.getDouble("min_logical_nit");maximum=(float)runtime.getDouble("max_logical_nit");
             String baseline=runtime.optString("baseline_id");
-            if(!baseline.equals(loadedBaseline)){loadedBaseline=baseline;dirty=false;curveFloor=0;savedBase=null;factors=new float[]{1,1,1,1};if(baseline.equals(getPreferences(0).getString("draft_baseline","")))try{factors=CurvePlan.factors(getPreferences(0).getString("draft","1,1,1,1"));curveFloor=getPreferences(0).getFloat("draft_floor",0);}catch(Exception ignored){}}
+            if(!baseline.equals(loadedBaseline)){loadedBaseline=baseline;dirty=false;curveFloor=0;savedBase=null;factors=new float[]{1,1,1,1};themeCurve=new ThemeCurveOptions();if(baseline.equals(getPreferences(0).getString("draft_baseline","")))try{factors=CurvePlan.factors(getPreferences(0).getString("draft","1,1,1,1"));curveFloor=getPreferences(0).getFloat("draft_floor",0);}catch(Exception ignored){}}
             JSONObject config=answer.optJSONObject("config");
             if(config!=null&&!ConfigurationCompatibility.canReuse(config,runtime,Build.FINGERPRINT))config=null;
             if(restoredUi!=null){Bundle previousUi=restoredUi;restoredUi=null;if(previousUi.getBoolean("dirty")&&baseline.equals(previousUi.getString("baseline"))){try{loadOptions(new JSONObject(previousUi.getString("draft_options")));dirty=true;}catch(Exception invalid){show("未保存的设置无法恢复，请重新检查");}}int group=previousUi.getInt("settings_group",-1);if(page==1&&group>=0&&group<settingGroups.length)showSettingsGroup(group);}
@@ -845,8 +847,8 @@ public final class MainActivity extends Activity {
     }
     static String severity(int level){String[] names={"正常","轻微","中等","严重","危急","紧急","关机"};return level>=0&&level<names.length?names[level]:"未知";}
     void resumeRuntime(){if(destroyed||!visible||welcome.showing()||quickSetup.showing())return;syncPageChrome();permissionNotice="";permissionBlocked=false;syncLauncherSetting();if(!startupFeatureCheckRequested){startupFeatureCheckRequested=true;checkAppFeatures();run("self-check","app-start");}else run("inspect",null);ui.removeCallbacks(tick);ui.postDelayed(tick,refreshSeconds*1000);if(page==0||page==3)checkUpdate(false);if(page==3)refreshThanks();offerLegacyModules();offerUpdate();}
-    @Override public void onResume(){super.onResume();visible=true;welcome.resume();quickSetup.resume();if(!welcome.showing()&&!quickSetup.showing())resumeRuntime();}
-    @Override public void onPause(){visible=false;welcome.finishTransition();quickSetup.finishTransition();if(floatingNavigation!=null)floatingNavigation.stop();if(settingsSearch!=null)settingsSearch.finishAnimation();if(aboutPage!=null)aboutPage.active(false);if(manualPanel!=null)manualPanel.close();finishPageTransition();ui.removeCallbacks(tick);getPreferences(0).edit().putString("draft",CurvePlan.encode(factors)).putString("draft_baseline",loadedBaseline).putFloat("draft_floor",curveFloor).apply();if(!busy)worker.execute(this::closeBridge);super.onPause();}
+    @Override public void onResume(){super.onResume();visible=true;if(controlCenterSettings!=null)controlCenterSettings.demo.refresh();welcome.resume();quickSetup.resume();if(!welcome.showing()&&!quickSetup.showing())resumeRuntime();}
+    @Override public void onPause(){visible=false;if(controlCenterSettings!=null)controlCenterSettings.demo.stop();welcome.finishTransition();quickSetup.finishTransition();if(floatingNavigation!=null)floatingNavigation.stop();if(settingsSearch!=null)settingsSearch.finishAnimation();if(aboutPage!=null)aboutPage.active(false);if(manualPanel!=null)manualPanel.close();finishPageTransition();ui.removeCallbacks(tick);getPreferences(0).edit().putString("draft",CurvePlan.encode(factors)).putString("draft_baseline",loadedBaseline).putFloat("draft_floor",curveFloor).apply();if(!busy)worker.execute(this::closeBridge);super.onPause();}
     @Override public void onStop(){if(!isChangingConfigurations())finishUpdateVisit();super.onStop();}
     @Override public Object onRetainNonConfigurationInstance(){return Boolean.valueOf(updateOffered);}
     @Override public void onSaveInstanceState(Bundle saved){if(settingsSearch!=null){saved.putString("settings_search_query",settingsSearch.query());saved.putInt("settings_search_home_y",settingsSearch.homePosition);}welcome.save(saved);quickSetup.save(saved);if(featureCheckPage!=null){saved.putBoolean("feature_checks_page",featureChecksVisible);saved.putInt("feature_checks_y",featureCheckPage.scroll.getScrollY());saved.putStringArrayList("feature_checks_expanded",new java.util.ArrayList<>(featureCheckPage.expanded));}rememberSettingsHome();saved.putInt("settings_home_y",settingsHomeY);saved.putInt("page",page);saved.putInt("settings_group",settingsGroup);saved.putBoolean("dirty",dirty);saved.putString("baseline",loadedBaseline);if(dirty&&factoryLux!=null)try{saved.putString("draft_options",configuration(false).toString());}catch(Exception ignored){}super.onSaveInstanceState(saved);}
@@ -939,9 +941,14 @@ public final class MainActivity extends Activity {
     }
 
     final class CurveView extends View{
-        final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);final boolean draft,memory;int point=-1;float startX,startY,startFactor;float[] dragBounds;boolean moved;
+        final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);final boolean draft,memory,darkProfile;int point=-1;float startX,startY,startFactor;float[] dragBounds;boolean moved;
         CurveView(boolean draft){this(draft,false);}
-        CurveView(boolean draft,boolean memory){super(MainActivity.this);this.draft=draft;this.memory=memory;setContentDescription(tr(draft?"拖动节点调整曲线，点击节点输入数值":memory?"蓝色基础曲线与浅绿色实际曲线":"当前亮度曲线"));setFocusable(draft);}
+        CurveView(boolean draft,boolean memory){this(draft,memory,false);}
+        CurveView(boolean draft,boolean memory,boolean darkProfile){super(MainActivity.this);this.draft=draft;this.memory=memory;this.darkProfile=darkProfile;setContentDescription(tr(draft?"拖动节点调整曲线，点击节点输入数值":memory?"蓝色基础曲线与浅绿色实际曲线":"当前亮度曲线"));setFocusable(draft);}
+        float[] editFactors(){return darkProfile?themeCurve.factors:factors;}
+        float editFloorValue(){return darkProfile?themeCurve.floor:curveFloor;}
+        SavedCurve editSaved(){return darkProfile?themeCurve.saved:savedBase;}
+        float[] editNit(){if(!darkProfile)return factoryNit;try{return editSaved()==null?RootControl.numbers(runtime.getJSONArray("factory_logical_nit")):editSaved().controls(factoryLux);}catch(Exception e){return factoryNit;}}
         float left(){return dp(draft||memory?38:32);}float top(){return dp(draft||memory?18:8);}float width(){return Math.max(0,getWidth()-left()-dp(draft||memory?12:8));}float height(){return getHeight()-top()-dp(draft||memory?28:22);}
         float x(float lux){return left()+(float)(Math.log1p(Math.max(0,Math.min(lux,factoryLux[3])))/Math.log1p(factoryLux[3]))*width();}
         float y(float nit){return top()+height()*(1-nit/maximum);}
@@ -950,7 +957,7 @@ public final class MainActivity extends Activity {
             if(factoryLux==null){canvas.drawText(tr("连接后读取曲线"),dp(10),dp(65),paint);return;}
             if(!draft&&!memory&&!StatusPresentation.fresh(runtime,SystemClock.elapsedRealtime())){canvas.drawText(tr("状态待刷新"),dp(10),dp(65),paint);return;}
             float left=left(),top=top(),width=width(),height=height();if(width<=0||height<=0)return;
-            CurveComparison data;try{data=CurveComparison.read(runtime,factors,curveFloor,draft,savedBase);}catch(Exception invalid){canvas.drawText(tr("曲线数据未就绪"),dp(10),dp(65),paint);return;}
+            CurveComparison data;try{data=CurveComparison.read(runtime,editFactors(),editFloorValue(),draft,editSaved());}catch(Exception invalid){canvas.drawText(tr("曲线数据未就绪"),dp(10),dp(65),paint);return;}
             paint.setStrokeWidth(dp(1));paint.setTextSize(dp(10));for(int i=0;i<3;i++){float yy=top+height*i/2;paint.setColor(themed(0xffe7ebf2));canvas.drawLine(left,yy,left+width,yy,paint);paint.setColor(MUTED);canvas.drawText((100-i*50)+"%",0,yy+dp(4),paint);}
             // Editable drafts never replace the applied baseline or current memory in the other graphs.
             String kind=data.kind(runtime);int currentColor=memory||kind.equals("memory")?themed(0xff78b997):kind.equals("system")?themed(0xffa5aab3):BLUE;
@@ -970,14 +977,15 @@ public final class MainActivity extends Activity {
         @Override public boolean onTouchEvent(android.view.MotionEvent event){
             if(memory){if(event.getActionMasked()==MotionEvent.ACTION_UP){performClick();memoryDetails();}return true;}
             if(!draft||factoryLux==null||!isEnabled())return super.onTouchEvent(event);
+            float[] factors=editFactors(),factoryNit=editNit();float curveFloor=editFloorValue();TextView curveHint=darkProfile?darkCurveHint:MainActivity.this.curveHint;
             if(event.getActionMasked()==MotionEvent.ACTION_DOWN){point=-1;float nearest=dp(32);float[] values;try{values=new CurvePlan(factoryLux,factoryNit,minimum,maximum,factors,curveFloor).nits();}catch(Exception ignored){return false;}
                 for(int i=0;i<4;i++){float distance=(float)Math.hypot(event.getX()-x(factoryLux[i]),event.getY()-y(values[i]));if(distance<nearest){nearest=distance;point=i;}}
                 if(point<0)return false;startX=event.getX();startY=event.getY();startFactor=point==0?values[0]:factors[point];dragBounds=point==0?CurveEditor.floorBounds(factoryNit,minimum,maximum,factors):point<3?CurveEditor.bounds(point,factoryNit,minimum,maximum,factors,curveFloor):null;moved=false;getParent().requestDisallowInterceptTouchEvent(true);invalidate();return true;
             }
             if(event.getActionMasked()==MotionEvent.ACTION_MOVE&&point>=0){if(Math.hypot(event.getX()-startX,event.getY()-startY)>ViewConfiguration.get(MainActivity.this).getScaledTouchSlop())moved=true;
-                if(moved&&point<3){try{float requested=startFactor+(startY-event.getY())/dp(140)*(dragBounds[1]-dragBounds[0]);if(point==0)curveFloor=Math.max(dragBounds[0],Math.min(dragBounds[1],requested));else factors[point]=CurveEditor.clamp(point,requested,factoryNit,minimum,maximum,factors,curveFloor);dirty=true;drawCurve();if(point==0)curveHint.setText("暗处亮度下限："+curvePercent(curveFloor/maximum*100)+"%");else{float[] range=CurveEditor.bounds(point,factoryNit,minimum,maximum,factors,curveFloor);curveHint.setText(format(factoryLux[point])+" lux · "+format(factors[point]*100)+"% · 可调 "+format(range[0]*100)+"%～"+format(range[1]*100)+"%");}}catch(Exception error){show(error.getMessage());}}return true;
+                if(moved&&point<3){try{float requested=startFactor+(startY-event.getY())/dp(140)*(dragBounds[1]-dragBounds[0]);if(point==0){curveFloor=Math.max(dragBounds[0],Math.min(dragBounds[1],requested));if(darkProfile)themeCurve.floor=curveFloor;else MainActivity.this.curveFloor=curveFloor;}else factors[point]=CurveEditor.clamp(point,requested,factoryNit,minimum,maximum,factors,curveFloor);dirty=true;drawCurve();if(point==0)curveHint.setText("暗处亮度下限："+curvePercent(curveFloor/maximum*100)+"%");else{float[] range=CurveEditor.bounds(point,factoryNit,minimum,maximum,factors,curveFloor);curveHint.setText(format(factoryLux[point])+" lux · "+format(factors[point]*100)+"% · 可调 "+format(range[0]*100)+"%～"+format(range[1]*100)+"%");}}catch(Exception error){show(error.getMessage());}}return true;
             }
-            if(event.getActionMasked()==MotionEvent.ACTION_UP&&point>=0){int selected=point;getParent().requestDisallowInterceptTouchEvent(false);if(!moved){performClick();editPoint(selected);}point=-1;invalidate();return true;}
+            if(event.getActionMasked()==MotionEvent.ACTION_UP&&point>=0){int selected=point;getParent().requestDisallowInterceptTouchEvent(false);if(!moved){performClick();editPoint(selected,darkProfile);}point=-1;invalidate();return true;}
             if(event.getActionMasked()==MotionEvent.ACTION_CANCEL){point=-1;getParent().requestDisallowInterceptTouchEvent(false);invalidate();return true;}return point>=0;
         }
         @Override public boolean performClick(){super.performClick();return true;}

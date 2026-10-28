@@ -8,7 +8,7 @@ import java.util.*;
  */
 final class CompatibilityCatalog {
     private CompatibilityCatalog(){}
-    private static final String[] FEATURES={"curve","manual_memory","saved_curve","persistent_memory","memory_mode","memory_forever","memory_reset","memory_timeout","main_sensor","assist_sensor","response","small_response","low_light","low_threshold","threshold_override","assist_gate","assist_override","animation_override","sunlight_override","touch_override","scene_night_driving","scene_step","scene_touch","scene_proximity","scene_stream_proximity","scene_reflection","scene_night_wake","scene_manual_sunlight","scene_game","dark_lock","dark_lock_schedule","manual_panel","control_center_slider","apps","thermal","outdoor","hbm","outdoor_range","opr","nit_limit","node_output","main_panel_node","root_storage","root_identity","root_settings","root_process_identity","stored_config","outdoor_node_device","native_payload","launcher","preferences","app_files"};
+    private static final String[] FEATURES={"curve","manual_memory","saved_curve","persistent_memory","memory_mode","memory_forever","memory_reset","memory_timeout","main_sensor","assist_sensor","response","small_response","low_light","low_threshold","threshold_override","assist_gate","assist_override","animation_override","sunlight_override","touch_override","scene_night_driving","scene_step","scene_touch","scene_proximity","scene_stream_proximity","scene_reflection","scene_night_wake","scene_manual_sunlight","scene_game","dark_lock","dark_lock_schedule","manual_panel","control_center_slider","control_center_raw","control_center_partition","apps","thermal","outdoor","hbm","outdoor_range","opr","nit_limit","node_output","main_panel_node","root_storage","root_identity","root_settings","root_process_identity","stored_config","outdoor_node_device","native_payload","launcher","preferences","app_files","dim_aod"};
     static String[] features(){return FEATURES.clone();}
     static final class Route {
         final String id,name,condition;
@@ -19,10 +19,12 @@ final class CompatibilityCatalog {
         route("refactor","Refactor 逻辑曲线","使用本机 RefactorNitController 的逻辑锚点、手动点与曲线重建接口。"),
         route("refactor_coefficients","Refactor 分段系数曲线","旧式9项系数与22项状态完整；保留原生手动学习和输出，尚不提供虚拟拟合点的跨模式 / 锁屏 / 重启恢复或记忆转基础。"),
         route("miui_physical","小米传统物理映射","实际映射器为 MiuiPhysicalBrightnessMappingStrategy，保留完整设备曲线与应用修正。"),
-        route("aosp_physical","系统标准物理映射","实际映射器为 PhysicalMappingStrategy，使用其亮度 / nit 转换与短期模型。")};}
+        route("aosp_physical","系统标准物理映射","实际映射器为 PhysicalMappingStrategy，使用其亮度 / nit 转换与短期模型。"),
+        route("aosp_physical_clamped","系统物理映射：标定端点裁剪","原机曲线超出标定范围，且实际双向标定样条及端点裁剪通过验证；按有效范围编辑，默认保持原曲线对象与原生保护。")};}
     static Route[] catalogue(String id){
         if(Arrays.asList("curve","manual_memory","saved_curve","persistent_memory","memory_mode","memory_forever","memory_reset","memory_timeout").contains(id))return curveRoutes();
         switch(id){
+        case "dim_aod":return new Route[]{route("automatic_dim_aod_cap","自动降亮与息屏目标协调","主屏仍亮且处于自动DIM降亮时，阻止全屏AOD目标重新抬高已降低的亮度；真正息屏、背屏、手动及HDR沿用系统。")};
         case "main_sensor":return new Route[]{route("oem_main","系统标准主光感","读取当前主屏 ABC 选用的 TYPE_LIGHT 光感，沿用原适配。"),route("oem_selected_secondary","系统选用的折叠光感","当前主屏 ABC 直接选用已验证的私有照度光感；拒绝原始、工厂、流式及其他屏幕候选。"),route("oem_selected_fov","系统 FOV 融合光感","沿用主屏原生光感选择器返回的 FOV 源和照度解析；不混用 ABC 保留的物理光感槽。")};
         case "assist_sensor":return new Route[]{
             route("native_auxiliary","系统原生辅助光感","原生辅助槽已有传感器时优先使用，继续沿用系统采样和融合。"),
@@ -35,7 +37,9 @@ final class CompatibilityCatalog {
         case "dark_lock":return new Route[]{route("abc_sensor_manager","自动亮度控制器的光感服务","复用本机 ABC 的 SensorManager；按传感器类型和句柄识别，锁定期间低频确认退出条件。")};
         case "manual_panel":return new Route[]{route("raw_primary_output","主屏手动节点接管","主屏手动输出接口配合实际节点识别、所有权租约与系统接管退让；不把节点值视为 nit。")};
         case "node_output":return new Route[]{route("raw_primary_output","原生策略节点协作","优先使用实际输出策略，普通自动输出到顶后协作，保留原生保护。"),route("automatic_strategy2_node","独立自动对象与原因协作","仅原生策略入口缺失时核验独立自动对象、同屏归属和双份亮度原因，不替换手动面板路径。")};
-        case "control_center_slider":return new Route[]{route("coordinate_v2","双向设备坐标映射","使用本机亮度到背光的转换表；可可靠单调反解才启用。本版入口隐藏，旧选择保留。")};
+        case "control_center_partition":return new Route[]{route("partition_node_v4","普通亮度与节点分区控制","使用本机普通亮度边界划分区间；普通区间保留自动亮度与原学习。到达边界松手后，三秒内再次向上滑动才使用共用节点保持；返回普通区间可恢复自动或保持手动。"),route("partition_ddc_hbm","原机配置普通上限","优先读取原始HBM过渡点，按本机标定换算普通区间；类型或数据错误不降级绕过。"),route("partition_hbm_normal","控制器普通上限","原机配置没有该入口或合法无HBM数据时，读取实际普通亮度上限；不按固定比例猜测。")};
+        case "control_center_raw":return new Route[]{route("raw_node_v3","完整主屏节点与手动保持","独立选择开启；按实际 max_brightness 比例下发节点目标。拖动退出暗光锁定并关闭自动亮度，复用主屏节点租约；重开自动亮度立即结束。需要实际可写节点与系统界面接口；未知折叠监听布局不套用。")};
+        case "control_center_slider":return new Route[]{route("coordinate_v2","双向设备坐标映射","使用本机亮度到背光的转换表；可可靠单调反解才启用。保留自动亮度、手动记忆与暗光锁定的原有控制权。"),route("coordinate_v2_calibrated","标定有效区间映射","仅完整原生标定与双向样条一致、端点裁剪和有效区间可反解时，排除最低或最高端的平台；中段异常及额外低亮度标定不套用。")};
         case "thermal":return new Route[]{route("display_thermal","显示层温控接口","仅调整显示亮度限制；严重温控、电池温度门槛及其他系统温控继续有效。")};
         case "response":case "small_response":case "low_light":case "low_threshold":case "threshold_override":case "assist_gate":case "assist_override":return new Route[]{
             route("native_driving","原生确认与夜间驾驶保护","使用已验证的主辅光感确认和阈值；保留原生夜间驾驶判断及附加等待。"),
@@ -62,5 +66,5 @@ final class CompatibilityCatalog {
     }
     static String sceneName(String id){switch(id){case "proximity":return "普通距离策略";case "stream_proximity":return "流式距离策略";case "night_driving":return "系统夜间驾驶策略";case "night_wake":return "系统夜间唤醒策略";case "step":return "系统步行延迟策略";case "touch":return "系统触摸遮挡策略";case "reflection":return "系统反射 / AON 策略";case "game":return "系统游戏防误降亮策略";case "manual_sunlight":return "系统手动阳光屏策略";default:return "未知场景接口";}}
     static String sceneCondition(String id){switch(id){case "proximity":return "匹配 dropAmbientLuxIfNeeded 和普通距离开关；系统未开启时不强制启动。流式距离是另一项独立策略，不混用设置。";case "stream_proximity":return "匹配 SceneDetector 的流式确认与跳过亮度变化接口；与普通距离分别设置。";case "step":return "使用 ABC 原生步行额外降亮确认接口。";case "touch":return "使用 TouchCoverProtectionHelper 的实时遮挡判断。";case "night_wake":return "使用 ABC 的 updateNightWakeMode，不伪造夜间唤醒条件。";case "manual_sunlight":return "使用 SunlightController 原生状态与条件。";default:return "匹配本机该场景的原生消费者，仅限制参与条件，不强制进入场景。";}}
-    static int group(String id){if(Arrays.asList("curve","manual_memory","saved_curve","persistent_memory","memory_mode","memory_forever","memory_reset","memory_timeout").contains(id))return 0;if(id.startsWith("scene_")||Arrays.asList("main_sensor","assist_sensor","response","small_response","low_light","low_threshold","assist_gate","threshold_override","assist_override","animation_override","sunlight_override","touch_override").contains(id))return 1;if(Arrays.asList("outdoor","hbm","outdoor_range","opr","nit_limit","node_output","thermal","dark_lock","dark_lock_schedule").contains(id))return 2;return 3;}
+    static int group(String id){if(Arrays.asList("curve","manual_memory","saved_curve","persistent_memory","memory_mode","memory_forever","memory_reset","memory_timeout").contains(id))return 0;if(id.startsWith("scene_")||Arrays.asList("main_sensor","assist_sensor","response","small_response","low_light","low_threshold","assist_gate","threshold_override","assist_override","animation_override","sunlight_override","touch_override","dim_aod").contains(id))return 1;if(Arrays.asList("outdoor","hbm","outdoor_range","opr","nit_limit","node_output","thermal","dark_lock","dark_lock_schedule").contains(id))return 2;return 3;}
 }

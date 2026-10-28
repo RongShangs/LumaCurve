@@ -1,6 +1,7 @@
 """Exercise release guards and real website scripts in an isolated fixture."""
 from pathlib import Path
-import ast, hashlib, json, shutil, subprocess, sys, tempfile, types, zipfile
+from workspace_scratch import scratch_directory
+import ast, hashlib, json, shutil, subprocess, sys, types, zipfile
 
 ROOT=Path(__file__).resolve().parents[1]
 cases=0
@@ -11,8 +12,27 @@ def check(value):
 
 tree=ast.parse((ROOT/'tools/build_refactor_hook_test.py').read_text(encoding='utf-8'))
 guard=next(n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=='validate_release_signing')
-with tempfile.TemporaryDirectory(prefix='hyperlux-release-') as temporary:
+with scratch_directory(prefix='hyperlux-release-') as temporary:
     base=Path(temporary)
+    class_input=next(n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=='class_archive')
+    archive_scope={'Path':Path,'zipfile':zipfile}
+    exec(compile(ast.Module(body=[class_input],type_ignores=[]),'<production class input archive>','exec'),archive_scope)
+    compiled=base/'classes';first=compiled/'top/example/One.class';second=compiled/'top/example/Two$Inner.class';first.parent.mkdir(parents=True)
+    first.write_bytes(b'class one');second.write_bytes(b'class two')
+    output=base/'d8-inputs.jar';archive_scope['class_archive'](output,[second,first],compiled)
+    with zipfile.ZipFile(output) as z:
+        check(z.namelist()==['top/example/One.class','top/example/Two$Inner.class'])
+        check(z.read('top/example/One.class')==first.read_bytes() and z.read('top/example/Two$Inner.class')==second.read_bytes())
+    unchanged=output.read_bytes()
+    outside=base/'outside.class';outside.write_bytes(b'outside')
+    for files in [[],[first,first],[outside],[base/'missing.class']]:
+        try:archive_scope['class_archive'](output,files,compiled)
+        except ValueError:check(output.read_bytes()==unchanged)
+        else:raise AssertionError('invalid class input accepted')
+    try:archive_scope['class_archive'](compiled/'wrong.jar',[first],compiled)
+    except ValueError:check(not (compiled/'wrong.jar').exists())
+    else:raise AssertionError('class archive escaped build directory')
+
     certificate=b'public certificate fixture, not a private signing key'
     calls=[]
     def export(args):

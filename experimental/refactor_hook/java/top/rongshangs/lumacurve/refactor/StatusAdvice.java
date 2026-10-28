@@ -15,6 +15,10 @@ final class StatusAdvice {
         if(at<0||elapsed<at||elapsed-at>15000)return new StatusAdvice("曲线说明","曲线尚未取得，连接后显示实际曲线。",true);
         try{
             String kind=CurveComparison.read(s,new float[]{1,1,1,1},0,false).kind(s);
+            if(s.optBoolean("theme_curve_dark")&&!kind.equals("unavailable")){
+                StatusAdvice advice=new StatusAdvice("曲线说明",kind.equals("memory")?"深色模式基础曲线 · 已学习，在手动记忆中调整。":"深色模式基础曲线 · 单独调整深色模式亮度。",true).action("深色模式基础曲线",0,"dark_curve");
+                if(kind.equals("memory"))advice.action("手动记忆",1,"memory");return advice;
+            }
             if(kind.equals("memory"))return new StatusAdvice("曲线说明","已学习曲线 · 在手动记忆中调整偏好。",true).action("手动记忆",1,"memory");
             if(kind.equals("baseline"))return new StatusAdvice("曲线说明","基础曲线 · 按环境光线调整亮度起点。",true).action("基础曲线",0,"curve");
             if(kind.equals("system"))return new StatusAdvice("曲线说明","系统默认曲线 · 可在基础曲线中调整。",true).action("基础曲线",0,"curve");

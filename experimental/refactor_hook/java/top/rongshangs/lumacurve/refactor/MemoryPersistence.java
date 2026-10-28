@@ -12,7 +12,7 @@ final class MemoryPersistence {
  Boolean lastSettingAuto;
  final Runnable writer=()->flush(),restorer=()->{restoreQueued=false;maybeRestore();},expiry=()->expireWake(),resetter=()->{resetQueued=false;afterReset();};
  MemoryPersistence(HookRuntime state){this.state=state;}
- String scope()throws Exception{CurvePlan p=state.kernel.plan();if(p==null)throw new IllegalStateException("基础曲线未启用");return CurveIdentity.of(state.fingerprint+":"+state.baselineId()+":"+state.kernel.integer("mUserSerial"),p.lux(),p.nits(),state.kernel.min,state.kernel.max);}
+ String scope()throws Exception{CurvePlan p=state.kernel.plan();if(p==null)throw new IllegalStateException("基础曲线未启用");return CurveIdentity.of(state.fingerprint+":"+state.baselineId()+":"+state.kernel.integer("mUserSerial")+state.themeMemoryScope,p.lux(),p.nits(),state.kernel.min,state.kernel.max);}
  void configure(MemoryOptions next,boolean reset){
   MemoryOptions old=options;
   if(!next.enabled()){cancelRestore();state.handler.removeCallbacks(writer);pendingWrite=null;status="保持记忆已关闭";options=next;return;}

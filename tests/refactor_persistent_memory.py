@@ -14,7 +14,7 @@ sources={
 'android/os/Handler.java':'''package android.os;import java.util.*;public class Handler {public boolean accept=true;public final List<Runnable> jobs=new ArrayList<>();public boolean post(Runnable r){return postDelayed(r,0);}public boolean postDelayed(Runnable r,long delay){if(!accept)return false;jobs.add(r);return true;}public void removeCallbacks(Runnable r){jobs.removeIf(x->x==r);}public void drain(){List<Runnable> copy=new ArrayList<>(jobs);jobs.clear();for(Runnable r:copy)r.run();}}''',
 'android/os/SystemClock.java':'''package android.os;public class SystemClock {public static long now=10000;public static long uptimeMillis(){return now;}}''',
 'android/os/PowerManager.java':'''package android.os;public class PowerManager {public boolean awake=true;public int reads;public boolean isInteractive(){reads++;return awake;}}''',
-'top/rongshangs/lumacurve/refactor/HookRuntime.java':'''package top.rongshangs.lumacurve.refactor;import android.os.*;import android.content.*;class HookRuntime {CurveBackend kernel;final MemoryLifecycle memoryLifecycle=new MemoryLifecycle();Handler handler=new Handler();Context context=new Context();PowerManager power=new PowerManager();String fingerprint="firmware-a",phase="active";boolean closed,changing,user=true,onThread=true,hdr;float memoryStrength=1;int logs;HookRuntime(CurveBackend k){kernel=k;}String baselineId(){return "device-baseline";}boolean appliesToUser(){return user;}boolean onDisplayThread(){return onThread;}Boolean hdrActive(){return hdr;}void requestRecalculation(){}void queuePublish(){}void log(String m){logs++;}}''',
+'top/rongshangs/lumacurve/refactor/HookRuntime.java':'''package top.rongshangs.lumacurve.refactor;import android.os.*;import android.content.*;class HookRuntime {CurveBackend kernel;final MemoryLifecycle memoryLifecycle=new MemoryLifecycle();Handler handler=new Handler();Context context=new Context();PowerManager power=new PowerManager();String themeMemoryScope="";String fingerprint="firmware-a",phase="active";boolean closed,changing,user=true,onThread=true,hdr;float memoryStrength=1;int logs;HookRuntime(CurveBackend k){kernel=k;}String baselineId(){return "device-baseline";}boolean appliesToUser(){return user;}boolean onDisplayThread(){return onThread;}Boolean hdrActive(){return hdr;}void requestRecalculation(){}void queuePublish(){}void log(String m){logs++;}}''',
 'top/rongshangs/lumacurve/refactor/MemoryLifecycle.java':'''package top.rongshangs.lumacurve.refactor;import org.json.*;class MemoryLifecycle {float lux=30;JSONObject record;int restores;float ambientLux(){return lux;}JSONObject modelRecord(){return record;}boolean restoreModel(JSONObject j){if(j!=null)restores++;return j!=null;}void event(String key){}void put(JSONObject j){}}''',
 'top/rongshangs/lumacurve/refactor/MemoryHostTest.java':r'''package top.rongshangs.lumacurve.refactor;
 import org.json.*;import java.util.*;import android.provider.Settings;
@@ -162,6 +162,12 @@ public class MemoryHostTest {
   pb.clearMemory();pm.scheduleRestore("system_reset");pb.anchors=points(30,101);pm.manualApplied();ps.handler.drain();check(pb.anchors.getJSONObject(0).getInt("value")==101&&!pm.pendingRestore);
   pm.clear();pb.clearMemory();pm.requestAfterReset();ps.handler.drain();ps.handler.drain();check(pb.anchors.length()==0&&!Settings.Global.data.containsKey(PersistentMemory.KEY));
   pb.anchors=points(30,70);pm.manualApplied();ps.handler.drain();pb.configure(new float[]{1,1.1f,1,1});pb.clearMemory();pm.scheduleRestore("system_reset");ps.handler.drain();check(pb.anchors.length()==0);
+  // Identical base values must not allow a light-theme archive to restore into dark mode.
+  Backend tb=new Backend();HookRuntime ts=new HookRuntime(tb);MemoryPersistence tm=new MemoryPersistence(ts);tm.options=permanent;ts.themeMemoryScope=":theme-light";tb.anchors=points(30,88);tm.manualApplied();ts.handler.drain();String lightScope=tm.scope();
+  tb.clearMemory();ts.themeMemoryScope=":theme-dark";check(!lightScope.equals(tm.scope()));tm.scheduleRestore("system_reset");ts.handler.drain();check(tb.anchors.length()==0);
+  // A theme handover cancels pending writes and all restore/reset jobs, even with forever enabled.
+  ts.themeMemoryScope=":theme-light";tb.anchors=points(30,99);tm.manualApplied();check(tm.pendingWrite!=null);tm.scheduleRestore("system_reset");tm.requestAfterReset();tm.clear();tb.clearMemory();ts.themeMemoryScope=":theme-dark";tm.configure(permanent,true);tm.clear();ts.handler.drain();check(tb.anchors.length()==0&&tm.pendingWrite==null&&!tm.pendingRestore&&!tm.resetQueued&&!Settings.Global.data.containsKey(PersistentMemory.KEY));
+  tm.requestAfterReset();ts.handler.drain();ts.handler.drain();check(tb.anchors.length()==0);ts.themeMemoryScope=":theme-light";tm.scheduleRestore();ts.handler.drain();check(tb.anchors.length()==0);
   System.out.println("Persistent memory/theme: "+cases+" cases PASS; service and OEM models, device not verified");
  }
 }'''
@@ -170,6 +176,6 @@ files=[]
 for name,text in sources.items():
     p=O/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_text(text,encoding='utf-8');files.append(p)
 C=O/'classes';C.mkdir(exist_ok=True)
-names=['MemoryScene','MemoryOptions','PersistentMemory','MemoryPersistence','ThemePalette','CurveBackend','SavedCurve','CurvePlan','CurveIdentity','RefactorAdapter','TraditionalAdapter','TraditionalCurve']
+names=['MemoryScene','MemoryOptions','PersistentMemory','MemoryPersistence','ThemePalette','CurveBackend','SavedCurve','CurvePlan','CurveIdentity','RefactorAdapter','PhysicalCurveCalibration','TraditionalAdapter','TraditionalCurve']
 subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(J),'-d',str(C),*[str(S/(n+'.java')) for n in names],*map(str,files)],check=True)
 subprocess.run(['java','-cp',str(C)+';'+str(J),'top.rongshangs.lumacurve.refactor.MemoryHostTest'],check=True)

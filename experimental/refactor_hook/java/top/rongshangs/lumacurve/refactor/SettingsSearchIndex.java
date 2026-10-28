@@ -17,6 +17,7 @@ final class SettingsSearchIndex {
     static Entry e(int g,String t,String d,String en,String ed,String target,String aliases){return new Entry(g,t,d,en,ed,target,aliases);}
     static final List<Entry> ENTRIES=Collections.unmodifiableList(Arrays.asList(
         e(0,"基础亮度曲线","调整不同光线下的亮度起点与曲线预设","Base brightness curve","Adjust brightness targets for different light levels.","curve","蓝色 基础 稍亮 柔和 默认 预设 spline curve"),
+        e(0,"深色模式基础曲线","单独调整深色模式亮度；切换模式清除手动记忆","Dark mode base curve","An independent base curve for dark mode; theme changes clear manual memory.","dark_curve","深色模式 独立曲线 黑暗 夜间 dark theme"),
         e(0,"暗处亮度下限","调整基础曲线在暗处的最低亮度","Minimum brightness","Set the base curve's minimum brightness in darkness.","curve","最低亮度 暗处下限 curve floor minimum nit"),
         e(1,"手动记忆","调整记忆强度，保留亮度条带来的偏好","Manual memory","Control how much your brightness adjustments affect the curve.","memory","绿色 学习 控制中心 亮度条 memory strength learning"),
         e(1,"永久保持记忆","跨自动亮度开关、锁屏和重启保持偏好","Keep memory permanently","Keep preferences across auto mode, screen off and reboot.","memory","保持记忆 永久保持 跨开关 跨锁屏 跨重启 持久化 permanent persistence"),
@@ -45,6 +46,7 @@ final class SettingsSearchIndex {
         e(7,"日落后锁定","仅在系统判定的日落后至日出前启用暗光锁定","Lock after sunset","Use low light lock only during the system's nighttime window.","dark_lock","日落 日出 夜间 定时 时间 sunset sunrise twilight"),
         e(7,"手动调整后退出锁定","选择调节亮度后继续锁定或维持手动模式","Manual adjustment while locked","Choose whether a manual adjustment continues or exits the lock.","dark_lock","手动后继续锁定 新亮度 manual exit"),
         e(8,"主屏手动亮度","设置磁贴面板与直接节点亮度调节","Manual panel brightness","Configure the tile panel and direct brightness node control.","","主屏节点 面板 磁贴 brightness tile panel"),
+        e(8,"控制中心亮度条节点映射","按设备节点比例显示和调节，保留自动亮度与暗光锁定策略","Control center node mapping","Use device node coordinates while preserving auto brightness and low light lock policy.","node_mapping","控制中心节点映射 滑块 映射 控制中心 slider node mapping"),
         e(8,"临时常亮","在主屏亮度面板中开启，本次锁屏前生效","Temporary screen on","Enable it from the brightness panel until the next screen off.","","不熄屏 常亮 屏幕超时 keep awake timeout"),
         e(9,"温控与显示保护","调整显示层温度门槛和冷却恢复","Thermal display protection","Adjust display thermal thresholds and cooling recovery.","thermal","温度限亮 温控 高温 温控放宽 thermal temperature cooling"),
         e(10,"暂停自动亮度名单","名单应用可见时暂停，退出后恢复","Pause auto brightness apps","Pause auto brightness while selected apps remain visible.","","应用 白名单 黑名单 小窗 分屏 自动亮度 apps whitelist window"),
