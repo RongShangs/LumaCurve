@@ -168,6 +168,11 @@
       "purpose": "明确选中的模式卡片、分区返回行为与紧凑节点编辑；兼容详情统一在日志页，不主动写亮度"
     },
     {
+      "file": "ControlCenterSetup.java",
+      "layer": "presentation",
+      "purpose": "控制中心映射的按需作用域核对、缺失引导及用户确认的系统界面重启；不修改草稿/配置"
+    },
+    {
       "file": "ControlCenterStatus.java",
       "layer": "policy",
       "purpose": "只读可见模式与可选能力；隐藏旧选项但不迁移配置，不生成已保存状态条"
@@ -721,6 +726,11 @@
       "file": "StatusTransport.java",
       "layer": "diagnostics",
       "purpose": "只读证据与诊断"
+    },
+    {
+      "file": "SystemUiAccess.java",
+      "layer": "adapters",
+      "purpose": "只读查询本模块实际LSPosed作用域；独立核验系统界面包UID/PID/启动标识后执行用户明确请求的单进程重启"
     },
     {
       "file": "SystemVersion.java",

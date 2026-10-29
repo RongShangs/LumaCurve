@@ -14,8 +14,10 @@ import top.rongshangs.lumacurve.refactor.hooking.*;
 
 /** Bidirectional coordinates plus opt-in v3 gestures into the existing raw-panel owner. */
 final class ControlCenterHooks {
+    static final String UI_PROCESS_START=uiProcessStart();
+    static String uiProcessStart(){try(java.io.BufferedReader reader=new java.io.BufferedReader(new java.io.FileReader("/proc/self/stat"))){String text=reader.readLine();return text.substring(text.lastIndexOf(')')+2).split(" +")[19];}catch(Exception unavailable){return "";}}
     static boolean installed;static Context context;static Handler main;static volatile Profile profile;static String profileIdentity="";
-    static volatile String error="",route="waiting_controller";static volatile boolean abiReady;
+    static volatile String error="",route="waiting_controller",gestureEvidence="";static volatile boolean abiReady,trackingLifecycle;
     static final Map<Object,Binding> bindings=Collections.synchronizedMap(new WeakHashMap<>());
     static final class Gesture{final Binding binding;final int position;Gesture(Binding b,int p){binding=b;position=p;}}
     static final ThreadLocal<Gesture> gesturePosition=new ThreadLocal<>();
@@ -37,7 +39,7 @@ final class ControlCenterHooks {
     static Method method(Class<?> c,String name,Class<?> result,Class<?>...args)throws Exception{Method m=c.getDeclaredMethod(name,args);if(m.getReturnType()!=result)throw new NoSuchMethodException(name);m.setAccessible(true);return m;}
     static final class Abi {
         final Field external,display,app,automatic,min,max,toggles,policy,target,animator,background,update;
-        final Method forward,inverse,support,logicalProgress,onChanged,setValue,add,feedback;
+        final Method forward,inverse,support,logicalProgress,onChanged,setValue,add,feedback,trackingStart,trackingStop;
         final boolean nested;
         Abi(ClassLoader loader)throws Exception{
             Class<?> c=Class.forName("com.android.systemui.controlcenter.policy.MiuiBrightnessController",false,loader),t=Class.forName("com.android.systemui.controlcenter.policy.ToggleSlidersControllerImpl",false,loader),slider=Class.forName("com.android.systemui.plugins.miui.controlcenter.ToggleSliderBase",false,loader),u=Class.forName("com.android.systemui.controlcenter.policy.BrightnessUtils",false,loader),v=Class.forName("com.android.systemui.controlcenter.policy.HyperOSBrightnessPolicyV1",false,loader);
@@ -48,6 +50,9 @@ final class ControlCenterHooks {
             logicalProgress=method(v,"brightnessToSliderProgress",int.class,float.class);if(!Modifier.isStatic(logicalProgress.getModifiers()))throw new NoSuchMethodException("未知逻辑亮度坐标");
             if(!Modifier.isStatic(forward.getModifiers())||!Modifier.isStatic(inverse.getModifiers()))throw new NoSuchMethodException("非静态亮度转换");
             onChanged=method(c,"onChanged",void.class,slider,boolean.class,boolean.class,int.class,boolean.class);setValue=method(t,"setValue",void.class,int.class,slider);add=method(c,"addToggleSlider",void.class,slider);
+            Method start=null,stop=null;
+            try{start=method(c,"onStart",void.class,int.class);stop=method(c,"onStop",void.class,int.class);if(Modifier.isStatic(start.getModifiers())||Modifier.isStatic(stop.getModifiers()))throw new NoSuchMethodException("未知滑动生命周期");}catch(NoSuchMethodException absent){start=stop=null;}
+            trackingStart=start;trackingStop=stop;
             Method f;boolean n;try{f=method(c,"-$$Nest$mupdateSlider",void.class,c,float.class);n=true;if(!Modifier.isStatic(f.getModifiers()))throw new NoSuchMethodException("未知回显接口");}catch(NoSuchMethodException absent){f=method(c,"updateSlider",void.class,float.class);n=false;}feedback=f;nested=n;
         }
     }
@@ -87,12 +92,22 @@ final class ControlCenterHooks {
         try{
             Abi abi=new Abi(loader);
             added.add(XposedBridge.hookMethod(abi.add,new XC_MethodHook(){protected void beforeHookedMethod(MethodHookParam p){try{binding(p.thisObject,abi,p.args[0]);}catch(Exception failure){failed(failure);}}}));
+            // Optional lifecycle evidence is independent of progress notifications.
+            // Keep the original onChanged stop path for controllers without this ABI.
+            if(abi.trackingStart!=null&&abi.trackingStop!=null){
+                try(HookTransaction lifecycle=new HookTransaction()){
+                    lifecycle.add(XposedBridge.hookMethod(abi.trackingStart,new XC_MethodHook(){protected void beforeHookedMethod(MethodHookParam p){try{Binding b=binding(p.thisObject,abi,null);Profile c=b.active();if(!abi.external.getBoolean(p.thisObject)&&c!=null&&c.mode==4){b.partition.beginStroke();recordGesture(b,"start",(Integer)p.args[0],-1);}}catch(Exception failure){failed(failure);}}}));
+                    lifecycle.add(XposedBridge.hookMethod(abi.trackingStop,new XC_MethodHook(){protected void afterHookedMethod(MethodHookParam p){try{Binding b=binding(p.thisObject,abi,null);Profile c=b.active();if(!abi.external.getBoolean(p.thisObject)&&c!=null&&c.mode==4){b.partition.endStroke(SystemClock.elapsedRealtime());recordGesture(b,"stop",(Integer)p.args[0],-1);}}catch(Exception failure){failed(failure);}}}));
+                    lifecycle.commitTo(added);trackingLifecycle=true;
+                }catch(Throwable unavailable){trackingLifecycle=false;}
+            }
             added.add(XposedBridge.hookMethod(abi.onChanged,new XC_MethodHook(){protected void beforeHookedMethod(MethodHookParam p){
                 try{Binding b=binding(p.thisObject,abi,p.args[0]);if(abi.external.getBoolean(p.thisObject)||!Boolean.TRUE.equals(p.args[1])&&!Boolean.TRUE.equals(p.args[4]))return;Profile c=b.active();if(c==null)return;int physical=(Integer)p.args[3],shown=physical,original;double fraction=ControlCenterMapping.fraction(physical,b.minimum,b.maximum);boolean last=Boolean.TRUE.equals(p.args[4]);
                     if(c.mode==4){int boundary=ControlCenterMapping.progress(ControlCenterPartition.ORDINARY_SPAN,b.minimum,b.maximum);double nodeFraction=b.node(c,fraction);if(boundary<=b.minimum||boundary>=b.maximum)throw new IllegalArgumentException("普通亮度区间不足以分区");
                         if(!b.partition.stroke&&Boolean.TRUE.equals(p.args[1])&&!last&&physical>boundary&&b.feedbackNode>c.manualNode&&abi.automatic.getBoolean(p.thisObject)&&!c.holding)b.partition.fromAutomaticHigh(SystemClock.elapsedRealtime());
                         b.feedbackNode=Double.NaN;
-                        int action=b.partition.move(physical,boundary,Boolean.TRUE.equals(p.args[1]),last,SystemClock.elapsedRealtime(),c.holding);
+                        boolean wasRaw=b.partition.raw;int action=b.partition.move(physical,boundary,Boolean.TRUE.equals(p.args[1]),last,SystemClock.elapsedRealtime(),c.holding);
+                        if(action==ControlCenterPartition.Gate.PROMPT||action==ControlCenterPartition.Gate.RELEASE||action==ControlCenterPartition.Gate.RAW&&!wasRaw||last)recordGesture(b,"changed",physical,action);
                         if(action==ControlCenterPartition.Gate.RAW){b.rawThumb=physical;b.rawThumbUntil=SystemClock.elapsedRealtime()+1000;b.showThumb(physical);sendNode(c,ControlCenterMapping.target(nodeFraction,c.maximum),last,"raw",b.partition);p.setResult(null);return;}
                         shown=Math.min(physical,boundary);b.rawThumb=shown;b.rawThumbUntil=SystemClock.elapsedRealtime()+1000;b.showThumb(shown);
                         if(action==ControlCenterPartition.Gate.PROMPT){if(b.hint!=null)b.hint.cancel();android.widget.Toast hint=android.widget.Toast.makeText(context,("zh".equals(Locale.getDefault().getLanguage())?"再次滑动突破手动亮度限制":"Swipe again to exceed the manual brightness limit"),android.widget.Toast.LENGTH_SHORT);b.hint=hint;hint.show();main.postDelayed(()->{hint.cancel();if(b.hint==hint)b.hint=null;},ControlCenterPartition.WINDOW_MS);}
@@ -113,7 +128,7 @@ final class ControlCenterHooks {
             added.add(XposedBridge.hookMethod(abi.logicalProgress,displayCoordinate));added.add(XposedBridge.hookMethod(abi.inverse,displayCoordinate));
             added.add(XposedBridge.hookMethod(abi.forward,new XC_MethodHook(){protected void afterHookedMethod(MethodHookParam p){Feedback f=feedbackPosition.get();if(f==null||p.hasThrowable())return;try{p.setResult((float)f.profile.standard.toInput(f.binding.node(f.profile,ControlCenterMapping.fraction((Integer)p.args[0],f.binding.minimum,f.binding.maximum))));}catch(Exception failure){failed(failure);}}}));
             added.add(XposedBridge.hookMethod(Application.class.getDeclaredMethod("onCreate"),new XC_MethodHook(){protected void afterHookedMethod(MethodHookParam p){if(p.thisObject instanceof Application)bind((Application)p.thisObject);}}));installed=true;
-        }catch(Throwable failure){HookTransaction.rollbackAll(added);failed(failure);}
+        }catch(Throwable failure){trackingLifecycle=false;HookTransaction.rollbackAll(added);failed(failure);}
     }
     static void failed(Throwable failure){String next=failure.toString();if(!next.equals(error)){error=next;XposedBridge.log("HyperLux slider coordinates unavailable: "+next);publish();}}
     static void bind(Context c){
@@ -131,7 +146,7 @@ final class ControlCenterHooks {
         if(!profileIdentity.equals(identity)||resetPartition){
             List<Binding> copy; synchronized(bindings){copy=new ArrayList<>(bindings.values());}
             for(Binding b:copy)try{Object o=b.owner.get();if(o==null)continue;Object a=b.abi.animator.get(o);if(a!=null)a.getClass().getMethod("cancel").invoke(a);b.animationPhysical=false;if(resetPartition){b.feedbackNode=Double.NaN;b.rawThumbUntil=0;b.partition.reset();if(b.hint!=null){b.hint.cancel();b.hint=null;}}}catch(Exception failure){failed(failure);}
-            profile=next;profileIdentity=identity;
+            profile=next;profileIdentity=identity;if(resetPartition)gestureEvidence="";
             // Ask the original background reader to refresh UI only, never synthesize an input gesture.
             for(Binding b:copy)try{Object o=b.owner.get();if(o!=null){Handler h=(Handler)b.abi.background.get(o);Runnable r=(Runnable)b.abi.update.get(o);if(h!=null&&r!=null)h.post(r);}}catch(Exception failure){failed(failure);}
         }else profile=next;publish();
@@ -164,5 +179,6 @@ final class ControlCenterHooks {
         }
     }
     static void publish(){if(context!=null)try{io.execute(ControlCenterHooks::publishNow);}catch(RejectedExecutionException ignored){}}
-    static void publishNow(){try{Settings.Global.putString(context.getContentResolver(),ControlCenterEngine.UI,new JSONObject().put("build",AppBuild.BUILD).put("input",profile!=null&&profile.mode==4?"partition_node_v4":profile!=null&&profile.raw?"raw_node_v3":"coordinate_v2").put("coordinate_abi",abiReady).put("route",route).put("profile_ready",profile!=null).put("detail",error).toString());}catch(Exception ignored){}}
+    static void recordGesture(Binding b,String event,int position,int action){try{ControlCenterPartition.Gate g=b.partition;gestureEvidence=new JSONObject().put("event",event).put("elapsed",SystemClock.elapsedRealtime()).put("position",position).put("minimum",b.minimum).put("maximum",b.maximum).put("boundary",ControlCenterMapping.progress(ControlCenterPartition.ORDINARY_SPAN,b.minimum,b.maximum)).put("action",action).put("since",g.since).put("confirmed",g.confirmed).put("released",g.released).put("stroke",g.stroke).put("raw",g.raw).toString();publish();}catch(Exception ignored){}}
+    static void publishNow(){try{String evidence=gestureEvidence;Settings.Global.putString(context.getContentResolver(),ControlCenterEngine.UI,new JSONObject().put("build",AppBuild.BUILD).put("pid",android.os.Process.myPid()).put("process_start",UI_PROCESS_START).put("input",profile!=null&&profile.mode==4?"partition_node_v4":profile!=null&&profile.raw?"raw_node_v3":"coordinate_v2").put("coordinate_abi",abiReady).put("route",route).put("tracking_lifecycle",trackingLifecycle?"controller_start_stop":"on_changed_stop").put("gesture",evidence.isEmpty()?JSONObject.NULL:new JSONObject(evidence)).put("profile_ready",profile!=null).put("detail",error).toString());}catch(Exception ignored){}}
 }

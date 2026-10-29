@@ -25,6 +25,27 @@ public class PartitionTest{
    check(g.move(boundary-1,boundary,true,false,start+5110,true)==g.NORMAL);check(g.move(boundary-1,boundary,false,true,start+5120,false)==g.NORMAL);g.reset();check(!g.raw&&g.since==-1&&!g.released);
    g=new ControlCenterPartition.Gate();check(g.move(boundary,boundary,true,false,start,false)==g.PROMPT);check(g.move(boundary+1,boundary,true,false,start+100,false)==g.CAP);check(g.move(boundary+1,boundary,false,true,start+200,false)==g.CAP);check(g.move(boundary+1,boundary,true,false,start+3001,false)==g.PROMPT);check(g.move(boundary+2,boundary,true,false,start+3010,false)==g.CAP);
   }
+  // Real sliders report the second finger-down at/below the clamped thumb before
+  // an upward move. That ordinary input must not erase the released first stroke.
+  for(int boundary:new int[]{100,750,75000})for(int offset:new int[]{1,10,50}){
+   ControlCenterPartition.Gate g=new ControlCenterPartition.Gate();
+   check(g.move(boundary+20,boundary,true,false,100,false)==g.PROMPT);
+   check(g.move(boundary,boundary,false,true,200,false)==g.CAP);
+   check(g.move(boundary-offset,boundary,true,false,300,false)==g.NORMAL);
+   check(g.move(boundary-1,boundary,true,false,350,false)==g.NORMAL);
+   check(g.move(boundary,boundary,true,false,400,false)==g.CAP);
+   check(g.move(boundary+1,boundary,true,false,450,false)==g.RAW);
+   check(g.since==100&&g.confirmed==450);
+   JSONObject proof=new JSONObject().put("partition_since",g.since).put("partition_confirmed",g.confirmed).put("elapsed",450);check(g.proof(proof));
+  }
+  for(int scenario=0;scenario<4;scenario++){
+   ControlCenterPartition.Gate g=new ControlCenterPartition.Gate();g.move(800,750,true,false,100,false);
+   if(scenario!=0)g.move(750,750,false,true,150,false);
+   check(g.move(700,750,true,false,scenario==1?3101:200,false)==g.NORMAL);
+   if(scenario==2)g.move(700,750,false,true,250,false);
+   if(scenario==3)g.reset();
+   check(g.move(800,750,true,false,scenario==1?3150:300,false)==g.PROMPT);
+  }
   ControlCenterPartition.Gate abandoned=new ControlCenterPartition.Gate();abandoned.move(500,500,true,false,0,false);abandoned.move(500,500,false,true,10,false);check(abandoned.move(600,500,true,false,20,false)==abandoned.RAW);check(abandoned.move(700,500,true,false,1600,false)==abandoned.PROMPT);
   for(int maximum:new int[]{4095,16383,65535})for(double ordinary:new double[]{.1,.3,.5,.8})for(int requested:new int[]{0,(int)(maximum*.9),maximum}){
     int upper=ControlCenterPartition.upper(requested,maximum,ordinary);check(Math.abs(ControlCenterPartition.node(.75,ordinary,upper,maximum)-ordinary)<.000001);check(Math.abs(ControlCenterPartition.node(1,ordinary,upper,maximum)*maximum-upper)<.000001);

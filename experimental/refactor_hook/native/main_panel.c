@@ -106,7 +106,12 @@ static int acquire_output(void){
 }
 static int write_output(int value){
  struct panel_lease lease;
- if(!read_lease(&lease)||lease.pid!=state.pid||strcmp(lease.token,state.token)){last_error=ECANCELED;return -1;}
+ if(!read_lease(&lease)||lease.pid!=state.pid||strcmp(lease.token,state.token)){
+  // A UI release/replacement can race the scheduled correction. It revokes this
+  // write, not the explicitly enabled listener. The next loop reconciles the lease.
+  if(control_center_listener)return 1;
+  last_error=ECANCELED;return -1;
+ }
  if(!same_node()){last_error=ESTALE;return -1;}
  if(!lease.active||lease.target!=value||!panel_output_live(number(node))||(active_fold_port>=0&&!fold_panel_live("/sys",active_fold_port)))return 1;
  attempts++;if(acquire_output()){last_error=errno?errno:EIO;return -1;}
@@ -123,7 +128,7 @@ static int private_lock(void){
  return 0;
 }
 static void response(int c,int ok,const char *reason){
- char out[2048];int n=snprintf(out,sizeof(out),"{\"ok\":%s,\"reason\":\"%s\",\"backend\":\"raw_main_node\",\"native_build\":\"raw08-slider\",\"path\":\"%s\",\"canonical_path\":\"%s\",\"fold_port\":%d,\"control_center_listener\":%s,\"control_center_pid\":%d,\"target\":%d,\"actual\":%d,\"maximum\":%d,\"armed\":%s,\"paused\":%s,\"session\":\"%s\",\"write_attempts\":%d,\"write_successes\":%d,\"corrections\":%d,\"errno\":%d}\n",ok?"true":"false",reason,node,real_node,active_fold_port,control_center_listener?"true":"false",control_center_pid,state.target,number(node),maximum,state.armed?"true":"false",state.paused?"true":"false",state.token,attempts,successes,corrections,last_error);
+ char out[2048];int n=snprintf(out,sizeof(out),"{\"ok\":%s,\"reason\":\"%s\",\"backend\":\"raw_main_node\",\"native_build\":\"raw09-slider\",\"path\":\"%s\",\"canonical_path\":\"%s\",\"fold_port\":%d,\"control_center_listener\":%s,\"control_center_pid\":%d,\"target\":%d,\"actual\":%d,\"maximum\":%d,\"armed\":%s,\"paused\":%s,\"session\":\"%s\",\"write_attempts\":%d,\"write_successes\":%d,\"corrections\":%d,\"errno\":%d}\n",ok?"true":"false",reason,node,real_node,active_fold_port,control_center_listener?"true":"false",control_center_pid,state.target,number(node),maximum,state.armed?"true":"false",state.paused?"true":"false",state.token,attempts,successes,corrections,last_error);
  if(n>0&&(size_t)n<sizeof(out))send(c,out,(size_t)n,MSG_NOSIGNAL);
 }
 static int read_lease(struct panel_lease *lease){
@@ -193,7 +198,7 @@ int main(int argc,char **argv){
  // Open-only check before Java asks the system to disable automatic brightness.
  int probe=open_output();if(probe<0)return startup_fail(4,"primary_node_open");close(probe);
  int server=bind_server();if(server<0)return startup_fail(5,"control_socket");
- fprintf(stderr,"NATIVE_READY build=raw08-slider pid=%d maximum=%d path=%s real=%s\n",getpid(),maximum,node,real_node);
+ fprintf(stderr,"NATIVE_READY build=raw09-slider pid=%d maximum=%d path=%s real=%s\n",getpid(),maximum,node,real_node);
  signal(SIGTERM,signal_stop);signal(SIGINT,signal_stop);signal(SIGHUP,signal_stop);signal(SIGPIPE,SIG_IGN);panel_clear(&state);
  // Lease rename wakes the guard immediately on screen-off/DOZE or automatic mode.
  int events=inotify_init1(IN_NONBLOCK|IN_CLOEXEC);
@@ -228,5 +233,6 @@ int main(int argc,char **argv){
   if(ready>0&&events>=0&&(p[1].revents&POLLIN)){char changes[4096];read(events,changes,sizeof(changes));}
   if(ready>0&&(p[0].revents&POLLIN)){int c=accept4(server,NULL,NULL,SOCK_CLOEXEC);if(c>=0){serve(c);close(c);}}
  }
+ fprintf(stderr,"NATIVE_EXIT error=%d armed=%d paused=%d target=%d writes=%d\n",last_error,state.armed,state.paused,state.target,successes);
  release_output();health(0);if(events>=0)close(events);close(server);return 0;
 }

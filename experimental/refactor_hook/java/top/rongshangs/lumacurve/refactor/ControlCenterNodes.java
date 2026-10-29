@@ -11,6 +11,8 @@ final class ControlCenterNodes {
     final ControlCenterEngine engine;final HookRuntime s;
     boolean registered;ContentObserver gestures,modes;String lastId="",error="";long accepted,rejected,lastGesture,autoEpoch;int confirmations;
     final Runnable confirm=()->confirm();
+    final JSONArray confirmationTrace=new JSONArray();
+    void trace(String event){try{if(confirmationTrace.length()>=8)confirmationTrace.remove(0);confirmationTrace.put(new JSONObject().put("event",event).put("elapsed_ms",SystemClock.elapsedRealtime()).put("session",s.brightnessControl.session).put("target",s.brightnessControl.rawTarget).put("attempt",confirmations).put("error",error));}catch(JSONException ignored){}}
     ControlCenterNodes(ControlCenterEngine engine){this.engine=engine;s=engine.s;}
     String physical(){try{Object id=HookEntry.get(HookEntry.get(s.owner,"mDisplayPowerController"),"mUniqueDisplayId");return id instanceof String?(String)id:"";}catch(Throwable unavailable){return "";}}
     boolean supported(){return registered&&engine.supported()&&RawPanelOutputHooks.supports(s.owner.getClass())&&!physical().isEmpty();}
@@ -72,7 +74,7 @@ final class ControlCenterNodes {
             }else if(!action.equals("raw"))throw new IllegalArgumentException("当前模式不接受分区操作");
             if(owned){
                 control.rawTarget=target;control.writeRawLease(true);
-            }else control.armRaw(token,target,physical());
+            }else{control.armRaw(token,target,physical());trace("arm");}
             lastGesture=at;accepted++;error="";
             confirmations=0;s.handler.removeCallbacks(confirm);s.handler.postDelayed(confirm,100);
             engine.publishTables();s.queueControlPublish();
@@ -81,16 +83,18 @@ final class ControlCenterNodes {
     void confirm(){
         BrightnessControl control=s.brightnessControl;
         if(s.closed||!control.owner.equals("raw_panel")||!control.session.startsWith("cc_")||control.auto())return;
-        try{if(RawPanelLease.healthy(control.session)){control.rawConfirmed=true;engine.publishTables();s.queueControlPublish();return;}}
+        try{if(RawPanelLease.healthy(control.session)){error="";if(!control.rawConfirmed)trace("confirmed");control.rawConfirmed=true;engine.publishTables();s.queueControlPublish();return;}error="节点保持程序健康状态尚未就绪或已过期";}
         catch(Throwable failure){error=failure.toString();}
+        if(confirmations==0)trace("waiting");
         if(++confirmations<6){s.handler.postDelayed(confirm,200);return;}
+        trace("timeout");
         boolean restore=control.rawWasAuto;control.relinquish("control_center_writer_missing",false);if(restore)try{control.setAuto(true);}catch(Throwable failure){error=failure.toString();}engine.publishTables();s.queueControlPublish();
         // Normal lease renewal owns subsequent health/lock/display checks; no idle polling.
     }
     JSONObject status()throws JSONException{
         BrightnessControl c=s.brightnessControl;
         boolean owned=c.owner.equals("raw_panel");
-        return new JSONObject().put("session",owned?c.session:"").put("auto_epoch",autoEpoch).put("active",owned&&!c.auto()&&!c.rawPaused&&!c.rawScreenOff&&c.awake()&&c.rawIdentityCurrent()).put("confirmed",owned&&c.rawConfirmed).put("target",owned?c.rawTarget:-1).put("physical",physical()).put("accepted",accepted).put("rejected",rejected).put("error",error);
+        return new JSONObject().put("session",owned?c.session:"").put("auto_epoch",autoEpoch).put("active",owned&&!c.auto()&&!c.rawPaused&&!c.rawScreenOff&&c.awake()&&c.rawIdentityCurrent()).put("confirmed",owned&&c.rawConfirmed).put("target",owned?c.rawTarget:-1).put("physical",physical()).put("accepted",accepted).put("rejected",rejected).put("error",error).put("confirmation_trace",new JSONArray(confirmationTrace.toString()));
     }
     void deactivate(){deactivate(false);}
     void deactivate(boolean restore){s.handler.removeCallbacks(confirm);BrightnessControl c=s.brightnessControl;if(c.owner.equals("raw_panel")&&c.session.startsWith("cc_"))c.relinquish("control_center_disabled",restore);}

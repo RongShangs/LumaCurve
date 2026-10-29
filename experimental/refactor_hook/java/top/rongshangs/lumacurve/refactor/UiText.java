@@ -6,6 +6,20 @@ public final class UiText {
     private static final LinkedHashMap<String,String> WORDS=new LinkedHashMap<>();
     private static final List<Map.Entry<String,String>> PHRASES;
     static {
+        WORDS.put("重启","Restart");
+        WORDS.put("重启系统界面","Restart SystemUI");
+        WORDS.put("点击核对系统界面作用域","Tap to check the SystemUI scope");
+        WORDS.put("正在检查系统界面作用域…","Checking the SystemUI scope…");
+        WORDS.put("未勾选系统界面，点击查看添加方法","SystemUI is not selected. Tap for setup instructions.");
+        WORDS.put("请在 LSPosed 启用 HyperLux，点击查看设置方法","Enable HyperLux in LSPosed. Tap for instructions.");
+        WORDS.put("系统界面仍在使用旧版，可重启后加载","SystemUI still has the previous build. Restart it to load the new build.");
+        WORDS.put("系统界面已加载 · 点击核对作用域","SystemUI is loaded · Tap to check scope");
+        WORDS.put("已勾选系统界面，尚未确认加载；可尝试重启系统界面","SystemUI is selected but loading is unconfirmed. Try restarting SystemUI.");
+        WORDS.put("作用域暂无法确认，点击查看核对方法","Scope is unconfirmed. Tap for checking instructions.");
+        WORDS.put("添加系统界面作用域","Add the SystemUI scope");
+        WORDS.put("在 LSPosed 中打开 HyperLux 的作用域，勾选“系统界面（com.android.systemui）”。\n\n列表中找不到时，请开启“显示系统应用”或取消“隐藏系统应用”。添加后重新检测，再点击“重启系统界面”。","Open the HyperLux scope in LSPosed and select SystemUI (com.android.systemui).\n\nIf it is hidden, enable Show system apps or turn off Hide system apps. Check again after adding it, then restart SystemUI.");
+        WORDS.put("状态栏和控制中心会短暂消失，随后由系统重新启动。请先保存当前设置。","The status bar and Control Center will briefly disappear while SystemUI restarts. Save your settings first.");
+        WORDS.put("已请求重启系统界面，状态栏和控制中心会短暂消失","SystemUI restart requested. The status bar and Control Center will briefly disappear.");
         WORDS.put("状态读回：","Status readback: ");
         WORDS.put("亮度换算：","Brightness conversion: ");
         WORDS.put("开启后分别编辑深浅色基础曲线；切换时如何处理手动记忆，请在下方选择。","Edit light and dark base curves separately. Choose how learned preferences change with the system theme below.");

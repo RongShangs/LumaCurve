@@ -6,6 +6,7 @@ flow and descriptor cleanup; actual Android DAC/SELinux/driver behavior needs a 
 from pathlib import Path
 import os
 import subprocess
+import re
 
 R = Path(__file__).resolve().parents[1]
 S = R / 'experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor'
@@ -46,7 +47,8 @@ public class PanelAccessTest{
   reset();Os.statFails=true;out=NativePanelRoot.status();check(!out.getBoolean("supported")&&out.getInt("write_errno")==5);check(Os.closes==1);unchanged();
   reset();PanelNodeDiscovery.selected.put("canonical_path",node.getAbsolutePath()+".other");check(!NativePanelRoot.status().getBoolean("supported"));check(Os.closes==1);unchanged();
   reset();NativePanelClient.guard=new JSONObject(PanelNodeDiscovery.selected.toString()).put("ok",true).put("native_build","raw08-slider");out=NativePanelRoot.status();check(out.getBoolean("supported")&&out.getBoolean("guard_running"));check(out.getString("write_probe").equals("guard_owns_descriptor"));check(Os.opens==0);unchanged();
-  for(String wrong:new String[]{"raw06-health","different-node"}){reset();NativePanelClient.guard=new JSONObject(PanelNodeDiscovery.selected.toString()).put("ok",true).put("native_build",wrong);out=NativePanelRoot.status();check(!out.getBoolean("supported"));check(out.getString("reason").equals("guard_node_mismatch"));check(Os.opens==0);unchanged();}
+  reset();NativePanelClient.guard=new JSONObject(PanelNodeDiscovery.selected.toString()).put("ok",true).put("native_build","raw09-slider");check(NativePanelRoot.status().getBoolean("guard_running"));unchanged();
+  for(String wrong:new String[]{"raw06-health","different-node","raw10-unknown"}){reset();NativePanelClient.guard=new JSONObject(PanelNodeDiscovery.selected.toString()).put("ok",true).put("native_build",wrong);out=NativePanelRoot.status();check(!out.getBoolean("supported"));check(out.getString("reason").equals("guard_node_mismatch"));check(Os.opens==0);unchanged();}
   reset();PanelNodeDiscovery.selected=new JSONObject().put("supported",false).put("reason","ambiguous_primary_nodes");check(!NativePanelRoot.status().getBoolean("supported"));check(Os.opens==0);unchanged();
   System.out.println("Panel access Java: "+cases+" cases PASS; production status, syscall model only");
  }
@@ -65,7 +67,8 @@ production = S / 'NativePanelRoot.java'
 def java_compile(source, target):
     subprocess.run(['javac', '-encoding', 'UTF-8', '--release', '8', '-cp', str(J), '-d', str(target), str(source), str(S / 'NativePanelAsset.java'), *map(str, paths)], check=True)
 java_compile(production, classes)
-subprocess.run(['java', '-cp', str(classes)+os.pathsep+str(J), entry], check=True, cwd=R)
+java_run=subprocess.run(['java', '-cp', str(classes)+os.pathsep+str(J), entry], check=True, cwd=R,capture_output=True,text=True)
+print(java_run.stdout,end='');java_cases=int(re.search(r'(\d+) cases PASS',java_run.stdout).group(1))
 # Reintroduce mode-bit rejection: the first 0444 fixture must now fail.
 fixed = production.read_text(encoding='utf-8')
 old = fixed.replace('probe(j);j.put("write_probe","open_ok");', 'if((Os.lstat(node.toString()).st_mode&0222)==0)throw new IOException("mode rejection");probe(j);j.put("write_probe","open_ok");')
@@ -146,5 +149,6 @@ int main(void){
 ''', encoding='utf-8')
 exe = O / 'access-test.exe'
 subprocess.run(['C:/msys64/mingw64/bin/gcc.exe', '-std=c11', '-static', '-Wall', '-Wextra', '-Werror', '-Wno-misleading-indentation', '-I', str(R / 'experimental/refactor_hook/native'), str(c), '-o', str(exe)], check=True)
-subprocess.run([str(exe)], check=True)
-print('Panel access total: 130 cases PASS; Java/native syscall models, Android not tested')
+native_run=subprocess.run([str(exe)], check=True,capture_output=True,text=True)
+print(native_run.stdout,end='');native_cases=int(re.search(r'(\d+) cases PASS',native_run.stdout).group(1))
+print(f'Panel access total: {java_cases+native_cases} cases PASS; Java/native syscall models, Android not tested')

@@ -15,7 +15,7 @@ runtime_close=between('HookRuntime.java','    void close()','    boolean relaxTh
 decode=between('MainActivity.java','    Bitmap decodeAsset(','    AlertDialog dialog(')
 test=O/'edges/ReviewEdges.java';test.parent.mkdir(exist_ok=True)
 test.write_text(r'''package top.rongshangs.lumacurve.refactor;
-import java.io.*;import java.util.*;import org.json.*;
+import java.io.*;import java.nio.file.Files;import java.util.*;import org.json.*;
 class OutdoorNodeRoot{static void stop(){}}
 class ControlCenterRoot{static final String PROFILE="control_center_profile";}
 class RootControl{
@@ -65,6 +65,7 @@ public class ReviewEdges{
   nodes();JSONObject wrong=node().put("maximum",100);try{NativePanelRoot.start(wrong);throw new AssertionError("changed selection accepted");}catch(IOException expected){check(true);}check(NativePanelRoot.installs==0&&NativePanelClient.probes==0);
   nodes();NativePanelRoot.changeDuringInstall=true;try{NativePanelRoot.start(node());throw new AssertionError("post-install change accepted");}catch(IOException expected){check(true);}check(NativePanelRoot.installs==1&&PanelNodeDiscovery.scans==2&&NativePanelClient.probes==0);
   nodes();NativePanelRoot.start(node());check(NativePanelRoot.installs==1&&PanelNodeDiscovery.scans==2&&NativePanelClient.probes==1);
+  nodes();NativePanelClient.reply.put("native_build","raw09-slider");NativePanelRoot.start(node());check(NativePanelClient.probes==1);
   nodes();NativePanelClient.reply.put("path","/sys/class/leds/lcd-backlight/brightness");try{NativePanelRoot.start(node());throw new AssertionError("other guard accepted");}catch(IOException expected){check(true);}check(NativePanelClient.probes==1);
   int[][] assets={{1080,1080,46},{748,748,240},{571,571,240}};
   for(int density:new int[]{1,2,3,4})for(int[] asset:assets){ImageCandidate image=new ImageCandidate();image.density=density;image.loader.width=asset[0];image.loader.height=asset[1];BitmapFactory.boundsCalls=BitmapFactory.decodeCalls=0;Bitmap b=image.decodeAsset("fixture.jpg",asset[2]);check(b.width>0&&b.height>0);check(b.width<=image.dp(asset[2])*2+1&&b.height<=image.dp(asset[2])*2+1);int sample=BitmapFactory.last.inSampleSize;check(sample>=1&&(sample&(sample-1))==0);check(image.loader.streams.size()==2&&image.loader.streams.get(0).closed&&image.loader.streams.get(1).closed);check(BitmapFactory.boundsCalls==1&&BitmapFactory.decodeCalls==1);}

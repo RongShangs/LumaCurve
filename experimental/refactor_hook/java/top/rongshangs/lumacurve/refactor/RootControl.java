@@ -273,9 +273,14 @@ public final class RootControl implements AutoCloseable {
                     write(zip,"pipeline-trace.json",pipeline==null?"[]":pipeline.toString(2));write(zip,"output-trace.json",output==null?"[]":output.toString(2));
                     write(zip,"trace-readme.txt","Pipeline records group stages from ONE updateAutoBrightness call. Values are framework brightness coordinates (0..1), not nit or percent. Missing fields mean unobserved, not disabled.\nOutput records are separate later calls, not automatically attributed to a calculation. Use uptime_ms within this boot, or unix_ms for wall time. Sensor readings are OEM filtered readings, not raw samples.\nBounded history: latest 24 calculations and 16 output calls.\n");
                 }
-                write(zip,"config.json",String.valueOf(settings.get(CONFIG)));write(zip,"manual-memory.json",String.valueOf(settings.get(PersistentMemory.KEY)));write(zip,"stored-hook-status.json",String.valueOf(settings.get(STATUS)));write(zip,"configuration-ack.json",String.valueOf(settings.get(ACK)));File controlError=new File(DATA,"last-control-error.txt");if(controlError.isFile()&&controlError.length()<=16384)write(zip,"last-control-error.txt",new String(Files.readAllBytes(controlError.toPath()),StandardCharsets.UTF_8));write(zip,"injection.json",String.valueOf(settings.get("lumacurve_refactor_injection_v1")));for(String f:new String[]{"main-panel-permissions","main-panel.log","last-panel-error.txt"}){optionalFile(zip,f,new File(DATA,f),65536);}
+                write(zip,"config.json",String.valueOf(settings.get(CONFIG)));write(zip,"manual-memory.json",String.valueOf(settings.get(PersistentMemory.KEY)));write(zip,"stored-hook-status.json",String.valueOf(settings.get(STATUS)));write(zip,"configuration-ack.json",String.valueOf(settings.get(ACK)));File controlError=new File(DATA,"last-control-error.txt");if(controlError.isFile()&&controlError.length()<=16384)write(zip,"last-control-error.txt",new String(Files.readAllBytes(controlError.toPath()),StandardCharsets.UTF_8));write(zip,"injection.json",String.valueOf(settings.get("lumacurve_refactor_injection_v1")));for(String f:new String[]{"main-panel-permissions","main-panel.log","main-panel.previous.log","last-panel-error.txt"}){optionalFile(zip,f,new File(DATA,f),65536);}
                 for(String f:new String[]{"hyperlux-main-panel-lease","hyperlux-main-panel-health"}){optionalFile(zip,f,new File("/data/system",f),1024);}
                 write(zip,"build.txt",BUILD+"\n"+Build.FINGERPRINT+"\n");
+                for(String key:new String[]{ControlCenterEngine.UI,ControlCenterHooks.NODE_REQUEST}){
+                    String value=null,issue=null;try{value=settings.get(key);}catch(Exception unavailable){issue=unavailable.toString();}
+                    boolean oversized=value!=null&&value.length()>262144;
+                    write(zip,"control-center/"+(key.equals(ControlCenterEngine.UI)?"system-ui":"node-request")+".json",new JSONObject().put("source","SettingsProvider").put("namespace","global").put("key",key).put("status",issue!=null?"error":value==null?"missing":oversized?"oversized":"ok").put("value",issue==null&&!oversized&&value!=null?value:JSONObject.NULL).put("error",issue==null?JSONObject.NULL:issue).toString(2));
+                }
                 new DiagnosticCollector(zip,settings::getSystem).collect();
                 progress("8/8 完成压缩并校验分析包…");
             }
@@ -377,6 +382,8 @@ public final class RootControl implements AutoCloseable {
         }
     }
     JSONObject execute(String command,String payload)throws Exception{
+        if(command.equals("mapping-setup"))return new JSONObject().put("ok",true).put("control_center_setup",SystemUiAccess.inspect(settings));
+        if(command.equals("restart-system-ui"))return SystemUiAccess.restart(settings);
         if(command.equals("inspect"))return inspect();
         if(command.equals("self-check")){selfCheckNext=true;selfCheckReason="app-start".equals(payload)?"app-start":"manual";try{return inspect();}finally{selfCheckNext=false;selfCheckReason="manual";}}
         if(command.equals("raw-panel")&&payload!=null)return rawPanel(payload);

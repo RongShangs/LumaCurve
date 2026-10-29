@@ -58,6 +58,14 @@ public class NodeGestureTest{
   JSONObject high=request(e.nodes,9000,"automatic_high_takeover").put("partition_since",300).put("partition_confirmed",300).put("partition_automatic_high",true);Settings.Global.putString(c.s.context.getContentResolver(),ControlCenterNodes.REQUEST,high.toString());check(!c.auto()&&c.rawTarget==9000&&c.owner.equals("raw_panel"));
   e.nodes.deactivate(true);c.setAuto(true);android.hardware.display.DisplayManagerGlobal.instance.info.brightness=.2f;high.put("id","stale_automatic_high");Settings.Global.putString(c.s.context.getContentResolver(),ControlCenterNodes.REQUEST,high.toString());check(c.auto()&&c.owner.equals("none"));
   android.hardware.display.DisplayManagerGlobal.instance.info.brightness=.9f;c.setAuto(false);high.put("id","manual_is_not_automatic_high");Settings.Global.putString(c.s.context.getContentResolver(),ControlCenterNodes.REQUEST,high.toString());check(!c.auto()&&c.owner.equals("none"));
+  e.close();c.close();
+  // A failed native handshake records why, without claiming a confirmed output.
+  c=BrightnessControlHostTest.controller();Settings.Global.values.put("boot_count","1");e=new ControlCenterEngine(c.s);e.start();ControlCenterEngine.IO.submit(()->{}).get();c.options.nodeSliderMode=3;e.configure(new JSONObject().put("enabled",true).put("revision","health").put("user_serial",0).put("control_center_node_mode",3).put("control_center_node_maximum",16383).put("control_center_node_path","primary"));SystemClock.now=50000;send(e.nodes,12000,"health_wait");RawPanelLease.ok=false;
+  e.nodes.confirm();check(!c.rawConfirmed&&e.nodes.status().getString("error").contains("健康"));
+  for(int i=0;i<5;i++){SystemClock.now+=200;e.nodes.confirm();}check(c.owner.equals("none")&&c.auto());
+  JSONArray history=e.nodes.status().getJSONArray("confirmation_trace");check(history.getJSONObject(history.length()-1).getString("event").equals("timeout"));
+  RawPanelLease.ok=true;SystemClock.now+=100;send(e.nodes,10000,"health_recover");e.nodes.confirm();check(c.rawConfirmed&&e.nodes.error.isEmpty());
+  for(int i=0;i<30;i++)e.nodes.trace("bounded");check(e.nodes.status().getJSONArray("confirmation_trace").length()==8);
   e.close();c.close();ControlCenterEngine.IO.shutdownNow();
   System.out.println("Control center full nodes: "+cases+" cases PASS; host model, Android not tested");
  }

@@ -41,6 +41,7 @@ class MainActivity {
 class HomeScroll extends ScrollView{void requestFocus(){super.requestFocus();y=0;}}
 class Container{View home;View getChildAt(int at){return home;}}
 class SettingsNavigation{
+ static class Setup{void check(boolean prompt){}}static class Mapping{Setup setup=new Setup();}Mapping controlCenterSettings;BrightnessControlOptions controls=new BrightnessControlOptions();
  ScrollView settingsHomeScroll=new HomeScroll();int settingsHomeY,page=1,settingsGroup=-1;long settingsScrollRestore;boolean settingsHomeRestoring,destroyed;
  View displayedPage=settingsHomeScroll,header=new View(),bottomNav=new View();View[] settingScreens=new View[10];Container content=new Container();
  SettingsNavigation(){content.home=settingsHomeScroll;for(int i=0;i<10;i++)settingScreens[i]=new View();}

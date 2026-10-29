@@ -13,6 +13,7 @@ def method(signature):
     return text[start:end]
 
 files={
+'top/rongshangs/lumacurve/refactor/ControlCenterSetup.java':'package top.rongshangs.lumacurve.refactor;class ControlCenterSetup{int checks;ControlCenterSetup(MainActivity a,android.widget.LinearLayout p,android.widget.TextView h){p.addView(h);}void refresh(){}void check(boolean prompt){checks++;}}',
 'android/graphics/drawable/GradientDrawable.java':'package android.graphics.drawable;public class GradientDrawable{public int color,stroke,strokeColor;public void setStroke(int w,int c){stroke=w;strokeColor=c;}}',
 'android/text/InputType.java':'package android.text;public class InputType{public static final int TYPE_CLASS_NUMBER=2;}',
 'android/widget/EditText.java':'package android.widget;public class EditText extends TextView{public boolean focused;public String error;public void setInputType(int t){}public String getText(){return text;}public boolean hasFocus(){return focused;}public void clearFocus(){focused=false;}public void setError(String x){error=x;}}',

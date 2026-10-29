@@ -32,7 +32,7 @@ final class NativePanelRoot {
   try{StructStat opened=Os.fstat(fd);if(!OsConstants.S_ISREG(opened.st_mode)||expected.st_dev!=opened.st_dev||expected.st_ino!=opened.st_ino||!node.toPath().toRealPath().toString().equals(selected.getString("canonical_path")))throw new IOException("主屏节点在权限检查期间发生变化");}
   finally{Os.close(fd);}
  }
- static boolean matches(JSONObject node,JSONObject guard){return (!ActivePanelNode.PROFILE.equals(node.optString("discovery"))||node.optInt("fold_port",-2)==guard.optInt("fold_port",-3))&&guard.optBoolean("ok")&&"raw08-slider".equals(guard.optString("native_build"))&&node.optString("path").equals(guard.optString("path"))&&node.optString("canonical_path").equals(guard.optString("canonical_path"))&&node.optInt("maximum",-1)==guard.optInt("maximum",-2);}
+ static boolean matches(JSONObject node,JSONObject guard){return (!ActivePanelNode.PROFILE.equals(node.optString("discovery"))||node.optInt("fold_port",-2)==guard.optInt("fold_port",-3))&&guard.optBoolean("ok")&&("raw08-slider".equals(guard.optString("native_build"))||"raw09-slider".equals(guard.optString("native_build")))&&node.optString("path").equals(guard.optString("path"))&&node.optString("canonical_path").equals(guard.optString("canonical_path"))&&node.optInt("maximum",-1)==guard.optInt("maximum",-2);}
  static void install()throws Exception{
   RootWorkspace.requireNative();
   Os.chmod(RootControl.DATA.toString(),0700);
@@ -60,6 +60,8 @@ final class NativePanelRoot {
   JSONObject existing=null;try{existing=NativePanelClient.call("STATUS");}catch(Exception ignored){}
   if(existing!=null){if(matches(current,existing)&&(!follow||existing.optBoolean("control_center_listener")&&existing.optInt("control_center_pid")==enginePid))return;if(matches(current,existing)){stop();existing=null;}else if(ActivePanelNode.PROFILE.equals(current.optString("discovery"))&&existing.optInt("fold_port",-1)>=0){stop();existing=null;}else throw new IOException("已有守护使用其他节点，请先恢复自动亮度");}
   File log=new File(RootControl.DATA,"main-panel.log");
+  // Retain one bounded previous run before ProcessBuilder replaces the current log.
+  if(log.isFile())try(RandomAccessFile old=new RandomAccessFile(log,"r")){int size=(int)Math.min(old.length(),65536);byte[] tail=new byte[size];old.seek(old.length()-size);old.readFully(tail);Files.write(new File(RootControl.DATA,"main-panel.previous.log").toPath(),tail);}catch(IOException unavailable){/* Optional evidence must not prevent startup. */}
   java.util.List<String> command=new java.util.ArrayList<>(java.util.Arrays.asList(BIN.toString(),"--daemon","--node",current.getString("path")));if(ActivePanelNode.PROFILE.equals(current.optString("discovery")))command.add("--active-fold="+current.getInt("fold_port"));if(follow){if(enginePid<=1)throw new IOException("系统进程身份无效");command.add("--control-center="+enginePid);}
   Process guard=new ProcessBuilder(command).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.to(log)).start();
   String lastProbe="未取得就绪响应";long deadline=System.nanoTime()+1500000000L;

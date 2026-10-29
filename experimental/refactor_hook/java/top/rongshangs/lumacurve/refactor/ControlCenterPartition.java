@@ -50,6 +50,8 @@ final class ControlCenterPartition {
         static final int NORMAL=0,CAP=1,PROMPT=2,RAW=3,RELEASE=4;
         long since=-1,confirmed=-1;boolean stroke,released,raw,releasePending,automaticHigh;
         void reset(){since=confirmed=-1;stroke=released=raw=releasePending=automaticHigh=false;}
+        void beginStroke(){stroke=false;}
+        void endStroke(long now){stroke=false;if(!raw&&since>=0&&now>=since&&now-since<=WINDOW_MS)released=true;}
         void fromAutomaticHigh(long now){reset();raw=automaticHigh=true;since=confirmed=now;}
         int move(int position,int boundary,boolean tracking,boolean stop,long now,boolean holding){
             if(raw&&!holding&&confirmed>=0&&now>=confirmed&&now-confirmed>1500){raw=automaticHigh=false;since=confirmed=-1;released=false;}
@@ -61,7 +63,14 @@ final class ControlCenterPartition {
             if(raw){
                 if(position<=boundary){raw=automaticHigh=false;releasePending=true;since=confirmed=-1;released=false;action=RELEASE;}
                 else action=RAW;
-            }else if(position<boundary){since=confirmed=-1;released=false;action=NORMAL;}
+            }else if(position<boundary){
+                // A new touch can begin below the thumb clamped by the first stroke.
+                // Keep its released admission while this stroke moves in the normal
+                // range; only crossing the boundary can confirm node control.
+                boolean approaching=since>=0&&released&&now>=since&&now-since<=WINDOW_MS&&tracking&&!stop;
+                if(!approaching){since=confirmed=-1;released=false;}
+                action=NORMAL;
+            }
             else if(since>=0&&now>=since&&now-since<=WINDOW_MS&&released&&tracking&&!stop&&position>boundary){raw=true;confirmed=now;action=RAW;}
             else if(since<0||now<since||now-since>WINDOW_MS&&newStroke){since=now;released=automaticHigh=false;action=PROMPT;}
             else action=CAP;

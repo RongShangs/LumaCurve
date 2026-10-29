@@ -9,10 +9,10 @@ final class ControlCenterSettings {
     final MainActivity a;final LinearLayout root,partitionBody,returnPolicy,limitHeader,limitInputRow;final TextView heading,availability,limitLabel;
     final int[] modes=ControlCenterStatus.visibleModes();final LinearLayout[] options=new LinearLayout[3];
     final TextView[] marks=new TextView[3],badges=new TextView[3];final Button[] returns=new Button[2];final Button setLimit,deviceLimit;
-    final ControlCenterDemo demo;final SeekBar maximumSlider;final EditText maximumInput;
+    final ControlCenterDemo demo;final ControlCenterSetup setup;final SeekBar maximumSlider;final EditText maximumInput;
     boolean updating;int maximum,ordinary;
     ControlCenterSettings(MainActivity a,LinearLayout parent){
-        this.a=a;root=a.card(parent);root.setTag("node_mapping");root.setFocusable(true);heading=a.text("控制中心亮度条映射",18,a.INK);root.addView(heading);
+        this.a=a;root=a.card(parent);root.setTag("node_mapping");root.setFocusable(true);heading=a.text("控制中心亮度条映射",18,a.INK);setup=new ControlCenterSetup(a,root,heading);
         String[] summaries={"系统原有调节方式","全段节点控制 · 不参与记忆","普通 75% + 增强 25%"};
         for(int i=0;i<modes.length;i++){
             final int mode=modes[i];LinearLayout option=a.column();options[i]=option;option.setPadding(a.dp(12),a.dp(12),a.dp(12),a.dp(12));option.setMinimumHeight(a.dp(58));option.setClickable(true);option.setFocusable(true);
@@ -21,7 +21,7 @@ final class ControlCenterSettings {
             LinearLayout words=a.column();header.addView(words,new LinearLayout.LayoutParams(0,-2,1));words.addView(a.text(ControlCenterStatus.label(mode),15,a.INK));words.addView(a.text(summaries[i],12,a.MUTED));
             badges[i]=a.text("已选中",12,a.BLUE);badges[i].setGravity(Gravity.CENTER);header.addView(badges[i],new LinearLayout.LayoutParams(a.dp(48),-2));
             LinearLayout.LayoutParams size=new LinearLayout.LayoutParams(-1,-2);size.topMargin=a.dp(10);root.addView(option,size);
-            option.setOnClickListener(v->{if(a.busy||!ControlCenterStatus.selectable(a.runtime,mode,a.controls.nodeSliderMode))return;if(a.controls.nodeSliderMode!=mode){a.controls.nodeSliderMode=mode;a.dirty=true;a.drawCurve();}});
+            option.setOnClickListener(v->{if(a.busy||!ControlCenterStatus.selectable(a.runtime,mode,a.controls.nodeSliderMode))return;if(a.controls.nodeSliderMode!=mode){a.controls.nodeSliderMode=mode;a.dirty=true;a.drawCurve();}if(mode>0)setup.check(true);});
         }
         partitionBody=a.column();options[2].addView(partitionBody);demo=new ControlCenterDemo(a);LinearLayout.LayoutParams preview=new LinearLayout.LayoutParams(-1,a.dp(252));preview.topMargin=a.dp(12);partitionBody.addView(demo,preview);
         limitHeader=a.column();limitHeader.setOrientation(LinearLayout.HORIZONTAL);limitHeader.setGravity(Gravity.CENTER_VERTICAL);limitHeader.setBaselineAligned(false);LinearLayout.LayoutParams headerSize=new LinearLayout.LayoutParams(-1,-2);headerSize.topMargin=a.dp(10);partitionBody.addView(limitHeader,headerSize);
@@ -38,6 +38,7 @@ final class ControlCenterSettings {
         refresh();
     }
     void refresh(){
+        setup.refresh();
         boolean partition=a.controls.nodeSliderMode==4;partitionBody.setVisibility(partition?View.VISIBLE:View.GONE);returnPolicy.setVisibility(partition?View.VISIBLE:View.GONE);
         for(int i=0;i<modes.length;i++){boolean chosen=modes[i]==a.controls.nodeSliderMode;options[i].setSelected(chosen);options[i].setEnabled(!a.busy&&ControlCenterStatus.selectable(a.runtime,modes[i],a.controls.nodeSliderMode));options[i].setAlpha(options[i].isEnabled()?1:.5f);GradientDrawable background=a.background(chosen?0xffe5edff:0xfff2f4f8,16);background.setStroke(a.dp(chosen?2:1),chosen?a.BLUE:((a.MUTED&0xffffff)|0x55000000));options[i].setBackground(background);marks[i].setText(chosen?"●":"○");badges[i].setVisibility(chosen?View.VISIBLE:View.GONE);options[i].setContentDescription(a.tr(ControlCenterStatus.label(modes[i]))+(chosen?" · "+a.tr("已选中"):""));}
         String[] labels={"恢复自动亮度","继续保持手动"};for(int i=0;i<2;i++){boolean chosen=a.controls.partitionRestoreAuto==(i==0);returns[i].setSelected(chosen);returns[i].setEnabled(!a.busy);returns[i].setText((chosen?"✓ ":"")+a.tr(labels[i]));returns[i].setTextColor(chosen?a.BG:a.INK);returns[i].setBackground(a.ripple(chosen?a.BLUE:0xffeef2fa,12));}
