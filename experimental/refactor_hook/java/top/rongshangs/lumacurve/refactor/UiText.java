@@ -6,6 +6,23 @@ public final class UiText {
     private static final LinkedHashMap<String,String> WORDS=new LinkedHashMap<>();
     private static final List<Map.Entry<String,String>> PHRASES;
     static {
+        WORDS.put("状态读回：","Status readback: ");
+        WORDS.put("亮度换算：","Brightness conversion: ");
+        WORDS.put("开启后分别编辑深浅色基础曲线；切换时如何处理手动记忆，请在下方选择。","Edit light and dark base curves separately. Choose how learned preferences change with the system theme below.");
+        WORDS.put("深浅色模式记忆处理","Theme memory policy");
+        WORDS.put("切换时清除记忆","Clear on theme change");
+        WORDS.put("切换时保持记忆","Share across themes");
+        WORDS.put("深浅色模式独立记忆曲线","Separate learned curves for light and dark modes");
+        WORDS.put("清除：每次切换重新学习；保持：共用手动偏好；独立：各自学习，切换时恢复对应记忆。跨重启恢复仍由“重启后保持”控制。","Clear to learn again, share the same preferences, or learn separately for each theme. Restore after reboot still controls disk persistence.");
+        WORDS.put("切换深浅色模式后保持","Keep preferences across theme changes");
+        WORDS.put("独立基础曲线开启时，此项由亮度曲线页的记忆处理选择接管，原选择保留。","With independent base curves, the curve page controls theme memory. This stored choice is retained.");
+        WORDS.put("深色模式曲线与记忆","Dark mode curve and memory");
+        WORDS.put("将当前绿色曲线保存为深色模式基础曲线","Save the green curve as the dark mode base curve");
+        WORDS.put("清除当前模式的手动节点与存档，保留基础曲线及另一模式的独立记忆。","Clear this mode's learned points and archive, keeping its base curve and the other mode's independent preferences.");
+        WORDS.put("当前屏幕节点","Current screen node");
+        WORDS.put("当前亮度（设备换算）","Current brightness (device conversion)");
+        WORDS.put("单独调整深色模式亮度；可清除、保持或分开记忆","Set a dark base curve and choose clear, shared or separate preferences.");
+
         WORDS.put("最高节点必须高于普通区间上限","The maximum node must exceed the ordinary ceiling");
         WORDS.put("系统原有调节方式","Original system behavior");
         WORDS.put("全段节点控制 · 不参与记忆","Full node range \u00b7 no learning");

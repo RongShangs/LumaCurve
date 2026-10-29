@@ -4,13 +4,13 @@
 
 此索引说明已实现和验证责任，不代表所有功能已在所有设备启用或实测。
 
-共 55 项功能、22 组适配、161 份生产 Java。
+共 55 项功能、22 组适配、163 份生产 Java。
 
 ## 曲线与手动记忆 · curve
 
 功能：`curve`、`manual_memory`、`saved_curve`、`persistent_memory`、`memory_mode`、`memory_forever`、`memory_reset`、`memory_timeout`。
 
-选择：ABC 活动策略为准；Refactor 未就绪不得因物理映射对象存在而抢用，未知活动标记才按已验证对象选择。 Refactor内部分段锚点优先；任一旧锚点标记存在时不得回退绕过残缺旧结构；仅旧锚点整体缺失且9/22系数布局、实例字段与原生消费者签名完整时采用系数路径。 记忆转基础保持现有路径；仅对新鲜物理映射采样的4个float ULP以内边界/平台舍入误差归一，仍严格校验全节点、坐标与范围；Refactor锚点及持久化输入不放宽。 原机完整单调曲线超出真实标定范围时，只对已验证系统物理映射及双向原生样条追加端点裁剪分支；其他范围内旧路径不增加探测要求，残缺标定不回退绕过。；可选深色曲线复用同一已选后端和实际设备约束，仅按系统uiMode选择独立基础配置；不开启时旧配置原样选择。
+选择：ABC 活动策略为准；Refactor 未就绪不得因物理映射对象存在而抢用，未知活动标记才按已验证对象选择。 Refactor内部分段锚点优先；任一旧锚点标记存在时不得回退绕过残缺旧结构；仅旧锚点整体缺失且9/22系数布局、实例字段与原生消费者签名完整时采用系数路径。 记忆转基础保持现有路径；仅对新鲜物理映射采样的4个float ULP以内边界/平台舍入误差归一，仍严格校验全节点、坐标与范围；Refactor锚点及持久化输入不放宽。 原机完整单调曲线超出真实标定范围时，只对已验证系统物理映射及双向原生样条追加端点裁剪分支；其他范围内旧路径不增加探测要求，残缺标定不回退绕过。；可选深色曲线复用同一已选后端和实际设备约束，仅按系统uiMode选择独立基础配置；不开启时旧配置原样选择。 深浅色模式记忆策略独立选择清除/共用/分开；独立作用域按本机用户与基础曲线隔离，仅启用跨重启保持才保存两份磁盘存档。
 
 组合关系：`exclusive`；互斥、独立功能、双维度和补充组件分别处理。
 
@@ -22,9 +22,9 @@
 | `aosp_physical` · 系统标准物理映射 | 实际映射器为 PhysicalMappingStrategy，使用其亮度 / nit 转换与短期模型。 |
 | `aosp_physical_clamped` · 系统物理映射：标定端点裁剪 | 原机曲线超出标定范围，且实际双向标定样条及端点裁剪通过验证；按有效范围编辑，默认保持原曲线对象与原生保护。 |
 
-实现：[BackendSelection.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/BackendSelection.java)、[CurveBackend.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/CurveBackend.java)、[RefactorAdapter.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/RefactorAdapter.java)、[TraditionalAdapter.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/TraditionalAdapter.java)、[TraditionalHooks.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/TraditionalHooks.java)、[MemoryLifecycle.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/MemoryLifecycle.java)、[PersistentMemory.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/PersistentMemory.java)、[MemoryPersistence.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/MemoryPersistence.java)、[SavedCurve.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/SavedCurve.java)、[RefactorProfiles.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/RefactorProfiles.java)、[RefactorCoefficientsAdapter.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/RefactorCoefficientsAdapter.java)、[PhysicalCurveCalibration.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/PhysicalCurveCalibration.java)、[ThemeCurveOptions.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ThemeCurveOptions.java)。
+实现：[BackendSelection.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/BackendSelection.java)、[CurveBackend.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/CurveBackend.java)、[RefactorAdapter.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/RefactorAdapter.java)、[TraditionalAdapter.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/TraditionalAdapter.java)、[TraditionalHooks.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/TraditionalHooks.java)、[MemoryLifecycle.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/MemoryLifecycle.java)、[PersistentMemory.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/PersistentMemory.java)、[MemoryPersistence.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/MemoryPersistence.java)、[SavedCurve.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/SavedCurve.java)、[RefactorProfiles.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/RefactorProfiles.java)、[RefactorCoefficientsAdapter.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/RefactorCoefficientsAdapter.java)、[PhysicalCurveCalibration.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/PhysicalCurveCalibration.java)、[ThemeCurveOptions.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ThemeCurveOptions.java)、[ThemeMemoryStore.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ThemeMemoryStore.java)。
 
-证据：`curve_backend`、`physical_mapper_class`、`baseline_id`、`user_serial`、`curve_route`、`physical_baseline_route`、`physical_calibration_min_nit`、`physical_calibration_max_nit`、`physical_original_min_nit`、`physical_original_max_nit`、`physical_clamped_points`、`theme_curve_enabled`、`theme_curve_dark`、`base_curve_name`。
+证据：`curve_backend`、`physical_mapper_class`、`baseline_id`、`user_serial`、`curve_route`、`physical_baseline_route`、`physical_calibration_min_nit`、`physical_calibration_max_nit`、`physical_original_min_nit`、`physical_original_max_nit`、`physical_clamped_points`、`theme_curve_enabled`、`theme_curve_dark`、`base_curve_name`、`theme_memory_mode`、`theme_curve_dark`。
 
 退出 / 回滚：关闭 / 故障 / OTA 基准或用户变化恢复本次应用的曲线；只按所选保持范围恢复匹配记忆。 系数路线事务快照同时保存数组内容与身份；拒绝其他所有者替换的基线，未验证的虚拟拟合参考点不冒充可移植用户锚点。 转存前校验失败不调用配置应用，不清除当前手动点；精度归一不修改原始状态快照或其他已保存设置。 新分支中性参数保持原配置对象，编辑只提交有效标定范围内的节点；停用恢复未裁剪原始对象，元数据/记忆清理及失败回滚沿用旧事务。；启用独立曲线后真实主题切换在显示Handler事务内撤销待保存/恢复、清除活跃与归档记忆；永久保持不能复活旧主题记忆。关闭功能不删除两条基础配置。
 
@@ -355,7 +355,7 @@
 
 功能：`main_panel_node`。
 
-选择：backlight 或明确标识显示的 leds；真实 sysfs 路径与上限配对且唯一主屏，不按机型写死上限。 新增手动面板折叠路线：实际原生布局至少两个不同默认物理屏；实时默认内部屏地址与布局、成对同控制器背光、唯一 DSI 亮屏端口一致，选当前端口，扫描后再确认物理屏未变化。无切换布局证据时原发现路径不变；有折叠证据但不完整则等待。 兼容实际 Physical / StablePhysical 地址对象，均直接调用原生 getPort；StablePhysical 的物理 ID 与端口独立，按内核成对 panelN 清单验证，不解码该 ID。
+选择：backlight 或明确标识显示的 leds；真实 sysfs 路径与上限配对且唯一主屏，不按机型写死上限。 新增手动面板折叠路线：实际原生布局至少两个不同默认物理屏；实时默认内部屏地址与布局、成对同控制器背光、唯一 DSI 亮屏端口一致，选当前端口，扫描后再确认物理屏未变化。无切换布局证据时原发现路径不变；有折叠证据但不完整则等待。 兼容实际 Physical / StablePhysical 地址对象，均直接调用原生 getPort；StablePhysical 的物理 ID 与端口独立，按内核成对 panelN 清单验证，不解码该 ID。 状态读数单独只读实际节点；可验证本机DisplayDeviceConfig背光标定时换算nit，不可换算时原生接管仅显示节点值，不复用框架旧亮度。
 
 组合关系：`exclusive`；互斥、独立功能、双维度和补充组件分别处理。
 
@@ -365,13 +365,13 @@
 | `display_led_node` · 显示专用 leds 节点 | 仅接受明确标识为主屏背光的 leds 节点，排除通知灯、手电与背屏。 |
 | `fold_default_display` · 折叠屏当前主屏节点 | 原生折叠布局允许不同物理屏作为默认屏；根据实时默认屏地址、成对背光与唯一点亮 DSI 选择节点；显示端口与内核编号不一致时独立核验默认屏点亮状态，切屏释放旧接管。 |
 
-实现：[PanelNodeDiscovery.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/PanelNodeDiscovery.java)、[NativePanelRoot.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/NativePanelRoot.java)、[ActivePanelNode.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ActivePanelNode.java)。
+实现：[PanelNodeDiscovery.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/PanelNodeDiscovery.java)、[NativePanelRoot.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/NativePanelRoot.java)、[ActivePanelNode.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ActivePanelNode.java)、[ScreenBrightnessReading.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ScreenBrightnessReading.java)。
 
-证据：`main_panel_node.node_class`、`main_panel_node.node_path`、`main_panel_node.node_maximum`、`main_panel_node.node_discovery`、`main_panel_node.node_physical_display_id`、`main_panel_node.node_address_profile`、`main_panel_node.node_port_source`、`main_panel_node.node_detail`。
+证据：`main_panel_node.node_class`、`main_panel_node.node_path`、`main_panel_node.node_maximum`、`main_panel_node.node_discovery`、`main_panel_node.node_physical_display_id`、`main_panel_node.node_address_profile`、`main_panel_node.node_port_source`、`main_panel_node.node_detail`、`actual_nit_source`、`actual_node_source`、`screen_nit_calibration.route`、`brightness_read_error`。
 
-退出 / 回滚：发现与权限检查只读，不启动写入器；实际租约写入另由原生事务负责，拒绝副屏 / 指示灯 / 手电。 折叠专用原生选项与 v3 权限恢复记录仅允许绑定端口节点；v2 / 旧节点拒绝规则不变。关闭、熄屏、DRM 改变结束旧接管；租约和框架输出隔离绑定物理屏，晚到命令拒绝，不复用旧目标。户外新增显式折叠协作分支，使用独立物理租约和原生 DSI 核验；隐藏映射仍不启用此分支。
+退出 / 回滚：发现与权限检查只读，不启动写入器；实际租约写入另由原生事务负责，拒绝副屏 / 指示灯 / 手电。 折叠专用原生选项与 v3 权限恢复记录仅允许绑定端口节点；v2 / 旧节点拒绝规则不变。关闭、熄屏、DRM 改变结束旧接管；租约和框架输出隔离绑定物理屏，晚到命令拒绝，不复用旧目标。户外新增显式折叠协作分支，使用独立物理租约和原生 DSI 核验；隐藏映射仍不启用此分支。 读数不启动写入器、不修改节点或权限；物理屏或标定不一致时不显示旧nit。
 
-验证：[refactor_panel_nodes.py](../../tests/refactor_panel_nodes.py)、[refactor_panel_access.py](../../tests/refactor_panel_access.py)、[refactor_fold_panel.py](../../tests/refactor_fold_panel.py)。
+验证：[refactor_panel_nodes.py](../../tests/refactor_panel_nodes.py)、[refactor_panel_access.py](../../tests/refactor_panel_access.py)、[refactor_fold_panel.py](../../tests/refactor_fold_panel.py)、[refactor_screen_brightness.py](../../tests/refactor_screen_brightness.py)。
 
 ## Root 存储与原生工具 · root_tools
 
@@ -526,6 +526,8 @@
 | `physical_baseline_calibration` · `PhysicalCurveCalibration.java` | `in_range_original_route` / `aosp_verified_endpoint_clamp` | 只有实际默认曲线越过标定边界才检查双向原生LinearSpline/MonotoneCubicSpline、坐标对应、未调整的范围、纯换算端点；严格拒绝错误、动态标定、非单调或不匹配对象。中性保留原始曲线，编辑使用标定端点，不扩大硬件上限。 | [refactor_physical_calibration.py](../../tests/refactor_physical_calibration.py) |
 | `slider_calibration_domain` · `ControlCenterCalibration.java` | `full_unit_domain` / `verified_native_endpoints` | 原全域校验不新增接口要求；端点平台分支仅匹配完整本机标定，排除中间平台、残缺结构和活动额外低亮度标定。范围随转换表传输，不扩展硬件或自动亮度允许范围。 | [refactor_control_center_calibration.py](../../tests/refactor_control_center_calibration.py) |
 | `partition_manual_ceiling` · `ControlCenterPartition.java` | `ddc_hbm_transition` / `hbm_normal_ceiling` | 优先原始DDC HBM过渡点；入口不存在或合法无HBM数据才用实际控制器普通上限。残缺/类型错/坏数据不回退，不用固定百分比或机型表；边界不能证明时只停分区。 | [refactor_control_center_partition.py](../../tests/refactor_control_center_partition.py) |
+| `screen_brightness_readback` · `ScreenBrightnessReading.java` | `driver_actual_brightness` / `sysfs_brightness_readback` / `display_config_backlight_to_nit` / `node_readback_uncalibrated` / `driver_zero_conflicts_with_lit_output` | 保留有效驱动actual_brightness优先的原路径。亮屏、同设备brightness为正、未报告背光关闭，且独立框架实际输出为正时，将矛盾的驱动0标为不可用并采用该设备brightness读回；未知、实际熄屏或背光关闭不推断为假0。常规输出优先原有框架nit，直接节点接管才优先本机标定换算。记录驱动值、寄存器值、原框架nit及回退原因；范围外不外推，不使用请求目标或机型表。 | [refactor_screen_brightness.py](../../tests/refactor_screen_brightness.py) |
+| `coefficient_terminal_domain` · `RefactorCoefficientsAdapter.java` | `native_maximum_terminal` / `edited_lower_terminal` | 仅最高点显式下调时，将本机已校验calculateBrt的实际三组系数数组限定到原最高照度域；其他数组、用户/线程/未启用/原始100%路径不改变。相邻点保持严格递增，避免零斜率拟合；不改光感照度或最终输出保护。 | [refactor_coefficient_curve.py](../../tests/refactor_coefficient_curve.py) |
 
 ## 原生协议与运行分支
 
@@ -544,7 +546,7 @@
 
 ### adapters · 原生折叠布局、默认物理屏与背光节点绑定
 
-`ActivePanelNode.java`、`AdvancedTuning.java`、`AssistSensorCompat.java`、`AuxiliarySensorIdentity.java`、`BrightnessSensorAccess.java`、`ControlCenterCalibration.java`、`ControlCenterHooks.java`、`ControlCenterNodes.java`、`ControlCenterPartition.java`、`DarkLockSchedule.java`、`DimAodCompatibility.java`、`FieldOverride.java`、`ForegroundApps.java`、`FrameworkBrightness.java`、`HbmAccess.java`、`LowLightTuning.java`、`OutdoorOpr.java`、`OutdoorOprEnvelope.java`、`OutdoorOutputAccess.java`、`OutdoorSdrScope.java`、`OutdoorTuning.java`、`PhysicalCurveCalibration.java`、`PipelineHooks.java`、`RawPanelOutputHooks.java`、`RefactorAdapter.java`、`RefactorCoefficientsAdapter.java`、`RefactorProfiles.java`、`ResponseTuning.java`、`SceneTuning.java`、`TraditionalAdapter.java`、`TraditionalAnimation.java`、`TraditionalHooks.java`。
+`ActivePanelNode.java`、`AdvancedTuning.java`、`AssistSensorCompat.java`、`AuxiliarySensorIdentity.java`、`BrightnessSensorAccess.java`、`ControlCenterCalibration.java`、`ControlCenterHooks.java`、`ControlCenterNodes.java`、`ControlCenterPartition.java`、`DarkLockSchedule.java`、`DimAodCompatibility.java`、`FieldOverride.java`、`ForegroundApps.java`、`FrameworkBrightness.java`、`HbmAccess.java`、`LowLightTuning.java`、`OutdoorOpr.java`、`OutdoorOprEnvelope.java`、`OutdoorOutputAccess.java`、`OutdoorSdrScope.java`、`OutdoorTuning.java`、`PhysicalCurveCalibration.java`、`PipelineHooks.java`、`RawPanelOutputHooks.java`、`RefactorAdapter.java`、`RefactorCoefficientsAdapter.java`、`RefactorProfiles.java`、`ResponseTuning.java`、`SceneTuning.java`、`ScreenBrightnessReading.java`、`TraditionalAdapter.java`、`TraditionalAnimation.java`、`TraditionalHooks.java`。
 
 ### bootstrap · 入口与代次
 
@@ -576,7 +578,7 @@
 
 ### policy · 自适应高度带、独立速度与错落位置的弹幕模型、可见范围计算和预测防重叠
 
-`AboutMarquee.java`、`AdvancedPolicy.java`、`BackendSelection.java`、`CompatibilityCatalog.java`、`ControlCenterCurve.java`、`ControlCenterDemoState.java`、`ControlCenterMapping.java`、`ControlCenterStatus.java`、`CurveBackend.java`、`CurveComparison.java`、`CurveIdentity.java`、`CurvePlan.java`、`DarkLockPolicy.java`、`DelayPolicy.java`、`ForegroundUser.java`、`LowLightAssistEvidence.java`、`LowLightAssistGate.java`、`LowLightPolicy.java`、`LowLightThresholds.java`、`MemoryPolicy.java`、`MemoryScene.java`、`NavigationPolicy.java`、`NitBrightnessLimit.java`、`OutdoorNodeProfile.java`、`OutdoorNodeTarget.java`、`OutdoorPolicy.java`、`OutputProtection.java`、`RawPanelLease.java`、`RawPanelTilePolicy.java`、`RelativeNodeGesture.java`、`ReleasePolicy.java`、`ScenePolicy.java`、`ScrollElasticity.java`、`ThermalPolicy.java`、`TraditionalCurve.java`。
+`AboutMarquee.java`、`AdvancedPolicy.java`、`BackendSelection.java`、`CompatibilityCatalog.java`、`ControlCenterCurve.java`、`ControlCenterDemoState.java`、`ControlCenterMapping.java`、`ControlCenterStatus.java`、`CurveBackend.java`、`CurveComparison.java`、`CurveIdentity.java`、`CurvePlan.java`、`DarkLockPolicy.java`、`DelayPolicy.java`、`ForegroundUser.java`、`LowLightAssistEvidence.java`、`LowLightAssistGate.java`、`LowLightPolicy.java`、`LowLightThresholds.java`、`MemoryPolicy.java`、`MemoryScene.java`、`NavigationPolicy.java`、`NitBrightnessLimit.java`、`OutdoorNodeProfile.java`、`OutdoorNodeTarget.java`、`OutdoorPolicy.java`、`OutputProtection.java`、`RawPanelLease.java`、`RawPanelTilePolicy.java`、`RelativeNodeGesture.java`、`ReleasePolicy.java`、`ScenePolicy.java`、`ScrollElasticity.java`、`ThemeMemoryStore.java`、`ThermalPolicy.java`、`TraditionalCurve.java`。
 
 ### presentation · 浅蓝底色的大圆角方形图标、容器内裁剪弹幕及仅可见时运行的绘制调度
 

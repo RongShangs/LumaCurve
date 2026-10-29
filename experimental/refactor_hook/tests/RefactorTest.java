@@ -62,7 +62,7 @@ public final class RefactorTest {
         check(Math.abs(o.defaultAtLux(70)-a.plan().at(70))<.001);
         check(o.defaultAtLux(70)<135+85*40/570f);
         check(o.defaultAtLux(5000)==1060);
-        try{a.configure(new float[]{1,1,1,.5f});throw new AssertionError();}catch(IllegalArgumentException expected){check(o.mDefNit30==108);}
+        try{a.configure(new float[]{1,1,1,1.1f});throw new AssertionError();}catch(IllegalArgumentException expected){check(o.mDefNit30==108);}
         // Manual anchors survive normal reads; module rewrites only explicit profile/reset events.
         o.mAnchorNit[1]=180;o.mAnchorIsUserDrag[1]=true;check(a.plan().at(30)==108 && o.mAnchorNit[1]==180 && o.mAnchorIsUserDrag[1]);
         o.resetDefaultSpline();check(o.mAnchorNit[1]==108 && o.mGoodAnchorNit[1]==108);
@@ -106,11 +106,11 @@ public final class RefactorTest {
         check(CurveEditor.bounds(2,saturation,.2f,1060,full)[1]<2);
         float effective=CurveEditor.clamp(2,2,saturation,.2f,1060,full);
         check(saturation[2]*effective<=1060 && saturation[2]*effective>1059.9f);
-        bad(()->CurveEditor.bounds(3,base,.2f,1060,draft));
+        check(CurveEditor.bounds(3,base,.2f,1060,draft)[1]==1);
         bad(()->CurveEditor.clamp(1,Float.NaN,base,.2f,1060,draft));
         Random random=new Random(928);
         for(int i=0;i<400;i++){
-            int point=random.nextInt(3);float wanted=random.nextFloat()*6-2;
+            int point=random.nextInt(4);float wanted=random.nextFloat()*6-2;
             draft[point]=CurveEditor.clamp(point,wanted,base,.2f,1060,draft);
             float[] actual=new CurvePlan(new float[]{0,30,600,5000},base,.2f,1060,draft).nits();
             check(actual[0]<=actual[1]&&actual[1]<=actual[2]&&actual[2]<=actual[3]);

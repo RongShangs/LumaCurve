@@ -168,6 +168,27 @@ public class MemoryHostTest {
   // A theme handover cancels pending writes and all restore/reset jobs, even with forever enabled.
   ts.themeMemoryScope=":theme-light";tb.anchors=points(30,99);tm.manualApplied();check(tm.pendingWrite!=null);tm.scheduleRestore("system_reset");tm.requestAfterReset();tm.clear();tb.clearMemory();ts.themeMemoryScope=":theme-dark";tm.configure(permanent,true);tm.clear();ts.handler.drain();check(tb.anchors.length()==0&&tm.pendingWrite==null&&!tm.pendingRestore&&!tm.resetQueued&&!Settings.Global.data.containsKey(PersistentMemory.KEY));
   tm.requestAfterReset();ts.handler.drain();ts.handler.drain();check(tb.anchors.length()==0);ts.themeMemoryScope=":theme-light";tm.scheduleRestore();ts.handler.drain();check(tb.anchors.length()==0);
+
+  // Independent live banks: do not require disk persistence or revive a bank after restart.
+  Backend themesBackend=new Backend();HookRuntime themesState=new HookRuntime(themesBackend);MemoryPersistence themesMemory=new MemoryPersistence(themesState);
+  MemoryOptions themeOnly=defaults.with("memory_hold_theme",true);check(themeOnly.themeHold&&!themeOnly.persist&&themeOnly.enabled());
+  themesState.themeMemoryScope=":independent-light";themesMemory.configure(themeOnly,false);themesBackend.anchors=points(30,81);themesMemory.manualApplied();
+  MemoryPersistence.ThemeHandover toDark=themesMemory.beforeTheme(2);themesBackend.clearMemory();themesMemory.detachTheme();themesState.themeMemoryScope=":independent-dark";themesMemory.configure(themeOnly,true);themesMemory.afterTheme(toDark);themesState.handler.drain();check(themesBackend.anchors.length()==0);
+  themesBackend.anchors=points(30,43);themesMemory.manualApplied();MemoryPersistence.ThemeHandover toLight=themesMemory.beforeTheme(2);themesBackend.clearMemory();themesMemory.detachTheme();themesState.themeMemoryScope=":independent-light";themesMemory.configure(themeOnly,true);themesMemory.afterTheme(toLight);themesState.handler.drain();check(themesBackend.anchors.getJSONObject(0).getInt("value")==81);
+  themesMemory.clear();themesBackend.clearMemory();toDark=themesMemory.beforeTheme(2);themesMemory.detachTheme();themesState.themeMemoryScope=":independent-dark";themesMemory.configure(themeOnly,true);themesMemory.afterTheme(toDark);themesState.handler.drain();check(themesBackend.anchors.getJSONObject(0).getInt("value")==43);
+  toLight=themesMemory.beforeTheme(2);themesBackend.clearMemory();themesMemory.detachTheme();themesState.themeMemoryScope=":independent-light";themesMemory.configure(themeOnly,true);themesMemory.afterTheme(toLight);themesState.handler.drain();check(themesBackend.anchors.length()==0);
+  Backend restartB=new Backend();HookRuntime restartS=new HookRuntime(restartB);restartS.themeMemoryScope=":independent-dark";MemoryPersistence restartM=new MemoryPersistence(restartS);restartM.configure(themeOnly,true);restartS.handler.drain();check(restartB.anchors.length()==0);
+  // Separate persistent keys: neither save nor clear can overwrite the other theme.
+  themesState.themeMemoryScope=":independent-light";themesMemory.detachTheme();themesMemory.configure(themeOnly.with("memory_persist",true),false);themesBackend.anchors=points(30,91);themesMemory.manualApplied();themesMemory.flush();String lightDisk=Settings.Global.data.get(PersistentMemory.KEY+"_light");check(lightDisk!=null);
+  toDark=themesMemory.beforeTheme(2);lightDisk=Settings.Global.data.get(PersistentMemory.KEY+"_light");themesBackend.clearMemory();themesMemory.detachTheme();themesState.themeMemoryScope=":independent-dark";themesMemory.configure(themeOnly.with("memory_persist",true),true);themesMemory.afterTheme(toDark);themesState.handler.drain();themesBackend.anchors=points(30,47);themesMemory.manualApplied();themesMemory.flush();check(Settings.Global.data.get(PersistentMemory.KEY+"_light").equals(lightDisk));check(Settings.Global.data.get(PersistentMemory.KEY+"_dark")!=null);
+  themesMemory.clear();themesBackend.clearMemory();check(Settings.Global.data.get(PersistentMemory.KEY+"_dark")==null&&Settings.Global.data.get(PersistentMemory.KEY+"_light").equals(lightDisk));
+  restartB=new Backend();restartS=new HookRuntime(restartB);restartS.themeMemoryScope=":independent-light";restartM=new MemoryPersistence(restartS);restartM.configure(themeOnly.with("memory_persist",true),true);restartS.handler.drain();check(restartB.anchors.getJSONObject(0).getInt("value")==91);
+  restartB=new Backend();restartS=new HookRuntime(restartB);restartS.themeMemoryScope=":independent-light";restartM=new MemoryPersistence(restartS);restartM.configure(themeOnly,true);restartS.handler.drain();check(restartB.anchors.length()==0); // disk exists, but persist is OFF
+  // Shared preferences can cross a changed base explicitly, while independent scopes stay bound.
+  Backend sharedB=new Backend();HookRuntime sharedS=new HookRuntime(sharedB);MemoryPersistence sharedM=new MemoryPersistence(sharedS);sharedM.configure(themeOnly,false);sharedB.anchors=points(30,72);sharedM.manualApplied();MemoryPersistence.ThemeHandover sharedH=sharedM.beforeTheme(1);sharedB.configure(new float[]{1,.7f,1,1});sharedB.clearMemory();sharedM.configure(themeOnly,true);sharedM.afterTheme(sharedH);sharedS.handler.drain();check(sharedB.anchors.getJSONObject(0).getInt("value")==72);
+  MemoryPersistence.ThemeHandover cleared=sharedM.beforeTheme(0);sharedB.clearMemory();sharedM.configure(themeOnly,true);sharedM.afterTheme(cleared);sharedS.handler.drain();check(sharedB.anchors.length()==0&&!sharedM.pendingRestore);
+  themesMemory.clearAll();check(!Settings.Global.data.containsKey(PersistentMemory.KEY+"_light")&&!Settings.Global.data.containsKey(PersistentMemory.KEY+"_dark"));
+
   System.out.println("Persistent memory/theme: "+cases+" cases PASS; service and OEM models, device not verified");
  }
 }'''
@@ -176,6 +197,6 @@ files=[]
 for name,text in sources.items():
     p=O/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_text(text,encoding='utf-8');files.append(p)
 C=O/'classes';C.mkdir(exist_ok=True)
-names=['MemoryScene','MemoryOptions','PersistentMemory','MemoryPersistence','ThemePalette','CurveBackend','SavedCurve','CurvePlan','CurveIdentity','RefactorAdapter','PhysicalCurveCalibration','TraditionalAdapter','TraditionalCurve']
+names=['MemoryScene','MemoryOptions','PersistentMemory','MemoryPersistence','ThemeMemoryStore','ThemePalette','CurveBackend','SavedCurve','CurvePlan','CurveIdentity','RefactorAdapter','PhysicalCurveCalibration','TraditionalAdapter','TraditionalCurve']
 subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(J),'-d',str(C),*[str(S/(n+'.java')) for n in names],*map(str,files)],check=True)
 subprocess.run(['java','-cp',str(C)+';'+str(J),'top.rongshangs.lumacurve.refactor.MemoryHostTest'],check=True)

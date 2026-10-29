@@ -31,6 +31,6 @@ final class AboutPage {
         card=a.card(sheet);card.addView(a.text("测试贡献",18,a.INK));card.addView(a.text(String.join(" ",AboutMarquee.TESTERS),14,a.INK));
         card=a.card(sheet);card.addView(a.text("代码贡献",18,a.INK));card.addView(a.text("凌乱的风W",14,a.INK));card.addView(a.text("贡献手动接管恢复、系统进程重启与断连兜底、节点校验顺序修复，以及图片解码优化。",12,a.MUTED));
         try{JSONObject data;try{data=ThanksFeed.parse(a.getPreferences(0).getString("thanks_cache",null));}catch(Exception absent){data=ThanksFeed.parse(ThanksFeed.read(a.getAssets().open("thanks.json")));}a.renderThanks(data);}catch(Exception ignored){a.thanksStatus.setText("暂时无法读取名单");}
-        card=a.card(sheet);line=a.row(card);line.addView(a.image("avatar.jpg",46,15));TextView author=a.text("戎Shang",19,a.INK);author.setPadding(a.dp(14),0,0,0);line.addView(author);line=a.row(card);button("作者博客",()->a.open("https://rongshangs.top"),line);button("酷安主页",()->a.open("https://www.coolapk.com/u/3261403"),line);
+        card=a.card(sheet);line=a.row(card);line.addView(a.image("avatar.jpg",46,15));LinearLayout authorInfo=a.column();authorInfo.setPadding(a.dp(14),0,0,0);line.addView(authorInfo,new LinearLayout.LayoutParams(0,-2,1));TextView author=a.text("戎Shang",19,a.INK);author.setPadding(0,0,0,0);authorInfo.addView(author);TextView studio=a.text("①❻❾①  Studio",13,a.MUTED);studio.setPadding(0,a.dp(4),0,0);authorInfo.addView(studio);line=a.row(card);button("作者博客",()->a.open("https://rongshangs.top"),line);button("酷安主页",()->a.open("https://www.coolapk.com/u/3261403"),line);
     }
 }

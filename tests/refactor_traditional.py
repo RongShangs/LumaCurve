@@ -71,7 +71,7 @@ public class TraditionalHostTest {
   float[] shape=dense.reshape(1,1000,f);near(shape[0],1);near(shape[4],24);near(shape[7],108);near(shape[shape.length-1],1000);check(shape[10]==shape[11]);
   for(int i=1;i<shape.length;i++)check(shape[i]>=shape[i-1]);
   Random random=new Random(24);for(int t=0;t<200;t++){float[] p={.1f+random.nextFloat()*1.9f,.1f+random.nextFloat()*1.9f,.1f+random.nextFloat()*1.9f,1};try{float[] n=dense.reshape(1,1000,p);for(int i=1;i<n.length;i++)check(n[i]>=n[i-1]&&n[i]<=1000);}catch(IllegalArgumentException rejected){cases++;}}
-  bad(()->new TraditionalCurve(new float[]{0,1,1,10},new float[]{2,3,4,5}));bad(()->dense.reshape(1,1000,new float[]{1,1,1,.5f}));bad(()->dense.reshape(1,1000,new float[]{Float.NaN,1,1,1}));
+  bad(()->new TraditionalCurve(new float[]{0,1,1,10},new float[]{2,3,4,5}));bad(()->dense.reshape(1,1000,new float[]{1,1,1,1.1f}));bad(()->dense.reshape(1,1000,new float[]{Float.NaN,1,1,1}));
   float[] cloned=dense.nit();cloned[0]=900;check(dense.nit()[0]==2);
   String id=CurveIdentity.of("physical_mapping",x,y,1,1000);check(!id.equals(CurveIdentity.of("refactor",x,y,1,1000)));check(!id.equals(CurveIdentity.of("physical_mapping",x,shape,1,1000)));
   Owner owner=new Owner();BrightnessConfiguration nativeConfig=config(x,y);MiuiPhysicalBrightnessMappingStrategy m=new MiuiPhysicalBrightnessMappingStrategy(nativeConfig);ABC abc=new ABC();abc.mBrightnessMappingStrategyMap.mapper=abc.mCurrentBrightnessMapper=m;

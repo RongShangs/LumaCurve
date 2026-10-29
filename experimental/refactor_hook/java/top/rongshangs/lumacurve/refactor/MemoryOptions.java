@@ -3,6 +3,7 @@ import org.json.*;
 /** Persistence, gesture grouping, and OEM wake reset are separate policies. */
 final class MemoryOptions {
  final boolean persist,unlock,sameScene,replaceOnUnlock,resetOverride,timeoutOverride,modeSwitch,forever;
+ boolean themeHold;
  final int days,maxPoints,settleMs,offMinutes,forceMinutes,timeoutMinutes;
  final float sceneRatio,sceneMinimum,resetLux;
  MemoryOptions(boolean persist,int days){this(persist,days,0);}
@@ -16,19 +17,20 @@ final class MemoryOptions {
  static MemoryOptions parse(JSONObject j)throws JSONException {
   boolean modern=j.has("memory_hold_schema")||j.has("memory_hold_switch")||j.has("memory_hold_forever"),p=flag(j,"memory_persist",false),wake=flag(j,"memory_restore_unlock",false);
   number(j,"memory_hold_schema",1,1,1,true);
-  return new MemoryOptions(p,(int)number(j,"memory_retention_days",30,1,90,true),(int)number(j,"memory_max_points",0,0,7,true),
+  MemoryOptions out=new MemoryOptions(p,(int)number(j,"memory_retention_days",30,1,90,true),(int)number(j,"memory_max_points",0,0,7,true),
    wake&&(modern||p),flag(j,"memory_restore_same_scene",true),flag(j,"memory_restore_replace",true),(int)number(j,"memory_restore_settle",1500,500,5000,true),
    (float)number(j,"memory_restore_ratio",.5,.1,2,false),(float)number(j,"memory_restore_min_lux",5,1,30,false),flag(j,"memory_reset_override",false),
    (int)number(j,"memory_reset_off_minutes",6,1,30,true),(int)number(j,"memory_reset_force_minutes",30,1,120,true),(float)number(j,"memory_reset_lux",20,1,200,false),
    flag(j,"memory_timeout_override",false),(int)number(j,"memory_timeout_minutes",30,1,120,true),flag(j,"memory_hold_switch",false),flag(j,"memory_hold_forever",false));
+  out.themeHold=flag(j,"memory_hold_theme",false);return out;
  }
  static MemoryOptions forDisplay(JSONObject config,JSONObject runtime)throws JSONException{return parse(config!=null&&config.optBoolean("enabled")?config:runtime!=null?runtime:new JSONObject());}
- boolean enabled(){return persist||unlock||modeSwitch||forever;}
+ boolean enabled(){return persist||unlock||modeSwitch||forever||themeHold;}
  MemoryOptions with(String key,Object value){try{JSONObject j=new JSONObject();put(j);if(Boolean.FALSE.equals(value)&&(key.equals("memory_persist")||key.equals("memory_restore_unlock")||key.equals("memory_hold_switch")))j.put("memory_hold_forever",false);j.put(key,value);return parse(j);}catch(JSONException invalid){throw new IllegalArgumentException(invalid);}}
  MemoryOptions fit(int capacity){return capacity>0&&maxPoints>capacity?with("memory_max_points",capacity):this;}
  void verify(JSONObject runtime){if(modeSwitch&&!runtime.optBoolean("memory_mode_supported"))throw new IllegalArgumentException("本机暂不支持跨自动亮度开关保持记忆");if(forever&&!runtime.optBoolean("memory_forever_supported"))throw new IllegalArgumentException("本机暂不支持永久保持，可分别选择保持范围");if(!forever&&resetOverride&&!runtime.optBoolean("memory_reset_supported"))throw new IllegalArgumentException("本机暂不支持锁屏记忆重判设置");if(!forever&&timeoutOverride&&!runtime.optBoolean("memory_timeout_supported"))throw new IllegalArgumentException("本机暂不支持短期记忆有效时间设置");}
  void put(JSONObject j)throws JSONException{j.put("memory_persist",persist).put("memory_retention_days",days).put("memory_max_points",maxPoints)
   .put("memory_restore_unlock",unlock).put("memory_restore_same_scene",sameScene).put("memory_restore_replace",replaceOnUnlock).put("memory_restore_settle",settleMs).put("memory_restore_ratio",sceneRatio).put("memory_restore_min_lux",sceneMinimum)
   .put("memory_reset_override",resetOverride).put("memory_reset_off_minutes",offMinutes).put("memory_reset_force_minutes",forceMinutes).put("memory_reset_lux",resetLux).put("memory_timeout_override",timeoutOverride).put("memory_timeout_minutes",timeoutMinutes)
-  .put("memory_hold_schema",1).put("memory_hold_switch",modeSwitch).put("memory_hold_forever",forever);}
+  .put("memory_hold_theme",themeHold).put("memory_hold_schema",1).put("memory_hold_switch",modeSwitch).put("memory_hold_forever",forever);}
 }

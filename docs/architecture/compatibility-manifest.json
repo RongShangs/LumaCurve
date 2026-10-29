@@ -48,9 +48,10 @@
         "RefactorProfiles.java",
         "RefactorCoefficientsAdapter.java",
         "PhysicalCurveCalibration.java",
-        "ThemeCurveOptions.java"
+        "ThemeCurveOptions.java",
+        "ThemeMemoryStore.java"
       ],
-      "selector": "ABC 活动策略为准；Refactor 未就绪不得因物理映射对象存在而抢用，未知活动标记才按已验证对象选择。 Refactor内部分段锚点优先；任一旧锚点标记存在时不得回退绕过残缺旧结构；仅旧锚点整体缺失且9/22系数布局、实例字段与原生消费者签名完整时采用系数路径。 记忆转基础保持现有路径；仅对新鲜物理映射采样的4个float ULP以内边界/平台舍入误差归一，仍严格校验全节点、坐标与范围；Refactor锚点及持久化输入不放宽。 原机完整单调曲线超出真实标定范围时，只对已验证系统物理映射及双向原生样条追加端点裁剪分支；其他范围内旧路径不增加探测要求，残缺标定不回退绕过。；可选深色曲线复用同一已选后端和实际设备约束，仅按系统uiMode选择独立基础配置；不开启时旧配置原样选择。",
+      "selector": "ABC 活动策略为准；Refactor 未就绪不得因物理映射对象存在而抢用，未知活动标记才按已验证对象选择。 Refactor内部分段锚点优先；任一旧锚点标记存在时不得回退绕过残缺旧结构；仅旧锚点整体缺失且9/22系数布局、实例字段与原生消费者签名完整时采用系数路径。 记忆转基础保持现有路径；仅对新鲜物理映射采样的4个float ULP以内边界/平台舍入误差归一，仍严格校验全节点、坐标与范围；Refactor锚点及持久化输入不放宽。 原机完整单调曲线超出真实标定范围时，只对已验证系统物理映射及双向原生样条追加端点裁剪分支；其他范围内旧路径不增加探测要求，残缺标定不回退绕过。；可选深色曲线复用同一已选后端和实际设备约束，仅按系统uiMode选择独立基础配置；不开启时旧配置原样选择。 深浅色模式记忆策略独立选择清除/共用/分开；独立作用域按本机用户与基础曲线隔离，仅启用跨重启保持才保存两份磁盘存档。",
       "evidence": [
         "curve_backend",
         "physical_mapper_class",
@@ -65,7 +66,9 @@
         "physical_clamped_points",
         "theme_curve_enabled",
         "theme_curve_dark",
-        "base_curve_name"
+        "base_curve_name",
+        "theme_memory_mode",
+        "theme_curve_dark"
       ],
       "cleanup": "关闭 / 故障 / OTA 基准或用户变化恢复本次应用的曲线；只按所选保持范围恢复匹配记忆。 系数路线事务快照同时保存数组内容与身份；拒绝其他所有者替换的基线，未验证的虚拟拟合参考点不冒充可移植用户锚点。 转存前校验失败不调用配置应用，不清除当前手动点；精度归一不修改原始状态快照或其他已保存设置。 新分支中性参数保持原配置对象，编辑只提交有效标定范围内的节点；停用恢复未裁剪原始对象，元数据/记忆清理及失败回滚沿用旧事务。；启用独立曲线后真实主题切换在显示Handler事务内撤销待保存/恢复、清除活跃与归档记忆；永久保持不能复活旧主题记忆。关闭功能不删除两条基础配置。",
       "tests": [
@@ -564,9 +567,10 @@
       "owners": [
         "PanelNodeDiscovery.java",
         "NativePanelRoot.java",
-        "ActivePanelNode.java"
+        "ActivePanelNode.java",
+        "ScreenBrightnessReading.java"
       ],
-      "selector": "backlight 或明确标识显示的 leds；真实 sysfs 路径与上限配对且唯一主屏，不按机型写死上限。 新增手动面板折叠路线：实际原生布局至少两个不同默认物理屏；实时默认内部屏地址与布局、成对同控制器背光、唯一 DSI 亮屏端口一致，选当前端口，扫描后再确认物理屏未变化。无切换布局证据时原发现路径不变；有折叠证据但不完整则等待。 兼容实际 Physical / StablePhysical 地址对象，均直接调用原生 getPort；StablePhysical 的物理 ID 与端口独立，按内核成对 panelN 清单验证，不解码该 ID。",
+      "selector": "backlight 或明确标识显示的 leds；真实 sysfs 路径与上限配对且唯一主屏，不按机型写死上限。 新增手动面板折叠路线：实际原生布局至少两个不同默认物理屏；实时默认内部屏地址与布局、成对同控制器背光、唯一 DSI 亮屏端口一致，选当前端口，扫描后再确认物理屏未变化。无切换布局证据时原发现路径不变；有折叠证据但不完整则等待。 兼容实际 Physical / StablePhysical 地址对象，均直接调用原生 getPort；StablePhysical 的物理 ID 与端口独立，按内核成对 panelN 清单验证，不解码该 ID。 状态读数单独只读实际节点；可验证本机DisplayDeviceConfig背光标定时换算nit，不可换算时原生接管仅显示节点值，不复用框架旧亮度。",
       "evidence": [
         "main_panel_node.node_class",
         "main_panel_node.node_path",
@@ -575,13 +579,18 @@
         "main_panel_node.node_physical_display_id",
         "main_panel_node.node_address_profile",
         "main_panel_node.node_port_source",
-        "main_panel_node.node_detail"
+        "main_panel_node.node_detail",
+        "actual_nit_source",
+        "actual_node_source",
+        "screen_nit_calibration.route",
+        "brightness_read_error"
       ],
-      "cleanup": "发现与权限检查只读，不启动写入器；实际租约写入另由原生事务负责，拒绝副屏 / 指示灯 / 手电。 折叠专用原生选项与 v3 权限恢复记录仅允许绑定端口节点；v2 / 旧节点拒绝规则不变。关闭、熄屏、DRM 改变结束旧接管；租约和框架输出隔离绑定物理屏，晚到命令拒绝，不复用旧目标。户外新增显式折叠协作分支，使用独立物理租约和原生 DSI 核验；隐藏映射仍不启用此分支。",
+      "cleanup": "发现与权限检查只读，不启动写入器；实际租约写入另由原生事务负责，拒绝副屏 / 指示灯 / 手电。 折叠专用原生选项与 v3 权限恢复记录仅允许绑定端口节点；v2 / 旧节点拒绝规则不变。关闭、熄屏、DRM 改变结束旧接管；租约和框架输出隔离绑定物理屏，晚到命令拒绝，不复用旧目标。户外新增显式折叠协作分支，使用独立物理租约和原生 DSI 核验；隐藏映射仍不启用此分支。 读数不启动写入器、不修改节点或权限；物理屏或标定不一致时不显示旧nit。",
       "tests": [
         "tests/refactor_panel_nodes.py",
         "tests/refactor_panel_access.py",
-        "tests/refactor_fold_panel.py"
+        "tests/refactor_fold_panel.py",
+        "tests/refactor_screen_brightness.py"
       ],
       "composition": "exclusive"
     },
@@ -1120,6 +1129,29 @@
       ],
       "rule": "优先原始DDC HBM过渡点；入口不存在或合法无HBM数据才用实际控制器普通上限。残缺/类型错/坏数据不回退，不用固定百分比或机型表；边界不能证明时只停分区。",
       "test": "tests/refactor_control_center_partition.py"
+    },
+    {
+      "id": "screen_brightness_readback",
+      "owner": "ScreenBrightnessReading.java",
+      "alternatives": [
+        "driver_actual_brightness",
+        "sysfs_brightness_readback",
+        "display_config_backlight_to_nit",
+        "node_readback_uncalibrated",
+        "driver_zero_conflicts_with_lit_output"
+      ],
+      "rule": "保留有效驱动actual_brightness优先的原路径。亮屏、同设备brightness为正、未报告背光关闭，且独立框架实际输出为正时，将矛盾的驱动0标为不可用并采用该设备brightness读回；未知、实际熄屏或背光关闭不推断为假0。常规输出优先原有框架nit，直接节点接管才优先本机标定换算。记录驱动值、寄存器值、原框架nit及回退原因；范围外不外推，不使用请求目标或机型表。",
+      "test": "tests/refactor_screen_brightness.py"
+    },
+    {
+      "id": "coefficient_terminal_domain",
+      "owner": "RefactorCoefficientsAdapter.java",
+      "alternatives": [
+        "native_maximum_terminal",
+        "edited_lower_terminal"
+      ],
+      "rule": "仅最高点显式下调时，将本机已校验calculateBrt的实际三组系数数组限定到原最高照度域；其他数组、用户/线程/未启用/原始100%路径不改变。相邻点保持严格递增，避免零斜率拟合；不改光感照度或最终输出保护。",
+      "test": "tests/refactor_coefficient_curve.py"
     }
   ],
   "native_variants": [

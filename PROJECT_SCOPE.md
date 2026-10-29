@@ -1,5 +1,17 @@
 # HyperLux 项目范围与任务边界
 
+2026-10-29 当前正式发布目标：**4.3.1 / 43100 / release-4.3.1**。用户重新授权正式发布，合入公开4.3.0之后Beta01—03；小版本日志保留4.3.0完整内容，按版本追加4.3.1。163份Java，相对Beta03生产源码仅AppBuild身份变化；旧兼容和全部设置保留，保留390份已有APK/ZIP。官网、GitHub、LSPosed同时同步，完成以build/release-4.3.1-publish/public-verification.json为准；不授权安装设备。发布后再统计各平台下载，按真实统计时间绘制累计下载量。见docs/releases/4.3.1.md、docs/reviews/review-4.3.1.md；下方为历史阶段。
+
+
+2026-10-29 当前本地交付目标：**4.3.0 Beta 03 / 43003 / beta-4.3.0-beta03**。用户撤销4.3.1发布；本轮修复状态页驱动actual_brightness占位0覆盖正常读数，常规保留原框架输出，直接节点按实际读回及本机标定；有效驱动路径和真实熄屏0保留。163份Java，全部兼容与用户设置保留，保留387份旧APK/ZIP。累计公开4.3.0/43000之后Beta01—03，按版本分段。仅本地，不发布或安装；见docs/releases/4.3.0-beta03.md、docs/reviews/review-4.3.0-beta03.md与build/beta-4.3.0-beta03/。下方为历史阶段。
+
+
+2026-10-29 当前本地交付目标：**4.3.0 Beta 02 / 43002 / beta-4.3.0-beta02**。关于页作者昵称下新增“①❻❾①  Studio”，头像右侧两行左对齐，跟随主题配色。相对Beta01仅AboutPage及AppBuild生产Java改变；亮度、记忆、兼容与全部保存设置保持。163份Java，保留384份旧APK/ZIP；累计基线公开4.3.0/43000，保留Beta01、02分段。仅本地，不发布或安装；见docs/releases/4.3.0-beta02.md、docs/reviews/review-4.3.0-beta02.md及build/beta-4.3.0-beta02/。下方为历史阶段。
+
+
+2026-10-29 当前本地交付目标：**4.3.0 Beta 01 / 43001 / beta-4.3.0-beta01**。状态页节点读回与设备标定换算；深浅色模式支持清除、共用及独立记忆，当前面板单独转存/清除；最高照度节点允许下调。163份Java，保留旧兼容、全部保存设置及381份既有APK/ZIP。累计基线公开4.3.0/43000，仅本地、不发布或安装。详见docs/releases/4.3.0-beta01.md、docs/architecture/theme-memory-and-readback.md和docs/reviews/review-4.3.0-beta01.md；核验build/beta-4.3.0-beta01/。下方为历史阶段。
+
+
 2026-10-28 当前正式发布目标：**4.3.0 / 43000 / release-4.3.0**。用户授权对齐关于页链接排两侧后正式发布，累计合入公开4.2.0之后Beta 01—09最终改动。简略日志首项介绍控制中心完整/分区节点控制，后附详细机制与边界。161份Java；相对Beta09仅AboutPage及AppBuild生产源码变化，旧兼容与全部设置保留，保留377份旧APK/ZIP。官网、GitHub和LSPosed同时同步，完成以build/release-4.3.0-publish/public-verification.json为准；不授权安装手机。详见docs/releases/4.3.0.md及docs/reviews/review-4.3.0.md。下方为历史阶段。
 
 

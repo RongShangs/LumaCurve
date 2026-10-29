@@ -668,6 +668,11 @@
       "purpose": "设备接口与所有权"
     },
     {
+      "file": "ScreenBrightnessReading.java",
+      "layer": "adapters",
+      "purpose": "只读主屏节点及标定；识别与亮屏实际输出矛盾的驱动0，常规保留框架输出、节点接管按实际读回换算"
+    },
+    {
       "file": "ScrollElasticity.java",
       "layer": "policy",
       "purpose": "纯界面像素阻尼与有界回弹，不改变逻辑滚动位置"
@@ -736,6 +741,11 @@
       "file": "ThemeCurveOptions.java",
       "layer": "configuration",
       "purpose": "可选深色基础曲线的设备约束、配置选择与手动记忆作用域隔离"
+    },
+    {
+      "file": "ThemeMemoryStore.java",
+      "layer": "policy",
+      "purpose": "深浅色记忆作用域、仅本次运行的独立存档与显式共用交接"
     },
     {
       "file": "ThemePalette.java",

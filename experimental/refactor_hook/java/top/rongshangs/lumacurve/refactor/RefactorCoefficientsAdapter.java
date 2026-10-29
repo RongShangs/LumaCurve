@@ -54,7 +54,12 @@ final class RefactorCoefficientsAdapter extends CurveBackend {
         for(String name:FLOATS){float[] a=(float[])get(name);int size=name.equals("mLogicalData")?9:22;if(a==null||a.length!=size||!identities.add(a))throw new IllegalArgumentException("Refactor 状态容器不兼容："+name);for(float x:a)if(!Float.isFinite(x))throw new IllegalArgumentException("Refactor 状态不是有限值");}
     }
     private float at(double[] c,float lux)throws Exception{
-        float value=((Number)calculate.invoke(target,lux,c)).floatValue();if(!Float.isFinite(value)||value<min||value>max)throw new IllegalStateException("Refactor 返回超出逻辑范围的亮度");return value;
+        float value=((Number)calculate.invoke(target,limitedLux(lux,c),c)).floatValue();if(!Float.isFinite(value)||value<min||value>max)throw new IllegalStateException("Refactor 返回超出逻辑范围的亮度");return value;
+    }
+    float limitedLux(float lux,double[] curve)throws Exception{
+        if(active==null||factors==null||factors[3]>=1||!Float.isFinite(lux)||lux<=factoryLux[3])return lux;
+        for(String name:DOUBLES)if(curve==get(name))return factoryLux[3];
+        return lux;
     }
     public String name(){return "refactor";}
     public String compatibilityRoute(){return "refactor_coefficients";}
@@ -70,12 +75,12 @@ final class RefactorCoefficientsAdapter extends CurveBackend {
         if(Float.isFinite(x)&&x>=0&&x<=factoryLux[3]&&Float.isFinite(y)&&y>=min&&y<=max)points.put(new JSONObject().put("lux",x).put("value",y));return points;
     }
     public float currentAt(float lux)throws Exception{if(!Float.isFinite(lux)||lux<0)throw new IllegalArgumentException("照度无效");return at((double[])get("mLuxToLogicalNit"),lux);}
-    public float[] currentLux()throws Exception{double[] c=(double[])get("mLuxToLogicalNit");double end=c[8]>0?c[5]+(max-c[7])/c[8]:factoryLux[3];float last=(float)Math.max(factoryLux[3],end);if(!Float.isFinite(last)||c[2]<=0||c[5]<=c[2]||last<=c[5])throw new IllegalStateException("当前系数曲线坐标不兼容");return new float[]{0,(float)c[2],(float)c[5],last};}
+    public float[] currentLux()throws Exception{double[] c=(double[])get("mLuxToLogicalNit");double end=active!=null&&factors!=null&&factors[3]<1?factoryLux[3]:c[8]>0?c[5]+(max-c[7])/c[8]:factoryLux[3];float last=(float)Math.max(factoryLux[3],end);if(!Float.isFinite(last)||c[2]<=0||c[5]<=c[2]||last<=c[5])throw new IllegalStateException("当前系数曲线坐标不兼容");return new float[]{0,(float)c[2],(float)c[5],last};}
     public float[] currentNit()throws Exception{float[] x=currentLux(),y=new float[x.length];for(int i=0;i<x.length;i++)y[i]=currentAt(x[i]);return y;}
     public void configure(float[] next)throws Exception{configure(next,0);}
     public void clearMemory()throws Exception{configure(factors,floor);}
     public void configure(float[] next,float nextFloor)throws Exception{
-        if(next!=null&&(next.length!=4||next[3]!=1))throw new IllegalArgumentException("本应用高照度端保持官方上限");
+        if(next!=null&&(next.length!=4||next[3]>1))throw new IllegalArgumentException("最高照度节点不可超过设备原始值");
         if(savedBase!=null)throw new IllegalArgumentException("此系数路线尚不支持记忆转基础曲线；已保存设置保持不变");
         CurvePlan proposed=next==null?null:proposed(next,nextFloor);if(proposed!=null)coefficients(proposed);validateArrays();
         double[] actual=(double[])get(DOUBLES[0]);

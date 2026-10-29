@@ -25,7 +25,7 @@ public final class ConfigurationCompatibility {
     public static JSONObject fit(JSONObject original,JSONObject caps,JSONArray paused)throws JSONException{
         JSONObject out=new JSONObject(original.toString());
         MemoryOptions holds=MemoryOptions.parse(out);holds.put(out);
-        if(caps.has("persistent_memory_supported")&&!caps.optBoolean("persistent_memory_supported")&&holds.enabled()){out.put("memory_persist",false).put("memory_restore_unlock",false).put("memory_hold_switch",false).put("memory_hold_forever",false);paused.put("保持记忆");}
+        if(caps.has("persistent_memory_supported")&&!caps.optBoolean("persistent_memory_supported")&&holds.enabled()){out.put("memory_persist",false).put("memory_restore_unlock",false).put("memory_hold_switch",false).put("memory_hold_forever",false).put("memory_hold_theme",false);paused.put("保持记忆");}
         if(caps.has("memory_mode_supported")&&!caps.optBoolean("memory_mode_supported")&&(holds.modeSwitch||holds.forever)){out.put("memory_hold_switch",false).put("memory_hold_forever",false);paused.put("跨自动亮度开关保持记忆");}
         if(caps.has("memory_forever_supported")&&!caps.optBoolean("memory_forever_supported")&&out.optBoolean("memory_hold_forever")){out.put("memory_hold_forever",false);paused.put("永久保持记忆");}
         String sliderCap=BrightnessControlOptions.capability(out.optInt("control_center_node_mode"));

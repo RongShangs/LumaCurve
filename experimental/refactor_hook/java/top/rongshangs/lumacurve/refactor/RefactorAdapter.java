@@ -88,7 +88,7 @@ public final class RefactorAdapter extends CurveBackend {
         configure(factors,0);
     }
     public void configure(float[] factors,float floor) throws Exception {
-        if(factors!=null && (factors.length!=4 || factors[3]!=1f))throw new IllegalArgumentException("本应用高照度端保持官方上限");
+        if(factors!=null && (factors.length!=4 || factors[3]>1f))throw new IllegalArgumentException("本应用高照度端保持官方上限");
         CurvePlan next=factors==null?null:proposed(factors,floor);
         Map<String,Object> before=new HashMap<>();
         for(String name:ARRAYS){Object a=get(name);Object copy=Array.newInstance(a.getClass().getComponentType(),Array.getLength(a));System.arraycopy(a,0,copy,0,Array.getLength(a));before.put(name,copy);}

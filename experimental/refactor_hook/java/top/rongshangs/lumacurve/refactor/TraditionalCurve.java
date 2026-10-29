@@ -23,7 +23,7 @@ public final class TraditionalCurve {
         return reshape(min,max,factors,0);
     }
     public float[] reshape(float min,float max,float[] factors,float floor){
-        if(factors==null||factors.length!=4||factors[3]!=1)throw new IllegalArgumentException("高照度末端保持设备原始值");
+        if(factors==null||factors.length!=4||factors[3]>1)throw new IllegalArgumentException("高照度末端保持设备原始值");
         float[] desired=new CurvePlan(controlsLux(),controlsNit(),min,max,factors,floor).nits(),result=nit.clone();
         for(int s=0;s<3;s++){
             int a=handles[s],b=handles[s+1];float span=nit[b]-nit[a];

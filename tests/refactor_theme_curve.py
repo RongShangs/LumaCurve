@@ -13,14 +13,14 @@ java=r'''package top.rongshangs.lumacurve.refactor;
 import org.json.*;import java.util.*;import java.io.*;
 class Kernel {
  final float[] factoryLux={0,30,600,5000},factoryNit={2,30,200,1000};final float min=1,max=1000;CurvePlan active;SavedCurve savedBase;int clears,configures;
- String name(){return "refactor";}CurvePlan plan(){return active;}void clearMemory(){clears++;}void configure(float[] f,float floor,SavedCurve base){active=SavedCurve.plan(base,factoryLux,factoryNit,min,max,f, floor);savedBase=base;configures++;}
+ boolean persistentMemorySupported(){return true;}String name(){return "refactor";}CurvePlan plan(){return active;}void clearMemory(){clears++;}void configure(float[] f,float floor,SavedCurve base){active=SavedCurve.plan(base,factoryLux,factoryNit,min,max,f, floor);savedBase=base;configures++;}
 }
-class Persistence {int clears;boolean pending;void clear(){clears++;pending=false;}void configure(Object o,boolean changed){pending=true;}}
+class MemoryPersistence {static class ThemeHandover {int mode;ThemeHandover(int m){mode=m;}}int clears;boolean pending;void clear(){clears++;pending=false;}void configure(Object o,boolean changed){pending=true;}ThemeHandover beforeTheme(int mode){if(mode==0)clear();return new ThemeHandover(mode);}void afterTheme(ThemeHandover h){if(h!=null&&h.mode==0)clear();}void flush(){}void detachTheme(){pending=false;}void invalidateTheme(){}}
 class MemoryPolicy {void reset(){}}
 class Lifecycle {void event(String s){}}
 class Runtime {
- Kernel kernel=new Kernel();Persistence persistentMemory=new Persistence();MemoryPolicy memoryPolicy=new MemoryPolicy();Lifecycle memoryLifecycle=new Lifecycle();Object memoryOptions;
- boolean themeCurveEnabled,themeCurveDark,dark;String themeMemoryScope="";boolean systemDark(){return dark;}void log(String s){}
+ Kernel kernel=new Kernel();MemoryPersistence persistentMemory=new MemoryPersistence();MemoryPolicy memoryPolicy=new MemoryPolicy();Lifecycle memoryLifecycle=new Lifecycle();MemoryOptions memoryOptions=new MemoryOptions(false,30);
+ boolean themeCurveEnabled,themeCurveDark,dark,themeKnown;int themeMemoryMode;String themeMemoryScope="";boolean systemDark(){return dark;}void log(String s){}
  void apply(JSONObject config,boolean dark)throws Exception{this.dark=dark;HANDOVER FINISH}
 }
 class ControlCenterRoot {static String PROFILE="profile";}
@@ -45,9 +45,9 @@ public class ThemeTest {
   runtime.apply(normal,true);check(runtime.kernel.clears==1);runtime.apply(normal,false);check(runtime.kernel.clears==2&&runtime.kernel.plan().nits()[1]==33);
   // Even numerically equal profiles still discard hand adjustments on every real theme transition.
   t.factors=new float[]{1,1.1f,1,1};t.floor=0;t.put(normal);runtime.apply(normal,false);int writes=runtime.kernel.configures;runtime.apply(normal,true);check(runtime.kernel.configures==writes&&runtime.kernel.clears==3&&!runtime.persistentMemory.pending);
-  t.enabled=false;t.put(normal);runtime.apply(normal,false);int count=runtime.kernel.clears;runtime.apply(normal,true);check(runtime.kernel.clears==count&&runtime.themeMemoryScope.isEmpty());
+  t.enabled=false;t.put(normal);runtime.apply(normal,false);int count=runtime.kernel.clears;runtime.apply(normal,true);check(runtime.kernel.clears==count+1&&runtime.themeMemoryScope.isEmpty());
   // Invalid other profile is rejected before mutating memory or the applied curve.
-  JSONObject invalid=config().put(ThemeCurveOptions.KEY,new JSONObject().put("enabled",true).put("factors","1,1,1,2"));count=runtime.kernel.configures;try{runtime.apply(invalid,false);throw new AssertionError();}catch(IllegalArgumentException expected){check(runtime.kernel.configures==count&&runtime.kernel.clears==3);}
+  JSONObject invalid=config().put(ThemeCurveOptions.KEY,new JSONObject().put("enabled",true).put("factors","1,1,1,2"));count=runtime.kernel.configures;try{runtime.apply(invalid,false);throw new AssertionError();}catch(IllegalArgumentException expected){check(runtime.kernel.configures==count&&runtime.kernel.clears==5);}
   t.enabled=true;t.saved=new SavedCurve(new float[]{0,30,600,5000},new float[]{2,20,100,1000});t.factors=new float[]{1,1,1,1};t.put(normal);read=ThemeCurveOptions.parse(normal);check(SavedCurve.same(t.saved,read.saved));check(!read.select(normal,true).has("captured_theme_dark"));
   Root root=new Root();root.settings.values.put("profile","old");root.settings.values.put("config",stored);check(root.restoreDefaults().getBoolean("ok"));JSONObject reset=new JSONObject(root.settings.values.get("config"));check(reset.getBoolean("restore_system_defaults")&&!reset.getBoolean("enabled")&&reset.getString("reset_anchors").length()>0&&!reset.has(ThemeCurveOptions.KEY)&&root.settings.values.get("profile")==null);check(OutdoorNodeRoot.stops==1&&NativePanelRoot.stops==1);
   root=new Root();root.connected=false;try{root.restoreDefaults();throw new AssertionError();}catch(IOException expected){check(root.settings.values.isEmpty());}
@@ -57,5 +57,5 @@ public class ThemeTest {
  }
 }'''.replace('HANDOVER',handover).replace('FINISH',finish).replace('RESET',reset)
 p=O/'ThemeTest.java';p.write_text(java,encoding='utf-8');C=O/'classes';C.mkdir(exist_ok=True)
-subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(J),'-d',str(C),*[str(S/(n+'.java')) for n in ['ThemeCurveOptions','SavedCurve','CurvePlan']],str(p)],check=True)
+subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(J),'-d',str(C),*[str(S/(n+'.java')) for n in ['ThemeCurveOptions','MemoryOptions','SavedCurve','CurvePlan']],str(p)],check=True)
 subprocess.run(['java','-cp',str(C)+os.pathsep+str(J),'top.rongshangs.lumacurve.refactor.ThemeTest'],check=True)

@@ -17,7 +17,7 @@ final class SettingsSearchIndex {
     static Entry e(int g,String t,String d,String en,String ed,String target,String aliases){return new Entry(g,t,d,en,ed,target,aliases);}
     static final List<Entry> ENTRIES=Collections.unmodifiableList(Arrays.asList(
         e(0,"基础亮度曲线","调整不同光线下的亮度起点与曲线预设","Base brightness curve","Adjust brightness targets for different light levels.","curve","蓝色 基础 稍亮 柔和 默认 预设 spline curve"),
-        e(0,"深色模式基础曲线","单独调整深色模式亮度；切换模式清除手动记忆","Dark mode base curve","An independent base curve for dark mode; theme changes clear manual memory.","dark_curve","深色模式 独立曲线 黑暗 夜间 dark theme"),
+        e(0,"深色模式基础曲线","单独调整深色模式亮度；可清除、保持或分开记忆","Dark mode base curve","A separate dark base curve with clear, shared or independent learned preferences.","dark_curve","深色模式 独立曲线 黑暗 夜间 dark theme"),
         e(0,"暗处亮度下限","调整基础曲线在暗处的最低亮度","Minimum brightness","Set the base curve's minimum brightness in darkness.","curve","最低亮度 暗处下限 curve floor minimum nit"),
         e(1,"手动记忆","调整记忆强度，保留亮度条带来的偏好","Manual memory","Control how much your brightness adjustments affect the curve.","memory","绿色 学习 控制中心 亮度条 memory strength learning"),
         e(1,"永久保持记忆","跨自动亮度开关、锁屏和重启保持偏好","Keep memory permanently","Keep preferences across auto mode, screen off and reboot.","memory","保持记忆 永久保持 跨开关 跨锁屏 跨重启 持久化 permanent persistence"),

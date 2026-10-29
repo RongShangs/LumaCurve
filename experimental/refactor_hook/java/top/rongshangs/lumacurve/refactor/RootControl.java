@@ -86,7 +86,7 @@ public final class RootControl implements AutoCloseable {
             try{OutdoorNodeRoot.reconcile(state,raw);}catch(Exception nodeFailure){if(state!=null)state.put("outdoor_node_detail",nodeFailure.toString());}
             try{ControlCenterRoot.reconcile(settings,state,raw);}catch(Exception nodeFailure){try{settings.put(ControlCenterRoot.PROFILE,null);}catch(Exception ignored){}if(state!=null)state.put("control_center_node_detail",nodeFailure.toString());}
         }
-        OutdoorNodeRoot.annotate(state);
+        OutdoorNodeRoot.annotate(state);ScreenBrightnessReading.annotate(state);
         if(state==null&&!processAccessError.isEmpty())out.put("hook_issue","root_process_visibility").put("hook_message","Root 无法核验系统进程身份；保留已有系统配置，暂停本次修改。 "+processAccessError);
         out.put("root_access",RootAccess.report(settings).put("process_validation_error",processAccessError));
         if(selfCheckNext)out.put("root_feature_self_check",RootFeatureChecks.run(state,raw,settings).put("request",selfCheckReason));
@@ -178,7 +178,7 @@ public final class RootControl implements AutoCloseable {
         if(thermal&&!state.optBoolean("thermal_supported"))throw new IOException("此固件温控亮度接口尚未兼容，不能启用该选项");
         float[] f=CurvePlan.factors(factors);
         float floor=CurvePlan.floor(options.has("curve_floor_nit")?options.opt("curve_floor_nit"):null);
-        if(f[3]!=1f)throw new IOException("高照度端暂保持官方上限，请保持第四个参数为 100%");
+        if(f[3]>1f)throw new IOException("最高照度节点不可超过设备原始值");
         SavedCurve saved=SavedCurve.parse(options);
         if(saved!=null)saved.verifyBackend(state.optString("curve_backend"));
         SavedCurve.plan(saved,numbers(state.getJSONArray("factory_lux")),numbers(state.getJSONArray("factory_logical_nit")),
@@ -202,7 +202,7 @@ public final class RootControl implements AutoCloseable {
             else if(stored!=null){if(stored.has("control_center_node_maximum"))config.put("control_center_node_maximum",stored.get("control_center_node_maximum"));if(stored.has("control_center_node_path"))config.put("control_center_node_path",stored.get("control_center_node_path"));}
         }
         if(saved!=null)saved.put(config);theme.put(config);
-        if(options.has("reset_anchors")){String reset=options.getString("reset_anchors");if(!reset.matches("[A-Za-z0-9_-]{1,80}"))throw new IOException("记忆清除标识无效");config.put("reset_anchors",reset);}
+        if(options.has("reset_anchors")){if(options.has("captured_theme_dark"))config.put("reset_theme_dark",options.getBoolean("captured_theme_dark"));String reset=options.getString("reset_anchors");if(!reset.matches("[A-Za-z0-9_-]{1,80}"))throw new IOException("记忆清除标识无效");config.put("reset_anchors",reset);}
         if(config.toString().getBytes(StandardCharsets.UTF_8).length>28000)throw new IOException("配置超过安全保存范围，请减少应用名单或曲线节点");
         try {
             prepare();
@@ -403,8 +403,9 @@ public final class RootControl implements AutoCloseable {
             if(command.equals("reset-memory")){
                 JSONObject state=live();if(state==null||!state.has("factory_lux"))throw new IOException("尚未连接兼容的系统曲线");
                 String raw=settings.get(CONFIG);JSONObject config=raw==null?new JSONObject().put("schema",1).put("enabled",false):new JSONObject(raw);
-                String revision=UUID.randomUUID().toString();config.put("revision",revision).put("reset_anchors",UUID.randomUUID().toString());
+                String revision=UUID.randomUUID().toString();config.put("revision",revision).put("reset_anchors",UUID.randomUUID().toString()).put("reset_theme_dark",state.optBoolean("theme_curve_dark"));
                 if(!settings.put(CONFIG,config.toString())||!waitFor(revision,config.optBoolean("enabled")))throw new IOException("系统尚未确认锚点清除，请重新读取状态");
+                JSONObject settled=refreshedLive(true);if(settled!=null&&config.getString("reset_anchors").equals(settled.optString("memory_reset_rejected")))throw new IOException("深浅色模式已变化，本次未清除，请在当前模式重试");
                 return new JSONObject().put("ok",true).put("message","已清除当前与已保存的手动记忆；系统保存的最近滑块位置保持原样");
             }
             throw new IOException("未知操作");

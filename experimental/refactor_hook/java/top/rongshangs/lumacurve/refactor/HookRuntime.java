@@ -149,7 +149,7 @@ final class HookRuntime {
         if(closed||changing)return;
         try{String current=Settings.Global.getString(context.getContentResolver(),CONFIG);
             if(!configProcessed||!Objects.equals(current,processedConfig))reload();
-            else if(themeCurveEnabled&&themeCurveDark!=systemDark())themeChanged();
+            else if(themeKnown&&themeCurveDark!=systemDark())themeChanged();
             else publishAcknowledgement();
         }catch(Throwable error){XposedBridge.log("HyperLux configuration refresh: "+error);}
     }
@@ -169,10 +169,11 @@ final class HookRuntime {
         final long generation=++selfCheckGeneration;
         for(long delay:new long[]{1000,5000,15000})handler.postDelayed(()->{if(!closed&&generation==selfCheckGeneration&&featureChecks.pending())checkFeatures("startup-readiness");},delay);
     }
-    boolean themeCurveEnabled,themeCurveDark;
-    String themeMemoryScope="";
+    boolean themeCurveEnabled,themeCurveDark,themeKnown;
+    int themeMemoryMode;
+    String themeMemoryScope="",memoryResetRejected="";
     boolean systemDark(){return (context.getResources().getConfiguration().uiMode&android.content.res.Configuration.UI_MODE_NIGHT_MASK)==android.content.res.Configuration.UI_MODE_NIGHT_YES;}
-    void themeChanged(){if(!closed&&themeCurveEnabled&&themeCurveDark!=systemDark()){configProcessed=false;reload();}}
+    void themeChanged(){if(!closed&&themeKnown&&themeCurveDark!=systemDark()){configProcessed=false;reload();}}
     void reload(){
         if(closed||changing)return;changing=true;
         try{
@@ -217,16 +218,21 @@ final class HookRuntime {
                     if(thermal&&!HookEntry.thermalSupported.contains(owner.getClass()))throw new IllegalArgumentException("此固件的温控亮度接口尚未兼容");
                     ThemeCurveOptions theme=ThemeCurveOptions.parse(config);
                     theme.verify(kernel.name(),kernel.factoryLux,kernel.factoryNit,kernel.min,kernel.max);
-                    boolean nextDark=systemDark(),themeSwitch=themeCurveEnabled&&theme.enabled&&themeCurveDark!=nextDark;
+                    boolean nextDark=systemDark(),themeSwitch=themeKnown&&themeCurveDark!=nextDark;
+                    int nextMemoryMode=theme.enabled?theme.memoryMode:memoryOptions.themeHold?1:0;
+                    if(theme.enabled)memoryOptions=memoryOptions.with("memory_hold_theme",nextMemoryMode!=0&&kernel.persistentMemorySupported());
                     JSONObject selected=theme.select(config,nextDark);
                     float[] factors=CurvePlan.factors(selected.getString("factors"));
                     float floor=CurvePlan.floor(selected.has("curve_floor_nit")?selected.opt("curve_floor_nit"):null);
                     SavedCurve nextBase=SavedCurve.parse(selected);if(nextBase!=null)nextBase.verifyBackend(kernel.name());CurvePlan nextPlan=SavedCurve.plan(nextBase,kernel.factoryLux,kernel.factoryNit,kernel.min,kernel.max,factors,floor);
                     boolean curveChanged=kernel.plan()==null||!SavedCurve.same(kernel.savedBase,nextBase)||!Arrays.equals(kernel.plan().nits(),nextPlan.nits())||!Arrays.equals(kernel.plan().lux(),nextPlan.lux());
                     // Clear queued archive restores before changing scope, including permanent retention.
-                    if(themeSwitch){persistentMemory.clear();kernel.clearMemory();memoryPolicy.reset();}
-                    if(curveChanged)kernel.configure(factors,floor,nextBase);
-                    themeCurveEnabled=theme.enabled;themeCurveDark=nextDark;themeMemoryScope=ThemeCurveOptions.scope(theme.enabled,nextDark);
+                    MemoryPersistence.ThemeHandover handover=themeSwitch?persistentMemory.beforeTheme(nextMemoryMode):null;
+                    if(themeSwitch){kernel.clearMemory();memoryPolicy.reset();}
+                    if(curveChanged){if(!themeSwitch)persistentMemory.invalidateTheme();kernel.configure(factors,floor,nextBase);}
+                    String nextScope=theme.memoryScope(nextDark);
+                    if(!themeMemoryScope.equals(nextScope)){persistentMemory.flush();persistentMemory.detachTheme();}
+                    themeCurveEnabled=theme.enabled;themeCurveDark=nextDark;themeKnown=true;themeMemoryMode=nextMemoryMode;themeMemoryScope=nextScope;
                     AdvancedTuning.restoreAnimation(this);advanced=proposed;
                     boundUser=config.getInt("user_serial");thermalCeiling=ceiling;thermalEnabled=thermal;memoryStrength=strength;
                     if(memoryWindow!=memoryMs||memoryLuxRange!=memoryRange)memoryPolicy.configure(memoryMs,memoryRange);memoryWindow=memoryMs;memoryLuxRange=memoryRange;thermalCooling=cooling;thermalGate.configure(cooling);
@@ -243,14 +249,16 @@ final class HookRuntime {
                     if(kernel.name().equals("refactor"))kernel.reconcile();
                     if(compatibilityPaused.length()>0)message+="；已暂停不可用选项："+compatibilityPaused.toString();
                     persistentMemory.configure(memoryOptions,curveChanged);
-                    if(themeSwitch){persistentMemory.clear();log("深浅色模式已切换，清除手动记忆并使用"+(nextDark?"深色模式基础曲线":"基础曲线"));}
+                    persistentMemory.afterTheme(handover);
+                    if(themeSwitch)log("深浅色模式已切换，记忆策略："+(nextMemoryMode==0?"清除":nextMemoryMode==1?"保持共用":"独立记忆"));
                     log(curveChanged?"曲线已应用，重新建立基础锚点":"设置已更新，保留当前手动锚点");
                 }else{
-                    if(kernel.plan()!=null)kernel.configure(null);disableOverrides();if(config.optBoolean("restore_system_defaults"))persistentMemory.configure(new MemoryOptions(false,30),false);memoryStrength=1;phase="attached";message="已恢复官方曲线与温控策略";log(message);
+                    if(config.optBoolean("restore_system_defaults"))persistentMemory.clearAll();if(kernel.plan()!=null)kernel.configure(null);disableOverrides();if(config.optBoolean("restore_system_defaults"))persistentMemory.configure(new MemoryOptions(false,30),false);memoryStrength=1;phase="attached";message="已恢复官方曲线与温控策略";log(message);
                 }
                 String reset=config.optString("reset_anchors","");
                 if(!reset.isEmpty()&&!reset.equals(lastReset)){
-                    persistentMemory.clear();kernel.clearMemory();memoryPolicy.reset();
+                    boolean wrongTheme=config.has("reset_theme_dark")&&config.optBoolean("reset_theme_dark")!=(themeCurveEnabled&&themeCurveDark);memoryResetRejected=wrongTheme?reset:"";
+                    if(!wrongTheme){persistentMemory.clear();kernel.clearMemory();memoryPolicy.reset();}else log("深浅色模式已变化，本次记忆清除未执行");
                     if(!Settings.Global.putString(context.getContentResolver(),"lumacurve_manual_memory_reset_v1",reset))throw new IllegalStateException("记忆清除确认写入失败");
                     lastReset=reset;log("已清除当前与已保存的手动记忆，保留基础曲线");
                 }
@@ -286,7 +294,7 @@ final class HookRuntime {
             phase="error";message="接入异常，已尝试恢复官方："+error;log(message);publish();faultPending=false;});
     }
     void disableOverrides(){
-        themeCurveEnabled=false;themeCurveDark=false;themeMemoryScope="";controlCenter.deactivate();outdoorNode.release();scenes.stop();brightnessControl.stop();assistCompat.restore();assistGate.reset();outdoor.stop();thermalEnabled=false;responseEnabled=false;smallResponseEnabled=false;lowLightEnabled=false;memoryStrength=1;advanced=new AdvancedOptions();AdvancedTuning.restoreAnimation(this);AdvancedTuning.refreshThresholds(this);}
+        themeCurveEnabled=false;themeCurveDark=false;themeKnown=false;themeMemoryMode=0;themeMemoryScope="";controlCenter.deactivate();outdoorNode.release();scenes.stop();brightnessControl.stop();assistCompat.restore();assistGate.reset();outdoor.stop();thermalEnabled=false;responseEnabled=false;smallResponseEnabled=false;lowLightEnabled=false;memoryStrength=1;advanced=new AdvancedOptions();AdvancedTuning.restoreAnimation(this);AdvancedTuning.refreshThresholds(this);}
     void memorySettingChanged(boolean automatic){persistentMemory.modeSettingChanged(automatic);}
     void memoryModeKnown(boolean automatic){persistentMemory.modeSettingKnown(automatic);}
     boolean onDisplayThread(){return !closed&&Looper.myLooper()==handler.getLooper();}
@@ -334,10 +342,10 @@ final class HookRuntime {
             if(lastAnimationSeconds>0)status.put("last_animation_seconds",lastAnimationSeconds);
             status.put("animation_compatibility_profile",AdvancedTuning.animationProfile(this));
             if(lastMainBrighten>=0)status.put("last_main_brighten_ms",lastMainBrighten);if(lastMainDarken>=0)status.put("last_main_darken_ms",lastMainDarken);if(lastMainSmall>=0)status.put("last_main_small_ms",lastMainSmall);status.put("last_main_extra_ms",lastMainExtra);
-            status.put("theme_curve_enabled",themeCurveEnabled).put("theme_curve_dark",themeCurveEnabled&&themeCurveDark).put("base_curve_name",themeCurveEnabled&&themeCurveDark?"深色模式基础曲线":"基础曲线").put("curve_backend",kernel.name()).put("curve_route",kernel.compatibilityRoute()).put("baseline_id",baselineId()).put("curve_coordinate",kernel.name().equals("refactor")?"logical_nit":"physical_nit")
+            status.put("theme_memory_mode",themeMemoryMode).put("theme_curve_enabled",themeCurveEnabled).put("theme_curve_dark",themeCurveEnabled&&themeCurveDark).put("base_curve_name",themeCurveEnabled&&themeCurveDark?"深色模式基础曲线":"基础曲线").put("curve_backend",kernel.name()).put("curve_route",kernel.compatibilityRoute()).put("baseline_id",baselineId()).put("curve_coordinate",kernel.name().equals("refactor")?"logical_nit":"physical_nit")
                 .put("factory_full_lux",array(kernel.fullLux())).put("factory_full_nit",array(kernel.fullNit()));
             if(kernel instanceof TraditionalAdapter)status.put("user_identity_source",HookEntry.currentUser.source()).put("user_identity_ready",kernel.integer("mUserSerial")>=0);
-            status.put("memory_strength",memoryStrength).put("memory_events",memoryEvents);persistentMemory.put(status);
+            status.put("memory_reset_rejected",memoryResetRejected).put("memory_strength",memoryStrength).put("memory_events",memoryEvents);persistentMemory.put(status);
             Object good=kernel.get("mIsHaveGoodCurve");if(good!=null)status.put("good_curve_available",good);
             status.put("memory_window",memoryWindow).put("memory_lux_range",memoryLuxRange).put("thermal_cooling",thermalCooling)
                 .put("response_supported",ResponseTuning.supported(owner)).put("response_override",responseEnabled).put("brighten_delay",brightenDelay).put("darken_delay",darkenDelay).put("response_adjustments",responseAdjustments);
@@ -373,6 +381,7 @@ final class HookRuntime {
                 if(Float.isFinite(nit)&&nit>=0)status.put("actual_nit",nit).put("actual_nit_source","device_backlight_mapping");
                 status.put("screen_state",display.getClass().getMethod("getScreenState").invoke(display));
             }catch(Throwable unavailable){}
+            if(controlCenter.screenNitCalibration!=null)status.put("screen_nit_calibration",controlCenter.screenNitCalibration).put("screen_nit_physical",controlCenter.screenNitPhysical);
             CurvePlan plan=kernel.plan();if(plan!=null){float[] handles=new float[4];for(int i=0;i<4;i++)handles[i]=plan.at(kernel.factoryLux[i]);status.put("active_logical_nit",array(handles)).put("applied_base_lux",array(kernel.baselineLux())).put("applied_base_nit",array(kernel.baselineNit()));}
             if(kernel.name().equals("refactor"))try{kernel.putVerification(status);}catch(Exception unavailable){status.put("refactor_curve_verification_error",unavailable.toString());}
             for(Iterator<String> keys=featureChecks.caps.keys();keys.hasNext();){String key=keys.next();status.put(key,featureChecks.caps.get(key));}

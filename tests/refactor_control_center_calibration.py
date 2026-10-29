@@ -8,6 +8,7 @@ O=R/'build/control-center-calibration-tests';O.mkdir(exist_ok=True)
 J=R/'build/refactor-diagnostics/json-20240303.jar'
 files={
  'top/rongshangs/lumacurve/refactor/ControlCenterPartition.java':'package top.rongshangs.lumacurve.refactor;class ControlCenterPartition{static org.json.JSONObject read(Object o,org.json.JSONObject c){throw new IllegalArgumentException("no partition in coordinate fixture");}}',
+ 'top/rongshangs/lumacurve/refactor/ScreenBrightnessReading.java':'''package top.rongshangs.lumacurve.refactor;class ScreenBrightnessReading {static org.json.JSONObject calibration(Object o)throws Exception{throw new IllegalStateException("optional telemetry unavailable");}}''',
  'top/rongshangs/lumacurve/refactor/ControlCenterNodes.java':'''package top.rongshangs.lumacurve.refactor;class ControlCenterNodes{ControlCenterNodes(ControlCenterEngine e){}void start(){}void deactivate(){}void deactivate(boolean restore){}void close(){}boolean supported(){return false;}String physical(){return "";}org.json.JSONObject status(){return new org.json.JSONObject();}}''',
 'com/android/server/display/config/EvenDimmerBrightnessData.java':'package com.android.server.display.config;public class EvenDimmerBrightnessData{}',
 'android/util/Spline.java':'''package android.util;
