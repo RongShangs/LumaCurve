@@ -55,31 +55,36 @@ harness=r'''
 #include <errno.h>
 #include <string.h>
 #include "panel_policy.h"
+#include "control_center_policy.h"
 #ifndef ESTALE
 #define ESTALE 116
 #endif
 static struct panel_policy state;
 static const char *node="node";
 static int control_center_listener,last_error,active_fold_port=-1,output=10,attempts,successes;
-static int present,matching_pid,matching_token,live,actual,acquire_failure,write_failure,readback_failure,late_change,reads,writes,releases;
+static int present,matching_pid,matching_token,live,actual,acquire_failure,write_failure,readback_failure,late_change,reads,writes,releases,delays,transient,interrupt,restore_failure;
+static char failed_lease[81];
 static int read_lease(struct panel_lease *l){reads++;memset(l,0,sizeof(*l));l->pid=matching_pid?7:8;strcpy(l->token,matching_token?"cc_good":"cc_other");l->active=1;l->target=late_change&&reads>1?8000:9000;return present;}
 static int same_node(void){return live;}
 static int number(const char *p){(void)p;return actual;}
 static int fold_panel_live(const char *p,int n){(void)p;(void)n;return 1;}
 static int acquire_output(void){if(acquire_failure){errno=EACCES;return -1;}return 0;}
-static int release_output(void){releases++;return 0;}
+static int release_output(void){releases++;return restore_failure?-1:0;}
+static int health(int active){return active?-1:0;}
+static void usleep(int n){if(n!=20000)abort();delays++;if(interrupt==1)present=0;if(interrupt==2)actual=0;if(interrupt==3)live=0;}
 static long fake_lseek(int fd,long offset,int mode){(void)fd;(void)offset;(void)mode;return 0;}
-static int fake_write(int fd,const char *b,size_t n){(void)fd;if(write_failure){errno=EIO;return -1;}writes++;if(!readback_failure)actual=atoi(b);return (int)n;}
+static int fake_write(int fd,const char *b,size_t n){(void)fd;if(write_failure){errno=EIO;return -1;}writes++;if(!readback_failure&&writes>transient)actual=atoi(b);return (int)n;}
 #define lseek fake_lseek
 #define write fake_write
 #ifndef SEEK_SET
 #define SEEK_SET 0
 #endif
 '''
-harness=harness.replace('#include <errno.h>','#include <errno.h>\n#include <stdlib.h>')+function+r'''
+helper_at=native.index('static int recover_readback(void){');helper=native[helper_at:native.index('\n}',helper_at)+2]
+harness=harness.replace('#include <errno.h>','#include <errno.h>\n#include <stdlib.h>')+function+'\n'+helper+r'''
 static int cases;
 #define CHECK(x) do{if(!(x)){fprintf(stderr,"lease race case %d\n",cases);return 1;}cases++;}while(0)
-static void reset(int follow){panel_clear(&state);panel_arm(&state,"cc_good",7,0);control_center_listener=follow;present=matching_pid=matching_token=live=1;actual=1000;last_error=attempts=successes=acquire_failure=write_failure=readback_failure=late_change=reads=writes=releases=0;}
+static void reset(int follow){panel_clear(&state);panel_arm(&state,"cc_good",7,0);control_center_listener=follow;present=matching_pid=matching_token=live=1;actual=1000;last_error=attempts=successes=acquire_failure=write_failure=readback_failure=late_change=reads=writes=releases=delays=transient=interrupt=restore_failure=0;failed_lease[0]=0;}
 int main(void){
  for(int follow=0;follow<=1;follow++)for(int variant=0;variant<3;variant++){
   reset(follow);if(variant==0)present=0;if(variant==1)matching_pid=0;if(variant==2)matching_token=0;
@@ -95,6 +100,16 @@ int main(void){
   reset(follow);CHECK(write_output(8000)==1&&writes==0);
   reset(follow);late_change=1;CHECK(write_output(9000)==1&&writes==0&&releases==1&&last_error==0);
  }
+
+ struct panel_lease withdrawn={0};strcpy(withdrawn.token,"cc_good");withdrawn.active=1;strcpy(failed_lease,"cc_good");CHECK(!control_center_after_failure(&withdrawn,1,failed_lease));CHECK(!control_center_after_failure(&withdrawn,0,failed_lease)&&!failed_lease[0]);CHECK(control_center_after_failure(&withdrawn,1,failed_lease));strcpy(failed_lease,"old");CHECK(control_center_after_failure(&withdrawn,1,failed_lease));strcpy(failed_lease,"cc_good");withdrawn.active=0;CHECK(control_center_after_failure(&withdrawn,1,failed_lease)&&!failed_lease[0]);
+ reset(1);transient=2;CHECK(write_output(9000)==0&&writes==3&&delays==2&&successes==1&&last_error==0);
+ reset(0);transient=2;CHECK(write_output(9000)<0&&writes==1&&delays==0&&last_error==ERANGE);CHECK(recover_readback()<0);
+ for(int stop=1;stop<=3;stop++){reset(1);transient=2;interrupt=stop;int result=write_output(9000);CHECK(writes==1&&delays==1);CHECK(stop==3?result<0&&last_error==ESTALE:result==1);}
+ reset(1);readback_failure=1;CHECK(write_output(9000)<0&&writes==3&&delays==2&&last_error==ERANGE);CHECK(recover_readback()==0&&!state.armed&&!strcmp(failed_lease,"cc_good")&&releases==1);
+ reset(1);last_error=EACCES;CHECK(recover_readback()<0&&state.armed);
+ reset(1);transient=2;interrupt=1;restore_failure=1;CHECK(write_output(9000)<0&&writes==1&&releases==1);
+ reset(1);last_error=ERANGE;restore_failure=1;CHECK(recover_readback()<0&&state.armed);
+ reset(1);strcpy(state.token,"tile_session");last_error=ERANGE;CHECK(recover_readback()<0&&state.armed);
  printf("Lease revocation race: %d cases PASS; real write_output, syscall doubles\n",cases);return 0;
 }
 '''

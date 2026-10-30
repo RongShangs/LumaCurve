@@ -344,7 +344,7 @@ public final class RootControl implements AutoCloseable {
             return new JSONObject().put("ok",true).put("node",NativePanelRoot.status()).put("runtime",refreshedLive());
         }
         int value=request.getInt("value");if(request.getDouble("value")!=value)throw new IOException("请输入整数节点值");
-        JSONObject node=NativePanelRoot.status();if(!node.optBoolean("supported"))throw new IOException("主屏节点尚不可用："+node.optString("reason","unknown"));if(value<10||value>node.getInt("maximum"))throw new IOException("主屏节点值超出范围");
+        JSONObject node=NativePanelRoot.status();if(!node.optBoolean("supported"))throw new IOException("主屏节点尚不可用："+node.optString("reason","unknown"));int ceiling=BrightnessControlOptions.manualCeiling(BrightnessControlOptions.parseStored(new JSONObject(java.util.Objects.toString(settings.get(CONFIG),"{}"))).manualMaximum,node.getInt("maximum"));if(value<10||value>ceiling)throw new IOException("主屏节点值超出磁贴设置范围");
         if(ActivePanelNode.PROFILE.equals(node.optString("discovery"))&&!node.optString("physical_display_id").equals(request.optString("panel_display_id")))throw new IOException("当前屏幕已切换，请重新打开面板后调节");
         if(action.equals("begin")){step="启动主屏原生守护";NativePanelRoot.start(node);}else if(!action.equals("set"))throw new IOException("未知节点操作");
         request.put("action",action.equals("begin")?"raw_begin":"raw_validate");

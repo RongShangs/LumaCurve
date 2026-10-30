@@ -13,7 +13,7 @@ import org.json.*;import java.util.*;import java.io.*;import java.nio.file.*;imp
 class ControlCenterRoot{static void reconcile(Object settings,JSONObject runtime,String raw){}}
 class RootControl{static final String CONFIG="config";
 static final File DATA=new File("build/raw-panel-transaction-tests");Settings settings=new Settings();boolean reject,failMode,failHook,loseBeginAck;String session="";int hookCalls,aborts;List<String> calls=new ArrayList<>();
-class Settings{String get(String key){return null;}String mode="1";String getSystem(String key){return mode;}boolean putSystem(String key,String value){mode=value;return true;}}
+class Settings{String config;String get(String key){return config;}String mode="1";String getSystem(String key){return mode;}boolean putSystem(String key,String value){mode=value;return true;}}
 JSONObject live()throws Exception{return new JSONObject().put("pid",123).put("phase","active");}
 JSONObject refreshedLive()throws Exception{return live();}
 JSONObject brightness(String encoded)throws Exception{hookCalls++;JSONObject request=new JSONObject(new String(Base64.getDecoder().decode(encoded),StandardCharsets.UTF_8));String action=request.getString("action");calls.add(action);
@@ -52,6 +52,8 @@ c=ctl();c.failHook=true;check(failed(c,"begin",4000,"a").contains("no hook"));ch
 c=ctl();c.rawPanel(req("begin",4000,"a"));check(c.rawPanel(req("restore",0,"a")).getBoolean("ok"));check(NativePanelRoot.stops==1&&c.settings.mode.equals("1"));
 c=ctl();c.failHook=true;check(c.rawPanel(req("restore",0,"a")).getBoolean("ok"));check(NativePanelRoot.stops==1&&c.settings.mode.equals("1"));
 c=ctl();c.loseBeginAck=true;check(failed(c,"begin",4000,"acklost").contains("ack lost"));check(c.settings.mode.equals("1")&&c.session.isEmpty()&&c.aborts==1);check(NativePanelClient.calls.equals(Arrays.asList("STOP acklost"))&&NativePanelClient.actual==700);
+c=ctl();c.settings.config=new JSONObject().put("manual_panel_maximum",9000).toString();check(failed(c,"begin",9001,"limit").contains("磁贴设置范围"));check(c.settings.mode.equals("1")&&NativePanelRoot.starts==0&&c.hookCalls==0);check(c.rawPanel(req("begin",9000,"limit_ok")).getBoolean("ok")&&NativePanelClient.actual==9000);check(failed(c,"set",10000,"limit_ok").contains("磁贴设置范围")&&NativePanelClient.actual==9000);
+c=ctl();c.settings.config=new JSONObject().put("manual_panel_maximum",65535).toString();check(failed(c,"begin",20000,"device_limit").contains("磁贴设置范围")&&NativePanelRoot.starts==0);
 System.out.println("Raw panel root transaction: "+cases+" cases PASS; production orchestration with service doubles, Android not tested");
 }}
 '''}
@@ -59,5 +61,6 @@ paths=[]
 for name,source in files.items():
  p=O/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_text(source,encoding='utf-8');paths.append(p)
 classes=O/'classes';classes.mkdir(exist_ok=True)
+paths.append(S/'BrightnessControlOptions.java')
 subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(J),'-d',str(classes),*[str(p) for p in paths]],check=True)
 subprocess.run(['java','-cp',str(classes)+';'+str(J),'top.rongshangs.lumacurve.refactor.RawTransactionTest'],check=True,cwd=R)

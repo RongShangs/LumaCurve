@@ -69,7 +69,7 @@ final class RawBrightnessPanel {
   }
   String physical=node.optString("physical_display_id");
   if(!panelDisplayId.equals(physical)){generation++;claimed=false;pending=null;dragging=false;session=UUID.randomUUID().toString();if(activeDialog!=null)activeDialog.dismiss();clearFault();panelDisplayId=physical;}
-  maximum=node.optInt("maximum",10);int actual=node.optInt("actual",-1);JSONObject guard=node.optJSONObject("guard");
+  JSONObject configuration=runtime==null?null:runtime.optJSONObject("brightness_control");maximum=BrightnessControlOptions.manualCeiling(configuration==null?0:configuration.optInt("manual_panel_maximum",0),node.optInt("maximum",10));int actual=node.optInt("actual",-1);JSONObject guard=node.optJSONObject("guard");
   boolean auto=runtime==null||runtime.optBoolean("auto_mode");JSONObject owner=runtime==null?null:runtime.optJSONObject("brightness_control");
   BrightnessTileService.publish(runtime);
   keepingAwake=owner!=null&&owner.optBoolean("temporary_screen_on");keepAwakeAction.setText(tr(keepingAwake?"取消临时常亮":"临时常亮"));keepAwakeAction.setEnabled(runtime!=null&&"active".equals(runtime.optString("phase")));

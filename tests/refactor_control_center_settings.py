@@ -32,7 +32,7 @@ public class LinearLayout extends View{public static final int HORIZONTAL=0,VERT
 import android.widget.*;import org.json.*;
 class MainActivity{
  int BG=0xfffafafa,INK=0xff24303c,MUTED=0xff616d79,BLUE=0xff3265df;boolean busy,dirty,english,dark;JSONObject runtime,lastAnswer,rootFeatureReport;Controls controls=new Controls();ControlCenterSettings mapping;int checks,runs,selected,opened;String command;
- ScrollView[] settingsScrollers=new ScrollView[11];Feature featureCheckPage;static class Feature{ScrollView scroll=new ScrollView();}static class Controls{int nodeSliderMode,partitionMaximum;boolean partitionRestoreAuto=true,darkLock=true;}
+ ScrollView[] settingsScrollers=new ScrollView[11];Feature featureCheckPage;static class Feature{ScrollView scroll=new ScrollView();}static class Controls{int nodeSliderMode,partitionMaximum,manualMaximum;boolean partitionRestoreAuto=true,darkLock=true,manualPanel=true;}
  int dp(float x){return Math.round(x);}int themed(int x){return ThemePalette.color(x,dark);}String tr(String x){return UiText.translate(x,english);}LinearLayout column(){return new LinearLayout();}LinearLayout card(LinearLayout parent){LinearLayout card=column();parent.addView(card);return card;}TextView text(String x,int size,int color){TextView t=new TextView();t.text=tr(x);t.size=size;t.color=themed(color);return t;}Object ripple(int color,int radius){return ThemePalette.surface(color,dark);}android.graphics.drawable.GradientDrawable background(int color,int radius){android.graphics.drawable.GradientDrawable b=new android.graphics.drawable.GradientDrawable();b.color=(Integer)ThemePalette.surface(color,dark);return b;}EditText input(String h){return new EditText();}Button action(String label,Runnable run){Button b=new Button();b.text=tr(label);b.minimumHeight=48;b.setOnClickListener(v->run.run());return b;}void drawCurve(){if(mapping!=null)mapping.refresh();}void checkAppFeatures(){checks++;}void run(String command,String ignored){this.command=command;runs++;}void select(int p){selected=p;}void showFeatureChecks(){opened++;}
  INSETS
 }'''.replace('INSETS',method('void updateSecondaryInsets(')),
@@ -41,7 +41,7 @@ for name,text in files.items():
     p=O/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_text(text,encoding='utf-8')
 
 phrases=[]
-for name in ['ControlCenterStatus.java','ControlCenterSettings.java']:
+for name in ['ControlCenterStatus.java','ControlCenterSettings.java','ManualPanelLimitSettings.java']:
     for literal in re.findall(r'"(?:[^"\\]|\\.)*"',(S/name).read_text(encoding='utf-8')):
         text=ast.literal_eval(literal)
         if re.search('[\u4e00-\u9fff]',text) and text not in phrases:phrases.append(text)
@@ -58,6 +58,7 @@ public class MappingSettingsTest{
   a.dirty=false;card.returns[1].performClick();check(!a.dirty);a.busy=true;card.refresh();card.options[1].performClick();card.returns[0].performClick();check(a.controls.nodeSliderMode==4&&!a.controls.partitionRestoreAuto&&!card.setLimit.enabled&&!card.deviceLimit.enabled);a.busy=false;card.refresh();
   card.options[1].performClick();check(a.controls.nodeSliderMode==3&&card.returnPolicy.visibility==View.GONE);a.runtime=runtime(false,false);card.refresh();check(card.options[1].enabled&&!card.options[2].enabled&&card.options[0].enabled&&card.availability.visibility==View.VISIBLE);card.options[0].performClick();check(a.controls.nodeSliderMode==0&&card.availability.visibility==View.GONE);
   for(int legacy:new int[]{1,2}){a.controls.nodeSliderMode=legacy;card.refresh();for(LinearLayout option:card.options)check(!option.selected);check(a.controls.nodeSliderMode==legacy);}
+  ManualPanelLimitSettings tile=new ManualPanelLimitSettings(a,parent);a.controls.manualMaximum=12000;a.runtime.put("control_center_slider",new JSONObject().put("maximum",16383));tile.refresh();check(tile.maximum==16383&&tile.slider.progress==11990);tile.input.setText("9000");tile.apply.performClick();check(a.controls.manualMaximum==9000&&a.controls.partitionMaximum==0);tile.refresh();tile.input.setText("16384");tile.apply.performClick();check(a.controls.manualMaximum==9000&&tile.input.error!=null);tile.reset.performClick();check(a.controls.manualMaximum==0);tile.refresh();check(tile.slider.progress==16373);a.controls.manualMaximum=12000;a.runtime=new JSONObject();tile.refresh();check(!tile.slider.enabled&&a.controls.manualMaximum==12000);a.controls.manualPanel=false;tile.refresh();check(!tile.input.enabled);a.controls.manualPanel=true;
   for(View child:card.root.children)check(!(child instanceof Button));check(a.opened==0&&a.runs==0&&a.checks==0);
   a.controls.nodeSliderMode=3;a.runtime=runtime(true,true);a.dark=true;card.refresh();check(((android.graphics.drawable.GradientDrawable)card.options[1].background).stroke==2&&card.badges[1].visibility==View.VISIBLE);
   a.runtime.put("control_center_slider",new JSONObject().put("maximum",16383).put("partition",new JSONObject().put("node",.5)));a.controls.nodeSliderMode=4;card.refresh();check(card.demo.ordinary==8192&&card.demo.upper==16383);check(card.partitionBody.children.contains(card.returnPolicy)&&card.options[2].children.contains(card.partitionBody));card.maximumInput.setText("12000");card.setLimit.performClick();check(a.controls.partitionMaximum==12000&&card.demo.upper==12000);card.maximumInput.setText("8000");card.setLimit.performClick();check(a.controls.partitionMaximum==12000&&card.maximumInput.error!=null);card.deviceLimit.performClick();check(a.controls.partitionMaximum==0&&card.demo.upper==16383);
@@ -70,7 +71,7 @@ public class MappingSettingsTest{
 }'''.replace('PHRASES',','.join(json.dumps(p,ensure_ascii=False) for p in phrases))
 p=O/'top/rongshangs/lumacurve/refactor/MappingSettingsTest.java';p.write_text(java,encoding='utf-8')
 C=O/'classes';C.mkdir(exist_ok=True)
-sources=[*O.rglob('*.java'),*[S/(n+'.java') for n in ['ControlCenterStatus','ControlCenterSettings','ThemePalette','UiText']]]
+sources=[*O.rglob('*.java'),*[S/(n+'.java') for n in ['ControlCenterStatus','ControlCenterSettings','ManualPanelLimitSettings','BrightnessControlOptions','ThemePalette','UiText']]]
 subprocess.run(['javac','--release','8','-encoding','UTF-8','-cp',str(J),'-d',str(C),*[str(p) for p in sources]],check=True)
 subprocess.run(['java','-cp',str(C)+os.pathsep+str(J),'top.rongshangs.lumacurve.refactor.MappingSettingsTest'],check=True)
 main=(S/'MainActivity.java').read_text(encoding='utf-8');manual=method('void makeManualPanelSettings(')

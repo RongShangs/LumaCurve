@@ -1,5 +1,11 @@
 # HyperLux 项目范围与任务边界
 
+2026-10-30 当前正式发布目标：**4.3.3 / 43300 / release-4.3.3**。用户授权发布，合入公开4.3.2之后Beta01：作用域未知提示、已确认HDR节点保持、有界读回重试与监听恢复、磁贴独立最高节点及风险提示。166份Java，相比Beta01仅AppBuild身份变化；raw10不变，保留raw08/raw09与全部设置。保护408份旧APK/ZIP。官网/GitHub/LSPosed同步，完成以build/release-4.3.3-publish/public-verification.json为准；无安装/重启设备授权或真机功耗实测。日志从4.3.0起累计18项简要及分版本详情；见docs/releases/4.3.3.md、docs/reviews/review-4.3.3.md。下方为历史。
+
+
+2026-10-30 当前本地交付：**4.3.2 Beta 01 / 43201 / beta-4.3.2-beta01**。基线公开4.3.2。作用域未知直接引导；已确认手动节点保持不因HDR结束，其他HDR规则保留；报告ERANGE34对应有界读回重试和失败租约撤回后监听恢复。磁贴新增独立真实节点上限及风险提示。166份Java/raw10，保留raw08/raw09和全部保存设置，保护405份旧APK/ZIP。仅本地，不发布/安装，无真机或功耗实测。见docs/releases/4.3.2-beta01.md、docs/reviews/review-4.3.2-beta01.md，下方为历史。
+
+
 2026-10-29 当前正式发布目标：**4.3.2 / 43200 / release-4.3.2**。用户授权发布，合入公开4.3.1之后Beta01—03，保留4.3.0及4.3.1累计日志并追加4.3.2。165份Java，相比Beta03仅构建身份变化；raw09保持、全部旧兼容和用户设置保留，保护402份已有APK/ZIP。官网/GitHub/LSPosed同步，发布完成以build/release-4.3.2-publish/public-verification.json为准。授权不含安装或重启设备，无新真机或功耗验证。见docs/releases/4.3.2.md与docs/reviews/review-4.3.2.md。下方为历史阶段。
 
 

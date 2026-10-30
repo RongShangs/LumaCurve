@@ -46,7 +46,7 @@ final class ControlCenterNodes {
             BrightnessControl control=s.brightnessControl;
             int target=validate(request,generation(),SystemClock.elapsedRealtime(),control.lastAutoEnabledAt);
             long at=request.getLong("elapsed");if(at<lastGesture)throw new IllegalArgumentException("忽略较早的节点操作");
-            if(!engine.enabled||control.options.nodeSliderMode<3||!control.enabled()||!control.awake()||!control.unlocked()||!control.mainDisplay()||!Boolean.FALSE.equals(s.hdrActive())||s.thermalSeverity<0||s.thermalSeverity>=3||!supported())throw new IllegalStateException("当前主屏状态不允许节点控制");
+            if(!engine.enabled||control.options.nodeSliderMode<3||!control.enabled()||!control.awake()||!control.unlocked()||!control.mainDisplay()||!(Boolean.FALSE.equals(s.hdrActive())||Boolean.TRUE.equals(s.hdrActive())&&control.owner.equals("raw_panel")&&control.rawConfirmed&&control.rawIdentityCurrent()&&!control.auto())||s.thermalSeverity<0||s.thermalSeverity>=3||!supported())throw new IllegalStateException("当前主屏状态不允许节点控制");
             // Raw-panel ownership releases dark/app locks and disables auto exactly once.
             // Further slider events update the same lease instead of recreating a writer.
             String token=request.getString("session");

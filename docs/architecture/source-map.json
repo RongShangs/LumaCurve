@@ -383,6 +383,11 @@
       "purpose": "界面与只读说明"
     },
     {
+      "file": "ManualPanelLimitSettings.java",
+      "layer": "presentation",
+      "purpose": "磁贴面板独立最高节点草稿、真实设备范围显示与输入验证，不触发运行写入"
+    },
+    {
       "file": "MemoryLifecycle.java",
       "layer": "orchestration",
       "purpose": "显示运行协调"

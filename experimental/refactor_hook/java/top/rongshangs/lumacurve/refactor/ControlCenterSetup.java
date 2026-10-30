@@ -16,12 +16,13 @@ final class ControlCenterSetup {
         restart.setEnabled(!a.busy&&!checking);
         String scope=report==null?"unknown":report.optString("scope_state"),injection=report==null?"unconfirmed":report.optString("injection_state");
         String label=checking?"正在检查系统界面作用域…":scope.equals("missing")?"未勾选系统界面，点击查看添加方法":scope.equals("module_missing")||report!=null&&!report.isNull("module_enabled")&&!report.optBoolean("module_enabled")?"请在 LSPosed 启用 HyperLux，点击查看设置方法":injection.equals("old_build")?"系统界面仍在使用旧版，可重启后加载":injection.equals("current")?"系统界面已加载 · 点击核对作用域":scope.equals("present")?"已勾选系统界面，尚未确认加载；可尝试重启系统界面":"作用域暂无法确认，点击查看核对方法";
+        if(!checking&&scope.equals("unknown")&&!injection.equals("current")&&!injection.equals("old_build"))label="需要“系统界面”作用域 · 点击查看";
         status.setText(a.tr(label));
     }
     void check(boolean prompt){
         pendingPrompt|=prompt;if(checking||a.destroyed)return;checking=true;refresh();
         a.worker.execute(()->{JSONObject answer;try{JSONObject result=a.request("mapping-setup",null);if(!result.optBoolean("ok"))throw new Exception(result.optString("message"));answer=result.getJSONObject("control_center_setup");}catch(Exception unavailable){answer=new JSONObject();try{answer.put("scope_state","unknown").put("detail",unavailable.toString());}catch(JSONException ignored){}}
-            final JSONObject result=answer;a.ui.post(()->{if(a.destroyed)return;report=result;checking=false;boolean explain=pendingPrompt;pendingPrompt=false;refresh();String scope=report.optString("scope_state");if(explain&&a.page==1&&a.settingsGroup==5&&(scope.equals("missing")||scope.equals("module_missing")||!report.isNull("module_enabled")&&!report.optBoolean("module_enabled")))guide();});
+            final JSONObject result=answer;a.ui.post(()->{if(a.destroyed)return;report=result;checking=false;boolean explain=pendingPrompt;pendingPrompt=false;refresh();String scope=report.optString("scope_state");if(explain&&a.page==1&&a.settingsGroup==5&&(!scope.equals("present")||!report.isNull("module_enabled")&&!report.optBoolean("module_enabled")))guide();});
         });
     }
     void guide(){a.messageDialog("添加系统界面作用域","在 LSPosed 中打开 HyperLux 的作用域，勾选“系统界面（com.android.systemui）”。\n\n列表中找不到时，请开启“显示系统应用”或取消“隐藏系统应用”。添加后重新检测，再点击“重启系统界面”。","重新检测",()->check(false));}

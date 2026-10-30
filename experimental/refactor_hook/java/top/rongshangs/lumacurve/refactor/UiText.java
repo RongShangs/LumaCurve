@@ -6,6 +6,12 @@ public final class UiText {
     private static final LinkedHashMap<String,String> WORDS=new LinkedHashMap<>();
     private static final List<Map.Entry<String,String>> PHRASES;
     static {
+        WORDS.put("需要“系统界面”作用域 · 点击查看","SystemUI scope required · Tap for instructions");
+        WORDS.put("磁贴最高节点","Tile maximum node");
+        WORDS.put("仅限制磁贴面板；控制中心分区和户外高亮上限分别设置。","Applies to the tile panel only. Control Center partition and outdoor limits are separate.");
+        WORDS.put("长期保持同一亮度会增加烧屏风险","Holding one brightness level for long periods increases burn-in risk");
+        WORDS.put("部分设备可能无法承受接口提供的亮度上限（如 Redmi K100 系列），极端亮度下可能出现偏色。建议实测后为最高节点设置上限。","Some displays may not tolerate the maximum exposed by their interface (for example, Redmi K100 series) and may show color shifts at extreme brightness. Test your display and set a lower node ceiling.");
+        WORDS.put("面板拉满使用上方设置的最高节点；不是 nit。实际亮度仍受驱动与面板限制。","Full scale uses the node ceiling above, not nits. Actual output remains limited by the driver and display.");
         WORDS.put("重启","Restart");
         WORDS.put("重启系统界面","Restart SystemUI");
         WORDS.put("点击核对系统界面作用域","Tap to check the SystemUI scope");

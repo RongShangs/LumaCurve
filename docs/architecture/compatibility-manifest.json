@@ -739,7 +739,8 @@
         "ControlCenterSettings.java",
         "ControlCenterStatus.java",
         "ControlCenterSetup.java",
-        "SystemUiAccess.java"
+        "SystemUiAccess.java",
+        "ManualPanelLimitSettings.java"
       ],
       "selector": "原mode=0/1/2保持原义：全区间严格单调坐标优先；端点平台仅在实际标定数组、原生双向样条和端点裁剪证明完整时使用有效域，逻辑101点表独立核验。独立mode=3/raw_node_v3复用标准坐标进行回显，并核验主屏输出隔离、物理ID、Root实际可写节点及监听进程；不按机型或版本放行，未知动态折叠监听不套用。只有显式拖动才接管完整节点，不在升级时迁移旧选择。 mode=4追加分区路线，读取DDC原始HBM transitionPoint或控制器普通亮度上限，在真实标定中转成节点比例；未知或无额外区间拒绝分区，不影响完整节点控制。 分区呈现普通75%/增强25%；普通物理边界仍读原机接口，独立上界默认真实max_brightness。配置上界只约束用户节点目标，不修改自动HBM范围。",
       "evidence": [
@@ -767,7 +768,7 @@
         "hyperlux_control_center_ui_v1.pid",
         "hyperlux_control_center_ui_v1.process_start"
       ],
-      "cleanup": "旧坐标路线不拥有模式/输出；停用、用户、配置、进程或对象变化撤销旧profile。mode=3拖动经既有raw_panel退出暗光锁定并关闭自动亮度，共用原生程序/租约/健康检查/锁屏暂停和解锁恢复；重开自动亮度清租约，auto_epoch拒绝此前排队手势。同节点且只更新其他设置时保留保持；关闭引擎复用原始所有权恢复。Root暂缺保留原配置，不阻止保存其他设置；不清理其他弹窗的会话。 普通段调用原系统回调以保留开启中的自动亮度和学习，超出段共用raw_panel且不学习；三秒内需先结束首笔再上滑。返回普通段按独立保存选项恢复自动或继续手动，超时/代次/范围/自动模式变化清确认。 首笔同步源滑块，在mExternalChange保护下setValue(position,null)封顶；系统自动反馈不进手势门禁、不写节点。自动高亮已在增强区时，明确新手势可直接接管，系统端以原FrameworkBrightness实际值和标定二次确认；失效证据不放行。动画仅当前可见设置页运行，暂停/切页/移除停止，不新增采样或守护。 首笔封顶后，第二笔尚在普通区间的向上接近保留本次已松手确认，不提前写节点；未越界就结束、超时或清理则撤销。可选控制器onStart/onStop提供独立手势边界，不再仅靠进度终止通知；原进度通知路线保留，可选子组失败独立回滚。 raw09仅修复显式控制中心监听在租约撤销/替换与补写并发时不应死亡的竞态，旧普通手动路径及真实I/O故障退出保留。握手保留最近8条阶段/错误；重启原生程序时保留上次最多64KiB日志，导出按需只读。 按需只读核对本模块primary-user的实际LSPosed作用域，与当前SystemUI注入分别显示；拒读/坏库/多库冲突是未知，不按未注入推断未勾选。只有明确按钮确认才重启精确SystemUI主进程，核对包UID、PID、cmdline及启动标识；不杀system_server、不写作用域数据库或重置选择。",
+      "cleanup": "旧坐标路线不拥有模式/输出；停用、用户、配置、进程或对象变化撤销旧profile。mode=3拖动经既有raw_panel退出暗光锁定并关闭自动亮度，共用原生程序/租约/健康检查/锁屏暂停和解锁恢复；重开自动亮度清租约，auto_epoch拒绝此前排队手势。同节点且只更新其他设置时保留保持；关闭引擎复用原始所有权恢复。Root暂缺保留原配置，不阻止保存其他设置；不清理其他弹窗的会话。 普通段调用原系统回调以保留开启中的自动亮度和学习，超出段共用raw_panel且不学习；三秒内需先结束首笔再上滑。返回普通段按独立保存选项恢复自动或继续手动，超时/代次/范围/自动模式变化清确认。 首笔同步源滑块，在mExternalChange保护下setValue(position,null)封顶；系统自动反馈不进手势门禁、不写节点。自动高亮已在增强区时，明确新手势可直接接管，系统端以原FrameworkBrightness实际值和标定二次确认；失效证据不放行。动画仅当前可见设置页运行，暂停/切页/移除停止，不新增采样或守护。 首笔封顶后，第二笔尚在普通区间的向上接近保留本次已松手确认，不提前写节点；未越界就结束、超时或清理则撤销。可选控制器onStart/onStop提供独立手势边界，不再仅靠进度终止通知；原进度通知路线保留，可选子组失败独立回滚。 raw09仅修复显式控制中心监听在租约撤销/替换与补写并发时不应死亡的竞态，旧普通手动路径及真实I/O故障退出保留。握手保留最近8条阶段/错误；重启原生程序时保留上次最多64KiB日志，导出按需只读。 按需只读核对本模块primary-user的实际LSPosed作用域，与当前SystemUI注入分别显示；拒读/坏库/多库冲突是未知，不按未注入推断未勾选。只有明确按钮确认才重启精确SystemUI主进程，核对包UID、PID、cmdline及启动标识；不杀system_server、不写作用域数据库或重置选择。 用户显式节点保持的HDR规则局部调整：已确认cc_手动节点继续隔离背光，不影响HDR颜色；首笔HDR未持有仍拒绝，严重温控和真实故障保持退让。作用域未知只引导，不判为缺失。",
       "tests": [
         "tests/refactor_control_center.py",
         "tests/refactor_control_center_root.py",
@@ -1192,6 +1193,16 @@
       ],
       "rule": "仅用户明确确认后请求。通过真实PM包UID、精确主进程cmdline、PID和两次启动标识核验，Os.kill只针对该进程；不使用killall/pkill通配，不操作system_server或重启设备。作用域已知缺失先引导添加，未知不假定未勾选；重启权限失败不清设置。",
       "test": "tests/refactor_system_ui_setup.py"
+    },
+    {
+      "id": "manual_node_hold_policy",
+      "owner": "BrightnessControl.java",
+      "alternatives": [
+        "ordinary_tile_ceiling",
+        "control_center_confirmed_hold_hdr"
+      ],
+      "rule": "磁贴上限独立键manual_panel_maximum，0沿用真实设备上限，界面/Root/引擎均验证；旧设置缺键不变。仅已明确确认的手动节点保持不因HDR退出，隔离当前主屏正数背光帧；不修改HDR格式/色彩、其他功能HDR规则、锁屏/物理屏/重开自动及控制中心严重温控退让。首次HDR未持有时原控制中心拒绝路径保留。",
+      "test": "tests/refactor_control_center_nodes.py"
     }
   ],
   "native_variants": [
@@ -1266,7 +1277,7 @@
         "ordinary_manual_lease_fatal_cancel",
         "control_center_listener_yield_cancel"
       ],
-      "rule": "保留普通手动面板租约失效的原退出路径。仅已显式绑定framework PID的控制中心监听，校验/补写之间租约撤销、过期或被替换时跳过该次写入，由原循环重新协调；不退出整个监听。主屏身份、权限、写入和读回失败仍退出；原inotify唤醒和无监听时250ms后备保留，不增加空闲轮询。raw09输出同协议，Root继续识别raw08状态，安装按APK实际资产哈希替换，不放行未知native_build。",
+      "rule": "保留普通手动面板租约失效的原退出路径。仅已显式绑定framework PID的控制中心监听，校验/补写之间租约撤销、过期或被替换时跳过该次写入，由原循环重新协调；不退出整个监听。主屏身份、权限、写入和读回失败仍退出；原inotify唤醒和无监听时250ms后备保留，不增加空闲轮询。raw09输出同协议，Root继续识别raw08状态，安装按APK实际资产哈希替换，不放行未知native_build。 raw10仅控制中心cc_写入读回不一致时最多3次、间隔20ms，每次重核租约/目标/PID/物理节点及亮屏。持续ERANGE释放本租约并写失败健康状态，监听保留，直到租约撤回或会话更换才接纳新目标；权限/身份/真实I/O仍退出。原raw08/raw09识别保留。",
       "test": "tests/refactor_native_panel.py"
     }
   ]
