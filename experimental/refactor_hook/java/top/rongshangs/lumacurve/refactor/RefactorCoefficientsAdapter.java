@@ -80,7 +80,7 @@ final class RefactorCoefficientsAdapter extends CurveBackend {
     public void configure(float[] next)throws Exception{configure(next,0);}
     public void clearMemory()throws Exception{configure(factors,floor);}
     public void configure(float[] next,float nextFloor)throws Exception{
-        if(next!=null&&(next.length!=4||next[3]>1))throw new IllegalArgumentException("最高照度节点不可超过设备原始值");
+        if(next!=null&&(next.length!=4))throw new IllegalArgumentException("需要四个曲线参数");
         if(savedBase!=null)throw new IllegalArgumentException("此系数路线尚不支持记忆转基础曲线；已保存设置保持不变");
         CurvePlan proposed=next==null?null:proposed(next,nextFloor);if(proposed!=null)coefficients(proposed);validateArrays();
         double[] actual=(double[])get(DOUBLES[0]);

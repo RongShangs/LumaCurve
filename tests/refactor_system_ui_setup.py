@@ -52,14 +52,20 @@ for file in widgets.rglob('*.java'):
  target=W/'android'/file.relative_to(widgets);target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(file.read_bytes())
 activity=r'''package top.rongshangs.lumacurve.refactor;
 import android.widget.*;import org.json.*;import java.util.*;
-class MainActivity{boolean busy,destroyed;int page=1,settingsGroup=5,BLUE=1;String title,message,toast;Runnable confirm;JSONObject answer=new JSONObject();final Queue worker=new Queue(),ui=new Queue();final List<String> commands=new ArrayList<>();
+class MainActivity{boolean busy,destroyed;int page=1,settingsGroup=8,BLUE=1;String title,message,toast;Runnable confirm;JSONObject answer=new JSONObject();final Queue worker=new Queue(),ui=new Queue();final List<String> commands=new ArrayList<>();
  static class Queue{final ArrayDeque<Runnable> list=new ArrayDeque<>();void execute(Runnable r){list.add(r);}void post(Runnable r){r.run();}void postDelayed(Runnable r,long n){list.add(r);}void drain(){while(!list.isEmpty())list.remove().run();}}
  JSONObject request(String command,String payload){commands.add(command);return answer;}LinearLayout column(){return new LinearLayout();}int dp(int n){return n;}String tr(String s){return s;}TextView text(String s,int size,int color){TextView t=new TextView();t.setText(s);return t;}Button action(String s,Runnable r){Button b=new Button();b.setText(s);b.setOnClickListener(v->r.run());return b;}void messageDialog(String t,String m,String label,Runnable r){title=t;message=m;confirm=r;}void show(String s){toast=s;}}
 public class SetupUiTest{static int cases;static void check(boolean b){if(!b)throw new AssertionError("setup UI "+cases);cases++;}static JSONObject answer(String scope,String loaded)throws Exception{return new JSONObject().put("ok",true).put("control_center_setup",new JSONObject().put("scope_state",scope).put("module_enabled",true).put("injection_state",loaded));}
  public static void main(String[] args)throws Exception{MainActivity a=new MainActivity();LinearLayout parent=new LinearLayout();TextView heading=new TextView();ControlCenterSetup setup=new ControlCenterSetup(a,parent,heading);check(parent.children.size()==2);LinearLayout row=(LinearLayout)parent.children.get(0);check(row.orientation==LinearLayout.HORIZONTAL&&row.children.get(0)==heading&&row.children.get(1)==setup.restart);check(((LinearLayout.LayoutParams)heading.params).weight==1&&setup.restart.minimumHeight==40);
  a.answer=answer("missing","unconfirmed");setup.check(true);check(a.commands.isEmpty());a.worker.drain();check(a.commands.size()==1&&a.commands.get(0).equals("mapping-setup")&&a.title.equals("添加系统界面作用域")&&setup.status.text.contains("未勾选"));setup.restart.performClick();check(a.title.equals("添加系统界面作用域")&&a.commands.size()==1&&a.message.contains("显示系统应用"));
  a.answer=answer("present","unconfirmed");a.confirm.run();a.worker.drain();check(setup.status.text.contains("已勾选"));setup.restart.performClick();check(a.title.equals("重启系统界面")&&a.commands.size()==2);a.answer=new JSONObject().put("ok",true).put("message","requested");a.confirm.run();check(a.commands.size()==2);a.worker.drain();check(a.commands.get(2).equals("restart-system-ui")&&a.toast.equals("requested"));
- a.answer=answer("unknown","current");a.ui.drain();a.worker.drain();check(setup.status.text.contains("已加载"));a.answer=answer("unknown","unconfirmed");setup.check(true);a.worker.drain();check(setup.status.text.contains("需要“系统界面”作用域")&&a.title.equals("添加系统界面作用域"));a.busy=true;setup.refresh();check(!setup.restart.enabled);a.busy=false;a.destroyed=true;int count=a.commands.size();setup.check(true);a.worker.drain();check(a.commands.size()==count);
+ a.answer=answer("unknown","current");a.ui.drain();a.worker.drain();check(setup.status.text.contains("已加载"));a.answer=answer("unknown","unconfirmed");setup.check(true);a.worker.drain();check(setup.status.text.contains("需要“系统界面”作用域")&&a.title.equals("添加系统界面作用域"));
+ // Opening a page is silent, and async prompts cannot escape into scenes or other pages.
+ for(int group=-1;group<10;group++){a.settingsGroup=group;a.title=null;a.answer=answer("missing","unconfirmed");setup.check(true);a.worker.drain();check((a.title!=null)==(group==ControlCenterSetup.SETTINGS_GROUP));}
+ a.settingsGroup=8;a.title=null;setup.check(false);a.worker.drain();check(a.title==null);
+ setup.check(true);a.settingsGroup=5;a.worker.drain();check(a.title==null);
+ a.settingsGroup=8;setup.check(true);a.page=0;a.worker.drain();check(a.title==null);a.page=1;
+ a.busy=true;setup.refresh();check(!setup.restart.enabled);a.busy=false;a.destroyed=true;int count=a.commands.size();setup.check(true);a.worker.drain();check(a.commands.size()==count);
  System.out.println("SystemUI setup UI: "+cases+" cases PASS; user-confirmed actions, Android rendering not tested");}}
 '''
 p=W/'top/rongshangs/lumacurve/refactor/SetupUiTest.java';p.parent.mkdir(parents=True,exist_ok=True);p.write_text(activity,'utf-8')
@@ -67,7 +73,9 @@ WC=W/'classes';WC.mkdir(exist_ok=True)
 subprocess.run(['javac','--release','8','-encoding','UTF-8','-cp',str(J),'-d',str(WC),*[str(p) for p in W.rglob('*.java')],str(S/'ControlCenterSetup.java')],check=True)
 result=subprocess.run(['java','-cp',str(WC)+os.pathsep+str(J),'top.rongshangs.lumacurve.refactor.SetupUiTest'],check=True,capture_output=True,text=True);print(result.stdout,end='');cases+=int(re.search(r'(\d+) cases PASS',result.stdout).group(1))
 main=(S/'MainActivity.java').read_text('utf-8');root=(S/'RootControl.java').read_text('utf-8')
-assert 'group==5&&controlCenterSettings!=null)controlCenterSettings.setup.check' in main
+assert 'group==ControlCenterSetup.SETTINGS_GROUP&&controlCenterSettings!=null)controlCenterSettings.setup.check(false)' in main
+assert 'settingsTarget=settingGroups[ControlCenterSetup.SETTINGS_GROUP];makeManualPanelSettings();' in main
+assert 'command.equals("apply")&&settingsGroup==ControlCenterSetup.SETTINGS_GROUP' in main
 assert 'command.equals("restart-system-ui"))return SystemUiAccess.restart(settings)' in root
 assert 'command.equals("mapping-setup")' in root
 for phrase in re.findall(r'"(?:[^"\\]|\\.)*"',(S/'ControlCenterSetup.java').read_text('utf-8')):

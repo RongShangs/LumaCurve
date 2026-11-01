@@ -22,12 +22,12 @@ public final class CurvePlan {
         lux=factoryLux.clone(); nit=new float[4];
         for(int i=0;i<4;i++) {
             if(!Float.isFinite(lux[i]) || !Float.isFinite(factoryNit[i]) ||
-                    !Float.isFinite(factors[i]) || factors[i]<.1f || factors[i]>2f ||
+                    !Float.isFinite(factors[i]) || factors[i]<0 ||
                     lux[i]<0 || (i==0 && lux[i]!=0) || (i>0 && lux[i]<=lux[i-1]) ||
                     factoryNit[i]<min || factoryNit[i]>max || (i>0 && factoryNit[i]<factoryNit[i-1]))
                 throw new IllegalArgumentException("曲线节点无效");
-            nit[i]=Math.max(min, Math.min(max, factoryNit[i]*factors[i]));
-            if(i==0)nit[i]=Math.max(nit[i],floor);
+            float scaled=factoryNit[i]*factors[i];if(!Float.isFinite(scaled))throw new IllegalArgumentException("曲线节点计算超出数值范围");
+            nit[i]=Math.max(floor,Math.max(min,Math.min(max,scaled)));
             if(i>0 && nit[i]<nit[i-1]) throw new IllegalArgumentException("节点必须随照度不递减，请降低前一个节点或提高后一个节点");
         }
     }
@@ -44,7 +44,7 @@ public final class CurvePlan {
         if(value==null || value.length()>100) throw new IllegalArgumentException("曲线参数无效");
         String[] words=value.split(",",-1); if(words.length!=4) throw new IllegalArgumentException("需要四个曲线参数");
         float[] values=new float[4];
-        for(int i=0;i<4;i++) {values[i]=Float.parseFloat(words[i]); if(!Float.isFinite(values[i]) || values[i]<.1 || values[i]>2) throw new IllegalArgumentException("节点强度范围是 10%～200%");}
+        for(int i=0;i<4;i++) {values[i]=Float.parseFloat(words[i]); if(!Float.isFinite(values[i]) || values[i]<0) throw new IllegalArgumentException("节点强度必须是有限非负数");}
         return values;
     }
     public static String encode(float[] values) {

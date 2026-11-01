@@ -30,7 +30,7 @@ final class ResponsiveDialog extends LinearLayout {
         Insets safe=insets.getInsets(WindowInsets.Type.systemBars()|WindowInsets.Type.displayCutout()|WindowInsets.Type.ime());
         int available=Math.max(1,metrics.getBounds().height()-safe.top-safe.bottom-dp(24));
         if(MeasureSpec.getMode(h)!=MeasureSpec.UNSPECIFIED)available=Math.min(available,MeasureSpec.getSize(h));
-        int cap=Math.max(1,Math.round(available*heightFraction));
+        int cap=Math.max(1,MeasureSpec.getMode(h)==MeasureSpec.EXACTLY?available:Math.round(available*heightFraction));
         int width=MeasureSpec.getMode(w)==MeasureSpec.UNSPECIFIED?metrics.getBounds().width()-safe.left-safe.right:MeasureSpec.getSize(w);
         int fixedWidth=MeasureSpec.makeMeasureSpec(Math.max(1,width),MeasureSpec.EXACTLY);
         int natural=MeasureSpec.makeMeasureSpec(0,MeasureSpec.UNSPECIFIED);
@@ -51,15 +51,25 @@ final class ResponsiveDialog extends LinearLayout {
         cap=Math.min(available,Math.max(cap,fixed+dp(48)));
         bodyLimit=Math.max(0,cap-fixed);
         body.measure(MeasureSpec.makeMeasureSpec(Math.max(0,width-getPaddingLeft()-getPaddingRight()-lp.leftMargin-lp.rightMargin),MeasureSpec.EXACTLY),MeasureSpec.makeMeasureSpec(bodyLimit,MeasureSpec.AT_MOST));
-        setMeasuredDimension(width,Math.min(cap,fixed+body.getMeasuredHeight()));
+        setMeasuredDimension(width,MeasureSpec.getMode(h)==MeasureSpec.EXACTLY?cap:Math.min(cap,fixed+body.getMeasuredHeight()));
     }
     @Override protected void onLayout(boolean changed,int left,int top,int right,int bottom){
+        // Final allocation can differ from the preliminary measure in OEM dialog
+        // panels. Anchor the footer to the actual bounds, and shrink only notes.
+        LayoutParams footer=(LayoutParams)actions.getLayoutParams();
+        int footerTop=Math.max(getPaddingTop(),bottom-top-getPaddingBottom()-footer.bottomMargin-actions.getMeasuredHeight());
+        int x=getPaddingLeft()+footer.leftMargin;
+        actions.layout(x,footerTop,x+actions.getMeasuredWidth(),footerTop+actions.getMeasuredHeight());
         int y=getPaddingTop();
-        for(View child:new View[]{title,body,actions}){
+        for(View child:new View[]{title,body}){
             LayoutParams lp=(LayoutParams)child.getLayoutParams();y+=lp.topMargin;
-            int x=getPaddingLeft()+lp.leftMargin;
-            child.layout(x,y,x+child.getMeasuredWidth(),y+child.getMeasuredHeight());
-            y+=child.getMeasuredHeight()+lp.bottomMargin;
+            x=getPaddingLeft()+lp.leftMargin;
+            int limit=footerTop-footer.topMargin-lp.bottomMargin;
+            if(child==title){LayoutParams notes=(LayoutParams)body.getLayoutParams();limit-=notes.topMargin+notes.bottomMargin;}
+            y=Math.min(y,Math.max(getPaddingTop(),limit));
+            int height=Math.max(0,Math.min(child.getMeasuredHeight(),limit-y));
+            child.layout(x,y,x+child.getMeasuredWidth(),y+height);
+            y+=height+lp.bottomMargin;
         }
     }
     static void configure(Activity host,Window window,int maximumWidth){

@@ -39,6 +39,10 @@ public class ConfigHostTest{
    JSONObject roundtrip=new JSONObject();retained.put(roundtrip);retainedLow.put(roundtrip);retainedMemory.put(roundtrip);check(BrightnessControlOptions.parseStored(roundtrip).darkLock==choice&&LowLightThresholds.parse(roundtrip).enabled==choice&&MemoryOptions.parse(roundtrip).modeSwitch==choice);
   }
   BrightnessControlOptions intentional=new BrightnessControlOptions();intentional.holdInDarkness();check(intentional.darkLock&&!new BrightnessControlOptions().darkLock);intentional.darkLock=false;check(!BrightnessControlOptions.parseStored(new JSONObject()).darkLock);
+  JSONObject expanded=clone(file);expanded.getJSONObject("options").put("factors","0,48,9.6,1").put("curve_floor_nit",960);
+  ConfigurationFile.Imported wide=ConfigurationFile.read(expanded.toString(),s,c);check(wide.options.getDouble("curve_floor_nit")==960);check(CurvePlan.factors(wide.options.getString("factors"))[1]==48);
+  ThemeCurveOptions expandedTheme=new ThemeCurveOptions();expandedTheme.enabled=true;expandedTheme.factors=new float[]{0,48,9.6f,1};expandedTheme.floor=960;expandedTheme.put(expanded.getJSONObject("options"));
+  wide=ConfigurationFile.read(expanded.toString(),s,c);check(ThemeCurveOptions.parse(wide.options).factors[1]==48&&ThemeCurveOptions.parse(wide.options).floor==960);
   JSONObject first=clone(file);first.put("format","hyperlux_config_v1");first.remove("schema");check(ConfigurationFile.read(first.toString(),s,c).options.getDouble("curve_floor_nit")==10);
   JSONObject changed=clone(file);changed.put("baseline_id","other");changed.getJSONObject("options").put("factors","1,1.5,1,1").put("curve_floor_nit",15).put("thermal_ceiling",40);r=ConfigurationFile.read(changed.toString(),s,c);check(r.options.getString("factors").equals("1.0,1.0,1.0,1.0"));check(r.options.getDouble("curve_floor_nit")==10);check(r.options.getInt("thermal_ceiling")==40);check(r.notes.size()==1);
   JSONObject unsupported=clone(file);JSONObject opts=unsupported.getJSONObject("options");for(String key:ConfigurationFile.FLAGS)opts.put(key,true);for(String key:AdvancedOptions.GROUPS)opts.put(key,true);for(String key:OutdoorOptions.FLAGS)opts.put(key,true);
@@ -49,7 +53,7 @@ public class ConfigHostTest{
   upperThermal.getJSONObject("options").put("thermal_ceiling",45);r=ConfigurationFile.read(upperThermal.toString(),s,c);check(r.options.getInt("thermal_ceiling")==45&&r.notes.isEmpty());
   JSONObject bad=clone(file);bad.put("schema",3);bad(bad,s,c);bad=clone(file);bad.put("format","hyperlux_config_v3");bad(bad,s,c);
   for(String key:new String[]{"thermal_ceiling","memory_strength","assist_brighten","outdoor_enter_lux","curve_floor_nit"}){bad=clone(file);bad.getJSONObject("options").put(key,"12");bad(bad,s,c);}
-  bad=clone(file);bad.getJSONObject("options").put("thermal_relax",1);bad(bad,s,c);bad=clone(file);bad.getJSONObject("options").put("memory_window",1000.5);bad(bad,s,c);bad=clone(file);bad.getJSONObject("options").put("curve_floor_nit",21);bad(bad,s,c);
+  bad=clone(file);bad.getJSONObject("options").put("thermal_relax",1);bad(bad,s,c);bad=clone(file);bad.getJSONObject("options").put("memory_window",1000.5);bad(bad,s,c);bad=clone(file);bad.getJSONObject("options").put("curve_floor_nit",1001);bad(bad,s,c);
   bad=clone(file);bad.getJSONObject("interface").put("refresh_seconds",1.5);bad(bad,s,c);bad=clone(file);bad.put("oversized",String.join("",Collections.nCopies(32769,"x")));bad(bad,s,c);
   check(c.getDouble("curve_floor_nit")==10&&s.getString("baseline_id").equals("basis"));
   check(!r.options.getBoolean("memory_persist"));check(r.options.getInt("memory_retention_days")==30);check(r.options.getInt("memory_max_points")==0);

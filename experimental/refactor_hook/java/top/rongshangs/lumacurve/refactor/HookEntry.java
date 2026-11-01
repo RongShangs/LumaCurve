@@ -79,7 +79,7 @@ public final class HookEntry {
                 ResponseTuning.install(owner.getClassLoader());AdvancedTuning.install(owner.getClassLoader());
                 LowLightTuning.install(owner.getClassLoader());SceneTuning.install(owner.getClassLoader());
                 PipelineHooks.install(owner);OutdoorTuning.install(owner);RawPanelOutputHooks.install(owner);
-                ForegroundApps.install(owner.getClassLoader());
+                ForegroundApps.install(owner.getClassLoader());AppBrightnessIsolation.install(owner);
                 try (HookTransaction refactorHooks=new HookTransaction()) {
                 Class<?> ref=Class.forName(REFACTOR,false,owner.getClassLoader());
                 Method defaultCurve=RefactorProfiles.defaultMethod(ref);

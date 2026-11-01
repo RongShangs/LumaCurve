@@ -15,7 +15,7 @@
     {
       "file": "AboutPage.java",
       "layer": "presentation",
-      "purpose": "首帧测量的顺排大图标与关于卡片、上大下小圆角信息卡、名称/简介/版本三行居中和无抬升紧凑操作"
+      "purpose": "首帧测量的顺排大图标与关于卡片、上大下小圆角信息卡、名称/简介/版本三行居中和无抬升紧凑操作；代码贡献作者主页及参考项目文内跳转"
     },
     {
       "file": "ActivePanelNode.java",
@@ -38,9 +38,19 @@
       "purpose": "设备接口与所有权"
     },
     {
+      "file": "AppBrightnessIsolation.java",
+      "layer": "adapters",
+      "purpose": "同屏/同用户/真实窗口来源限定的应用偏好同步隔离，原子安装与原生无同步路径分离"
+    },
+    {
       "file": "AppBuild.java",
       "layer": "bootstrap",
       "purpose": "入口与代次"
+    },
+    {
+      "file": "AppIsolationSettings.java",
+      "layer": "presentation",
+      "purpose": "独立默认关闭的应用亮度隔离设置页与只读兼容状态"
     },
     {
       "file": "AppRootDiagnostics.java",
@@ -170,7 +180,7 @@
     {
       "file": "ControlCenterSetup.java",
       "layer": "presentation",
-      "purpose": "控制中心映射的按需作用域核对、缺失引导及用户确认的系统界面重启；不修改草稿/配置"
+      "purpose": "主屏设置组内按需核对系统界面作用域和确认重启，阻止异步弹窗跨页"
     },
     {
       "file": "ControlCenterStatus.java",
@@ -190,7 +200,7 @@
     {
       "file": "CurveEditor.java",
       "layer": "presentation",
-      "purpose": "界面与只读说明"
+      "purpose": "依据设备实际范围原子联动编辑，统一纵轴0—100%换算；系数ABI维护严格递增"
     },
     {
       "file": "CurveIdentity.java",
@@ -200,7 +210,7 @@
     {
       "file": "CurvePlan.java",
       "layer": "policy",
-      "purpose": "策略与算子"
+      "purpose": "共享设备亮度范围及曲线顺序验证，非负有限倍率和全局暗处下限"
     },
     {
       "file": "DarkLockPolicy.java",
@@ -590,7 +600,7 @@
     {
       "file": "ResponsiveDialog.java",
       "layer": "presentation",
-      "purpose": "界面与只读说明"
+      "purpose": "弹窗固定区域/滚动正文测量、EXACT后续高度与最终分配底部操作区锚定、安全窗口约束"
     },
     {
       "file": "RootAccess.java",
@@ -811,6 +821,11 @@
       "file": "UpdateChecker.java",
       "layer": "network",
       "purpose": "更新与名单网络客户端"
+    },
+    {
+      "file": "UpdateDialogActions.java",
+      "layer": "presentation",
+      "purpose": "更新弹窗四按钮独立自然高度测量与两列布局，消除嵌套权重行和固定文本高度"
     },
     {
       "file": "WelcomeGuide.java",

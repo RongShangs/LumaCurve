@@ -49,9 +49,12 @@
         "RefactorCoefficientsAdapter.java",
         "PhysicalCurveCalibration.java",
         "ThemeCurveOptions.java",
-        "ThemeMemoryStore.java"
+        "ThemeMemoryStore.java",
+        "CurvePlan.java",
+        "CurveEditor.java",
+        "TraditionalCurve.java"
       ],
-      "selector": "ABC 活动策略为准；Refactor 未就绪不得因物理映射对象存在而抢用，未知活动标记才按已验证对象选择。 Refactor内部分段锚点优先；任一旧锚点标记存在时不得回退绕过残缺旧结构；仅旧锚点整体缺失且9/22系数布局、实例字段与原生消费者签名完整时采用系数路径。 记忆转基础保持现有路径；仅对新鲜物理映射采样的4个float ULP以内边界/平台舍入误差归一，仍严格校验全节点、坐标与范围；Refactor锚点及持久化输入不放宽。 原机完整单调曲线超出真实标定范围时，只对已验证系统物理映射及双向原生样条追加端点裁剪分支；其他范围内旧路径不增加探测要求，残缺标定不回退绕过。；可选深色曲线复用同一已选后端和实际设备约束，仅按系统uiMode选择独立基础配置；不开启时旧配置原样选择。 深浅色模式记忆策略独立选择清除/共用/分开；独立作用域按本机用户与基础曲线隔离，仅启用跨重启保持才保存两份磁盘存档。",
+      "selector": "ABC 活动策略为准；Refactor 未就绪不得因物理映射对象存在而抢用，未知活动标记才按已验证对象选择。 Refactor内部分段锚点优先；任一旧锚点标记存在时不得回退绕过残缺旧结构；仅旧锚点整体缺失且9/22系数布局、实例字段与原生消费者签名完整时采用系数路径。 记忆转基础保持现有路径；仅对新鲜物理映射采样的4个float ULP以内边界/平台舍入误差归一，仍严格校验全节点、坐标与范围；Refactor锚点及持久化输入不放宽。 原机完整单调曲线超出真实标定范围时，只对已验证系统物理映射及双向原生样条追加端点裁剪分支；其他范围内旧路径不增加探测要求，残缺标定不回退绕过。；可选深色曲线复用同一已选后端和实际设备约束，仅按系统uiMode选择独立基础配置；不开启时旧配置原样选择。 深浅色模式记忆策略独立选择清除/共用/分开；独立作用域按本机用户与基础曲线隔离，仅启用跨重启保持才保存两份磁盘存档。 曲线编辑按实际min/max，取消倍率边界；联动相邻节点保持顺序，系数ABI保持可表示的严格递增；根验证、深色配置和后端共用CurvePlan，不修改已有合法配置。 UI所有基础曲线节点以实际曲线值/max显示0—100%，数值输入与拖动均提交绝对曲线坐标；保存仍用原倍率/下限结构，无升级迁移。输入0由实际接口最小值约束，系数路线仍严格递增。",
       "evidence": [
         "curve_backend",
         "physical_mapper_class",
@@ -83,7 +86,9 @@
         "tests/refactor_saved_curve.py",
         "tests/refactor_physical_calibration.py",
         "tests/refactor_physical_calibration_firmware.py",
-        "tests/refactor_theme_curve.py"
+        "tests/refactor_theme_curve.py",
+        "tests/refactor_curve_editing.py",
+        "tests/refactor_curve_percentage.py"
       ],
       "composition": "exclusive"
     },
@@ -742,7 +747,7 @@
         "SystemUiAccess.java",
         "ManualPanelLimitSettings.java"
       ],
-      "selector": "原mode=0/1/2保持原义：全区间严格单调坐标优先；端点平台仅在实际标定数组、原生双向样条和端点裁剪证明完整时使用有效域，逻辑101点表独立核验。独立mode=3/raw_node_v3复用标准坐标进行回显，并核验主屏输出隔离、物理ID、Root实际可写节点及监听进程；不按机型或版本放行，未知动态折叠监听不套用。只有显式拖动才接管完整节点，不在升级时迁移旧选择。 mode=4追加分区路线，读取DDC原始HBM transitionPoint或控制器普通亮度上限，在真实标定中转成节点比例；未知或无额外区间拒绝分区，不影响完整节点控制。 分区呈现普通75%/增强25%；普通物理边界仍读原机接口，独立上界默认真实max_brightness。配置上界只约束用户节点目标，不修改自动HBM范围。",
+      "selector": "原mode=0/1/2保持原义：全区间严格单调坐标优先；端点平台仅在实际标定数组、原生双向样条和端点裁剪证明完整时使用有效域，逻辑101点表独立核验。独立mode=3/raw_node_v3复用标准坐标进行回显，并核验主屏输出隔离、物理ID、Root实际可写节点及监听进程；不按机型或版本放行，未知动态折叠监听不套用。只有显式拖动才接管完整节点，不在升级时迁移旧选择。 mode=4追加分区路线，读取DDC原始HBM transitionPoint或控制器普通亮度上限，在真实标定中转成节点比例；未知或无额外区间拒绝分区，不影响完整节点控制。 分区呈现普通75%/增强25%；普通物理边界仍读原机接口，独立上界默认真实max_brightness。配置上界只约束用户节点目标，不修改自动HBM范围。 分区普通段在已验证OEM V1逻辑滑块上保留完整原生输入范围，不将逻辑nit当物理nit提前封顶；gamma路线继续使用实际物理普通边界。增强段及回显仍走原节点标定，手势证明/Root权限及用户模式不放宽。 V1普通区延迟回显先由真实物理读数经同一本机V1标定反解为原生逻辑进度，再按实际控件端点压入75%；动画比较的反向换算使用同一对应关系。gamma、增强区、已确认节点保持和旧模式继续原物理路径，不缓存手势位置掩盖输出变化。",
       "evidence": [
         "control_center_slider.kind",
         "control_center_slider.error",
@@ -835,6 +840,41 @@
       "tests": [
         "tests/refactor_dim_aod.py"
       ]
+    },
+    {
+      "id": "app_brightness_isolation",
+      "name": "应用临时亮度隔离",
+      "features": [
+        "app_brightness_isolation"
+      ],
+      "routes": [
+        "app_override_scoped_sync",
+        "native_window_no_sync"
+      ],
+      "owners": [
+        "AppBrightnessIsolation.java",
+        "AppIsolationSettings.java",
+        "BrightnessControlOptions.java"
+      ],
+      "selector": "独立默认关闭。按实际Class/加载器核验窗口消费者、请求来源、亮度原因与同步消费者；完整新ABI才安装5个必要Hook。三个同步入口全部缺失且窗口接口完整时采用原生无同步路径、0个Hook；残缺新结构拒绝，不按OS/机型回退。仅匹配当前主屏DPC、当前用户、已接受且正在生效的同标签窗口覆盖、同一次调用及相同亮度参数；控制中心真实调节优先至窗口释放/来源变更。",
+      "evidence": [
+        "app_brightness_isolation.profile",
+        "app_brightness_isolation.detail",
+        "app_brightness_isolation.window_active",
+        "app_brightness_isolation.user_adjustment_priority",
+        "app_brightness_isolation.blocked_syncs",
+        "app_brightness_isolation.state",
+        "app_brightness_isolation_supported"
+      ],
+      "cleanup": "HookTransaction全组回滚；ThreadLocal调用栈在返回/异常时恢复；弱引用同屏状态不持有控制器。停用/切用户/非活动/非亮屏/其他控制者/HDR时沿用系统，不写缓存亮度、不改自动模式、不全局拦截Settings。接口暂缺只裁剪运行副本，原保存开关保留。无新增服务/传感器/轮询；不承诺拦截应用直接写系统设置。",
+      "tests": [
+        "tests/refactor_app_isolation.py",
+        "tests/refactor_feature_self_check.py",
+        "tests/refactor_feature_compatibility.py",
+        "tests/refactor_ui_navigation.py",
+        "tests/refactor_app_isolation_firmware.py"
+      ],
+      "composition": "exclusive"
     }
   ],
   "abi_variants": [
@@ -936,7 +976,7 @@
         "synthetic_updateSlider",
         "direct_updateSlider"
       ],
-      "rule": "匹配合成 / 直接回显签名，两者属于同一坐标映射，不替换系统自动亮度策略；入口隐藏。",
+      "rule": "匹配合成/直接回显签名，均在原生回显作用域内转换，不替换自动亮度策略。V1普通区用原生逻辑进度与75%互逆，动画比较与直接setValue同单位；实际输出改变仍跟随。节点保持、自动HBM及gamma保持原物理回显；显式设置入口不改变旧0/1/2含义。",
       "test": "tests/refactor_control_center.py"
     },
     {

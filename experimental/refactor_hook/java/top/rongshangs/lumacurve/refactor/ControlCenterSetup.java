@@ -6,6 +6,7 @@ import org.json.*;
 
 /** On-demand scope guidance and user-confirmed SystemUI restart. Never changes scope/config. */
 final class ControlCenterSetup {
+    static final int SETTINGS_GROUP=8;
     final MainActivity a;final TextView status;final Button restart;JSONObject report;boolean checking,pendingPrompt;
     ControlCenterSetup(MainActivity a,LinearLayout parent,TextView heading){
         this.a=a;LinearLayout header=a.column();header.setOrientation(LinearLayout.HORIZONTAL);header.setGravity(Gravity.CENTER_VERTICAL);header.setBaselineAligned(false);parent.addView(header);
@@ -22,7 +23,7 @@ final class ControlCenterSetup {
     void check(boolean prompt){
         pendingPrompt|=prompt;if(checking||a.destroyed)return;checking=true;refresh();
         a.worker.execute(()->{JSONObject answer;try{JSONObject result=a.request("mapping-setup",null);if(!result.optBoolean("ok"))throw new Exception(result.optString("message"));answer=result.getJSONObject("control_center_setup");}catch(Exception unavailable){answer=new JSONObject();try{answer.put("scope_state","unknown").put("detail",unavailable.toString());}catch(JSONException ignored){}}
-            final JSONObject result=answer;a.ui.post(()->{if(a.destroyed)return;report=result;checking=false;boolean explain=pendingPrompt;pendingPrompt=false;refresh();String scope=report.optString("scope_state");if(explain&&a.page==1&&a.settingsGroup==5&&(!scope.equals("present")||!report.isNull("module_enabled")&&!report.optBoolean("module_enabled")))guide();});
+            final JSONObject result=answer;a.ui.post(()->{if(a.destroyed)return;report=result;checking=false;boolean explain=pendingPrompt;pendingPrompt=false;refresh();String scope=report.optString("scope_state");if(explain&&a.page==1&&a.settingsGroup==SETTINGS_GROUP&&(!scope.equals("present")||!report.isNull("module_enabled")&&!report.optBoolean("module_enabled")))guide();});
         });
     }
     void guide(){a.messageDialog("添加系统界面作用域","在 LSPosed 中打开 HyperLux 的作用域，勾选“系统界面（com.android.systemui）”。\n\n列表中找不到时，请开启“显示系统应用”或取消“隐藏系统应用”。添加后重新检测，再点击“重启系统界面”。","重新检测",()->check(false));}

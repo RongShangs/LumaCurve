@@ -45,7 +45,7 @@ public final class RefactorTest {
         check(p.at(0)==2);check(p.at(30)==135);check(p.at(600)==220);check(p.at(50000)==1060);
         check(Math.abs(p.at(70)-(135+85*40/570f))<.001);
         x[1]=999; y[1]=999;check(p.at(30)==135);float[] copy=p.nits();copy[0]=999;check(p.at(0)==2);
-        bad(()->CurvePlan.factors("NaN,1,1,1"));bad(()->CurvePlan.factors("1,1,1"));bad(()->CurvePlan.factors("Infinity,1,1,1"));bad(()->CurvePlan.factors("0,1,1,1"));bad(()->CurvePlan.factors("3,1,1,1"));
+        bad(()->CurvePlan.factors("NaN,1,1,1"));bad(()->CurvePlan.factors("1,1,1"));bad(()->CurvePlan.factors("Infinity,1,1,1"));check(CurvePlan.factors("0,1,1,1")[0]==0);check(CurvePlan.factors("3,1,1,1")[0]==3);bad(()->CurvePlan.factors("-1,1,1,1"));
         bad(()->p.at(Float.NaN));bad(()->p.at(-1));
         bad(()->new CurvePlan(new float[]{0,30,30,5000},new float[]{2,135,220,1060},.2f,1060,one));
         bad(()->new CurvePlan(new float[]{0,30,600,5000},new float[]{2,135,220,1060},.2f,1060,new float[]{1,2,.1f,1}));
@@ -53,16 +53,16 @@ public final class RefactorTest {
         float[] zeroLux={0,30,600,5000},zeroNit={0,20,100,1000};
         CurvePlan raised=new CurvePlan(zeroLux,zeroNit,0,1000,one,10);check(raised.at(0)==10);check(raised.at(15)==15);check(raised.at(30)==20);check(raised.at(5000)==1000);
         check(new CurvePlan(zeroLux,zeroNit,0,1000,one).at(0)==0);check(zeroNit[0]==0);
-        bad(()->new CurvePlan(zeroLux,zeroNit,0,1000,one,21));bad(()->new CurvePlan(zeroLux,zeroNit,0,1000,one,Float.NaN));bad(()->new CurvePlan(zeroLux,zeroNit,0,1000,one,-1));
+        check(new CurvePlan(zeroLux,zeroNit,0,1000,one,21).at(30)==21);bad(()->new CurvePlan(zeroLux,zeroNit,0,1000,one,Float.NaN));bad(()->new CurvePlan(zeroLux,zeroNit,0,1000,one,-1));
         check(CurvePlan.floor(null)==0);check(CurvePlan.floor(10)==10);bad(()->CurvePlan.floor("10"));bad(()->CurvePlan.floor(Float.POSITIVE_INFINITY));
-        check(Arrays.equals(CurveEditor.floorBounds(zeroNit,0,1000,one),new float[]{0,20}));check(CurveEditor.preset(one,zeroNit,0,1000)[0]==1);
+        check(Arrays.equals(CurveEditor.floorBounds(zeroNit,0,1000,one),new float[]{0,1000}));check(CurveEditor.preset(one,zeroNit,0,1000)[0]==1);
         float[] zeroDraft=one.clone();zeroDraft[1]=CurveEditor.clamp(1,.1f,zeroNit,0,1000,one,10);check(zeroDraft[1]>=.5f);check(new CurvePlan(zeroLux,zeroNit,0,1000,zeroDraft,10).at(30)>=10);
         OEM o=new OEM();o.resetDefaultSpline();RefactorAdapter a=new RefactorAdapter(o,.2f,1060);
         a.configure(new float[]{.7f,.8f,.95f,1});check(Math.abs(o.mAnchorNit[1]-108)<.001);check(o.mGoodAnchorNit[1]==o.mAnchorNit[1]);check(o.mDefNit30==108);
         check(Math.abs(o.defaultAtLux(70)-a.plan().at(70))<.001);
         check(o.defaultAtLux(70)<135+85*40/570f);
         check(o.defaultAtLux(5000)==1060);
-        try{a.configure(new float[]{1,1,1,1.1f});throw new AssertionError();}catch(IllegalArgumentException expected){check(o.mDefNit30==108);}
+        a.configure(new float[]{1,1,1,1.1f});check(a.plan().at(5000)==1060);a.configure(new float[]{.7f,.8f,.95f,1});
         // Manual anchors survive normal reads; module rewrites only explicit profile/reset events.
         o.mAnchorNit[1]=180;o.mAnchorIsUserDrag[1]=true;check(a.plan().at(30)==108 && o.mAnchorNit[1]==180 && o.mAnchorIsUserDrag[1]);
         o.resetDefaultSpline();check(o.mAnchorNit[1]==108 && o.mGoodAnchorNit[1]==108);

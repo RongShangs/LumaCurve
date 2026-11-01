@@ -22,7 +22,6 @@ public final class ThemeCurveOptions {
         out.floor=CurvePlan.floor(value.has("curve_floor_nit")?value.opt("curve_floor_nit"):null);out.saved=SavedCurve.parse(value);return out;
     }
     public void verify(String backend,float[] lux,float[] nit,float min,float max){
-        if(factors[3]>1f)throw new IllegalArgumentException("深色模式最高照度节点不可超过设备原始值");
         if(saved!=null)saved.verifyBackend(backend);SavedCurve.plan(saved,lux,nit,min,max,factors,floor);
     }
     public JSONObject profile()throws JSONException {JSONObject value=new JSONObject().put("factors",CurvePlan.encode(factors)).put("curve_floor_nit",floor);if(saved!=null)saved.put(value);return value;}

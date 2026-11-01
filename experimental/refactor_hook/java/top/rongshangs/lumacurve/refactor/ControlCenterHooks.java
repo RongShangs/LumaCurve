@@ -76,8 +76,23 @@ final class ControlCenterHooks {
         int inputNode(Profile p,double node)throws Exception{if(v1()){v1Range();return ControlCenterMapping.progress(p.v1.toInput(node),minimum,maximum);}
             range();double brightness=p.standard.toInput(node);int value=(Integer)abi.inverse.invoke(null,(float)Math.max(low(),Math.min(high(),brightness)),low(),high());ControlCenterMapping.fraction(value,minimum,maximum);return value;
         }
+        int partitionInput(Profile p,int shown,double node)throws Exception{
+            if(v1()){v1Range();return ControlCenterPartition.logicalInput(shown,minimum,maximum);}
+            return inputNode(p,node);
+        }
         int output(Profile p,int position)throws Exception{
-            double node;if(v1()){v1Range();node=p.v1.toNode(ControlCenterMapping.fraction(position,minimum,maximum));}else{range();float value=(Float)abi.forward.invoke(null,position,low(),high());if(!Float.isFinite(value))throw new IllegalArgumentException("系统亮度坐标无效");node=p.standard.toNode(value);}return ControlCenterMapping.progress(position(p,node),minimum,maximum);
+            double node;if(v1()){v1Range();node=p.v1.toNode(ControlCenterMapping.fraction(position,minimum,maximum));}else{range();float value=(Float)abi.forward.invoke(null,position,low(),high());if(!Float.isFinite(value))throw new IllegalArgumentException("系统亮度坐标无效");node=p.standard.toNode(value);}return displayNode(p,node);
+        }
+        // Native ordinary input uses perceptual/logical coordinates on V1.
+        // Its feedback must invert that same device table before compressing to
+        // 75%; a physical-node ratio is not the inverse of logicalInput.
+        int displayNode(Profile p,double value)throws Exception{
+            if(p.mode==4&&(!p.holding||partition.releasePending)&&value<=p.manualNode&&v1())return ControlCenterPartition.logicalPosition(ControlCenterMapping.progress(p.v1.toInput(value),minimum,maximum),minimum,maximum);
+            return ControlCenterMapping.progress(position(p,value),minimum,maximum);
+        }
+        double displayedNode(Profile p,int value)throws Exception{
+            if(p.mode==4&&(!p.holding||partition.releasePending)&&value<=ControlCenterMapping.progress(ControlCenterPartition.ORDINARY_SPAN,minimum,maximum)&&v1())return p.v1.toNode(ControlCenterMapping.fraction(ControlCenterPartition.logicalInput(value,minimum,maximum),minimum,maximum));
+            return node(p,ControlCenterMapping.fraction(value,minimum,maximum));
         }
         double position(Profile p,double node){return p.mode==4?ControlCenterPartition.position(node,p.manualNode,p.partitionUpper,p.maximum):node;}
         double node(Profile p,double position){return p.mode==4?ControlCenterPartition.node(position,p.manualNode,p.partitionUpper,p.maximum):position;}
@@ -112,21 +127,21 @@ final class ControlCenterHooks {
                         shown=Math.min(physical,boundary);b.rawThumb=shown;b.rawThumbUntil=SystemClock.elapsedRealtime()+1000;b.showThumb(shown);
                         if(action==ControlCenterPartition.Gate.PROMPT){if(b.hint!=null)b.hint.cancel();android.widget.Toast hint=android.widget.Toast.makeText(context,("zh".equals(Locale.getDefault().getLanguage())?"再次滑动突破手动亮度限制":"Swipe again to exceed the manual brightness limit"),android.widget.Toast.LENGTH_SHORT);b.hint=hint;hint.show();main.postDelayed(()->{hint.cancel();if(b.hint==hint)b.hint=null;},ControlCenterPartition.WINDOW_MS);}
                         if(action==ControlCenterPartition.Gate.RELEASE)sendNode(c,Math.min(ControlCenterMapping.target(nodeFraction,c.maximum),(int)Math.ceil(c.manualNode*c.maximum)),true,"release",b.partition);
-                        original=b.inputNode(c,Math.min(nodeFraction,c.manualNode));
+                        original=b.partitionInput(c,shown,Math.min(nodeFraction,c.manualNode));
                     }else if(c.raw){b.rawThumb=physical;b.rawThumbUntil=SystemClock.elapsedRealtime()+1000;sendNode(c,ControlCenterMapping.target(fraction,c.maximum),last);p.setResult(null);return;}else original=b.input(c,physical);p.setObjectExtra("hyperlux.coordinate.previous",gesturePosition.get());p.setObjectExtra("hyperlux.coordinate.changed",true);gesturePosition.set(new Gesture(b,shown));p.args[3]=original;
                 }catch(Exception failure){failed(failure);}
             }protected void afterHookedMethod(MethodHookParam p){if(Boolean.TRUE.equals(p.getObjectExtra("hyperlux.coordinate.changed"))){Gesture previous=(Gesture)p.getObjectExtra("hyperlux.coordinate.previous");if(previous==null)gesturePosition.remove();else gesturePosition.set(previous);}}}));
             added.add(XposedBridge.hookMethod(abi.setValue,new XC_MethodHook(){protected void beforeHookedMethod(MethodHookParam p){try{Binding b=bindings.get(p.thisObject);if(b==null)return;Profile c=b.active();if(c==null)return;if(c.raw&&SystemClock.elapsedRealtime()<b.rawThumbUntil){p.args[0]=b.rawThumb;return;}if(c.raw&&c.holding&&!b.partition.releasePending){p.args[0]=ControlCenterMapping.progress(b.position(c,c.held/(double)c.maximum),b.minimum,b.maximum);return;}Gesture gesture=gesturePosition.get();if(gesture!=null&&gesture.binding==b)p.args[0]=gesture.position;else if(!b.animationPhysical)p.args[0]=b.output(c,(Integer)p.args[0]);}catch(Exception failure){failed(failure);}}}));
             added.add(XposedBridge.hookMethod(abi.feedback,new XC_MethodHook(){protected void beforeHookedMethod(MethodHookParam p){
-                try{Object o=abi.nested?p.args[0]:p.thisObject;Binding b=binding(o,abi,null);Profile c=b.active();if(c==null)return;if(!c.raw){if(b.v1())b.v1Range();else b.range();}float value=((Number)p.args[abi.nested?1:0]).floatValue();if(!Float.isFinite(value)||value<0||value>1)return;
+                try{Object o=abi.nested?p.args[0]:p.thisObject;Binding b=binding(o,abi,null);Profile c=b.active();if(c==null)return;if(!c.raw||c.mode==4){if(b.v1())b.v1Range();else b.range();}float value=((Number)p.args[abi.nested?1:0]).floatValue();if(!Float.isFinite(value)||value<0||value>1)return;
                     b.feedbackNode=c.mode==4&&!c.holding?c.standard.toNode(value):Double.NaN;
                     p.setObjectExtra("hyperlux.coordinate.feedback",true);p.setObjectExtra("hyperlux.coordinate.previous_feedback",feedbackPosition.get());feedbackPosition.set(new Feedback(b,c,value));b.animationPhysical=true;
                 }catch(Exception failure){failed(failure);}
             }protected void afterHookedMethod(MethodHookParam p){if(Boolean.TRUE.equals(p.getObjectExtra("hyperlux.coordinate.feedback"))){Feedback previous=(Feedback)p.getObjectExtra("hyperlux.coordinate.previous_feedback");if(previous==null)feedbackPosition.remove();else feedbackPosition.set(previous);}}}));
             // Only the verified UI feedback call is transformed; ordinary OEM brightness conversion is untouched.
-            XC_MethodHook displayCoordinate=new XC_MethodHook(){protected void afterHookedMethod(MethodHookParam p){Feedback f=feedbackPosition.get();if(f==null||p.hasThrowable())return;try{double node;if(f.profile.raw&&f.profile.holding&&!f.binding.partition.releasePending){node=f.profile.held/(double)f.profile.maximum;}else if(f.profile.raw){node=f.profile.standard.toNode(f.actual);}else if(!f.converted){node=f.profile.standard.toNode(f.actual);f.converted=true;}else node=abi.logicalProgress.equals(p.method)?f.profile.v1.toNode(((Number)p.args[0]).doubleValue()):f.profile.standard.toNode(((Number)p.args[0]).doubleValue());p.setResult(ControlCenterMapping.progress(f.binding.position(f.profile,node),f.binding.minimum,f.binding.maximum));}catch(Exception failure){failed(failure);}}};
+            XC_MethodHook displayCoordinate=new XC_MethodHook(){protected void afterHookedMethod(MethodHookParam p){Feedback f=feedbackPosition.get();if(f==null||p.hasThrowable())return;try{double node;if(f.profile.raw&&f.profile.holding&&!f.binding.partition.releasePending){node=f.profile.held/(double)f.profile.maximum;}else if(f.profile.raw){node=f.profile.standard.toNode(f.actual);}else if(!f.converted){node=f.profile.standard.toNode(f.actual);f.converted=true;}else node=abi.logicalProgress.equals(p.method)?f.profile.v1.toNode(((Number)p.args[0]).doubleValue()):f.profile.standard.toNode(((Number)p.args[0]).doubleValue());p.setResult(f.binding.displayNode(f.profile,node));}catch(Exception failure){failed(failure);}}};
             added.add(XposedBridge.hookMethod(abi.logicalProgress,displayCoordinate));added.add(XposedBridge.hookMethod(abi.inverse,displayCoordinate));
-            added.add(XposedBridge.hookMethod(abi.forward,new XC_MethodHook(){protected void afterHookedMethod(MethodHookParam p){Feedback f=feedbackPosition.get();if(f==null||p.hasThrowable())return;try{p.setResult((float)f.profile.standard.toInput(f.binding.node(f.profile,ControlCenterMapping.fraction((Integer)p.args[0],f.binding.minimum,f.binding.maximum))));}catch(Exception failure){failed(failure);}}}));
+            added.add(XposedBridge.hookMethod(abi.forward,new XC_MethodHook(){protected void afterHookedMethod(MethodHookParam p){Feedback f=feedbackPosition.get();if(f==null||p.hasThrowable())return;try{p.setResult((float)f.profile.standard.toInput(f.binding.displayedNode(f.profile,(Integer)p.args[0])));}catch(Exception failure){failed(failure);}}}));
             added.add(XposedBridge.hookMethod(Application.class.getDeclaredMethod("onCreate"),new XC_MethodHook(){protected void afterHookedMethod(MethodHookParam p){if(p.thisObject instanceof Application)bind((Application)p.thisObject);}}));installed=true;
         }catch(Throwable failure){trackingLifecycle=false;HookTransaction.rollbackAll(added);failed(failure);}
     }

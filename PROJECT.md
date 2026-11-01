@@ -1,5 +1,35 @@
 # HyperLux 项目文档
 
+2026-11-01 当前正式发布目标：**4.4.0 / 44000 / release-4.4.0**。用户授权发布，合入公开4.3.3后的Beta01—09：应用亮度隔离、设备范围与百分比曲线编辑、V1普通输入及延迟回显、作用域和更新弹窗修复。169份Java，相对Beta09仅AppBuild身份变化，原签名/raw10及全部设置保留，保护438份旧APK/ZIP。官网/GitHub/LSPosed同一功能优先简要+详细日志，完成以build/release-4.4.0-publish/public-verification.json为准；不安装设备，无新增真机/功耗结果。见docs/releases/4.4.0.md及docs/reviews/review-4.4.0.md。下方为历史。
+
+
+2026-11-01 当前本地交付：**4.3.3 Beta 09 / 43309 / beta-4.3.3-beta09**。累计公开4.3.3之后Beta01—09；两位代码贡献者增加酷安@前缀；应用亮度隔离使用视频/付款码及退出后恢复系统调节的直白介绍，同步摘要/搜索/英文。只改界面文字，不扩展拦截范围，保留全部实现和设置；169份Java/raw10，保护435份旧APK/ZIP。仅本地不发布/安装；见docs/releases/4.3.3-beta09.md、docs/reviews/review-4.3.3-beta09.md、build/beta-4.3.3-beta09/。下方为历史。
+
+
+2026-11-01 当前本地交付：**4.3.3 Beta 08 / 43308 / beta-4.3.3-beta08**。累计公开4.3.3之后Beta01—08；代码贡献中的凌乱的风W补充酷安主页蓝字跳转，原昵称、说明及简约/项目链接保持。169份Java/raw10，保留亮度/兼容逻辑、全部设置与432份旧APK/ZIP。仅本地不发布/安装；见docs/releases/4.3.3-beta08.md、docs/reviews/review-4.3.3-beta08.md、build/beta-4.3.3-beta08/。下方为历史。
+
+
+2026-11-01 当前本地交付：**4.3.3 Beta 07 / 43307 / beta-4.3.3-beta07**。累计公开4.3.3之后Beta01—07；关于页代码贡献新增简约，昵称跳转酷安，说明内unbind-brightness跳转参考项目，补充源码来源。保留所有旧贡献、亮度/兼容逻辑及设置；169份Java/raw10，保护429份旧APK/ZIP。仅本地不发布/安装；见docs/releases/4.3.3-beta07.md、docs/reviews/review-4.3.3-beta07.md、build/beta-4.3.3-beta07/。下方为历史。
+
+
+2026-11-01 当前本地交付：**4.3.3 Beta 06 / 43306 / beta-4.3.3-beta06**。累计公开4.3.3之后Beta01—06；修复V1分区普通段拖动与延迟回显不互逆导致滑块回落，真实输出变化仍正常回显。保留gamma/HBM/节点保持/旧模式、原生学习及全部设置；169份Java/raw10，保护426份旧APK/ZIP。仅本地不发布/安装，无在线ADB或真机/功耗验证。见docs/releases/4.3.3-beta06.md、docs/reviews/review-4.3.3-beta06.md、build/beta-4.3.3-beta06/。下方为历史。
+
+
+2026-11-01 当前本地交付：**4.3.3 Beta 05 / 43305 / beta-4.3.3-beta05**。累计公开4.3.3之后Beta01—05，新增独立默认关闭的应用亮度隔离，入口位于暂停自动亮度名单上方。来源限定同步与原生无同步两条独立路线，事务Hook、自检和运行状态；控制中心主动调整及其他控制者优先，无新采样/轮询。169份Java/raw10，旧兼容和全部设置保持，保护423份旧APK/ZIP；仅本地不发布/安装，无真机或功耗验证。见docs/releases/4.3.3-beta05.md、docs/reviews/review-4.3.3-beta05.md、build/beta-4.3.3-beta05/。下方为历史。
+
+
+2026-11-01 当前本地交付：**4.3.3 Beta 04 / 43304 / beta-4.3.3-beta04**。累计公开4.3.3之后Beta01—04；曲线节点弹窗/拖动统一纵轴0—100%，亮深色/四节点共用，内部旧倍率和全部设置保持。167份Java/raw10，保护420份旧APK/ZIP；8129项生产表单回归。仅本地不发布/安装；见docs/releases/4.3.3-beta04.md、docs/reviews/review-4.3.3-beta04.md、build/beta-4.3.3-beta04/。下方为历史。
+
+
+2026-10-31 当前本地交付：**4.3.3 Beta 03 / 43303 / beta-4.3.3-beta03**。累计公开4.3.3之后Beta01—03；修复V1分区普通段逻辑输入提前封顶、保留原生记忆。gamma/旧模式/增强区保护、全部设置与417份旧APK/ZIP保持；167份Java/raw10。仅本地不发布/安装，见docs/releases/4.3.3-beta03.md、docs/reviews/review-4.3.3-beta03.md、build/beta-4.3.3-beta03/。下方为历史。
+
+
+2026-10-31 当前本地交付：**4.3.3 Beta 02 / 43302 / beta-4.3.3-beta02**。累计公开4.3.3之后Beta01—02。修复场景页误弹作用域；曲线取消额外倍率边界，按设备范围联动编辑，主题/导入/Root/后端统一。167份Java，保留旧兼容、全部设置与414份旧APK/ZIP。仅本地，不发布/安装；见docs/releases/4.3.3-beta02.md、docs/reviews/review-4.3.3-beta02.md及build/beta-4.3.3-beta02/。下方为历史。
+
+
+2026-10-30 当前本地交付：**4.3.3 Beta 01 / 43301 / beta-4.3.3-beta01**。基线公开4.3.3。更新弹窗改四按钮独立自然测量网格，展示前创建；ResponsiveDialog按实际底部锚定操作区，EXACT二次测量不重复乘期望比例。5347项布局/123项更新交互回归及旧生产负向对照。167份Java，亮度/Root/raw10/旧兼容和全部设置保持，保护411份旧APK/ZIP。仅本地，不发布/安装，无Android像素实测。见docs/releases/4.3.3-beta01.md、docs/reviews/review-4.3.3-beta01.md；下方为历史。
+
+
 2026-10-30 当前正式发布目标：**4.3.3 / 43300 / release-4.3.3**。用户授权发布，合入公开4.3.2之后Beta01：作用域未知提示、已确认HDR节点保持、有界读回重试与监听恢复、磁贴独立最高节点及风险提示。166份Java，相比Beta01仅AppBuild身份变化；raw10不变，保留raw08/raw09与全部设置。保护408份旧APK/ZIP。官网/GitHub/LSPosed同步，完成以build/release-4.3.3-publish/public-verification.json为准；无安装/重启设备授权或真机功耗实测。日志从4.3.0起累计18项简要及分版本详情；见docs/releases/4.3.3.md、docs/reviews/review-4.3.3.md。下方为历史。
 
 

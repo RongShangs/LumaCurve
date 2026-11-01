@@ -30,27 +30,31 @@ class MainActivity {
  ThemeCurveOptions themeCurve=new ThemeCurveOptions();JSONObject runtime;
  View darkCurveCard=new View(),themeCurveSwitch=new View(),controlCenterChoice=new View();
  SavedCurve savedBase;
- final Map<String,Runnable> detailOpeners=new HashMap<>();final ScrollView[] settingsScrollers=new ScrollView[10];final View[] settingScreens=new View[10];
+ final Map<String,Runnable> detailOpeners=new HashMap<>();final ScrollView[] settingsScrollers=new ScrollView[12];final View[] settingScreens=new View[12];
  View displayedPage,rangeSwitch=new View(),oprSwitch=new View(),thermalSwitch=new View(),darkLockSwitch=new View(),lowLightSwitch=new View(),settingsGraph=new View(),memorySwitch=new View();boolean destroyed,dirty=true;int page,group;
  float[] factoryLux={0,30,600,100000},factoryNit={2,100,300,1060},factors={1,1,1,1};float minimum=1,maximum=1060,curveFloor=0,thermalCeiling=43,memoryStrength=1,memoryLuxRange=.3f,thermalCooling=1,lowLightLimit=50;
  boolean thermalRelax,memoryEnabled=true,responseOverride,smallBrightenOverride,lowLightStability;long memoryWindow=1500,brightenDelay=1500,darkenDelay=5000,smallBrightenDelay=5000,lowLightBrighten=3000,lowLightDarken=4000;
  SceneSettings sceneSettings;SceneOptions sceneOptions=new SceneOptions();AdvancedOptions advanced=new AdvancedOptions();OutdoorOptions outdoorOptions=new OutdoorOptions();BrightnessControlOptions controls=new BrightnessControlOptions();LowLightThresholds lowThresholds=new LowLightThresholds();LowLightAssistGate assistGateOptions=new LowLightAssistGate();MemoryOptions memoryOptions=new MemoryOptions(true,30);
- MainActivity(){try{runtime=new JSONObject().put("curve_backend","refactor").put("factory_logical_nit",new JSONArray(factoryNit));}catch(JSONException e){throw new RuntimeException(e);}for(int i=0;i<10;i++){settingsScrollers[i]=new ScrollView();settingScreens[i]=new View();}}
+ MainActivity(){try{runtime=new JSONObject().put("curve_backend","refactor").put("factory_logical_nit",new JSONArray(factoryNit));}catch(JSONException e){throw new RuntimeException(e);}for(int i=0;i<12;i++){settingsScrollers[i]=new ScrollView();settingScreens[i]=new View();}}
  int dp(float x){return Math.round(x);}void select(int p){page=p;}void showSettingsGroup(int g){group=g;displayedPage=settingScreens[g];}
 ''' +navigation+configuration+r'''}
 class HomeScroll extends ScrollView{void requestFocus(){super.requestFocus();y=0;}}
 class Container{View home;View getChildAt(int at){return home;}}
+class ControlCenterSetup{static final int SETTINGS_GROUP=8;}
 class SettingsNavigation{
- static class Setup{void check(boolean prompt){}}static class Mapping{Setup setup=new Setup();}Mapping controlCenterSettings;BrightnessControlOptions controls=new BrightnessControlOptions();
+ static class Setup{int calls;boolean prompt;void check(boolean prompt){calls++;this.prompt=prompt;}}static class Mapping{Setup setup=new Setup();}Mapping controlCenterSettings;BrightnessControlOptions controls=new BrightnessControlOptions();
  ScrollView settingsHomeScroll=new HomeScroll();int settingsHomeY,page=1,settingsGroup=-1;long settingsScrollRestore;boolean settingsHomeRestoring,destroyed;
- View displayedPage=settingsHomeScroll,header=new View(),bottomNav=new View();View[] settingScreens=new View[10];Container content=new Container();
- SettingsNavigation(){content.home=settingsHomeScroll;for(int i=0;i<10;i++)settingScreens[i]=new View();}
+ View displayedPage=settingsHomeScroll,header=new View(),bottomNav=new View();View[] settingScreens=new View[12];Container content=new Container();
+ SettingsNavigation(){content.home=settingsHomeScroll;for(int i=0;i<12;i++)settingScreens[i]=new View();}
  void transitionPage(View target,int direction){displayedPage=target;}void drawCurve(){}void syncPageChrome(){header.setVisibility(View.GONE);bottomNav.setVisibility(settingsGroup<0?View.VISIBLE:View.GONE);}
 ''' +settings_navigation+r'''}
 public class NavigationTest {
  static int cases;static void check(boolean b){if(!b)throw new AssertionError("case "+cases);cases++;}
  public static void main(String[] args)throws Exception{
   SettingsNavigation settings=new SettingsNavigation();ScrollView home=settings.settingsHomeScroll;
+  settings.controlCenterSettings=new SettingsNavigation.Mapping();
+  for(int group=0;group<12;group++){int calls=settings.controlCenterSettings.setup.calls;settings.showSettingsGroup(group);check(settings.controlCenterSettings.setup.calls==calls+(group==8?1:0));check(!settings.controlCenterSettings.setup.prompt);}
+  settings.showSettingsGroup(-1);home.tree.draw();
   for(int position:new int[]{12,450,900}){home.y=position;settings.showSettingsGroup(5);check(settings.settingsHomeY==position&&settings.displayedPage==settings.settingScreens[5]);check(settings.header.visibility==View.GONE&&settings.bottomNav.visibility==View.GONE);home.y=0;settings.showSettingsGroup(-1);check(home.y==0&&settings.settingsHomeRestoring);home.tree.draw();check(home.y==position&&!settings.settingsHomeRestoring);check(home.tree.listeners.isEmpty()&&settings.header.visibility==View.GONE&&settings.bottomNav.visibility==View.VISIBLE);}
   // A quick second navigation must cancel pending restoration without replacing
   // the saved home position with the temporary focus-induced offset of zero.
@@ -75,7 +79,7 @@ public class NavigationTest {
   for(int mode=0;mode<3;mode++){MainActivity a=new MainActivity();a.openAdvice(new StatusAdvice.Action("link",2,"range"));if(mode==0)a.displayedPage=new View();if(mode==1)a.destroyed=true;if(mode==2)a.rangeSwitch.shown=false;a.settingsScrollers[2].tree.draw();check(a.settingsScrollers[2].moves==0&&a.rangeSwitch.focuses==0);check(a.settingsScrollers[2].tree.listeners.isEmpty());}
   MainActivity a=new MainActivity();a.openAdvice(new StatusAdvice.Action("conditions",2,""));check(a.settingsScrollers[2].tree.listeners.isEmpty());check(a.dirty);
   for(boolean extreme:new boolean[]{false,true}){
-   a=new MainActivity();if(extreme){a.advanced.values[5]=2000;a.outdoorOptions.values[1]=100000;a.factors=new float[]{1.234567f,1.234567f,1.234567f,1};a.curveFloor=1.234567f;a.thermalCeiling=50;a.memoryWindow=3000;a.memoryLuxRange=.1234567f;a.controls.exitLux=500;a.controls.exitSeconds=30;a.controls.minutes=30;}
+   a=new MainActivity();if(extreme){a.advanced.values[5]=2000;a.outdoorOptions.values[1]=100000;a.factors=new float[]{1.234567f,1.234567f,1.234567f,1};a.curveFloor=1.234567f;a.thermalCeiling=50;a.memoryWindow=3000;a.memoryLuxRange=.1234567f;a.controls.exitLux=500;a.controls.exitSeconds=30;a.controls.minutes=30;a.controls.appIsolation=true;}
    String options=a.configuration().toString(),payload=Base64.getEncoder().encodeToString(options.getBytes(StandardCharsets.UTF_8));String request=new JSONObject().put("command","apply").put("payload",payload).toString();
    check(payload.length()<=16384);check(request.length()<=16384);System.out.println("Apply request frame: "+request.length()+" chars");
   }

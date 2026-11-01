@@ -53,11 +53,16 @@ public class PartitionTest{
   }
   for(long delay:new long[]{0,1,500,1000,1001,2000,3000,3001}){JSONObject proof=new JSONObject().put("partition_since",10).put("partition_confirmed",10+delay).put("elapsed",20+delay);check(ControlCenterPartition.Gate.proof(proof)==(delay<=3000));}
   for(JSONObject bad:new JSONObject[]{new JSONObject(),new JSONObject().put("partition_since",-1).put("partition_confirmed",0).put("elapsed",1),new JSONObject().put("partition_since",0).put("partition_confirmed",2).put("elapsed",1),new JSONObject().put("partition_since","0").put("partition_confirmed",1).put("elapsed",2)})check(!ControlCenterPartition.Gate.proof(bad));
+  for(int max:new int[]{1000,4095,16383,65535})for(int min:new int[]{0,10}){
+   int boundary=ControlCenterMapping.progress(.75,min,max);check(ControlCenterPartition.logicalInput(min,min,max)==min);check(ControlCenterPartition.logicalInput(boundary,min,max)==max);check(ControlCenterPartition.logicalInput(max,min,max)==max);
+   int previous=min;for(int pos=min;pos<=boundary;pos++){int input=ControlCenterPartition.logicalInput(pos,min,max);check(input>=previous&&input<=max);check(Math.abs(ControlCenterPartition.logicalPosition(input,min,max)-pos)<=1);previous=input;}
+  }
+  for(int bad:new int[]{-1,1001}){try{ControlCenterPartition.logicalInput(bad,0,1000);throw new AssertionError();}catch(IllegalArgumentException expected){cases++;}try{ControlCenterPartition.logicalPosition(bad,0,1000);throw new AssertionError();}catch(IllegalArgumentException expected){cases++;}}
   System.out.println("Control center partition: "+cases+" cases PASS; actual adapter and gesture policy, Android not tested");
  }
 }'''}
 for name,text in files.items():
  p=O/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_text(text,encoding='utf-8')
 C=O/'classes';C.mkdir(exist_ok=True)
-subprocess.run(['javac','--release','8','-encoding','UTF-8','-cp',str(J),'-d',str(C),*[str(O/n) for n in files],str(S/'ControlCenterCurve.java'),str(S/'ControlCenterPartition.java')],check=True)
+subprocess.run(['javac','--release','8','-encoding','UTF-8','-cp',str(J),'-d',str(C),*[str(O/n) for n in files],str(S/'ControlCenterCurve.java'),str(S/'ControlCenterPartition.java'),str(S/'ControlCenterMapping.java')],check=True)
 subprocess.run(['java','-cp',str(C)+';'+str(J),'top.rongshangs.lumacurve.refactor.PartitionTest'],check=True)

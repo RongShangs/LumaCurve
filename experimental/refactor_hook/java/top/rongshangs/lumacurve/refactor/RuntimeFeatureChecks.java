@@ -44,6 +44,7 @@ final class RuntimeFeatureChecks {
         if(!s.controlCenter.partitionError.isEmpty())f.explain("control_center_partition",s.controlCenter.partitionError);
         if(!s.controlCenter.nodes.error.isEmpty())f.explain("control_center_raw",s.controlCenter.nodes.error);
         if(!s.controlCenter.error.isEmpty())f.explain("control_center_slider",s.controlCenter.error);
+        f.check("app_brightness_isolation","应用亮度隔离","app_brightness_isolation_supported",true,()->AppBrightnessIsolation.supported(s));
         f.check("apps","暂停自动亮度名单","app_auto_supported",true,()->s.receiverRegistered&&ForegroundApps.supported());
         f.check("thermal","温控调整","thermal_supported",true,()->s.receiverRegistered&&s.thermalRegistered&&HookEntry.thermalSupported.contains(s.owner.getClass()));
         f.check("response","变化确认","response_supported",false,()->ResponseTuning.supported(s.owner));

@@ -17,6 +17,7 @@ public class FeatureCompatibilityTest{
  static void picked(String id,JSONObject r,String expected){Set<String> actual=selected(enrich(id,"available",r));check(actual.equals(new HashSet<>(Arrays.asList(expected))));}
  public static void main(String[] args)throws Exception{
   JSONObject r=new JSONObject().put("curve_backend","refactor");
+  for(String route:new String[]{"app_override_scoped_sync","native_window_no_sync"}){r.put("app_brightness_isolation",new JSONObject().put("profile",route).put("blocked_syncs",7));picked("app_brightness_isolation",r,route);check(enrich("app_brightness_isolation","available",r).getString("evidence").contains("7"));check(selected(enrich("app_brightness_isolation","unsupported",r)).isEmpty());}
   String[] memory={"curve","manual_memory","saved_curve","persistent_memory","memory_mode","memory_forever","memory_reset","memory_timeout"};
   for(String id:memory){picked(id,r,"refactor");JSONObject row=enrich(id,"available",r);check(row.getJSONArray("routes").length()==5);}
   r.put("curve_route","refactor_coefficients");picked("curve",r,"refactor_coefficients");check(selected(enrich("persistent_memory","unsupported",r)).isEmpty());r.put("curve_route","unknown");check(selected(enrich("curve","available",r)).isEmpty());r.remove("curve_route");

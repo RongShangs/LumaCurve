@@ -6,6 +6,7 @@ O=R/'build/refactor-dialog-layout';O.mkdir(exist_ok=True)
 source=(S/'ResponsiveDialog.java').read_text(encoding='utf-8')
 methods=source[source.index('    @Override protected void onMeasure(int w,int h){\n        WindowMetrics'):source.index('    static void configure(')]
 main=(S/'MainActivity.java').read_text(encoding='utf-8');start=main.index('    void updateButton(');update_button=main[start:main.index('    void select(',start)]
+grid=(S/'UpdateDialogActions.java').read_text('utf-8');grid=grid[grid.index('    @Override protected void onMeasure'):grid.rindex('}') ]
 code=r'''import java.util.*;
 class Insets{int top,bottom,left,right;Insets(int t,int b,int l,int r){top=t;bottom=b;left=l;right=r;}}
 class WindowInsets{Insets safe;WindowInsets(Insets s){safe=s;}Insets getInsets(int flags){return safe;}static class Type{static int systemBars(){return 1;}static int displayCutout(){return 2;}static int ime(){return 4;}}}
@@ -15,6 +16,7 @@ class WindowManager{WindowMetrics metrics;WindowMetrics getCurrentWindowMetrics(
 class Activity{WindowManager manager=new WindowManager();WindowManager getSystemService(Class<WindowManager> cls){return manager;}}
 class View{
  int measuredWidth,measuredHeight,l,t,r,b,naturalWidth=1,naturalHeight;LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(-1,-2);
+ static final int GONE=8;int getVisibility(){return 0;}
  static class MeasureSpec{static final int UNSPECIFIED=0,EXACTLY=1<<30,AT_MOST=2<<30;static int makeMeasureSpec(int s,int m){return s|m;}static int getMode(int s){return s&0xc0000000;}static int getSize(int s){return s&0x3fffffff;}}
  Object getLayoutParams(){return params;}int getMeasuredWidth(){return measuredWidth;}int getMeasuredHeight(){return measuredHeight;}
  void measure(int w,int h){onMeasure(w,h);}protected void onMeasure(int w,int h){int width=MeasureSpec.getMode(w)==MeasureSpec.UNSPECIFIED?naturalWidth:MeasureSpec.getSize(w);int nh=naturalHeight*Math.max(1,(naturalWidth+Math.max(1,width)-1)/Math.max(1,width));setMeasuredDimension(width,MeasureSpec.getMode(h)==MeasureSpec.EXACTLY?MeasureSpec.getSize(h):MeasureSpec.getMode(h)==MeasureSpec.AT_MOST?Math.min(nh,MeasureSpec.getSize(h)):nh);}
@@ -22,11 +24,15 @@ class View{
 }
 class LinearLayout extends View{
  int pt=20,pb=18,pl=22,pr=22;String tag;List<View> children=new ArrayList<>();
- static class LayoutParams{static final int WRAP_CONTENT=-2;int width,height,topMargin,bottomMargin,leftMargin,rightMargin;LayoutParams(int w,int h){width=w;height=h;}}
+ static class LayoutParams{static final int WRAP_CONTENT=-2;int width,height,topMargin,bottomMargin,leftMargin,rightMargin;float weight;void setMargins(int l,int t,int r,int b){leftMargin=l;topMargin=t;rightMargin=r;bottomMargin=b;}LayoutParams(int w,int h){width=w;height=h;}}
+ int getChildCount(){return children.size();}View getChildAt(int n){return children.get(n);}
  int getPaddingTop(){return pt;}int getPaddingBottom(){return pb;}int getPaddingLeft(){return pl;}int getPaddingRight(){return pr;}
  void measureChildWithMargins(View child,int w,int wu,int h,int hu){LayoutParams p=child.params;int width=Math.max(0,MeasureSpec.getSize(w)-pl-pr-p.leftMargin-p.rightMargin-wu);int wm=MeasureSpec.getMode(w)==MeasureSpec.UNSPECIFIED?MeasureSpec.UNSPECIFIED:MeasureSpec.EXACTLY;int height=MeasureSpec.getMode(h)==MeasureSpec.UNSPECIFIED?0:Math.max(0,MeasureSpec.getSize(h)-pt-pb-p.topMargin-p.bottomMargin-hu);child.measure(MeasureSpec.makeMeasureSpec(width,wm),MeasureSpec.makeMeasureSpec(height,MeasureSpec.getMode(h)));}
  @Override protected void onMeasure(int w,int h){if(children.isEmpty()){super.onMeasure(w,h);return;}int width=MeasureSpec.getSize(w),height=pt+pb;for(View child:children){child.measure(MeasureSpec.makeMeasureSpec(Math.max(1,width-pl-pr-child.params.leftMargin-child.params.rightMargin),MeasureSpec.EXACTLY),MeasureSpec.makeMeasureSpec(0,MeasureSpec.UNSPECIFIED));height+=child.measuredHeight+child.params.topMargin+child.params.bottomMargin;}setMeasuredDimension(width,height);}
  @Override protected void onLayout(boolean c,int l,int t,int r,int b){int y=pt;for(View child:children){y+=child.params.topMargin;child.layout(pl+child.params.leftMargin,y,pl+child.params.leftMargin+child.measuredWidth,y+child.measuredHeight);y+=child.measuredHeight+child.params.bottomMargin;}}
+}
+class UpdateDialogActions extends LinearLayout{final int gap=8,bottomSpace=4;final int[] rowHeight=new int[2];UpdateDialogActions(){pt=pb=pl=pr=0;}
+''' + grid + r'''
 }
 class AlertDialog{void dismiss(){}}
 class Button extends View{
@@ -45,7 +51,7 @@ class UpdateHost{
 }
 class ScrollView extends View{}
 class ResponsiveDialog extends LinearLayout{
- final Activity host=new Activity();final View title=new View();final LinearLayout actions=new LinearLayout();final ScrollView body=new ScrollView();int bodyLimit=Integer.MAX_VALUE;float heightFraction=1;WindowInsets rootInsets;
+ final Activity host=new Activity();final View title=new View();LinearLayout actions=new LinearLayout();final ScrollView body=new ScrollView();int bodyLimit=Integer.MAX_VALUE;float heightFraction=1;WindowInsets rootInsets;
  ResponsiveDialog(){children.add(title);children.add(body);children.add(actions);body.params.topMargin=10;}
  int dp(float x){return Math.round(x);}WindowInsets getRootWindowInsets(){return rootInsets;}
 ''' + methods + r'''
@@ -74,18 +80,22 @@ public class DialogLayoutTest{
   }
   ResponsiveDialog d=create(400,900,24,24,1,true);measure(d,400,900,View.MeasureSpec.AT_MOST);int shorter=d.measuredHeight;d.heightFraction=1;measure(d,400,900,View.MeasureSpec.AT_MOST);check(shorter<d.measuredHeight,"update popup shorter than generic detail dialog");
   d.rootInsets=new WindowInsets(new Insets(24,260,0,0));measure(d,400,900,View.MeasureSpec.AT_MOST);verify(d,900-24-260-24);
-  // Execute production updateButton styling, then reserve two real nested action rows.
+  // Execute production updateButton styling, then reserve the production four-button grid.
   // Text metrics are deterministic doubles; no claim of Android font/render verification.
   int wrapped=0;UpdateHost host=new UpdateHost();
   for(int[] bounds:new int[][]{{280,480},{320,480},{360,640},{440,720},{720,360},{900,440}})for(float font:new float[]{1,1.3f,1.7f,2})for(boolean english:new boolean[]{false,true}){
    int width=bounds[0],height=bounds[1];
    d=create(width,height,24,24,font,true);if(width>height){d.pt=d.pb=12;}d.actions.pt=d.actions.pb=d.actions.pl=d.actions.pr=0;
    String[] labels=english?new String[]{"Website download","GitHub download","Later","Ignore this version"}:new String[]{"官网下载","GitHub 下载","稍后","忽略此版本"};
-   for(int row=0;row<2;row++){ActionRow r=new ActionRow();if(row==1)r.tag="actions";d.actions.children.add(r);for(int col=0;col<2;col++){host.updateButton(new AlertDialog(),labels[row*2+col],null,r);((Button)r.children.get(col)).font=font;}}
+   d.actions=new UpdateDialogActions();
+   for(String label:labels){host.updateButton(new AlertDialog(),label,null,d.actions);((Button)d.actions.children.get(d.actions.children.size()-1)).font=font;}
    d.actions.measure(spec(width-d.pl-d.pr,View.MeasureSpec.EXACTLY),spec(0,View.MeasureSpec.UNSPECIFIED));int expected=d.actions.measuredHeight;d.actions.naturalHeight=expected;
-   measure(d,width,height,View.MeasureSpec.AT_MOST);verify(d,height-24-24-24);check(d.actions.measuredHeight==expected,"both natural action rows reserved before notes");
-   for(View row:d.actions.children){check(row.b<=d.actions.measuredHeight,"action row inside footer");for(View child:((LinearLayout)row).children){Button button=(Button)child;check(button.measuredHeight>=button.textHeight,"all translated button text visible");check(button.measuredHeight>=48,"touch target retained");check(button.t>=0&&button.b<=row.measuredHeight,"button vertically inside its row");check(button.l>=0&&button.r<=row.measuredWidth,"button horizontally inside its row");if(button.measuredHeight>48)wrapped++;}}
+   measure(d,width,height,View.MeasureSpec.AT_MOST);verify(d,height-24-24-24);check(d.actions.measuredHeight==expected,"explicit four-action grid reserved before notes");
+   for(View child:d.actions.children){Button button=(Button)child;check(button.measuredHeight>=button.textHeight,"all translated button text visible");check(button.measuredHeight>=48,"touch target retained");check(button.t>=0&&button.b<=d.actions.measuredHeight-4,"button fully inside footer with bottom breathing room");check(button.l>=0&&button.r<=d.actions.measuredWidth,"button horizontally inside footer");check(button.params.weight==0&&button.params.topMargin==0&&button.params.bottomMargin==0,"no inherited weighted row dimensions");if(button.measuredHeight>48)wrapped++;}
+   for(int reduction:new int[]{4,12}){int allocated=d.measuredHeight-reduction;d.layout(0,0,d.measuredWidth,allocated);check(d.actions.b==allocated-d.pb,"actual allocated bottom, not predicted height");check(d.body.b<=d.actions.t,"notes never cover relocated footer");for(View child:d.actions.children)check(child.b+d.actions.t<=allocated-d.pb-4,"full rounded bottom inside actual allocation");}
+
   }
+  d=create(400,900,24,24,1,true);measure(d,400,900,View.MeasureSpec.AT_MOST);int allocated=d.measuredHeight;measure(d,400,allocated,View.MeasureSpec.EXACTLY);check(d.measuredHeight==allocated,"EXACT pass must not apply preferred fraction a second time");verify(d,allocated);
   check(wrapped>0,"matrix exercises multiline actions taller than old fixed 48dp");
   System.out.println("Responsive dialog layout: "+cases+" cases PASS; production measure/layout with host doubles, Android rendering not tested");
  }

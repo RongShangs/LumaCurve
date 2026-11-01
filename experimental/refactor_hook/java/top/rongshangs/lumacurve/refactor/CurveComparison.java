@@ -39,7 +39,7 @@ final class CurveComparison {
         if("physical_mapping".equals(runtime.optString("curve_backend"))){
             TraditionalCurve full=new TraditionalCurve(numbers(runtime.getJSONArray("factory_full_lux")),numbers(runtime.getJSONArray("factory_full_nit")));
             reference=new Line(full.lux(),full.nit());
-            float[] liveFactors=new float[]{1,1,1,1};for(int i=1;i<3;i++)liveFactors[i]=base[i]==0&&factoryNit[i]==0?1:base[i]/factoryNit[i];
+            float[] liveFactors=new float[]{1,1,1,1};for(int i=1;i<4;i++)liveFactors[i]=base[i]==0&&factoryNit[i]==0?1:base[i]/factoryNit[i];
             if(!(draft&&saved!=null)&&!(!draft&&runtime.has("applied_base_lux")&&runtime.has("applied_base_nit")))baseline=new Line(full.lux(),draft?full.reshape(min,max,factors,floor):full.reshape(min,max,liveFactors,base[0]));
         }
         if(draft&&saved!=null){CurvePlan plan=SavedCurve.plan(saved,factoryLux,factoryNit,min,max,factors,floor);baseline=new Line(plan.lux(),plan.nits());}

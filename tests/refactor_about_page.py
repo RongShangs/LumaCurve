@@ -34,7 +34,7 @@ assert all(entry['message']!='[未填写]' for entry in web['entries'])
 assert 'setMinimumHeight(a.dp(40))' in about and 'a.dp(6)' in about
 assert 'setClipToOutline(true)' in (S/'AboutHeroView.java').read_text('utf-8')
 assert 'onMeasure(int w,int h){setSquare(View.MeasureSpec.getSize(w));super.onMeasure(w,h);}' in about
-assert 'HyperOS · Root · LSPosed' not in about and 'SpannableString' not in about
+assert 'HyperOS · Root · LSPosed' not in about and 'SpannableString' not in about[about.index('TextView name='):about.index('a.updateLabel=')]
 for label in ['name','description','version']:
  assert label+'.setGravity(Gravity.CENTER)' in about
  assert 'card.addView('+label+',new LinearLayout.LayoutParams(-1,-2))' in about

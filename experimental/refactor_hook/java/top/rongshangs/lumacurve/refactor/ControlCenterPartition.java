@@ -7,6 +7,19 @@ import org.json.*;
 final class ControlCenterPartition {
     static final long WINDOW_MS=3000;
     static final double ORDINARY_SPAN=.75;
+    // OEM V1 takes logical slider coordinates, not physical nits. Preserve its
+    // full ordinary input range (and native learning) inside the lower 75%.
+    static int logicalInput(int position,int minimum,int maximum){
+        int boundary=ControlCenterMapping.progress(ORDINARY_SPAN,minimum,maximum);
+        if(boundary<=minimum||boundary>=maximum)throw new IllegalArgumentException("普通亮度区间不足以分区");
+        ControlCenterMapping.fraction(position,minimum,maximum);
+        return ControlCenterMapping.progress((Math.min(position,boundary)-minimum)/(double)(boundary-minimum),minimum,maximum);
+    }
+    static int logicalPosition(int input,int minimum,int maximum){
+        int boundary=ControlCenterMapping.progress(ORDINARY_SPAN,minimum,maximum);
+        if(boundary<=minimum||boundary>=maximum)throw new IllegalArgumentException("普通亮度区间不足以分区");
+        return ControlCenterMapping.progress(ControlCenterMapping.fraction(input,minimum,maximum),minimum,boundary);
+    }
     static int upper(int requested,int maximum,double ordinary){
         if(maximum<=10||maximum>65535||!Double.isFinite(ordinary)||ordinary<=0||ordinary>=1||requested<0||requested>65535)throw new IllegalArgumentException("分区节点范围无效");
         int value=requested==0?maximum:Math.min(requested,maximum);

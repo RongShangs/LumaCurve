@@ -178,7 +178,6 @@ public final class RootControl implements AutoCloseable {
         if(thermal&&!state.optBoolean("thermal_supported"))throw new IOException("此固件温控亮度接口尚未兼容，不能启用该选项");
         float[] f=CurvePlan.factors(factors);
         float floor=CurvePlan.floor(options.has("curve_floor_nit")?options.opt("curve_floor_nit"):null);
-        if(f[3]>1f)throw new IOException("最高照度节点不可超过设备原始值");
         SavedCurve saved=SavedCurve.parse(options);
         if(saved!=null)saved.verifyBackend(state.optString("curve_backend"));
         SavedCurve.plan(saved,numbers(state.getJSONArray("factory_lux")),numbers(state.getJSONArray("factory_logical_nit")),
