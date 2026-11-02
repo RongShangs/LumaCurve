@@ -19,7 +19,11 @@ final class ControlCenterRoot {
             try{
                 reconcile(settings,runtime,raw);String value=settings.get(PROFILE);JSONObject profile=value==null?null:new JSONObject(value);
                 boolean current=profile!=null&&AppBuild.BUILD.equals(profile.optString("build"))&&profile.optInt("pid",-1)==runtime.optInt("pid",-2)&&runtime.optString("process_start").equals(profile.optString("process_start"))&&config.optString("revision").equals(profile.optString("revision"))&&String.valueOf(settings.get("boot_count")).equals(profile.optString("boot_count"))&&profile.optInt("mode",-1)==mode;
-                state=current?"restored":"pending";message=current?"已恢复映射绑定，等待手动操作":"等待本次开机的映射标定";
+                JSONObject ui=null;try{String json=settings.get(ControlCenterEngine.UI);if(json!=null&&json.length()<32000)ui=new JSONObject(json);}catch(Exception unavailable){}
+                boolean alive=false;if(ui!=null)try{JSONObject probe=SystemUiAccess.injection(new JSONObject(),ui.toString(),new java.io.File("/proc"));alive="current".equals(probe.optString("injection_state"));}catch(Exception unavailable){}
+                boolean consumed=current&&alive&&MappingRecoveryState.acknowledged(profile,ui);
+                result.put("binding_ready",current).put("system_ui_confirmed",consumed);
+                state=consumed?"restored":"pending";message=consumed?"系统界面已确认映射绑定，等待手动操作":current?"映射已准备，等待系统界面确认":"等待本次开机的映射标定";
             }catch(Exception unavailable){state="unavailable";message=unavailable.toString();}
         }
         result.put("boot_count",settings.get("boot_count")).put("pid",runtime==null?-1:runtime.optInt("pid",-1));

@@ -1,5 +1,8 @@
 # HyperLux 当前 APP 源码
 
+2026-11-03 当前正式发布目标：**4.4.2 /44200 /release-4.4.2**。累计公开4.4.1后Beta01—02：就绪事件与实际回执恢复、实际作用域检测、锁屏原生亮度条；测试贡献三空格间隔且昵称整体换行。178份Java，保留全部设置、旧兼容、原签名/raw10与462份旧APK/ZIP；官网/GitHub/LSPosed同一累计日志，发布以build/release-4.4.2-publish/public-verification.json为准。无本轮真机/功耗验证。下方为历史。
+
+
 2026-11-02 当前正式发布目标：**4.4.1 /44100 /release-4.4.1**。用户授权正式发布，累计公开4.4.0后Beta01—04：开机恢复、普通手动100%标尺、作用域按需提示、独立实时/归档记忆及全项目兼容工程约束。175份Java，相对Beta04仅AppBuild身份变化，保留原设置/签名/raw10及453份旧APK/ZIP。官网/GitHub/LSPosed同一累计日志，完成以build/release-4.4.1-publish/public-verification.json为准；不安装设备，无本轮真机/功耗验证。见docs/releases/4.4.1.md、docs/reviews/review-4.4.1.md。下方为历史。
 
 

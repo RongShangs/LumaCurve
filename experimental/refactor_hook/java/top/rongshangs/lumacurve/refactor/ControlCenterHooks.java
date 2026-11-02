@@ -17,6 +17,7 @@ final class ControlCenterHooks {
     static final String UI_PROCESS_START=uiProcessStart();
     static String uiProcessStart(){try(java.io.BufferedReader reader=new java.io.BufferedReader(new java.io.FileReader("/proc/self/stat"))){String text=reader.readLine();return text.substring(text.lastIndexOf(')')+2).split(" +")[19];}catch(Exception unavailable){return "";}}
     static boolean installed;static Context context;static Handler main;static volatile Profile profile;static String profileIdentity="";
+    static final MappingRecoveryState.Gate recoveryGate=new MappingRecoveryState.Gate();static volatile String recoverySignal="not_requested";
     static volatile String error="",route="waiting_controller",gestureEvidence="";static volatile boolean abiReady,trackingLifecycle;
     static final Map<Object,Binding> bindings=Collections.synchronizedMap(new WeakHashMap<>());
     static final class Gesture{final Binding binding;final int position;Gesture(Binding b,int p){binding=b;position=p;}}
@@ -67,7 +68,7 @@ final class ControlCenterHooks {
         }
         boolean v1()throws Exception{return (Boolean)abi.support.invoke(abi.policy.get(owner.get()));}
         void v1Range()throws Exception{if((Integer)abi.logicalProgress.invoke(null,0f)!=minimum||(Integer)abi.logicalProgress.invoke(null,1f)!=maximum)throw new IllegalArgumentException("逻辑亮度与控件坐标不一致");}
-        Profile active()throws Exception{Object o=owner.get();Profile p=profile;if(o==null||!valid||p==null||abi.display.getInt(o)!=0||p.mode==1&&abi.automatic.getBoolean(o)||(!p.raw||p.mode==4)&&v1()&&p.v1==null)return null;return p;}
+        Profile active()throws Exception{Object o=owner.get();Profile p=profile;if(p!=null&&p.raw&&!ControlCenterScreen.allowsNodes(context)){partition.reset();rawThumbUntil=0;feedbackNode=Double.NaN;animationPhysical=false;return null;}if(o==null||!valid||p==null||abi.display.getInt(o)!=0||p.mode==1&&abi.automatic.getBoolean(o)||(!p.raw||p.mode==4)&&v1()&&p.v1==null)return null;return p;}
         float low()throws Exception{return abi.min.getFloat(owner.get());}float high()throws Exception{return abi.max.getFloat(owner.get());}
         void range()throws Exception{if(!Float.isFinite(low())||!Float.isFinite(high())||low()<0||high()>1||high()<=low())throw new IllegalArgumentException("系统亮度范围无效");}
         int input(Profile p,int position)throws Exception{
@@ -139,20 +140,35 @@ final class ControlCenterHooks {
                 }catch(Exception failure){failed(failure);}
             }protected void afterHookedMethod(MethodHookParam p){if(Boolean.TRUE.equals(p.getObjectExtra("hyperlux.coordinate.feedback"))){Feedback previous=(Feedback)p.getObjectExtra("hyperlux.coordinate.previous_feedback");if(previous==null)feedbackPosition.remove();else feedbackPosition.set(previous);}}}));
             // Only the verified UI feedback call is transformed; ordinary OEM brightness conversion is untouched.
-            XC_MethodHook displayCoordinate=new XC_MethodHook(){protected void afterHookedMethod(MethodHookParam p){Feedback f=feedbackPosition.get();if(f==null||p.hasThrowable())return;try{double node;if(f.profile.raw&&f.profile.holding&&!f.binding.partition.releasePending){node=f.profile.held/(double)f.profile.maximum;}else if(f.profile.raw){node=f.profile.standard.toNode(f.actual);}else if(!f.converted){node=f.profile.standard.toNode(f.actual);f.converted=true;}else node=abi.logicalProgress.equals(p.method)?f.profile.v1.toNode(((Number)p.args[0]).doubleValue()):f.profile.standard.toNode(((Number)p.args[0]).doubleValue());p.setResult(f.binding.displayNode(f.profile,node));}catch(Exception failure){failed(failure);}}};
+            XC_MethodHook displayCoordinate=new XC_MethodHook(){protected void afterHookedMethod(MethodHookParam p){Feedback f=feedbackPosition.get();if(f==null||p.hasThrowable())return;try{if(f.binding.active()!=f.profile)return;}catch(Exception unavailable){return;}try{double node;if(f.profile.raw&&f.profile.holding&&!f.binding.partition.releasePending){node=f.profile.held/(double)f.profile.maximum;}else if(f.profile.raw){node=f.profile.standard.toNode(f.actual);}else if(!f.converted){node=f.profile.standard.toNode(f.actual);f.converted=true;}else node=abi.logicalProgress.equals(p.method)?f.profile.v1.toNode(((Number)p.args[0]).doubleValue()):f.profile.standard.toNode(((Number)p.args[0]).doubleValue());p.setResult(f.binding.displayNode(f.profile,node));}catch(Exception failure){failed(failure);}}};
             added.add(XposedBridge.hookMethod(abi.logicalProgress,displayCoordinate));added.add(XposedBridge.hookMethod(abi.inverse,displayCoordinate));
-            added.add(XposedBridge.hookMethod(abi.forward,new XC_MethodHook(){protected void afterHookedMethod(MethodHookParam p){Feedback f=feedbackPosition.get();if(f==null||p.hasThrowable())return;try{p.setResult((float)f.profile.standard.toInput(f.binding.displayedNode(f.profile,(Integer)p.args[0])));}catch(Exception failure){failed(failure);}}}));
+            added.add(XposedBridge.hookMethod(abi.forward,new XC_MethodHook(){protected void afterHookedMethod(MethodHookParam p){Feedback f=feedbackPosition.get();if(f==null||p.hasThrowable())return;try{if(f.binding.active()!=f.profile)return;}catch(Exception unavailable){return;}try{p.setResult((float)f.profile.standard.toInput(f.binding.displayedNode(f.profile,(Integer)p.args[0])));}catch(Exception failure){failed(failure);}}}));
             added.add(XposedBridge.hookMethod(Application.class.getDeclaredMethod("onCreate"),new XC_MethodHook(){protected void afterHookedMethod(MethodHookParam p){if(p.thisObject instanceof Application)bind((Application)p.thisObject);}}));installed=true;
         }catch(Throwable failure){trackingLifecycle=false;HookTransaction.rollbackAll(added);failed(failure);}
     }
     static void failed(Throwable failure){String next=failure.toString();if(!next.equals(error)){error=next;XposedBridge.log("HyperLux slider coordinates unavailable: "+next);publish();}}
     static void bind(Context c){
-        if(c==null||context!=null||!"com.android.systemui".equals(c.getPackageName()))return;context=c;main=new Handler(Looper.getMainLooper());ContentObserver changed=new ContentObserver(main){public void onChange(boolean self){refresh();}};
+        if(c==null||context!=null||!"com.android.systemui".equals(c.getPackageName()))return;context=c;main=new Handler(Looper.getMainLooper());try{ControlCenterScreen.observe(c,ControlCenterHooks::screenChanged);}catch(RuntimeException unavailable){failed(unavailable);}ContentObserver changed=new ContentObserver(main){public void onChange(boolean self){refresh();}};
         c.getContentResolver().registerContentObserver(Settings.Global.getUriFor(ControlCenterRoot.PROFILE),false,changed);c.getContentResolver().registerContentObserver(Settings.Global.getUriFor(ControlCenterEngine.TABLES),false,changed);c.getContentResolver().registerContentObserver(Settings.Global.getUriFor("boot_count"),false,changed);c.getContentResolver().registerContentObserver(Settings.System.getUriFor(Settings.System.SCREEN_BRIGHTNESS_MODE),false,changed);refresh();
+    }
+    static void screenChanged(){
+        if(main==null)return;
+        synchronized(ControlCenterHooks.class){pendingNode=null;nextNodeWrite=null;nodeQueued=false;main.removeCallbacks(nodeFlush);}
+        main.post(()->{
+            List<Binding> copy;synchronized(bindings){copy=new ArrayList<>(bindings.values());}
+            for(Binding b:copy)try{Object o=b.owner.get();if(o==null)continue;
+                Object animator=b.abi.animator.get(o);if(animator!=null)animator.getClass().getMethod("cancel").invoke(animator);
+                b.partition.reset();b.rawThumbUntil=0;b.feedbackNode=Double.NaN;b.animationPhysical=false;
+                if(b.hint!=null){b.hint.cancel();b.hint=null;}
+                Handler handler=(Handler)b.abi.background.get(o);Runnable update=(Runnable)b.abi.update.get(o);if(handler!=null&&update!=null)handler.post(update);
+            }catch(Exception failure){failed(failure);}
+            publish();
+        });
     }
     static void refresh(){try{io.execute(()->{try{
         String raw=Settings.Global.getString(context.getContentResolver(),ControlCenterRoot.PROFILE),tables=Settings.Global.getString(context.getContentResolver(),ControlCenterEngine.TABLES),boot=Settings.Global.getString(context.getContentResolver(),"boot_count");Profile parsed=null;
         if(raw!=null&&tables!=null&&raw.length()<260000&&tables.length()<260000){JSONObject p=new JSONObject(raw),t=new JSONObject(tables);if(t.optBoolean("enabled")&&p.optInt("user_serial",-1)==0&&p.getInt("user_serial")==t.optInt("user_serial",-1)&&!p.optString("revision").isEmpty()&&p.getString("revision").equals(t.optString("revision"))&&AppBuild.BUILD.equals(t.optString("build"))&&p.getInt("pid")==t.getInt("pid")&&p.getString("process_start").equals(t.getString("process_start"))&&boot!=null&&boot.equals(p.getString("boot_count"))&&boot.equals(t.getString("boot_count"))&&p.getJSONObject("calibration").toString().equals(t.getJSONObject("calibration").toString())&&(!("raw_node_v3".equals(p.optString("kind"))||"partition_node_v4".equals(p.optString("kind")))||p.optInt("maximum")==t.optInt("maximum")&&p.optString("physical").equals(t.optString("physical")))){parsed=new Profile(p);if(parsed.mode==4&&(!p.getJSONObject("partition").toString().equals(t.getJSONObject("partition").toString())||p.optInt("partition_maximum",0)!=t.optInt("partition_maximum",0)))throw new IllegalStateException("普通亮度区间已改变");parsed.automatic=Settings.System.getInt(context.getContentResolver(),Settings.System.SCREEN_BRIGHTNESS_MODE,1)!=0;JSONObject held=t.optJSONObject("raw_control");if(held!=null)parsed.autoEpoch=held.optLong("auto_epoch",0);if(parsed.raw&&held!=null&&held.optBoolean("active")&&held.optBoolean("confirmed")&&Settings.System.getInt(context.getContentResolver(),Settings.System.SCREEN_BRIGHTNESS_MODE,1)==0){parsed.holdSession=held.optString("session");parsed.held=held.optInt("target",-1);parsed.holding=parsed.held>=10&&parsed.held<=parsed.maximum;}}}
+        if(parsed==null&&abiReady&&tables!=null)try{String key=MappingRecoveryState.generation(new JSONObject(tables),boot);if(recoveryGate.claim(key,SystemClock.elapsedRealtime())){MappingRecoverySignal.send(context,key);recoverySignal="requested";}}catch(Exception unavailable){recoverySignal=unavailable.getClass().getSimpleName();}
         String key=parsed==null?"":raw+(parsed.mode==1||parsed.raw?":"+Settings.System.getInt(context.getContentResolver(),Settings.System.SCREEN_BRIGHTNESS_MODE,0):"");applyProfile(parsed,key);
     }catch(Exception failure){applyProfile(null,"");failed(failure);}});}catch(RejectedExecutionException ignored){}}
     static boolean sameGeneration(Profile a,Profile b){if(a==null||b==null)return false;for(String key:new String[]{"build","pid","process_start","boot_count","revision","user_serial","maximum","physical","mode"})if(!String.valueOf(a.generation.opt(key)).equals(String.valueOf(b.generation.opt(key))))return false;return true;}
@@ -172,6 +188,7 @@ final class ControlCenterHooks {
     static final Runnable nodeFlush=()->flushNode();
     static synchronized void sendNode(Profile p,int target,boolean last)throws Exception{sendNode(p,target,last,"raw",null);}
     static synchronized void sendNode(Profile p,int target,boolean last,String action,ControlCenterPartition.Gate gate)throws Exception{
+        if(!ControlCenterScreen.allowsNodes(context))return;
         JSONObject request=new JSONObject();for(String key:new String[]{"build","pid","process_start","boot_count","revision","user_serial","maximum","physical","mode"})request.put(key,p.generation.get(key));request.put("auto_epoch",p.autoEpoch).put("id",nodeSession+"_"+(++nodeSequence)).put("session",nodeSession).put("target",target).put("elapsed",SystemClock.elapsedRealtime());
         request.put("action",action).put("previous_session",p.holdSession);if(gate!=null)request.put("partition_since",gate.since).put("partition_confirmed",gate.confirmed).put("partition_automatic_high",gate.automaticHigh);
         pendingNode=request;
@@ -179,14 +196,14 @@ final class ControlCenterHooks {
         else if(!nodeQueued){nodeQueued=true;main.postDelayed(nodeFlush,32);}
     }
     static synchronized void flushNode(){
-        JSONObject request=pendingNode;pendingNode=null;nodeQueued=false;if(request==null)return;
+        JSONObject request=pendingNode;pendingNode=null;nodeQueued=false;if(request==null||!ControlCenterScreen.allowsNodes(context))return;
         nextNodeWrite=request;if(nodeWriting)return;nodeWriting=true;
         try{io.execute(ControlCenterHooks::writeNodes);}catch(RejectedExecutionException failure){nodeWriting=false;nextNodeWrite=null;if(SystemClock.elapsedRealtime()-request.optLong("elapsed",0)<3000){pendingNode=request;nodeQueued=true;main.postDelayed(nodeFlush,100);}else failed(failure);}
     }
     static void writeNodes(){
         for(;;){
             JSONObject request;synchronized(ControlCenterHooks.class){request=nextNodeWrite;nextNodeWrite=null;if(request==null){nodeWriting=false;return;}}
-            try{Profile current=profile;if(current==null||!current.raw)continue;
+            try{Profile current=profile;if(current==null||!current.raw||!ControlCenterScreen.allowsNodes(context))continue;
                 boolean matches=true;for(String key:new String[]{"build","pid","process_start","boot_count","revision","user_serial","maximum","physical","mode"})if(!String.valueOf(current.generation.opt(key)).equals(String.valueOf(request.opt(key))))matches=false;
                 if(!matches)continue;
                 if(!Settings.Global.putString(context.getContentResolver(),NODE_REQUEST,request.toString()))throw new IllegalStateException("节点请求未写入");
@@ -195,5 +212,5 @@ final class ControlCenterHooks {
     }
     static void publish(){if(context!=null)try{io.execute(ControlCenterHooks::publishNow);}catch(RejectedExecutionException ignored){}}
     static void recordGesture(Binding b,String event,int position,int action){try{ControlCenterPartition.Gate g=b.partition;gestureEvidence=new JSONObject().put("event",event).put("elapsed",SystemClock.elapsedRealtime()).put("position",position).put("minimum",b.minimum).put("maximum",b.maximum).put("boundary",ControlCenterMapping.progress(ControlCenterPartition.ORDINARY_SPAN,b.minimum,b.maximum)).put("action",action).put("since",g.since).put("confirmed",g.confirmed).put("released",g.released).put("stroke",g.stroke).put("raw",g.raw).toString();publish();}catch(Exception ignored){}}
-    static void publishNow(){try{String evidence=gestureEvidence;Settings.Global.putString(context.getContentResolver(),ControlCenterEngine.UI,new JSONObject().put("build",AppBuild.BUILD).put("pid",android.os.Process.myPid()).put("process_start",UI_PROCESS_START).put("input",profile!=null&&profile.mode==4?"partition_node_v4":profile!=null&&profile.raw?"raw_node_v3":"coordinate_v2").put("coordinate_abi",abiReady).put("route",route).put("tracking_lifecycle",trackingLifecycle?"controller_start_stop":"on_changed_stop").put("gesture",evidence.isEmpty()?JSONObject.NULL:new JSONObject(evidence)).put("profile_ready",profile!=null).put("detail",error).toString());}catch(Exception ignored){}}
+    static void publishNow(){try{Profile bound=profile;String evidence=gestureEvidence;Settings.Global.putString(context.getContentResolver(),ControlCenterEngine.UI,new JSONObject().put("build",AppBuild.BUILD).put("pid",android.os.Process.myPid()).put("process_start",UI_PROCESS_START).put("input",bound!=null&&bound.mode==4?"partition_node_v4":bound!=null&&bound.raw?"raw_node_v3":"coordinate_v2").put("coordinate_abi",abiReady).put("route",route).put("tracking_lifecycle",trackingLifecycle?"controller_start_stop":"on_changed_stop").put("gesture",evidence.isEmpty()?JSONObject.NULL:new JSONObject(evidence)).put("lockscreen_native",!ControlCenterScreen.allowsNodes(context)).put("profile_ready",bound!=null).put("bound_profile",bound==null?JSONObject.NULL:MappingRecoveryState.identity(bound.generation)).put("recovery_signal",recoverySignal).put("detail",error).toString());}catch(Exception ignored){}}
 }

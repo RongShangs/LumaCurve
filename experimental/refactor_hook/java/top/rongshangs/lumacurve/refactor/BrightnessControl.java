@@ -146,7 +146,7 @@ final class BrightnessControl implements SensorEventListener {
         }catch(Throwable failure){fail(failure);}
         };retry=()->{if(s.closed)return;if(!registered){start();if(!registered)return;}failed=false;tick();};
         modeObserver=new ContentObserver(s.handler){public void onChange(boolean self){try{if(s.closed)return;boolean automatic=auto();s.memorySettingChanged(automatic);if(busy)return;if(automatic){lastAutoEnabledAt=SystemClock.elapsedRealtime();suppressApplication();if(!owner.equals("none"))relinquish("user_auto",false);else tick();}else tick();}catch(Throwable failure){fail(failure);}}};
-        brightnessObserver=new ContentObserver(s.handler){public void onChange(boolean self){try{if(!s.closed&&!busy&&owner.equals("dark")&&SystemClock.uptimeMillis()>ignoreBrightnessUntil&&!brightnessSnapshot.equals(brightnessValues()))manualBrightnessChanged();}catch(Throwable failure){fail(failure);}}};
+        brightnessObserver=new ContentObserver(s.handler){public void onChange(boolean self){try{if(!s.closed&&!busy){if(owner.equals("raw_panel")&&session.startsWith("cc_")&&(rawPaused||!unlocked())&&!brightnessSnapshot.equals(brightnessValues()))relinquish("lockscreen_brightness",false);else if(owner.equals("dark")&&SystemClock.uptimeMillis()>ignoreBrightnessUntil&&!brightnessSnapshot.equals(brightnessValues()))manualBrightnessChanged();}}catch(Throwable failure){fail(failure);}}};
         commandObserver=new ContentObserver(s.handler){public void onChange(boolean self){command();}};
     }
     boolean auto(){return Settings.System.getInt(s.context.getContentResolver(),Settings.System.SCREEN_BRIGHTNESS_MODE,0)==1;}
@@ -311,7 +311,7 @@ final class BrightnessControl implements SensorEventListener {
     }
     void pauseRaw(){
         if(!owner.equals("raw_panel"))return;
-        try{boolean changed=!rawPaused;rawPaused=true;reason="raw_screen_paused";writeRawLease(false);s.handler.removeCallbacks(rawRenew);s.handler.postDelayed(rawRenew,2000);if(changed){s.log("主屏节点已释放，保留手动目标等待解锁");s.queueControlPublish();}}catch(Throwable failure){fail(failure);}
+        try{boolean changed=!rawPaused;if(changed)brightnessSnapshot=brightnessValues();rawPaused=true;reason="raw_screen_paused";writeRawLease(false);s.handler.removeCallbacks(rawRenew);s.handler.postDelayed(rawRenew,2000);if(changed){s.log("主屏节点已释放，保留手动目标等待解锁");s.queueControlPublish();}}catch(Throwable failure){fail(failure);}
     }
     void renewRaw(){
         if(!owner.equals("raw_panel"))return;
@@ -341,7 +341,7 @@ final class BrightnessControl implements SensorEventListener {
         try{
             mark(new JSONObject().put("owner","raw_panel").put("user",0).put("was_auto",wasAuto).put("session",token).toString());
             owner="raw_panel";session=token;rawPhysicalId=physical;rawWasAuto=wasAuto;held=Float.NaN;reason="manual_panel";
-            rawTarget=target;rawPaused=false;rawScreenOff=false;rawConfirmed=false;mode(false);writeRawLease(true);
+            rawTarget=target;brightnessSnapshot=brightnessValues();rawPaused=false;rawScreenOff=false;rawConfirmed=false;mode(false);writeRawLease(true);
             s.handler.removeCallbacks(rawRenew);s.handler.postDelayed(rawRenew,2000);
         }catch(Throwable failure){
             stopRaw();owner="none";session="";try{mark(null);}catch(Throwable ignored){}

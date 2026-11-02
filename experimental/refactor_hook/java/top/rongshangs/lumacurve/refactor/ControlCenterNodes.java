@@ -94,7 +94,7 @@ final class ControlCenterNodes {
     JSONObject status()throws JSONException{
         BrightnessControl c=s.brightnessControl;
         boolean owned=c.owner.equals("raw_panel");
-        return new JSONObject().put("session",owned?c.session:"").put("auto_epoch",autoEpoch).put("active",owned&&!c.auto()&&!c.rawPaused&&!c.rawScreenOff&&c.awake()&&c.rawIdentityCurrent()).put("confirmed",owned&&c.rawConfirmed).put("target",owned?c.rawTarget:-1).put("physical",physical()).put("accepted",accepted).put("rejected",rejected).put("error",error).put("confirmation_trace",new JSONArray(confirmationTrace.toString()));
+        return new JSONObject().put("session",owned?c.session:"").put("auto_epoch",autoEpoch).put("active",owned&&!c.auto()&&!c.rawPaused&&!c.rawScreenOff&&c.awake()&&c.unlocked()&&c.rawIdentityCurrent()).put("confirmed",owned&&c.rawConfirmed).put("target",owned?c.rawTarget:-1).put("physical",physical()).put("accepted",accepted).put("rejected",rejected).put("error",error).put("confirmation_trace",new JSONArray(confirmationTrace.toString()));
     }
     void deactivate(){deactivate(false);}
     void deactivate(boolean restore){s.handler.removeCallbacks(confirm);BrightnessControl c=s.brightnessControl;if(c.owner.equals("raw_panel")&&c.session.startsWith("cc_"))c.relinquish("control_center_disabled",restore);}

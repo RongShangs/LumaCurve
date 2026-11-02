@@ -23,18 +23,26 @@ final class SystemUiAccess {
         for(File file:candidates){
             if(!file.isFile())continue;
             // Do not let Android's default corruption handler delete another app's DB.
-            try(SQLiteDatabase db=SQLiteDatabase.openDatabase(file.toString(),null,SQLiteDatabase.OPEN_READONLY|SQLiteDatabase.NO_LOCALIZED_COLLATORS,broken->{});
-                Cursor row=db.rawQuery("SELECT m.enabled, EXISTS(SELECT 1 FROM scope s WHERE s.mid=m.mid AND s.app_pkg_name=? AND s.user_id=?) FROM modules m WHERE m.module_pkg_name=? LIMIT 2",new String[]{PACKAGE,"0",MODULE})){
-                sawSchema=true;attempts.put(new JSONObject().put("path",file.toString()).put("state","readable"));
-                if(!row.moveToFirst())continue;
-                if(row.getType(0)!=Cursor.FIELD_TYPE_INTEGER||row.getType(1)!=Cursor.FIELD_TYPE_INTEGER)throw new IOException("作用域字段类型未知");
-                int active=row.getInt(0),scope=row.getInt(1);if((active!=0&&active!=1)||(scope!=0&&scope!=1)||row.moveToNext())throw new IOException("作用域记录格式未知");
-                if(selected!=null&&(selected!=(scope==1)||enabled!=(active==1)))conflict=true;
-                selected=scope==1;enabled=active==1;source=file.toString();
+            try(SQLiteDatabase db=SQLiteDatabase.openDatabase(file.toString(),null,SQLiteDatabase.OPEN_READONLY|SQLiteDatabase.NO_LOCALIZED_COLLATORS,broken->{})){
+                Set<String> modules=columns(db,"modules"),scopeColumns=columns(db,"scope");
+                if(!modules.containsAll(Arrays.asList("mid","module_pkg_name"))||!scopeColumns.containsAll(Arrays.asList("mid","app_pkg_name","user_id")))throw new IOException("作用域表结构未知");
+                boolean hasEnabled=modules.contains("enabled");
+                attempts.put(new JSONObject().put("path",file.toString()).put("schema",hasEnabled?"enabled_column":"scope_without_enabled").put("state","readable"));
+                try(Cursor row=db.rawQuery("SELECT "+(hasEnabled?"m.enabled":"NULL")+", EXISTS(SELECT 1 FROM scope s WHERE s.mid=m.mid AND s.app_pkg_name=? AND s.user_id=?) FROM modules m WHERE m.module_pkg_name=? LIMIT 2",new String[]{PACKAGE,"0",MODULE})){
+                    sawSchema=true;if(!row.moveToFirst())continue;
+                    if((hasEnabled?row.getType(0)!=Cursor.FIELD_TYPE_INTEGER:row.getType(0)!=Cursor.FIELD_TYPE_NULL)||row.getType(1)!=Cursor.FIELD_TYPE_INTEGER)throw new IOException("作用域字段类型未知");
+                    int active=hasEnabled?row.getInt(0):-1,scope=row.getInt(1);if((hasEnabled&&active!=0&&active!=1)||(scope!=0&&scope!=1)||row.moveToNext())throw new IOException("作用域记录格式未知");
+                    Boolean moduleEnabled=hasEnabled?Boolean.valueOf(active==1):null;
+                    if(selected!=null&&(selected!=(scope==1)||!Objects.equals(enabled,moduleEnabled)))conflict=true;
+                    selected=scope==1;enabled=moduleEnabled;source=file.toString();
+                }
             }catch(Exception|LinkageError unavailable){failed=true;attempts.put(new JSONObject().put("path",file.toString()).put("state","unavailable").put("detail",unavailable.toString()));}
         }
         String state=conflict||failed?"unknown":selected!=null?(selected?"present":"missing"):sawSchema?"module_missing":"unknown";
         return new JSONObject().put("scope_state",state).put("module_enabled",enabled==null||conflict||failed?JSONObject.NULL:enabled).put("scope_source",conflict||failed?"":source).put("scope_route","lsposed_sqlite_readonly").put("scope_attempts",attempts).put("scope_conflict",conflict);
+    }
+    static Set<String> columns(SQLiteDatabase db,String table){
+        Set<String> names=new HashSet<>();try(Cursor cursor=db.rawQuery("PRAGMA table_info("+table+")",null)){if(cursor.moveToFirst())do{names.add(cursor.getString(1));}while(cursor.moveToNext());}return names;
     }
     static final class Identity {
         final int pid,uid;final String name,start;

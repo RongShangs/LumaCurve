@@ -12,7 +12,13 @@ files={
 'android/os/Handler.java':'package android.os;public class Handler{public Handler(Looper l){}public boolean post(Runnable r){r.run();return true;}public void removeCallbacks(Runnable r){}public boolean postDelayed(Runnable r,long ms){return true;}}',
 'android/database/ContentObserver.java':'package android.database;public class ContentObserver{public ContentObserver(android.os.Handler h){}public void onChange(boolean s){}}',
 'android/content/ContentResolver.java':'package android.content;public class ContentResolver{public void registerContentObserver(Object u,boolean b,android.database.ContentObserver c){}}',
-'android/content/Context.java':'package android.content;public class Context{public String getPackageName(){return "com.android.systemui";}public ContentResolver getContentResolver(){return new ContentResolver();}}',
+ 'android/content/Intent.java':'package android.content;public class Intent{public static final String ACTION_SCREEN_OFF="off",ACTION_SCREEN_ON="on",ACTION_USER_PRESENT="present";public Intent(String action){}public Intent setComponent(ComponentName c){return this;}public Intent putExtra(String k,String v){return this;}}',
+ 'android/content/ComponentName.java':'package android.content;public class ComponentName{public ComponentName(String p,String c){}}',
+'android/content/Context.java':'package android.content;public class Context{public static final String KEYGUARD_SERVICE="keyguard",POWER_SERVICE="power";public static final int RECEIVER_NOT_EXPORTED=4;public static boolean missing;public static BroadcastReceiver receiver;public Object getSystemService(String n){return missing?null:n.equals(KEYGUARD_SERVICE)?new android.app.KeyguardManager():new android.os.PowerManager();}public Intent registerReceiver(BroadcastReceiver r,IntentFilter f,int flags){if(flags!=4)throw new AssertionError();receiver=r;return null;}public int checkSelfPermission(String p){return 0;}public void sendBroadcast(Intent i){}public String getPackageName(){return "com.android.systemui";}public ContentResolver getContentResolver(){return new ContentResolver();}}',
+'android/content/BroadcastReceiver.java':'package android.content;public abstract class BroadcastReceiver{public abstract void onReceive(Context c,Intent i);}',
+'android/content/IntentFilter.java':'package android.content;public class IntentFilter{public void addAction(String s){}}',
+'android/app/KeyguardManager.java':'package android.app;public class KeyguardManager{public static boolean locked;public boolean isKeyguardLocked(){return locked;}}',
+'android/os/PowerManager.java':'package android.os;public class PowerManager{public static boolean interactive=true;public boolean isInteractive(){return interactive;}}',
 'android/app/Application.java':'package android.app;public class Application extends android.content.Context{public void onCreate(){}}',
 'android/provider/Settings.java':\
 '''package android.provider;import java.util.concurrent.*;public class Settings{public static class System{public static String SCREEN_BRIGHTNESS_MODE="mode";public static int mode=1;public static int getInt(android.content.ContentResolver r,String k,int fallback){return mode;}public static Object getUriFor(String k){return k;}}public static class Global{public static final ConcurrentMap<String,String> values=new ConcurrentHashMap<>();public static int requests;public static String getString(android.content.ContentResolver r,String k){return values.get(k);}public static Object getUriFor(String k){return k;}public static boolean putString(android.content.ContentResolver r,String k,String v){if(v==null)values.remove(k);else values.put(k,v);if(k.equals("request"))requests++;return true;}}}''',
@@ -140,6 +146,21 @@ public class InputTest{
   // Gamma keeps the existing physical ordinary mapping and is also reversible.
   ControlCenterHooks.profile=new ControlCenterHooks.Profile(heldSplit);owner.mBrightnessPolicy.enabled=false;owner.mAutomatic=true;
   for(int shown:new int[]{0,50,150,375,600,749,750}){partitionBinding.partition.reset();partitionBinding.feedbackNode=Double.NaN;android.os.SystemClock.now+=10000;call(owner,bar,true,shown,false);call(owner,bar,false,shown,true);float actual=(float)Math.pow(owner.received/1000.,2);android.os.SystemClock.now+=2000;feedback(owner,actual);near(bar.value,shown,2);check(owner.mAutomatic);}
+  // Both raw modes return every input/feedback path to OEM while locked. No queued drag escapes.
+  owner.mBrightnessPolicy.enabled=false;owner.mAutomatic=false;
+  for(int mode:new int[]{3,4}){
+   JSONObject lockProfile=config(mode).put("kind",mode==4?"partition_node_v4":"raw_node_v3").put("physical","panel-a");
+   if(mode==4){lockProfile.put("partition",new JSONObject().put("node",.4).put("input",.6324555).put("source","test")).put("partition_maximum",16383);}
+   ControlCenterHooks.profile=new ControlCenterHooks.Profile(lockProfile);
+   android.app.KeyguardManager.locked=true;int nativeCalls=owner.calls;String beforeRequest=Settings.Global.values.get(ControlCenterHooks.NODE_REQUEST);
+   call(owner,bar,true,900,true);check(owner.calls==nativeCalls+1&&owner.received==900);feedback(owner,.25f);near(bar.value,500,2);check(java.util.Objects.equals(beforeRequest,Settings.Global.values.get(ControlCenterHooks.NODE_REQUEST)));
+   android.app.KeyguardManager.locked=false;ControlCenterHooks.sendNode(ControlCenterHooks.profile,12000,false);check(ControlCenterHooks.pendingNode!=null);
+   android.app.KeyguardManager.locked=true;ControlCenterHooks.flushNode();flush();check(java.util.Objects.equals(beforeRequest,Settings.Global.values.get(ControlCenterHooks.NODE_REQUEST)));
+   android.app.KeyguardManager.locked=false;ControlCenterHooks.sendNode(ControlCenterHooks.profile,11000,false);android.content.Context.receiver.onReceive(ControlCenterHooks.context,new android.content.Intent("off"));check(ControlCenterHooks.pendingNode==null&&ControlCenterHooks.nextNodeWrite==null);
+   android.os.PowerManager.interactive=false;nativeCalls=owner.calls;call(owner,bar,true,900,true);check(owner.calls==nativeCalls+1&&owner.received==900);android.os.PowerManager.interactive=true;
+   android.content.Context.missing=true;nativeCalls=owner.calls;call(owner,bar,true,900,true);check(owner.calls==nativeCalls+1);android.content.Context.missing=false;
+   if(mode==3){nativeCalls=owner.calls;call(owner,bar,true,1000,true);flush();check(owner.calls==nativeCalls&&new JSONObject(Settings.Global.values.get(ControlCenterHooks.NODE_REQUEST)).getInt("target")==16383);}else{partitionBinding.partition.reset();call(owner,bar,true,500,false);check(owner.received!=500);}
+  }
   ControlCenterHooks.profile=null;  flush();ControlCenterHooks.io.shutdownNow();XposedBridge.unhookAll();check(hooks.isEmpty());System.out.println("Control center input: "+cases+" cases PASS; production coordinate hooks, observed ABI doubles");
  }
 }'''}
@@ -147,7 +168,7 @@ paths=[]
 for name,text in files.items():
  p=OUT/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_text(text,encoding='utf-8');paths.append(p)
 classes=OUT/'classes';classes.mkdir(exist_ok=True);jar=ROOT/'build/refactor-diagnostics/json-20240303.jar'
-paths += [SRC/(name+'.java') for name in ['hooking/HookTransaction','UiText','ControlCenterPartition','ControlCenterHooks','ControlCenterMapping','ControlCenterCurve','ControlCenterCalibration','AppBuild']]
+paths += [SRC/(name+'.java') for name in ['hooking/HookTransaction','UiText','ControlCenterPartition','ControlCenterHooks','ControlCenterScreen','MappingRecoveryState','MappingRecoverySignal','ControlCenterMapping','ControlCenterCurve','ControlCenterCalibration','AppBuild']]
 paths += [SRC/'hooking'/(name+'.java') for name in ['XC_MethodHook','XposedBridge']]
 subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(jar),'-d',str(classes),*map(str,paths)],check=True)
 result=subprocess.run(['java','-cp',str(classes)+os.pathsep+str(jar),'top.rongshangs.lumacurve.refactor.InputTest'],check=True,timeout=20,capture_output=True,text=True);print(result.stdout,end='');ui_cases=int(re.search(r'(\d+) cases PASS',result.stdout).group(1))

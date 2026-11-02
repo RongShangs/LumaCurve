@@ -37,3 +37,13 @@
 脚本有限等待sys.boot_completed（最多120次、2秒），再按0/3/10/30秒尝试当前安装APK的boot-resume-mapping，每次timeout8秒。APK从系统包管理当前主用户查询，拒绝多路径、未知路径和链接；卸载后不启动旧APK。只有pending重试，不启动Activity、不su、不恢复旧亮度。Root命令复用当前配置和既有reconcile，旧Android Job继续保留。
 
 Root配置键、Root实际执行结果键与短日志分别导出，避免APP晚到的任务覆盖开机证据。自检仅readOnly inspect；不写目录或安装脚本。新增目录/脚本不新增长期APP进程；启动脚本执行结束后退出。
+
+## 4.4.1 Beta 01：就绪事件与消费回执
+
+保留以上两类入口。首次任务优先 expedited，拒绝后原有延迟调度；SystemUI 拿到实际 ABI 和 enabled/current tables 但 profile 尚未绑定时，经 STATUS_BAR_SERVICE 签名权限保护的显式 ReadyReceiver 推进同一个 Job。generation 由 build/pid/process_start/boot_count/revision/user/mode/maximum/physical 构成，主用户与实际配置再次核验；可读关闭配置永远优先于提示。每代就绪请求最多两次且间隔至少5秒，仅随事件触发，不轮询或唤起页面；终止的 Root 拒绝不因事件不断重试。
+
+准备 PROFILE 不等于消费成功；恢复结果还须匹配活 SystemUI PID/启动标识和 bound_profile 全代次回执。任务取消/旧结果按 jobId、attempt、signal 判定，旧任务不能取消或覆盖就绪触发的新任务。Root 原脚本不变，补充文件/结果实际时间证据。第一次更新后的重启有效，不要求第二次重启。
+
+作用域读取先 PRAGMA 确认必需列，带 enabled 和不带 enabled 为分开的 schema 路线；后者 module_enabled 保留 null，不能推断开启。查询失败不猜测降级。未知与 module_missing 不自动弹“添加”，仅 confirmed missing 或明确 disabled 在实际相关修改时提示。数据库记录与当前注入分别呈现。
+
+完整/分区节点控制只有实际 interactive 且 Keyguard 未锁才接管。锁屏/息屏/未知返回原生输入、回显及动画；屏幕广播清空排队手势及分区授权，节点写入前/核心分别复验。锁屏真实亮度设置变化只撤回 cc_ 保持，保留磁贴暂停/解锁恢复。无新的采样、轮询或设备型号判断。

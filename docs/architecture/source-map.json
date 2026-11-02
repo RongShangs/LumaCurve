@@ -173,6 +173,11 @@
       "purpose": "集中核验Root节点绑定和写入能力，保留暂不可用的已有完整节点选择，准备共用节点监听并发布绑定profile"
     },
     {
+      "file": "ControlCenterScreen.java",
+      "layer": "adapters",
+      "purpose": "系统交互与锁屏状态读取和事件通知；完整/分区节点控制在锁屏退回原生输入与回显，未知状态不接管"
+    },
+    {
       "file": "ControlCenterSettings.java",
       "layer": "presentation",
       "purpose": "明确选中的模式卡片、分区返回行为与紧凑节点编辑；兼容详情统一在日志页，不主动写亮度"
@@ -416,6 +421,16 @@
       "file": "MappingRecoveryService.java",
       "layer": "bridge",
       "purpose": "系统保护的一次性映射Root重连任务；超时取消、并发代次隔离，拒绝授权不重试"
+    },
+    {
+      "file": "MappingRecoverySignal.java",
+      "layer": "adapters",
+      "purpose": "系统界面就绪时向签名权限保护的明确接收器发送一次恢复信号，无Root或亮度写入"
+    },
+    {
+      "file": "MappingRecoveryState.java",
+      "layer": "policy",
+      "purpose": "当前引擎映射代次、系统界面确认和有限就绪信号去重的统一数据契约"
     },
     {
       "file": "MappingStartup.java",

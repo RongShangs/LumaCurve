@@ -1,4 +1,4 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="top.rongshangs.lumacurve" android:versionCode="44100" android:versionName="4.4.1">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="top.rongshangs.lumacurve" android:versionCode="44200" android:versionName="4.4.2">
     <uses-sdk android:minSdkVersion="34" android:targetSdkVersion="34"/>
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
@@ -7,6 +7,7 @@
         <receiver android:name="top.rongshangs.lumacurve.refactor.MappingStartup$Receiver" android:exported="false">
             <intent-filter><action android:name="android.intent.action.BOOT_COMPLETED"/><action android:name="android.intent.action.USER_UNLOCKED"/><action android:name="android.intent.action.MY_PACKAGE_REPLACED"/></intent-filter>
         </receiver>
+        <receiver android:name="top.rongshangs.lumacurve.refactor.MappingStartup$ReadyReceiver" android:exported="true" android:permission="android.permission.STATUS_BAR_SERVICE"/>
         <service android:name="top.rongshangs.lumacurve.refactor.MappingRecoveryService" android:exported="false" android:permission="android.permission.BIND_JOB_SERVICE"/>
         <meta-data android:name="xposedmodule" android:value="true"/>
         <meta-data android:name="xposeddescription" android:resource="@string/module_description"/>

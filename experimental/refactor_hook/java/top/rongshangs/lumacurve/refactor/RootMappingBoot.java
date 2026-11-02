@@ -27,7 +27,8 @@ final class RootMappingBoot {
         JSONObject result=new JSONObject().put("route","root_service_directory").put("installed",false);String raw=settings.get(KEY);if(raw!=null)result=new JSONObject(raw);
         File file=new File(directory,NAME);boolean valid=!Files.isSymbolicLink(directory.toPath())&&!Files.isSymbolicLink(file.toPath())&&file.isFile()&&file.canExecute()&&file.length()<32768&&hash(Files.readAllBytes(file.toPath())).equals(result.optString("sha256"));
         String last=settings.get(ControlCenterRoot.RECOVERY+"_root");if(last!=null)try{JSONObject run=new JSONObject(last);result.put("last_result",run).put("current_boot",String.valueOf(settings.get("boot_count")).equals(run.optString("boot_count"))&&AppBuild.BUILD.equals(run.optString("build")));}catch(JSONException unavailable){}
-        return result.put("route","root_service_directory").put("installed",valid).put("path",file.toString());
+        File log=new File(directory,"hyperlux-mapping-boot.log");boolean present=!Files.isSymbolicLink(log.toPath())&&log.isFile();
+        return result.put("route","root_service_directory").put("installed",valid).put("path",file.toString()).put("entry_modified_ms",file.lastModified()).put("log_present",present).put("log_readable",present&&log.canRead()).put("log_bytes",present?log.length():0).put("log_modified_ms",present?log.lastModified():0);
     }
     static JSONObject configure(RootSettings settings,String raw){try{return configure(settings,raw,DIRECTORY);}catch(Exception failure){try{return new JSONObject().put("route","root_service_directory").put("installed",false).put("detail",failure.toString());}catch(JSONException impossible){throw new IllegalStateException(impossible);}}}
     static JSONObject configure(RootSettings settings,String raw,File directory)throws Exception{

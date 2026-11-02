@@ -15,9 +15,7 @@ final class ControlCenterSetup {
     }
     static boolean changedPayload(JSONObject before,String encoded){try{return mappingChanged(before,new JSONObject(new String(java.util.Base64.getDecoder().decode(encoded),java.nio.charset.StandardCharsets.UTF_8)));}catch(Exception invalid){return false;}}
     static boolean needsScope(JSONObject report){
-        String scope=report.optString("scope_state"),loaded=report.optString("injection_state");
-        if(scope.equals("missing")||scope.equals("module_missing")||!report.isNull("module_enabled")&&!report.optBoolean("module_enabled"))return true;
-        return !scope.equals("present")&&!loaded.equals("current")&&!loaded.equals("old_build");
+        return "missing".equals(report.optString("scope_state"))||report.has("module_enabled")&&!report.isNull("module_enabled")&&!report.optBoolean("module_enabled");
     }
     String selection(){return a.controls.nodeSliderMode+":"+a.controls.partitionMaximum+":"+a.controls.partitionRestoreAuto;}
     ControlCenterSetup(MainActivity a,LinearLayout parent,TextView heading){
@@ -28,8 +26,7 @@ final class ControlCenterSetup {
     void refresh(){
         restart.setEnabled(!a.busy&&!checking);
         String scope=report==null?"unknown":report.optString("scope_state"),injection=report==null?"unconfirmed":report.optString("injection_state");
-        String label=checking?"正在检查系统界面作用域…":scope.equals("missing")?"未勾选系统界面，点击查看添加方法":scope.equals("module_missing")||report!=null&&!report.isNull("module_enabled")&&!report.optBoolean("module_enabled")?"请在 LSPosed 启用 HyperLux，点击查看设置方法":injection.equals("old_build")?"系统界面仍在使用旧版，可重启后加载":injection.equals("current")?"系统界面已加载 · 点击核对作用域":scope.equals("present")?"已勾选系统界面，尚未确认加载；可尝试重启系统界面":"作用域暂无法确认，点击查看核对方法";
-        if(!checking&&scope.equals("unknown")&&!injection.equals("current")&&!injection.equals("old_build"))label="需要“系统界面”作用域 · 点击查看";
+        String label=checking?"正在检查系统界面作用域…":scope.equals("missing")?"未勾选系统界面，点击查看添加方法":report!=null&&!report.isNull("module_enabled")&&!report.optBoolean("module_enabled")?"请在 LSPosed 启用 HyperLux，点击查看设置方法":injection.equals("old_build")?"系统界面仍在使用旧版，可重启后加载":injection.equals("current")?"系统界面已加载 · 点击核对作用域":scope.equals("present")?"已勾选系统界面，尚未确认加载；可尝试重启系统界面":"作用域暂无法确认，点击查看核对方法";
         status.setText(a.tr(label));
     }
     void check(boolean prompt){

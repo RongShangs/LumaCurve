@@ -6,6 +6,7 @@ public final class UiText {
     private static final LinkedHashMap<String,String> WORDS=new LinkedHashMap<>();
     private static final List<Map.Entry<String,String>> PHRASES;
     static {
+        WORDS.put("节点控制区间通过直接写入节点值来锁定屏幕亮度，滑动时亮度变化不够平滑属于正常现象。","Node control writes node values directly to hold brightness. Brightness may change in steps while dragging.");
         WORDS.put("100% 为普通手动上限，更高数值为高亮范围。","100% is the normal manual maximum; higher values are in the high brightness range.");
         WORDS.put("\n普通手动100%：","\nNormal manual 100%:");
         WORDS.put("Root开机映射恢复","Root startup mapping recovery");
@@ -2154,6 +2155,10 @@ public final class UiText {
         WORDS.put("当前曲线路径或节点数量不支持保存基础曲线","This curve route or point count cannot be saved as a baseline");
         WORDS.put("此曲线路径尚不支持记忆转基础曲线","This curve route cannot yet promote memory to a baseline");
         WORDS.put("当前曲线超过本机可保存的节点数量","The current curve exceeds this device saved-point capacity");
+        WORDS.put("系统界面已确认映射绑定，等待手动操作","SystemUI confirmed the mapping binding; waiting for user input");
+        WORDS.put("映射已准备，等待系统界面确认","Mapping is prepared; waiting for SystemUI confirmation");
+        WORDS.put("启动来源：","Startup trigger: ");
+        WORDS.put("仅恢复已保存映射；启动/解锁或系统界面就绪事件触发有界任务，首次优先即时调度并保留原回退。准备后需当前系统界面确认同一代次才报成功；不回放手势，Root拒绝停止，无常驻APP服务。","A bounded job restores a saved mapping after boot, unlock, or protected SystemUI readiness. It prefers expedited dispatch with the original fallback, confirms the live UI generation, never replays gestures, stops on Root denial, and adds no resident app service.");
         PHRASES=new ArrayList<>(WORDS.entrySet());PHRASES.sort((a,b)->Integer.compare(b.getKey().length(),a.getKey().length()));
     }
     public static String translate(String text,boolean english){
