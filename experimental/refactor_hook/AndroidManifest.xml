@@ -1,8 +1,13 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="top.rongshangs.lumacurve" android:versionCode="44000" android:versionName="4.4.0">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="top.rongshangs.lumacurve" android:versionCode="44100" android:versionName="4.4.1">
     <uses-sdk android:minSdkVersion="34" android:targetSdkVersion="34"/>
     <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <queries><intent><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent></queries>
     <application android:label="HyperLux" android:theme="@style/AppTheme" android:icon="@drawable/icon" android:roundIcon="@drawable/icon" android:allowBackup="false" android:supportsRtl="true">
+        <receiver android:name="top.rongshangs.lumacurve.refactor.MappingStartup$Receiver" android:exported="false">
+            <intent-filter><action android:name="android.intent.action.BOOT_COMPLETED"/><action android:name="android.intent.action.USER_UNLOCKED"/><action android:name="android.intent.action.MY_PACKAGE_REPLACED"/></intent-filter>
+        </receiver>
+        <service android:name="top.rongshangs.lumacurve.refactor.MappingRecoveryService" android:exported="false" android:permission="android.permission.BIND_JOB_SERVICE"/>
         <meta-data android:name="xposedmodule" android:value="true"/>
         <meta-data android:name="xposeddescription" android:resource="@string/module_description"/>
         <meta-data android:name="xposedminversion" android:value="82"/>

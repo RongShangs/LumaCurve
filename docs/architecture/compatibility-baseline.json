@@ -5,45 +5,63 @@
     "curve": [
       "refactor",
       "miui_physical",
-      "aosp_physical"
+      "aosp_physical",
+      "refactor_coefficients",
+      "aosp_physical_clamped"
     ],
     "manual_memory": [
       "refactor",
       "miui_physical",
-      "aosp_physical"
+      "aosp_physical",
+      "refactor_coefficients",
+      "aosp_physical_clamped"
     ],
     "saved_curve": [
       "refactor",
       "miui_physical",
-      "aosp_physical"
+      "aosp_physical",
+      "refactor_coefficients",
+      "aosp_physical_clamped"
     ],
     "persistent_memory": [
       "refactor",
       "miui_physical",
-      "aosp_physical"
+      "aosp_physical",
+      "refactor_coefficients",
+      "aosp_physical_clamped"
     ],
     "memory_mode": [
       "refactor",
       "miui_physical",
-      "aosp_physical"
+      "aosp_physical",
+      "refactor_coefficients",
+      "aosp_physical_clamped"
     ],
     "memory_forever": [
       "refactor",
       "miui_physical",
-      "aosp_physical"
+      "aosp_physical",
+      "refactor_coefficients",
+      "aosp_physical_clamped"
     ],
     "memory_reset": [
       "refactor",
       "miui_physical",
-      "aosp_physical"
+      "aosp_physical",
+      "refactor_coefficients",
+      "aosp_physical_clamped"
     ],
     "memory_timeout": [
       "refactor",
       "miui_physical",
-      "aosp_physical"
+      "aosp_physical",
+      "refactor_coefficients",
+      "aosp_physical_clamped"
     ],
     "main_sensor": [
-      "oem_main"
+      "oem_main",
+      "oem_selected_secondary",
+      "oem_selected_fov"
     ],
     "assist_sensor": [
       "native_auxiliary",
@@ -78,7 +96,8 @@
       "native_without_driving"
     ],
     "animation_override": [
-      "oem_animation"
+      "oem_animation",
+      "traditional_ramp"
     ],
     "sunlight_override": [
       "manual_sunlight"
@@ -120,7 +139,8 @@
       "raw_primary_output"
     ],
     "control_center_slider": [
-      "coordinate_v2"
+      "coordinate_v2",
+      "coordinate_v2_calibrated"
     ],
     "apps": [
       "visible_tasks",
@@ -152,20 +172,24 @@
       "legacy_opr"
     ],
     "node_output": [
-      "raw_primary_output"
+      "raw_primary_output",
+      "automatic_strategy2_node"
     ],
     "main_panel_node": [
       "backlight_node",
-      "display_led_node"
+      "display_led_node",
+      "fold_default_display"
     ],
     "root_storage": [
-      "root_private_storage"
+      "root_private_storage",
+      "root_temporary_storage"
     ],
     "stored_config": [
       "stored_json"
     ],
     "outdoor_node_device": [
-      "primary_node_profile"
+      "primary_node_profile",
+      "fold_bound_outdoor"
     ],
     "native_payload": [
       "apk_native_asset"
@@ -178,6 +202,42 @@
     ],
     "app_files": [
       "app_files"
+    ],
+    "dark_lock_schedule": [
+      "system_twilight"
+    ],
+    "control_center_raw": [
+      "raw_node_v3"
+    ],
+    "control_center_partition": [
+      "partition_node_v4",
+      "partition_ddc_hbm",
+      "partition_hbm_normal"
+    ],
+    "root_identity": [
+      "root_actual_identity"
+    ],
+    "root_settings": [
+      "external_provider",
+      "cmd_settings",
+      "settings_cli"
+    ],
+    "root_process_identity": [
+      "root_proc_identity"
+    ],
+    "dim_aod": [
+      "automatic_dim_aod_cap"
+    ],
+    "app_brightness_isolation": [
+      "app_override_scoped_sync",
+      "native_window_no_sync"
+    ],
+    "mapping_startup": [
+      "android_boot_job"
+    ],
+    "mapping_boot": [
+      "root_service_directory"
     ]
-  }
+  },
+  "extended_through": "4.4.0-beta04 / 44004; additive protection of all reviewed feature-route pairs"
 }

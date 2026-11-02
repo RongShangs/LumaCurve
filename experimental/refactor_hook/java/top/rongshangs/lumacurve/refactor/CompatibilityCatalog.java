@@ -8,7 +8,7 @@ import java.util.*;
  */
 final class CompatibilityCatalog {
     private CompatibilityCatalog(){}
-    private static final String[] FEATURES={"curve","manual_memory","saved_curve","persistent_memory","memory_mode","memory_forever","memory_reset","memory_timeout","main_sensor","assist_sensor","response","small_response","low_light","low_threshold","threshold_override","assist_gate","assist_override","animation_override","sunlight_override","touch_override","scene_night_driving","scene_step","scene_touch","scene_proximity","scene_stream_proximity","scene_reflection","scene_night_wake","scene_manual_sunlight","scene_game","dark_lock","dark_lock_schedule","manual_panel","control_center_slider","control_center_raw","control_center_partition","apps","thermal","outdoor","hbm","outdoor_range","opr","nit_limit","node_output","main_panel_node","root_storage","root_identity","root_settings","root_process_identity","stored_config","outdoor_node_device","native_payload","launcher","preferences","app_files","dim_aod","app_brightness_isolation"};
+    private static final String[] FEATURES={"curve","manual_memory","saved_curve","persistent_memory","memory_mode","memory_forever","memory_reset","memory_timeout","main_sensor","assist_sensor","response","small_response","low_light","low_threshold","threshold_override","assist_gate","assist_override","animation_override","sunlight_override","touch_override","scene_night_driving","scene_step","scene_touch","scene_proximity","scene_stream_proximity","scene_reflection","scene_night_wake","scene_manual_sunlight","scene_game","dark_lock","dark_lock_schedule","manual_panel","control_center_slider","control_center_raw","control_center_partition","apps","thermal","outdoor","hbm","outdoor_range","opr","nit_limit","node_output","main_panel_node","root_storage","root_identity","root_settings","root_process_identity","stored_config","outdoor_node_device","native_payload","launcher","preferences","app_files","dim_aod","app_brightness_isolation","mapping_startup","mapping_boot"};
     static String[] features(){return FEATURES.clone();}
     static final class Route {
         final String id,name,condition;
@@ -59,6 +59,8 @@ final class CompatibilityCatalog {
         case "native_payload":return new Route[]{route("apk_native_asset","APK 内原生程序校验","核对当前 APK 的主屏程序资产完整性，不启动守护、不试写亮度。")};
         case "launcher":return new Route[]{route("launcher_alias","桌面入口别名","使用 PackageManager 的独立桌面别名，保留模块设置入口和欢迎引导完成状态。")};
         case "preferences":return new Route[]{route("app_preferences","应用本地偏好存储","读取设置草稿与欢迎记录，不清空、不改变开关。")};
+        case "mapping_boot":return new Route[]{route("root_service_directory","Root开机脚本入口","按实际Root目录权限配置受管启动文件；开机独立恢复监听，不依赖打开APP，不写入旧亮度。")};
+        case "mapping_startup":return new Route[]{route("android_boot_job","开机后一次性映射恢复","仅恢复已保存开启的映射；解锁后由系统任务有界重连Root并核验当前进程、用户和节点，不重放旧手势。Root拒绝不自动重试，不新增常驻服务。")};
         case "app_files":return new Route[]{route("app_files","应用私有文件目录","检查配置导入导出所用目录的可访问性。")};
         default:
             if(id.startsWith("scene_")&&Arrays.asList("night_driving","step","touch","proximity","stream_proximity","reflection","night_wake","manual_sunlight","game").contains(id.substring(6))){String scene=id.substring(6);return new Route[]{route("oem_"+scene,sceneName(scene),sceneCondition(scene))};}

@@ -8,6 +8,7 @@ O=R/'build/root-access-tests';O.mkdir(exist_ok=True)
 J=R/'build/refactor-diagnostics/json-20240303.jar'
 P='top/rongshangs/lumacurve/refactor/'
 files={
+P+'RootMappingBoot.java':'package top.rongshangs.lumacurve.refactor;class RootMappingBoot{static org.json.JSONObject inspect(RootSettings s){return new org.json.JSONObject();}}',
 'android/os/IBinder.java':'package android.os;public interface IBinder{}',
 'android/os/Binder.java':'package android.os;public class Binder implements IBinder{}',
 'android/os/Process.java':'package android.os;public class Process{public static int uid=0;public static int myUid(){return uid;}public static int myPid(){return 123;}}',
@@ -129,6 +130,7 @@ public class DiagnosticsTest{static int cases;static void check(boolean b){if(!b
 total+=run_java('DiagnosticsTest',['AppRootDiagnostics.java','AppBuild.java','FeatureSelfCheck.java'],diagnostics,'diagnostics')
 
 independent={
+P+'RootMappingBoot.java':'package top.rongshangs.lumacurve.refactor;class RootMappingBoot{static org.json.JSONObject inspect(RootSettings s){return new org.json.JSONObject();}}',
 'android/os/SystemClock.java':diagnostics['android/os/SystemClock.java'],
 P+'Doubles.java':r'''package top.rongshangs.lumacurve.refactor;import org.json.*;import java.io.*;
 class RootSettings{boolean readable;boolean available(){return readable;}}
@@ -142,7 +144,7 @@ class NativePanelAsset{static int calls;static byte[] read(File f){calls++;retur
 P+'RootFeatureTest.java':r'''package top.rongshangs.lumacurve.refactor;import org.json.*;
 public class RootFeatureTest{static int cases;static void check(boolean b){if(!b)throw new AssertionError("case "+cases);cases++;}static JSONObject find(JSONObject r,String id){JSONArray a=r.getJSONArray("features");for(int i=0;i<a.length();i++)if(a.getJSONObject(i).getString("id").equals(id))return a.getJSONObject(i);throw new AssertionError(id);}
  public static void main(String[] args)throws Exception{
-  RootSettings settings=new RootSettings();JSONObject r=RootFeatureChecks.run(null,null,settings);check(r.getJSONArray("features").length()==8);check(find(r,"root_settings").getString("state").equals("pending"));check(find(r,"root_identity").getString("state").equals("available"));check(find(r,"stored_config").getString("state").equals("pending"));check(find(r,"main_panel_node").getString("state").equals("pending"));check(find(r,"main_panel_node").getString("detail").contains("node denied"));check(ActivePanelNode.calls==1&&OutdoorNodeRoot.calls==1&&NativePanelAsset.calls==1);check(find(r,"root_storage").getString("state").equals("pending"));check(find(r,"root_storage").getString("detail").contains("Permission denied"));
+  RootSettings settings=new RootSettings();JSONObject r=RootFeatureChecks.run(null,null,settings);check(r.getJSONArray("features").length()==9);check(find(r,"root_settings").getString("state").equals("pending"));check(find(r,"root_identity").getString("state").equals("available"));check(find(r,"stored_config").getString("state").equals("pending"));check(find(r,"main_panel_node").getString("state").equals("pending"));check(find(r,"main_panel_node").getString("detail").contains("node denied"));check(ActivePanelNode.calls==1&&OutdoorNodeRoot.calls==1&&NativePanelAsset.calls==1);check(find(r,"root_storage").getString("state").equals("pending"));check(find(r,"root_storage").getString("detail").contains("Permission denied"));
   settings.readable=true;r=RootFeatureChecks.run(new JSONObject(),"{}",settings);check(find(r,"root_settings").getString("state").equals("available"));check(find(r,"root_settings").getString("settings_route").equals("cmd_settings"));check(find(r,"root_settings").getString("detail").contains("自检不试写"));check(find(r,"root_settings").getJSONArray("settings_attempts").length()==1);check(find(r,"root_process_identity").getString("state").equals("available"));check(find(r,"stored_config").getString("state").equals("available"));check(ActivePanelNode.calls==2&&OutdoorNodeRoot.calls==2&&NativePanelAsset.calls==2);
   r=RootFeatureChecks.run(new JSONObject(),"invalid-json",settings);check(find(r,"stored_config").getString("state").equals("pending"));check(find(r,"root_settings").getString("state").equals("available"));check(NativePanelAsset.calls==3);System.out.println("Root independent checks host: "+cases+" cases PASS");
  }}'''}

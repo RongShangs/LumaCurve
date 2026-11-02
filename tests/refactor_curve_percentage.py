@@ -12,6 +12,7 @@ class Button extends TextView{Runnable action;Button(String s,Runnable r){super(
 class LinearLayout{List<TextView> children=new ArrayList<>();void addView(TextView v){children.add(v);}}
 class AlertDialog{String title;LinearLayout body,actions=new LinearLayout();boolean showing;AlertDialog(String t,LinearLayout b){title=t;body=b;}void show(){showing=true;}void dismiss(){showing=false;}AlertDialog getWindow(){return this;}AlertDialog getDecorView(){return this;}Object findViewWithTag(String tag){return actions;}}
 class MainActivity{
+ float curveScale(){return CurveDisplayRange.maximum(runtime,maximum);}
  float[] factoryLux={0,30,600,100000},factoryNit={3.5f,83.13f,126.14f,3200},factors={1,8.832f,8.063f,1};float minimum=2,maximum=3200,curveFloor;int MUTED=1,BLUE=2,BG=3;boolean darkTheme,dirty;int draws;AlertDialog latest;EditText number;String toast;ThemeCurveOptions themeCurve=new ThemeCurveOptions();JSONObject runtime=new JSONObject();
  class DarkGraph{float[] editNit(){return factoryNit;}}DarkGraph darkCurveGraph=new DarkGraph();
  LinearLayout column(){return new LinearLayout();}TextView text(String s,int size,int color){return new TextView(s);}EditText input(String label){number=new EditText();return number;}String format(float f){return Float.toString(f);}String curvePercent(double v){return String.format(Locale.ROOT,"%.4f",v).replaceAll("0+$","").replaceAll("\\.$","");}
@@ -34,17 +35,18 @@ public class PercentageTest{
    a.editPoint(point,dark);a.number.setText("30");confirm(a);check(!a.latest.showing&&a.dirty&&a.draws==1);near(curve(a,dark)[point],960);
    check(Arrays.equals(dark?before:night,dark?a.factors:a.themeCurve.factors));
   }
-  for(String invalid:new String[]{"", "bad", "-1", "100.001", "NaN", "Infinity"}){a=new MainActivity();float[] before=a.factors.clone();a.editPoint(1,false);a.number.setText(invalid);confirm(a);check(a.latest.showing&&!a.dirty&&a.draws==0&&Arrays.equals(before,a.factors));check(a.latest.body.children.get(a.latest.body.children.size()-1).value.equals("请输入 0～100 的有效数值"));}
+  for(String invalid:new String[]{"", "bad", "-1", "100.001", "NaN", "Infinity"}){a=new MainActivity();float[] before=a.factors.clone();a.editPoint(1,false);a.number.setText(invalid);confirm(a);check(a.latest.showing&&!a.dirty&&a.draws==0&&Arrays.equals(before,a.factors));check(a.latest.body.children.get(a.latest.body.children.size()-1).value.equals("请输入范围内的有效数值"));}
   for(boolean strict:new boolean[]{false,true})for(float p:new float[]{0,50,100}){a=new MainActivity();if(strict)a.runtime.put("curve_route","refactor_coefficients");a.editPoint(1,false);a.number.setText(Float.toString(p));confirm(a);check(!a.latest.showing&&a.dirty);float[] out=curve(a,false);near(out[1],Math.max(a.minimum,CurveEditor.fromPercent(p,a.maximum)));for(int i=1;i<4;i++)check(strict?out[i]>out[i-1]:out[i]>=out[i-1]);}
   a=new MainActivity();float[] before=a.factors.clone();a.editFloor(false);((Button)a.latest.actions.children.get(0)).click();check(!a.latest.showing&&!a.dirty&&Arrays.equals(before,a.factors));
+  for(boolean dark:new boolean[]{false,true}){a=new MainActivity();a.runtime.put("curve_backend","physical_mapping").put("curve_coordinate","physical_nit").put("min_logical_nit",2).put("curve_display_range",new JSONObject().put("backend","physical_mapping").put("coordinate","physical_nit").put("state","available").put("maximum_nit",600));a.editPoint(3,dark);check(a.latest.body.children.get(1).value.equals("可调范围：0% ～ 533.3333%"));check(Float.parseFloat(a.number.getText())>100);confirm(a);check(!a.dirty);a.editPoint(2,dark);a.number.setText("100");confirm(a);near(curve(a,dark)[2],600);check(a.maximum==3200);}
   System.out.println("Curve percentage dialog: "+cases+" cases PASS; production form and commits with widget doubles, Android pixels not tested");
  }
 }'''
 p=O/'PercentageTest.java';p.write_text(java,'utf-8');stub=O/'android/text/InputType.java';stub.parent.mkdir(parents=True,exist_ok=True);stub.write_text('package android.text;public class InputType{public static final int TYPE_CLASS_NUMBER=2,TYPE_NUMBER_FLAG_DECIMAL=8192;}','utf-8');C=O/'classes';C.mkdir(exist_ok=True)
-names=['CurveEditor','CurvePlan','SavedCurve','ThemeCurveOptions']
+names=['CurveDisplayRange','ControlCenterCalibration','ControlCenterPartition','ControlCenterCurve','ControlCenterMapping','CurveEditor','CurvePlan','SavedCurve','CurveCompatibility','TraditionalCurve','ThemeCurveOptions']
 subprocess.run(['javac','--release','8','-encoding','UTF-8','-cp',str(J),'-d',str(C),*[str(S/(n+'.java')) for n in names],str(stub),str(p)],check=True)
 subprocess.run(['java','-cp',str(C)+os.pathsep+str(J),'top.rongshangs.lumacurve.refactor.PercentageTest'],check=True)
 # Draft dragging must start from actual curve height and share the dialog's nit commit.
 assert 'startFactor=values[point];dragBounds=pointBounds(point);' in main
-assert 'CurveEditor.percent(actual,maximum)' in main
+assert 'CurveDisplayRange.percent(actual,maximum,curveScale())' in main
 assert 'factors[point]*100' not in main and 'requested*base[point]' not in main

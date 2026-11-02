@@ -193,14 +193,29 @@
       "purpose": "策略与算子"
     },
     {
+      "file": "CurveBackendFactory.java",
+      "layer": "adapters",
+      "purpose": "按已选中的实际原生对象构造一条完整曲线后端；原生边界读取与锚点/系数/物理映射构造在此收束，失败不切换后端"
+    },
+    {
       "file": "CurveComparison.java",
       "layer": "policy",
       "purpose": "策略与算子"
     },
     {
+      "file": "CurveCompatibility.java",
+      "layer": "adapters",
+      "purpose": "曲线状态兼容边界：新契约严格解码、旧快照集中适配、坐标/插值/能力收束后供共享绘图和转存消费"
+    },
+    {
+      "file": "CurveDisplayRange.java",
+      "layer": "adapters",
+      "purpose": "原生普通手动范围与逻辑/物理曲线坐标换算；只改呈现尺度，完整编辑和持久化范围保留"
+    },
+    {
       "file": "CurveEditor.java",
       "layer": "presentation",
-      "purpose": "依据设备实际范围原子联动编辑，统一纵轴0—100%换算；系数ABI维护严格递增"
+      "purpose": "依据设备完整范围原子联动编辑，保留旧设备百分比工具；当前手动标尺由CurveDisplayRange负责，系数ABI维护严格递增"
     },
     {
       "file": "CurveIdentity.java",
@@ -398,9 +413,19 @@
       "purpose": "磁贴面板独立最高节点草稿、真实设备范围显示与输入验证，不触发运行写入"
     },
     {
+      "file": "MappingRecoveryService.java",
+      "layer": "bridge",
+      "purpose": "系统保护的一次性映射Root重连任务；超时取消、并发代次隔离，拒绝授权不重试"
+    },
+    {
+      "file": "MappingStartup.java",
+      "layer": "bootstrap",
+      "purpose": "已保存映射的开机/解锁/升级系统任务调度；有限次数、代次去重与独立恢复记录"
+    },
+    {
       "file": "MemoryLifecycle.java",
-      "layer": "orchestration",
-      "purpose": "显示运行协调"
+      "layer": "adapters",
+      "purpose": "原生短期模型与事件观察适配器，向统一记忆管理提供交接事件和模型快照；恢复按后端能力操作，不按名称猜测"
     },
     {
       "file": "MemoryOptions.java",
@@ -626,6 +651,11 @@
       "file": "RootLaunch.java",
       "layer": "bootstrap",
       "purpose": "APP与面板共用su定位；拒绝授权不重试"
+    },
+    {
+      "file": "RootMappingBoot.java",
+      "layer": "bridge",
+      "purpose": "Root受管service.d启动入口，所有权校验、原子更新、关闭撤回；有限等待恢复不回放旧手势"
     },
     {
       "file": "RootPanelBridge.java",

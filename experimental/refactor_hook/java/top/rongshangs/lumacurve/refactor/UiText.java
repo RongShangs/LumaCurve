@@ -6,6 +6,17 @@ public final class UiText {
     private static final LinkedHashMap<String,String> WORDS=new LinkedHashMap<>();
     private static final List<Map.Entry<String,String>> PHRASES;
     static {
+        WORDS.put("100% 为普通手动上限，更高数值为高亮范围。","100% is the normal manual maximum; higher values are in the high brightness range.");
+        WORDS.put("\n普通手动100%：","\nNormal manual 100%:");
+        WORDS.put("Root开机映射恢复","Root startup mapping recovery");
+        WORDS.put("Root开机脚本入口","Root startup script entry");
+        WORDS.put("按实际Root目录权限配置受管启动文件；开机独立恢复监听，不依赖打开APP，不写入旧亮度。","Installs an owned startup entry only with verified Root directory access. Restores listening without opening the app or replaying old brightness.");
+        WORDS.put("请输入范围内的有效数值","Enter a valid value within the range");
+        WORDS.put("控制中心开机恢复","Control Center startup recovery");
+        WORDS.put("开机后一次性映射恢复","One-shot startup mapping recovery");
+        WORDS.put("仅恢复已保存开启的映射；解锁后由系统任务有界重连Root并核验当前进程、用户和节点，不重放旧手势。Root拒绝不自动重试，不新增常驻服务。","Restores only a saved enabled mapping after unlock, using a bounded job that verifies the current process, user and node. No old gesture is replayed. Root denial is not retried and no persistent app service is added.");
+        WORDS.put("开机恢复：","Startup recovery:");
+        WORDS.put("\n尝试次数：","\nAttempts:");
         WORDS.put("酷安@","Coolapk @");
         WORDS.put("应用内临时调亮或调暗（非控制中心操作），退出应用后恢复系统原有的亮度调节。例如视频播放、付款码展示。","Temporary brightness changes inside an app, such as during video playback or a payment-code display, return to system control when you leave the app. This excludes Control Center adjustments.");
         WORDS.put("你在控制中心的主动调整仍按原有设置处理。默认关闭，保存并应用后生效。","Your Control Center adjustments still follow your existing settings. Off by default; save and apply to enable.");
@@ -2134,6 +2145,15 @@ public final class UiText {
         WORDS.put("物理标定样条与坐标表不一致","Calibration spline does not match the coordinate table.");
         WORDS.put("物理标定样条方法不兼容","Calibration spline method is incompatible.");
         WORDS.put("物理换算未遵循本机标定端点","Physical conversion does not follow this device calibration endpoints.");
+        WORDS.put("本次开机：","Current boot: ");
+        WORDS.put("历史启动记录：","Historical boot record: ");
+        WORDS.put("当前曲线读取接口尚未兼容","Current curve reading is not supported yet");
+        WORDS.put("手动记忆能力尚未确认","Manual memory capability is unconfirmed");
+        WORDS.put("曲线状态尚未就绪","Curve state is not ready");
+        WORDS.put("曲线兼容契约无效","Invalid curve compatibility contract");
+        WORDS.put("当前曲线路径或节点数量不支持保存基础曲线","This curve route or point count cannot be saved as a baseline");
+        WORDS.put("此曲线路径尚不支持记忆转基础曲线","This curve route cannot yet promote memory to a baseline");
+        WORDS.put("当前曲线超过本机可保存的节点数量","The current curve exceeds this device saved-point capacity");
         PHRASES=new ArrayList<>(WORDS.entrySet());PHRASES.sort((a,b)->Integer.compare(b.getKey().length(),a.getKey().length()));
     }
     public static String translate(String text,boolean english){

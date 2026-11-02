@@ -34,7 +34,7 @@ final class ControlCenterPartition {
         double value=node<=ordinary?ORDINARY_SPAN*node/ordinary:ORDINARY_SPAN+(1-ORDINARY_SPAN)*(node-ordinary)/(upper/(double)maximum-ordinary);
         return Math.max(0,Math.min(1,value));
     }
-    static JSONObject read(Object owner,JSONObject calibration)throws Exception{
+    static JSONObject boundary(Object owner)throws Exception{
         Object config=ControlCenterCalibration.configuration(owner);float ceiling;String profile;
         Method data=null;
         try{data=config.getClass().getMethod("getHighBrightnessModeData");}catch(NoSuchMethodException absent){}
@@ -45,6 +45,11 @@ final class ControlCenterPartition {
             else{ceiling=normal(owner);profile="hbm_normal_ceiling";}
         }else{ceiling=normal(owner);profile="hbm_normal_ceiling";}
         if(!Float.isFinite(ceiling)||ceiling<=0||ceiling>1)throw new IllegalArgumentException("普通亮度边界无效");
+        if(ControlCenterCalibration.configuration(owner)!=config)throw new IllegalStateException("主屏配置正在变化");
+        return new JSONObject().put("profile",profile).put("brightness",ceiling);
+    }
+    static JSONObject read(Object owner,JSONObject calibration)throws Exception{
+        Object config=ControlCenterCalibration.configuration(owner);JSONObject boundary=boundary(owner);float ceiling=(float)boundary.getDouble("brightness");String profile=boundary.getString("profile");
         ControlCenterCurve curve=ControlCenterCurve.read(calibration.getJSONObject("standard"));
         if(ceiling<curve.input[0]||ceiling>curve.input[curve.input.length-1])throw new IllegalArgumentException("普通亮度边界超出实际标定范围");
         double node=curve.toNode(ceiling);

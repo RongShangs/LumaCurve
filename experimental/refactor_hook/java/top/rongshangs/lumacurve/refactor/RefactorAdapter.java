@@ -50,6 +50,16 @@ public final class RefactorAdapter extends CurveBackend {
     public CurvePlan plan(){return active;}
     public Object target(){return target;}
     public String name(){return "refactor";}
+    public String legacyConfigBackend(){return "refactor";}
+    public String coordinate(){return "logical_nit";}
+    public String interpolation(){return "anchors";}
+    public boolean savedCurveSupported(){return true;}
+    public int savedPointLimit(){return 7;}
+    public String currentPipelineRoute(){return "refactor";}
+    public Object memoryLifecycleTarget(){return target;}
+    public String memoryDescription()throws Exception{return "当前曲线节点："+integer("mAnchorCount")+" / 7（包含基础与手动点）";}
+    public float[] currentLux()throws Exception{return java.util.Arrays.copyOf((float[])get("mAnchorLux"),integer("mAnchorCount"));}
+    public float[] currentNit()throws Exception{return java.util.Arrays.copyOf((float[])get("mAnchorNit"),integer("mAnchorCount"));}
     public void putCurveState(org.json.JSONObject status)throws Exception{
         int count=integer("mAnchorCount");boolean[] user=(boolean[])get("mAnchorIsUserDrag");if(count<0||count>user.length)throw new IllegalStateException("系统锚点数量异常");
         org.json.JSONArray flags=new org.json.JSONArray();for(int i=0;i<count;i++)flags.put(user[i]);status.put("manual_anchor_flags",flags);

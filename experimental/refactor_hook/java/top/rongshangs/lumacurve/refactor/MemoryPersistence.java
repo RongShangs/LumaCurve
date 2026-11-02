@@ -92,7 +92,7 @@ final class MemoryPersistence {
  }
  boolean ready()throws Exception{
   if(state.closed||asleep||state.changing||replaying||!state.phase.equals("active")||!state.appliesToUser()||!state.onDisplayThread()||state.memoryStrength==0||state.kernel.plan()==null||state.power==null||!state.power.isInteractive()||!Boolean.TRUE.equals(state.kernel.get("mUseAutoBrightness"))||Boolean.TRUE.equals(state.hdrActive()))return false;
-  if(state.kernel instanceof TraditionalAdapter){TraditionalAdapter a=(TraditionalAdapter)state.kernel;if(TraditionalAdapter.read(a.abc,"mCurrentBrightnessMapper")!=a.mapper)return false;}
+  if(!state.kernel.memoryContextActive())return false;
   return state.kernel.persistentMemorySupported();
  }
  int capacity(){int cap=state.kernel.manualPointCapacity();return options.maxPoints==0?cap:Math.min(cap,options.maxPoints);}
@@ -131,7 +131,7 @@ final class MemoryPersistence {
     if(p.length()>0&&!matches){cancelRestore();status="环境已变化，本次不恢复记忆";return;}
    }
    cancelRestore();if(p.length()==0){status="无匹配且未过期的手动记忆";return;}
-   replaying=true;try{if(replace)state.kernel.replaceManualPoints(p);else state.kernel.restoreManualPoints(p);JSONObject model=PersistentMemory.model(raw);boolean belongs=false;if(model!=null)for(int i=0;i<p.length();i++)if(Math.abs(model.getDouble("lux")-p.getJSONObject(i).getDouble("lux"))<.5)belongs=true;modelSynced=state.kernel.name().equals("physical_mapping")||belongs&&state.memoryLifecycle.restoreModel(model);}finally{replaying=false;}
+   replaying=true;try{if(replace)state.kernel.replaceManualPoints(p);else state.kernel.restoreManualPoints(p);JSONObject model=PersistentMemory.model(raw);boolean belongs=false;if(model!=null)for(int i=0;i<p.length();i++)if(Math.abs(model.getDouble("lux")-p.getJSONObject(i).getDouble("lux"))<.5)belongs=true;modelSynced=state.kernel.memoryRestoreIncludesModel()||belongs&&state.memoryLifecycle.restoreModel(model);}finally{replaying=false;}
    restored++;status="手动记忆已恢复";state.memoryLifecycle.event("archive_restored");state.log(status+"："+p.length()+" 个节点");state.requestRecalculation();state.queuePublish();
   }catch(Throwable error){cancelRestore();replaying=false;status="手动记忆恢复未完成";state.log(status+"："+error.getMessage());}
  }
@@ -139,7 +139,8 @@ final class MemoryPersistence {
  void close(){state.handler.removeCallbacks(writer);flush();cancelRestore();}
  void put(JSONObject j)throws JSONException{
   options.put(j);j.put("memory_persist_supported",state.kernel.persistentMemorySupported()).put("memory_point_capacity",state.kernel.manualPointCapacity()).put("memory_effective_capacity",capacity()).put("memory_persist_status",status).put("memory_restore_count",restored).put("memory_save_pending",pendingWrite!=null).put("memory_restore_pending",pendingRestore).put("memory_restore_cause",restoreCause).put("memory_model_synced",modelSynced);
-  try{JSONArray live=state.kernel.manualPoints(),saved=state.kernel.plan()==null?new JSONArray():trim(PersistentMemory.read(record(),scope(),System.currentTimeMillis(),options.days,options.forever));savedPoints=saved.length();j.put("memory_live_points",display(live)).put("memory_saved_anchors",display(saved)).put("memory_live_count",live.length());if(record()!=null&&!record().isEmpty())j.put("memory_saved_at",new JSONObject(record()).optLong("saved_at"));}catch(Throwable optional){j.put("memory_archive_error",optional.getClass().getSimpleName());}
+  try{JSONArray live=state.kernel.manualPoints();j.put("memory_live_points",display(live)).put("memory_live_count",live.length());}catch(Throwable optional){j.put("memory_live_error",optional.getClass().getSimpleName());}
+  try{JSONArray saved=state.kernel.plan()==null?new JSONArray():trim(PersistentMemory.read(record(),scope(),System.currentTimeMillis(),options.days,options.forever));savedPoints=saved.length();j.put("memory_saved_anchors",display(saved));if(record()!=null&&!record().isEmpty())j.put("memory_saved_at",new JSONObject(record()).optLong("saved_at"));}catch(Throwable optional){j.put("memory_archive_error",optional.getClass().getSimpleName());}
   j.put("memory_saved_points",savedPoints);state.memoryLifecycle.put(j);
  }
  JSONArray display(JSONArray points)throws Exception{JSONArray out=new JSONArray();for(int i=0;i<points.length();i++){JSONObject p=new JSONObject(points.getJSONObject(i).toString());float value=state.kernel.manualDisplayValue((float)p.getDouble("value"));if(Float.isFinite(value)&&value>=0)p.put("display_nit",value);out.put(p);}return out;}

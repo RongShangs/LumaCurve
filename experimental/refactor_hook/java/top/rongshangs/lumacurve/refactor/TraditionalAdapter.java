@@ -54,6 +54,15 @@ public final class TraditionalAdapter extends CurveBackend {
     static Method method(Class<?> type,String name,Class<?>...params)throws Exception{for(Class<?> c=type;c!=null;c=c.getSuperclass())try{Method m=c.getDeclaredMethod(name,params);m.setAccessible(true);return m;}catch(NoSuchMethodException missing){}throw new NoSuchMethodException(name);}
     static float bound(Object mapper,boolean high)throws Exception{float[] n=(float[])read(mapper,"mNits");if(n==null||n.length<2)throw new IllegalArgumentException("设备亮度标定未就绪");for(int i=0;i<n.length;i++)if(!Float.isFinite(n[i])||n[i]<0||(i>0&&n[i]<=n[i-1]))throw new IllegalArgumentException("设备亮度标定无效");return high?n[n.length-1]:n[0];}
     public String name(){return "physical_mapping";}
+    public String coordinate(){return "physical_nit";}
+    public boolean usesRuntimeUserIdentity(){return true;}
+    public String interpolation(){return "physical_spline";}
+    public boolean savedCurveSupported(){return true;}
+    public int savedPointLimit(){return SavedCurve.MAX_POINTS;}
+    public String currentPipelineRoute(){return "mapping";}
+    public boolean memoryContextActive()throws Exception{return read(abc,"mCurrentBrightnessMapper")==mapper;}
+    public boolean memoryRestoreIncludesModel(){return true;}
+    public String memoryDescription(){return "本机保留完整基础曲线，手动模型支持 1 个偏好点";}
     public void putCurveState(org.json.JSONObject status)throws Exception{
         status.put("physical_mapping_active",read(abc,"mCurrentBrightnessMapper")==mapper).put("physical_mapper_class",mapper.getClass().getName()).put("physical_user_lux_field",userLuxField)
             .put("physical_baseline_route",calibration.clamped?PhysicalCurveCalibration.CLAMPED_ROUTE:"direct")

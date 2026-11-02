@@ -89,6 +89,6 @@ public class NavigationTest {
  }
 }''',encoding='utf-8')
 classes=O/'classes';classes.mkdir(exist_ok=True)
-names=['SceneOptions','CurvePlan','CurveComparison','SavedCurve','ThemeCurveOptions','TraditionalCurve','ThermalPolicy','MemoryPolicy','MemoryOptions','AdvancedOptions','AdvancedPolicy','OutdoorNodeTarget','OutdoorOptions','BrightnessControlOptions','LowLightThresholds','LowLightAssistGate','StatusAdvice','LiveLimitEvidence']
+names=['SceneOptions', 'CurvePlan', 'CurveComparison', 'SavedCurve', 'CurveCompatibility', 'TraditionalCurve', 'ThemeCurveOptions', 'ThermalPolicy', 'MemoryPolicy', 'MemoryOptions', 'AdvancedOptions', 'AdvancedPolicy', 'OutdoorNodeTarget', 'OutdoorOptions', 'BrightnessControlOptions', 'LowLightThresholds', 'LowLightAssistGate', 'StatusAdvice', 'LiveLimitEvidence']
 subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(J),'-d',str(classes),*[str(S/(n+'.java')) for n in names],str(test)],check=True)
 subprocess.run(['java','-cp',str(classes)+os.pathsep+str(J),'top.rongshangs.lumacurve.refactor.NavigationTest'],check=True)

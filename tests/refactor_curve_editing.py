@@ -47,7 +47,7 @@ public class EditingTest{
  }
 }''','utf-8')
 C=O/'classes';C.mkdir(exist_ok=True)
-names=['CurvePlan','CurveEditor','TraditionalCurve','ThemeCurveOptions','SavedCurve']
+names=['CurvePlan', 'CurveEditor', 'TraditionalCurve', 'ThemeCurveOptions', 'SavedCurve', 'CurveCompatibility']
 subprocess.run(['javac','--release','8','-encoding','UTF-8','-cp',str(J),'-d',str(C),*[str(S/(n+'.java')) for n in names],str(test)],check=True)
 subprocess.run(['java','-cp',str(C)+os.pathsep+str(J),'top.rongshangs.lumacurve.refactor.EditingTest'],check=True)
 main=(S/'MainActivity.java').read_text('utf-8')

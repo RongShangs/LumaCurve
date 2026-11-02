@@ -13,7 +13,7 @@ SOURCE=ROOT/'experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor'
 REQUIRED_INVARIANTS={'preserve_existing_routes','preserve_saved_preferences','actual_capabilities_not_os_or_model',
     'reject_partial_modern_abi','no_runtime_failure_downgrade','main_display_and_user_ownership',
     'bounded_event_driven_work','transactional_required_hook_installation','independent_optional_features',
-    'evidence_absence_is_unknown','website_sync_on_explicit_publication'}
+    'evidence_absence_is_unknown','website_sync_on_explicit_publication','normalize_before_shared_management'}
 LAYERS={'bootstrap','orchestration','adapters','presentation','configuration','bridge','diagnostics','policy','network','hook_backend'}
 
 def load_catalogue():
@@ -64,6 +64,14 @@ def validate(manifest,catalogue,source_map,baseline,root=ROOT):
         for name in family.get('owners',[]):
             owners.add(name)
             check((SOURCE/name).is_file(),fid+': missing owner '+name)
+        convergence=family.get('convergence',{})
+        for key in ['contract','coordinates']:
+            check(isinstance(convergence.get(key),str) and bool(convergence[key].strip()),fid+': missing convergence '+key)
+        for key in ['boundary','consumers']:
+            values=convergence.get(key,[])
+            check(isinstance(values,list) and bool(values) and len(values)==len(set(values)),fid+': missing/duplicate convergence '+key)
+            check(all(v in {e['file'] for e in source_map.get('files',[])} for v in values),fid+': unknown convergence '+key)
+        check(set(convergence.get('boundary',[])).issubset(family.get('owners',[])),fid+': convergence boundary is not owned')
         for name in family.get('tests',[]):
             check(name.startswith('tests/') and name.endswith('.py') and (root/name).is_file(),fid+': missing validation '+name)
         if family.get('composition')=='two_dimensions':
@@ -123,6 +131,30 @@ def validate(manifest,catalogue,source_map,baseline,root=ROOT):
         refs=set(re.findall(r'\b[A-Z][A-Za-z0-9_]*\b',code))
         check(not refs.intersection(ui),'runtime depends on presentation: '+entry['file']+' '+str(sorted(refs.intersection(ui))))
         check(not re.search(r'SystemVersion\s*\.\s*(read|inspect)|Build\s*\.\s*(MODEL|DEVICE|VERSION)',code),'version/model gate in adapter: '+entry['file'])
+    for message in boundary_violations({name:(SOURCE/name).read_text(encoding='utf-8') for name in BOUNDARY_CONSUMERS}):errors.append(message)
+    missing=unexecuted_tests(manifest,(root/'tools/build_refactor_hook_test.py').read_text(encoding='utf-8'))
+    check(not missing,'registered tests not executed by full build: '+str(sorted(missing)))
+    return errors
+
+
+def unexecuted_tests(manifest,build_text):
+    # Packaged filenames do not prove execution. Accept only the two checked execution helpers.
+    calls=set(re.findall(r"checked_test\(ROOT/'(tests/[a-z0-9_]+\.py)'",build_text))
+    calls.update(re.findall(r"run\(\['python',ROOT/'(tests/[a-z0-9_]+\.py)'",build_text))
+    registered={name for family in manifest.get('families',[]) for name in family.get('tests',[])}
+    return registered-calls
+
+
+BOUNDARY_CONSUMERS={'MainActivity.java','CurveComparison.java','SavedCurve.java','MemoryPersistence.java','MemoryLifecycle.java','HookRuntime.java','CurveBackend.java'}
+def boundary_violations(sources):
+    errors=[]
+    for name,text in sources.items():
+        # Diagnostics may print a route name; shared control cannot select an ABI by it.
+        if name in {'CurveComparison.java','SavedCurve.java','MemoryPersistence.java','MemoryLifecycle.java'} and re.search(r'"(?:physical_mapping|refactor_coefficients|mAnchorLux|mAnchorNit)"|instanceof\s+TraditionalAdapter|kernel\.name\(\)\s*\.\s*equals',text):
+            errors.append('native curve branch leaked into shared consumer: '+name)
+        if name=='MainActivity.java' and re.search(r'optString\s*\(\s*"curve_(?:backend|route)"',text):errors.append('UI selects native curve route')
+        if name=='HookRuntime.java' and re.search(r'kernel\s+instanceof\s+TraditionalAdapter|kernel\.name\(\)\s*\.\s*equals',text):errors.append('runtime selects curve capability by backend identity')
+        if name=='CurveBackend.java' and re.search(r'"(?:mAnchorLux|mAnchorNit)"|name\(\)\.equals',text):errors.append('shared backend defaults to a native ABI')
     return errors
 
 def render(manifest,catalogue,source_map):
@@ -132,6 +164,7 @@ def render(manifest,catalogue,source_map):
         routes={r['id']:r for feature in f['features'] for r in catalogue[feature]['routes']}
         for rid in f['routes']:lines.append('| `'+rid+'` · '+routes[rid]['name']+' | '+routes[rid]['condition'].replace('\n','<br>')+' |')
         lines += ['','实现：'+ '、'.join('['+n+'](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/'+n+')' for n in f['owners'])+'。','','证据：'+ '、'.join('`'+v+'`' for v in f['evidence'])+'。','','退出 / 回滚：'+f['cleanup'],'','验证：'+ '、'.join('['+Path(n).name+'](../../'+n+')' for n in f['tests'])+'。','']
+        c=f['convergence'];lines += ['收束边界：'+ '、'.join('`'+n+'`' for n in c['boundary'])+'。','','统一契约：'+c['contract']+'。','','坐标与语义：'+c['coordinates']+'。','','共同消费者：'+ '、'.join('`'+n+'`' for n in c['consumers'])+'。','']
     lines += ['## ABI 内部变体','','以下是功能路线内部的字段、签名、协议或迁移选择；不应全部变成 APP 开关。相关测试表示验证入口，具体主机 / 固件 / 真机覆盖以测试输出与复审记录为准。','','| 变体与实现 | 已有分支 | 选择及保护 | 相关验证 |','| --- | --- | --- | --- |']
     for v in manifest['abi_variants']:
         lines.append('| `'+v['id']+'` · `'+v['owner']+'` | '+' / '.join('`'+a+'`' for a in v['alternatives'])+' | '+v['rule']+' | ['+Path(v['test']).name+'](../../'+v['test']+') |')

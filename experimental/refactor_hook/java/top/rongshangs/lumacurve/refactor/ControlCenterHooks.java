@@ -148,7 +148,7 @@ final class ControlCenterHooks {
     static void failed(Throwable failure){String next=failure.toString();if(!next.equals(error)){error=next;XposedBridge.log("HyperLux slider coordinates unavailable: "+next);publish();}}
     static void bind(Context c){
         if(c==null||context!=null||!"com.android.systemui".equals(c.getPackageName()))return;context=c;main=new Handler(Looper.getMainLooper());ContentObserver changed=new ContentObserver(main){public void onChange(boolean self){refresh();}};
-        c.getContentResolver().registerContentObserver(Settings.Global.getUriFor(ControlCenterRoot.PROFILE),false,changed);c.getContentResolver().registerContentObserver(Settings.Global.getUriFor(ControlCenterEngine.TABLES),false,changed);c.getContentResolver().registerContentObserver(Settings.System.getUriFor(Settings.System.SCREEN_BRIGHTNESS_MODE),false,changed);refresh();
+        c.getContentResolver().registerContentObserver(Settings.Global.getUriFor(ControlCenterRoot.PROFILE),false,changed);c.getContentResolver().registerContentObserver(Settings.Global.getUriFor(ControlCenterEngine.TABLES),false,changed);c.getContentResolver().registerContentObserver(Settings.Global.getUriFor("boot_count"),false,changed);c.getContentResolver().registerContentObserver(Settings.System.getUriFor(Settings.System.SCREEN_BRIGHTNESS_MODE),false,changed);refresh();
     }
     static void refresh(){try{io.execute(()->{try{
         String raw=Settings.Global.getString(context.getContentResolver(),ControlCenterRoot.PROFILE),tables=Settings.Global.getString(context.getContentResolver(),ControlCenterEngine.TABLES),boot=Settings.Global.getString(context.getContentResolver(),"boot_count");Profile parsed=null;

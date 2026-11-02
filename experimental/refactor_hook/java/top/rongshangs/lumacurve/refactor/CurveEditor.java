@@ -2,7 +2,7 @@ package top.rongshangs.lumacurve.refactor;
 
 /** UI limits in the same logical coordinates as CurvePlan. No silent saturation. */
 public final class CurveEditor {
-    /** The graph uses zero to device maximum; stored factors remain unchanged. */
+    /** Legacy full-device conversion; current presentation uses CurveDisplayRange. */
     public static float percent(float brightness,float maximum){
         if(!Float.isFinite(maximum)||maximum<=0||!Float.isFinite(brightness)||brightness<0||brightness>maximum)throw new IllegalArgumentException("曲线坐标不兼容");
         return (float)((double)brightness/maximum*100);

@@ -7,7 +7,19 @@ import org.json.*;
 /** On-demand scope guidance and user-confirmed SystemUI restart. Never changes scope/config. */
 final class ControlCenterSetup {
     static final int SETTINGS_GROUP=8;
-    final MainActivity a;final TextView status;final Button restart;JSONObject report;boolean checking,pendingPrompt;
+    final MainActivity a;final TextView status;final Button restart;JSONObject report;boolean checking,pendingPrompt;String lastPrompt="",promptSelection="";
+    static boolean mappingChanged(JSONObject before,JSONObject after){
+        if(after==null||after.optInt("control_center_node_mode",0)<=0)return false;
+        if(before==null)return true;
+        return before.optInt("control_center_node_mode",0)!=after.optInt("control_center_node_mode",0)||before.optInt("control_center_partition_maximum",0)!=after.optInt("control_center_partition_maximum",0)||before.optBoolean("control_center_partition_restore_auto",true)!=after.optBoolean("control_center_partition_restore_auto",true);
+    }
+    static boolean changedPayload(JSONObject before,String encoded){try{return mappingChanged(before,new JSONObject(new String(java.util.Base64.getDecoder().decode(encoded),java.nio.charset.StandardCharsets.UTF_8)));}catch(Exception invalid){return false;}}
+    static boolean needsScope(JSONObject report){
+        String scope=report.optString("scope_state"),loaded=report.optString("injection_state");
+        if(scope.equals("missing")||scope.equals("module_missing")||!report.isNull("module_enabled")&&!report.optBoolean("module_enabled"))return true;
+        return !scope.equals("present")&&!loaded.equals("current")&&!loaded.equals("old_build");
+    }
+    String selection(){return a.controls.nodeSliderMode+":"+a.controls.partitionMaximum+":"+a.controls.partitionRestoreAuto;}
     ControlCenterSetup(MainActivity a,LinearLayout parent,TextView heading){
         this.a=a;LinearLayout header=a.column();header.setOrientation(LinearLayout.HORIZONTAL);header.setGravity(Gravity.CENTER_VERTICAL);header.setBaselineAligned(false);parent.addView(header);
         header.addView(heading,new LinearLayout.LayoutParams(0,-2,1));restart=a.action("重启系统界面",this::confirmRestart);restart.setTextSize(12);restart.setSingleLine(false);restart.setMaxLines(2);restart.setMinHeight(a.dp(40));restart.setMinimumHeight(a.dp(40));LinearLayout.LayoutParams buttonSize=new LinearLayout.LayoutParams(a.dp(112),-2);buttonSize.leftMargin=a.dp(8);header.addView(restart,buttonSize);
@@ -21,9 +33,9 @@ final class ControlCenterSetup {
         status.setText(a.tr(label));
     }
     void check(boolean prompt){
-        pendingPrompt|=prompt;if(checking||a.destroyed)return;checking=true;refresh();
+        if(prompt)promptSelection=selection();pendingPrompt|=prompt;if(checking||a.destroyed)return;checking=true;refresh();
         a.worker.execute(()->{JSONObject answer;try{JSONObject result=a.request("mapping-setup",null);if(!result.optBoolean("ok"))throw new Exception(result.optString("message"));answer=result.getJSONObject("control_center_setup");}catch(Exception unavailable){answer=new JSONObject();try{answer.put("scope_state","unknown").put("detail",unavailable.toString());}catch(JSONException ignored){}}
-            final JSONObject result=answer;a.ui.post(()->{if(a.destroyed)return;report=result;checking=false;boolean explain=pendingPrompt;pendingPrompt=false;refresh();String scope=report.optString("scope_state");if(explain&&a.page==1&&a.settingsGroup==SETTINGS_GROUP&&(!scope.equals("present")||!report.isNull("module_enabled")&&!report.optBoolean("module_enabled")))guide();});
+            final JSONObject result=answer;a.ui.post(()->{if(a.destroyed)return;report=result;checking=false;boolean explain=pendingPrompt;pendingPrompt=false;refresh();if(!needsScope(report)){lastPrompt="";return;}if(explain&&a.page==1&&a.settingsGroup==SETTINGS_GROUP&&promptSelection.equals(selection())&&a.controls.nodeSliderMode>0&&!promptSelection.equals(lastPrompt)){lastPrompt=promptSelection;guide();}});
         });
     }
     void guide(){a.messageDialog("添加系统界面作用域","在 LSPosed 中打开 HyperLux 的作用域，勾选“系统界面（com.android.systemui）”。\n\n列表中找不到时，请开启“显示系统应用”或取消“隐藏系统应用”。添加后重新检测，再点击“重启系统界面”。","重新检测",()->check(false));}

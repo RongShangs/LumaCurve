@@ -5,6 +5,28 @@ import org.json.*;
 /** Root binds read-only coordinates to the current display and system-server generation. */
 final class ControlCenterRoot {
     static final String PROFILE="hyperlux_control_center_profile_v1";
+    static final String RECOVERY="hyperlux_mapping_startup_v1";
+    static JSONObject recover(RootSettings settings,JSONObject runtime,String raw,long now)throws Exception{return recover(settings,runtime,raw,now,"android_boot_job");}
+    static JSONObject recover(RootSettings settings,JSONObject runtime,String raw,long now,String route)throws Exception{
+        JSONObject config=raw==null?new JSONObject():new JSONObject(raw);int mode=config.optInt("control_center_node_mode",0);
+        JSONObject result=new JSONObject().put("ok",true).put("build",AppBuild.BUILD).put("checked_elapsed_ms",now).put("mode",mode).put("route",route);
+        String state,message;
+        if(!config.optBoolean("enabled")||mode==0){state="disabled";message="未开启控制中心映射";}
+        else if(!BrightnessControlOptions.mappingRecoveryWanted(config)){state="unsupported";message="当前映射用户或模式不适用";}
+        else if(runtime==null||!"active".equals(runtime.optString("phase"))||!config.optString("revision").equals(runtime.optString("revision"))){state="pending";message="等待当前系统亮度引擎就绪";}
+        else if(!runtime.optBoolean(BrightnessControlOptions.capability(mode))){state="pending".equals(runtime.optString(BrightnessControlOptions.capability(mode)+"_state"))?"pending":"unsupported";message="等待本机映射接口检查";}
+        else{
+            try{
+                reconcile(settings,runtime,raw);String value=settings.get(PROFILE);JSONObject profile=value==null?null:new JSONObject(value);
+                boolean current=profile!=null&&AppBuild.BUILD.equals(profile.optString("build"))&&profile.optInt("pid",-1)==runtime.optInt("pid",-2)&&runtime.optString("process_start").equals(profile.optString("process_start"))&&config.optString("revision").equals(profile.optString("revision"))&&String.valueOf(settings.get("boot_count")).equals(profile.optString("boot_count"))&&profile.optInt("mode",-1)==mode;
+                state=current?"restored":"pending";message=current?"已恢复映射绑定，等待手动操作":"等待本次开机的映射标定";
+            }catch(Exception unavailable){state="unavailable";message=unavailable.toString();}
+        }
+        result.put("boot_count",settings.get("boot_count")).put("pid",runtime==null?-1:runtime.optInt("pid",-1));
+        result.put("state",state).put("message",message.substring(0,Math.min(300,message.length())));
+        try{settings.put(RECOVERY,result.toString());if(route.equals("root_service_directory"))settings.put(RECOVERY+"_root",result.toString());}catch(Exception diagnosticsUnavailable){}
+        return result;
+    }
     /** Root node access is independent of the curve engine. Retain an unchanged dormant v3 choice. */
     static void captureBinding(JSONObject config,JSONObject runtime,JSONObject stored,int mode)throws Exception{
         JSONObject node=null;Exception unavailable=null;

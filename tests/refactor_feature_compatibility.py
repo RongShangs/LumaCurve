@@ -80,6 +80,7 @@ public class FeatureCompatibilityTest{
   JSONObject alt=row("root_storage","available").put("workspace_route","root_temporary_storage");check(selected(FeatureCompatibility.annotate(new JSONObject().put("features",new JSONArray().put(alt)),r,"root").getJSONArray("features").getJSONObject(0)).contains("root_temporary_storage"));
   alt.put("workspace_attempts",new JSONArray().put(new JSONObject().put("id","root_private_storage").put("readable",false).put("detail","current storage denied")).put(new JSONObject().put("id","root_temporary_storage").put("readable",true)));
   JSONObject altRow=FeatureCompatibility.annotate(new JSONObject().put("features",new JSONArray().put(alt)),r,"root").getJSONArray("features").getJSONObject(0);check(altRow.getJSONArray("routes").getJSONObject(0).getString("reason").equals("current storage denied"));
+  JSONObject startup=row("mapping_startup","available").put("startup",new JSONObject().put("route","android_boot_job").put("state","not_run").put("maximum_attempts",4));JSONObject startupReport=new JSONObject().put("features",new JSONArray().put(startup));JSONObject startupRow=FeatureCompatibility.annotate(startupReport,r,"app").getJSONArray("features").getJSONObject(0);check(selected(startupRow).contains("android_boot_job"));check(startupRow.getString("evidence").contains("0/4"));startup.getJSONObject("startup").put("state","restored").put("elapsed_ms",100).put("attempt",1);check(FeatureCompatibility.annotate(startupReport,r,"app").getJSONArray("features").getJSONObject(0).getString("evidence").contains("2/4"));startup.put("state","unsupported");check(selected(FeatureCompatibility.annotate(startupReport,r,"app").getJSONArray("features").getJSONObject(0)).isEmpty());
   System.out.println("Feature compatibility catalogue: "+cases+" cases PASS; actual presentation model, no device or brightness probes");
  }
 }''',encoding='utf-8')
@@ -92,7 +93,7 @@ for name in ['CompatibilityCatalog.java','FeatureCompatibility.java','FeatureChe
   if re.search('[\u4e00-\u9fff]',value) and value not in phrases:phrases.append(value)
 java=p.read_text(encoding='utf-8')
 array=','.join(json.dumps(value,ensure_ascii=False) for value in phrases)
-java=java.replace('  System.out.println("Feature compatibility catalogue:', '  for(String text:new String[]{'+array+'})check(UiText.translate(text,true).codePoints().noneMatch(n->n>=0x4e00&&n<=0x9fff));\n  System.out.println("Feature compatibility catalogue:')
+java=java.replace('  System.out.println("Feature compatibility catalogue:', '  for(String text:new String[]{'+array+'}){if(UiText.translate(text,true).codePoints().anyMatch(n->n>=0x4e00&&n<=0x9fff))throw new AssertionError("Untranslated: "+text);check(true);}\n  System.out.println("Feature compatibility catalogue:')
 p.write_text(java,encoding='utf-8')
 C=O/'classes';C.mkdir(exist_ok=True)
 subprocess.run(['javac','--release','8','-encoding','UTF-8','-cp',str(J),'-d',str(C),str(S/'CompatibilityCatalog.java'),str(S/'FeatureCompatibility.java'),str(S/'UiText.java'),str(p)],check=True)

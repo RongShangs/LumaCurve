@@ -26,7 +26,21 @@ public abstract class CurveBackend {
     public boolean reconcile()throws Exception{return false;}
     public void putVerification(org.json.JSONObject status)throws Exception{}
     public void putCurveState(org.json.JSONObject status)throws Exception{}
-    public boolean savedCurveSupported(){return name().equals("refactor")||name().equals("physical_mapping");}
+    public boolean savedCurveSupported(){return false;}
+    public String coordinate(){return "unknown";}
+    public String legacyConfigBackend(){return "";}
+    public boolean usesRuntimeUserIdentity(){return false;}
+    public String interpolation(){return "unknown";}
+    public boolean strictOrder(){return false;}
+    public int savedPointLimit(){return 0;}
+    public String currentPipelineRoute(){return "";}
+    public boolean memoryContextActive()throws Exception{return true;}
+    public boolean memoryRestoreIncludesModel(){return false;}
+    public Object memoryLifecycleTarget(){return null;}
+    public String memoryDescription()throws Exception{return "手动记忆能力尚未确认";}
+    public org.json.JSONObject curveContract(org.json.JSONObject status)throws Exception{
+        return CurveCompatibility.descriptor(coordinate(),interpolation(),memoryDescription(),strictOrder(),memoryContextActive()&&CurveCompatibility.normalPipeline(status,currentPipelineRoute()),savedCurveSupported(),savedPointLimit(),Math.max(0,status.optInt("memory_live_count")));
+    }
     public boolean memoryHandoverSupported(){return true;}
     public boolean persistentMemorySupported(){return false;}
     public int manualPointCapacity(){return 0;}
@@ -36,6 +50,6 @@ public abstract class CurveBackend {
     public float manualDisplayValue(float value)throws Exception{return value;}
     public float[] fullLux(){return factoryLux.clone();}
     public float[] fullNit(){return factoryNit.clone();}
-    public float[] currentLux()throws Exception{return java.util.Arrays.copyOf((float[])get("mAnchorLux"),integer("mAnchorCount"));}
-    public float[] currentNit()throws Exception{return java.util.Arrays.copyOf((float[])get("mAnchorNit"),integer("mAnchorCount"));}
+    public float[] currentLux()throws Exception{throw new IllegalStateException("当前曲线读取接口尚未兼容");}
+    public float[] currentNit()throws Exception{throw new IllegalStateException("当前曲线读取接口尚未兼容");}
 }

@@ -62,7 +62,13 @@ final class RefactorCoefficientsAdapter extends CurveBackend {
         return lux;
     }
     public String name(){return "refactor";}
+    public String legacyConfigBackend(){return "refactor";}
     public String compatibilityRoute(){return "refactor_coefficients";}
+    public String coordinate(){return "logical_nit";}
+    public String interpolation(){return "coefficients";}
+    public boolean strictOrder(){return true;}
+    public String currentPipelineRoute(){return "refactor";}
+    public String memoryDescription(){return "本机采用分段拟合；仅报告最近一次手动输入";}
     public Object target(){return target;}
     public CurvePlan plan(){return active;}
     // This ABI has no verified user-anchor export / replay. Preserve settings on disk,

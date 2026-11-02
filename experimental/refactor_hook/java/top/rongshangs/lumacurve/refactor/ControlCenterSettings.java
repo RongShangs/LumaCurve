@@ -21,7 +21,7 @@ final class ControlCenterSettings {
             LinearLayout words=a.column();header.addView(words,new LinearLayout.LayoutParams(0,-2,1));words.addView(a.text(ControlCenterStatus.label(mode),15,a.INK));words.addView(a.text(summaries[i],12,a.MUTED));
             badges[i]=a.text("已选中",12,a.BLUE);badges[i].setGravity(Gravity.CENTER);header.addView(badges[i],new LinearLayout.LayoutParams(a.dp(48),-2));
             LinearLayout.LayoutParams size=new LinearLayout.LayoutParams(-1,-2);size.topMargin=a.dp(10);root.addView(option,size);
-            option.setOnClickListener(v->{if(a.busy||!ControlCenterStatus.selectable(a.runtime,mode,a.controls.nodeSliderMode))return;if(a.controls.nodeSliderMode!=mode){a.controls.nodeSliderMode=mode;a.dirty=true;a.drawCurve();}if(mode>0)setup.check(true);});
+            option.setOnClickListener(v->{if(a.busy||!ControlCenterStatus.selectable(a.runtime,mode,a.controls.nodeSliderMode)||a.controls.nodeSliderMode==mode)return;a.controls.nodeSliderMode=mode;a.dirty=true;a.drawCurve();if(mode>0)setup.check(true);});
         }
         partitionBody=a.column();options[2].addView(partitionBody);demo=new ControlCenterDemo(a);LinearLayout.LayoutParams preview=new LinearLayout.LayoutParams(-1,a.dp(252));preview.topMargin=a.dp(12);partitionBody.addView(demo,preview);
         limitHeader=a.column();limitHeader.setOrientation(LinearLayout.HORIZONTAL);limitHeader.setGravity(Gravity.CENTER_VERTICAL);limitHeader.setBaselineAligned(false);LinearLayout.LayoutParams headerSize=new LinearLayout.LayoutParams(-1,-2);headerSize.topMargin=a.dp(10);partitionBody.addView(limitHeader,headerSize);

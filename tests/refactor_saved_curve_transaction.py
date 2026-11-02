@@ -46,5 +46,5 @@ public class SavedTransactionTest {
 }''',encoding='utf-8')
 clock=O/'android/os/SystemClock.java';clock.parent.mkdir(parents=True,exist_ok=True);clock.write_text('package android.os;public class SystemClock{public static long elapsedRealtime(){return 10000;}}',encoding='utf-8')
 C=O/'classes';C.mkdir(exist_ok=True)
-subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(J),'-d',str(C),str(S/'ThemeCurveOptions.java'),str(S/'SavedCurve.java'),str(S/'CurvePlan.java'),str(clock),str(p)],check=True)
+subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(J),'-d',str(C),str(S/'ThemeCurveOptions.java'),str(S/'SavedCurve.java'),str(S/'CurveCompatibility.java'),str(S/'TraditionalCurve.java'),str(S/'CurvePlan.java'),str(clock),str(p)],check=True)
 subprocess.run(['java','-cp',str(C)+';'+str(J),'top.rongshangs.lumacurve.refactor.SavedTransactionTest'],check=True)

@@ -52,5 +52,5 @@ public class ReadingTest {
 files=[]
 for name,t in sources.items():p=O/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_text(t,'utf-8');files.append(p)
 C=O/'classes';C.mkdir(exist_ok=True)
-subprocess.run(['javac','--release','8','-encoding','UTF-8','-cp',str(J),'-d',str(C),*[str(S/(n+'.java')) for n in ['ScreenBrightnessReading','CurveEditor','CurvePlan','TraditionalCurve','SavedCurve']],*map(str,files)],check=True)
+subprocess.run(['javac','--release','8','-encoding','UTF-8','-cp',str(J),'-d',str(C),*[str(S/(n+'.java')) for n in ['ScreenBrightnessReading', 'CurveEditor', 'CurvePlan', 'TraditionalCurve', 'SavedCurve', 'CurveCompatibility']],*map(str,files)],check=True)
 subprocess.run(['java','-cp',str(C)+';'+str(J),'top.rongshangs.lumacurve.refactor.ReadingTest',*sys.argv[1:]],check=True)

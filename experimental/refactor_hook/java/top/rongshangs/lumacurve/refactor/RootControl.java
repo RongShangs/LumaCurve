@@ -83,6 +83,7 @@ public final class RootControl implements AutoCloseable {
             }catch(Exception ignored){}
         }
         if(!selfCheckNext){
+            out.put("mapping_startup_root",RootMappingBoot.configure(settings,raw));
             try{OutdoorNodeRoot.reconcile(state,raw);}catch(Exception nodeFailure){if(state!=null)state.put("outdoor_node_detail",nodeFailure.toString());}
             try{ControlCenterRoot.reconcile(settings,state,raw);}catch(Exception nodeFailure){try{settings.put(ControlCenterRoot.PROFILE,null);}catch(Exception ignored){}if(state!=null)state.put("control_center_node_detail",nodeFailure.toString());}
         }
@@ -275,11 +276,13 @@ public final class RootControl implements AutoCloseable {
                 write(zip,"config.json",String.valueOf(settings.get(CONFIG)));write(zip,"manual-memory.json",String.valueOf(settings.get(PersistentMemory.KEY)));write(zip,"stored-hook-status.json",String.valueOf(settings.get(STATUS)));write(zip,"configuration-ack.json",String.valueOf(settings.get(ACK)));File controlError=new File(DATA,"last-control-error.txt");if(controlError.isFile()&&controlError.length()<=16384)write(zip,"last-control-error.txt",new String(Files.readAllBytes(controlError.toPath()),StandardCharsets.UTF_8));write(zip,"injection.json",String.valueOf(settings.get("lumacurve_refactor_injection_v1")));for(String f:new String[]{"main-panel-permissions","main-panel.log","main-panel.previous.log","last-panel-error.txt"}){optionalFile(zip,f,new File(DATA,f),65536);}
                 for(String f:new String[]{"hyperlux-main-panel-lease","hyperlux-main-panel-health"}){optionalFile(zip,f,new File("/data/system",f),1024);}
                 write(zip,"build.txt",BUILD+"\n"+Build.FINGERPRINT+"\n");
-                for(String key:new String[]{ControlCenterEngine.UI,ControlCenterHooks.NODE_REQUEST}){
+                for(String key:new String[]{ControlCenterEngine.UI,ControlCenterHooks.NODE_REQUEST,ControlCenterRoot.RECOVERY,ControlCenterRoot.RECOVERY+"_root",RootMappingBoot.KEY}){
                     String value=null,issue=null;try{value=settings.get(key);}catch(Exception unavailable){issue=unavailable.toString();}
                     boolean oversized=value!=null&&value.length()>262144;
-                    write(zip,"control-center/"+(key.equals(ControlCenterEngine.UI)?"system-ui":"node-request")+".json",new JSONObject().put("source","SettingsProvider").put("namespace","global").put("key",key).put("status",issue!=null?"error":value==null?"missing":oversized?"oversized":"ok").put("value",issue==null&&!oversized&&value!=null?value:JSONObject.NULL).put("error",issue==null?JSONObject.NULL:issue).toString(2));
+                    write(zip,"control-center/"+(key.equals(ControlCenterEngine.UI)?"system-ui":key.equals(ControlCenterRoot.RECOVERY)?"startup":key.equals(RootMappingBoot.KEY)?"startup-root":key.equals(ControlCenterRoot.RECOVERY+"_root")?"startup-root-result":"node-request")+".json",new JSONObject().put("source","SettingsProvider").put("namespace","global").put("key",key).put("status",issue!=null?"error":value==null?"missing":oversized?"oversized":"ok").put("value",issue==null&&!oversized&&value!=null?value:JSONObject.NULL).put("error",issue==null?JSONObject.NULL:issue).toString(2));
                 }
+                optionalFile(zip,"control-center/startup-root.log",new File(RootMappingBoot.DIRECTORY,"hyperlux-mapping-boot.log"),8192);
+                try{write(zip,"control-center/setup.json",SystemUiAccess.inspect(settings).toString(2));}catch(Exception unavailable){write(zip,"control-center/setup.json",new JSONObject().put("error",unavailable.toString()).toString());}
                 new DiagnosticCollector(zip,settings::getSystem).collect();
                 progress("8/8 完成压缩并校验分析包…");
             }
@@ -381,6 +384,8 @@ public final class RootControl implements AutoCloseable {
         }
     }
     JSONObject execute(String command,String payload)throws Exception{
+        if(command.equals("resume-mapping")){RootMappingBoot.configure(settings,settings.get(CONFIG));return ControlCenterRoot.recover(settings,refreshedLive(),settings.get(CONFIG),android.os.SystemClock.elapsedRealtime());}
+        if(command.equals("boot-resume-mapping"))return ControlCenterRoot.recover(settings,refreshedLive(),settings.get(CONFIG),android.os.SystemClock.elapsedRealtime(),"root_service_directory");
         if(command.equals("mapping-setup"))return new JSONObject().put("ok",true).put("control_center_setup",SystemUiAccess.inspect(settings));
         if(command.equals("restart-system-ui"))return SystemUiAccess.restart(settings);
         if(command.equals("inspect"))return inspect();

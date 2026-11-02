@@ -99,7 +99,7 @@ public class QuickSetupTest{
 paths=[]
 for name,code in files.items():
  p=O/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_text(code,encoding='utf-8');paths.append(p)
-production=['QuickSetupPlan','QuickSetupPage','SettingsPresets','MemoryOptions','BrightnessControlOptions','OutdoorOptions','OutdoorNodeTarget','AdvancedOptions','AdvancedPolicy','LowLightThresholds','SavedCurve','CurveEditor','CurvePlan','ThermalPolicy','UiText']
+production=['QuickSetupPlan','QuickSetupPage','SettingsPresets','MemoryOptions','BrightnessControlOptions','OutdoorOptions','OutdoorNodeTarget','AdvancedOptions','AdvancedPolicy','LowLightThresholds','SavedCurve','CurveCompatibility','TraditionalCurve','CurveEditor','CurvePlan','ThermalPolicy','UiText']
 C=O/'classes';C.mkdir(exist_ok=True)
 subprocess.run(['javac','--release','8','-encoding','UTF-8','-cp',str(J),'-d',str(C),*map(str,paths),*[str(S/(n+'.java')) for n in production]],check=True)
 subprocess.run(['java','-cp',str(C)+os.pathsep+str(J),'top.rongshangs.lumacurve.refactor.QuickSetupTest'],check=True)

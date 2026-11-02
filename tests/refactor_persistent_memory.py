@@ -189,6 +189,7 @@ public class MemoryHostTest {
   MemoryPersistence.ThemeHandover cleared=sharedM.beforeTheme(0);sharedB.clearMemory();sharedM.configure(themeOnly,true);sharedM.afterTheme(cleared);sharedS.handler.drain();check(sharedB.anchors.length()==0&&!sharedM.pendingRestore);
   themesMemory.clearAll();check(!Settings.Global.data.containsKey(PersistentMemory.KEY+"_light")&&!Settings.Global.data.containsKey(PersistentMemory.KEY+"_dark"));
 
+  Backend corruptB=new Backend();HookRuntime corruptS=new HookRuntime(corruptB);MemoryPersistence corruptM=new MemoryPersistence(corruptS);corruptB.anchors=points(30,50);corruptM.cachedRecord="malformed archive";corruptM.archiveLoaded=true;JSONObject published=new JSONObject();corruptM.put(published);check(published.getInt("memory_live_count")==1&&published.getJSONArray("memory_live_points").length()==1&&published.has("memory_archive_error"));check(corruptM.cachedRecord.equals("malformed archive")&&corruptB.anchors.getJSONObject(0).getInt("value")==50);
   System.out.println("Persistent memory/theme: "+cases+" cases PASS; service and OEM models, device not verified");
  }
 }'''
@@ -197,6 +198,6 @@ files=[]
 for name,text in sources.items():
     p=O/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_text(text,encoding='utf-8');files.append(p)
 C=O/'classes';C.mkdir(exist_ok=True)
-names=['MemoryScene','MemoryOptions','PersistentMemory','MemoryPersistence','ThemeMemoryStore','ThemePalette','CurveBackend','SavedCurve','CurvePlan','CurveIdentity','RefactorAdapter','PhysicalCurveCalibration','TraditionalAdapter','TraditionalCurve']
+names=['MemoryScene', 'MemoryOptions', 'PersistentMemory', 'MemoryPersistence', 'ThemeMemoryStore', 'ThemePalette', 'CurveBackend', 'SavedCurve', 'CurveCompatibility', 'TraditionalCurve', 'CurvePlan', 'CurveIdentity', 'RefactorAdapter', 'PhysicalCurveCalibration', 'TraditionalAdapter']
 subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(J),'-d',str(C),*[str(S/(n+'.java')) for n in names],*map(str,files)],check=True)
 subprocess.run(['java','-cp',str(C)+';'+str(J),'top.rongshangs.lumacurve.refactor.MemoryHostTest'],check=True)

@@ -24,6 +24,9 @@ public final class ThemeCurveOptions {
     public void verify(String backend,float[] lux,float[] nit,float min,float max){
         if(saved!=null)saved.verifyBackend(backend);SavedCurve.plan(saved,lux,nit,min,max,factors,floor);
     }
+    public void verify(CurveCompatibility.Profile profile,float[] lux,float[] nit,float min,float max){
+        if(saved!=null)CurveCompatibility.verifySaved(profile,saved.lux.length);SavedCurve.plan(saved,lux,nit,min,max,factors,floor);
+    }
     public JSONObject profile()throws JSONException {JSONObject value=new JSONObject().put("factors",CurvePlan.encode(factors)).put("curve_floor_nit",floor);if(saved!=null)saved.put(value);return value;}
     public void put(JSONObject config)throws JSONException {config.put(KEY,profile().put("enabled",enabled).put("initialized",initialized||enabled||saved!=null).put("memory_mode",memoryMode));}
     public JSONObject select(JSONObject config,boolean dark)throws JSONException {

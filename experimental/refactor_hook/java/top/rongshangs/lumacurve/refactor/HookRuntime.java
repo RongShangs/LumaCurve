@@ -54,12 +54,7 @@ final class HookRuntime {
         this.owner=owner;this.handler=handler;context=(Context)HookEntry.get(owner,"mContext");controlCenter=new ControlCenterEngine(this);fingerprint=Build.FINGERPRINT;brightnessControl=new BrightnessControl(this);
         stateWriter=new DeferredStateWriter((key,value)->Settings.Global.putString(context.getContentResolver(),key,value),
             failure->XposedBridge.log("HyperLux deferred state: "+failure));
-        if(ref.getClass().getName().equals(HookEntry.REFACTOR)){
-        Class<?> util=Class.forName("com.android.server.display.RefactorBrightnessUtil",true,ref.getClass().getClassLoader());
-        if(HookEntry.field(util,"MIN_NIT").getType()!=float.class||HookEntry.field(util,"MAX_NIT").getType()!=float.class)throw new IllegalStateException("逻辑亮度边界类型已变化");
-        float min=((Number)HookEntry.field(util,"MIN_NIT").get(null)).floatValue(),max=((Number)HookEntry.field(util,"MAX_NIT").get(null)).floatValue();
-        kernel=RefactorProfiles.create(ref,min,max);
-        }else {Object impl=HookEntry.get(owner,"mAutomaticBrightnessControllerImpl");Object abc=HookEntry.get(impl,"mAutomaticBrightnessController");kernel=new TraditionalAdapter(owner,ref,abc,()->HookEntry.currentUser.serial());}
+        kernel=CurveBackendFactory.create(owner,ref);
         baselineIdentity=CurveIdentity.of(kernel.name(),kernel.fullLux(),kernel.fullNit(),kernel.min,kernel.max);
         try{hdrProbe=owner.getClass().getDeclaredMethod("isHdrScene");if(hdrProbe.getReturnType()!=boolean.class)hdrProbe=null;else hdrProbe.setAccessible(true);}catch(Throwable optional){}
         observer=new ContentObserver(handler){public void onChange(boolean self){reload();}};
@@ -193,7 +188,7 @@ final class HookRuntime {
                     compatibilityPaused=new JSONArray();
                     config=ConfigurationCompatibility.fit(config,featureChecks.caps,compatibilityPaused);
                     if(config.getInt("user_serial")!=kernel.integer("mUserSerial"))throw new IllegalArgumentException("当前用户与曲线配置不一致");
-                    if(!config.optString("curve_backend",kernel.name().equals("refactor")?"refactor":"").equals(kernel.name())||
+                    if(!config.optString("curve_backend",kernel.legacyConfigBackend()).equals(kernel.name())||
                         (config.has("baseline_id")&&!config.getString("baseline_id").equals(baselineId())))throw new IllegalArgumentException("设备曲线路径或基准已变化，请重新应用");
                     float ceiling=(float)config.optDouble("thermal_ceiling",43);ThermalPolicy.validate(ceiling);
                     boolean thermal=config.optBoolean("thermal_relax",false);
@@ -246,7 +241,7 @@ final class HookRuntime {
                     controlCenter.configure(config);phase="active";assistCompat.refresh();scenes.configure(proposedScenes);brightnessControl.configure(controls);outdoor.configure(outdoorOptions);message=firmwareRevalidated?"系统更新后的曲线与接口已重新核验，原设置继续生效":"自定义曲线已接入，官方光感和过渡动画继续运行";
                     // Configuration can itself switch auto brightness while callbacks
                     // are transaction-suppressed. Verify the curve before acknowledging.
-                    if(kernel.name().equals("refactor"))kernel.reconcile();
+                    kernel.reconcile();
                     if(compatibilityPaused.length()>0)message+="；已暂停不可用选项："+compatibilityPaused.toString();
                     persistentMemory.configure(memoryOptions,curveChanged);
                     persistentMemory.afterTheme(handover);
@@ -312,7 +307,7 @@ final class HookRuntime {
         if(!normalTuningAllowed(abc,impl)||(lastManualAdjustment>=0&&SystemClock.uptimeMillis()-lastManualAdjustment<=memoryWindow))return false;
         try{return "AutomaticBrightnessStrategy".equals(outputStrategy(HookEntry.get(owner,"mDisplayPowerController")));}catch(Throwable missing){return false;}
     }
-    void refreshUserIdentity(){if(kernel instanceof TraditionalAdapter)HookEntry.refreshCurrentUser(context);}
+    void refreshUserIdentity(){if(kernel.usesRuntimeUserIdentity())HookEntry.refreshCurrentUser(context);}
     boolean appliesToUser(){try{return ForegroundUser.matches(boundUser,kernel.integer("mUserSerial"));}catch(Throwable error){return false;}}
     void userChanged(){disableOverrides();try{kernel.configure(null);phase="error";message="用户已切换，恢复官方策略";log(message);publish();}catch(Throwable error){fault(error);}}
     void sample(float lux,float nit){
@@ -342,9 +337,9 @@ final class HookRuntime {
             if(lastAnimationSeconds>0)status.put("last_animation_seconds",lastAnimationSeconds);
             status.put("animation_compatibility_profile",AdvancedTuning.animationProfile(this));
             if(lastMainBrighten>=0)status.put("last_main_brighten_ms",lastMainBrighten);if(lastMainDarken>=0)status.put("last_main_darken_ms",lastMainDarken);if(lastMainSmall>=0)status.put("last_main_small_ms",lastMainSmall);status.put("last_main_extra_ms",lastMainExtra);
-            status.put("theme_memory_mode",themeMemoryMode).put("theme_curve_enabled",themeCurveEnabled).put("theme_curve_dark",themeCurveEnabled&&themeCurveDark).put("base_curve_name",themeCurveEnabled&&themeCurveDark?"深色模式基础曲线":"基础曲线").put("curve_backend",kernel.name()).put("curve_route",kernel.compatibilityRoute()).put("baseline_id",baselineId()).put("curve_coordinate",kernel.name().equals("refactor")?"logical_nit":"physical_nit")
+            status.put("theme_memory_mode",themeMemoryMode).put("theme_curve_enabled",themeCurveEnabled).put("theme_curve_dark",themeCurveEnabled&&themeCurveDark).put("base_curve_name",themeCurveEnabled&&themeCurveDark?"深色模式基础曲线":"基础曲线").put("curve_backend",kernel.name()).put("curve_route",kernel.compatibilityRoute()).put("baseline_id",baselineId()).put("curve_coordinate",kernel.coordinate())
                 .put("factory_full_lux",array(kernel.fullLux())).put("factory_full_nit",array(kernel.fullNit()));
-            if(kernel instanceof TraditionalAdapter)status.put("user_identity_source",HookEntry.currentUser.source()).put("user_identity_ready",kernel.integer("mUserSerial")>=0);
+            if(kernel.usesRuntimeUserIdentity())status.put("user_identity_source",HookEntry.currentUser.source()).put("user_identity_ready",kernel.integer("mUserSerial")>=0);
             status.put("memory_reset_rejected",memoryResetRejected).put("memory_strength",memoryStrength).put("memory_events",memoryEvents);persistentMemory.put(status);
             Object good=kernel.get("mIsHaveGoodCurve");if(good!=null)status.put("good_curve_available",good);
             status.put("memory_window",memoryWindow).put("memory_lux_range",memoryLuxRange).put("thermal_cooling",thermalCooling)
@@ -381,12 +376,14 @@ final class HookRuntime {
                 if(Float.isFinite(nit)&&nit>=0)status.put("actual_nit",nit).put("actual_nit_source","device_backlight_mapping");
                 status.put("screen_state",display.getClass().getMethod("getScreenState").invoke(display));
             }catch(Throwable unavailable){}
+            if(controlCenter.curveDisplayRange!=null)status.put("curve_display_range",controlCenter.curveDisplayRange);
             if(controlCenter.screenNitCalibration!=null)status.put("screen_nit_calibration",controlCenter.screenNitCalibration).put("screen_nit_physical",controlCenter.screenNitPhysical);
             CurvePlan plan=kernel.plan();if(plan!=null){float[] handles=new float[4];for(int i=0;i<4;i++)handles[i]=plan.at(kernel.factoryLux[i]);status.put("active_logical_nit",array(handles)).put("applied_base_lux",array(kernel.baselineLux())).put("applied_base_nit",array(kernel.baselineNit()));}
-            if(kernel.name().equals("refactor"))try{kernel.putVerification(status);}catch(Exception unavailable){status.put("refactor_curve_verification_error",unavailable.toString());}
+            try{kernel.putVerification(status);}catch(Exception unavailable){status.put("refactor_curve_verification_error",unavailable.toString());}
             for(Iterator<String> keys=featureChecks.caps.keys();keys.hasNext();){String key=keys.next();status.put(key,featureChecks.caps.get(key));}
             // Screen identity is live state, not the startup self-check snapshot.
             long outdoorPhysical=OutdoorOutputAccess.physical(this);if(outdoorPhysical>0)status.put("outdoor_node_physical_id",outdoorPhysical);
+            status.put(CurveCompatibility.KEY,kernel.curveContract(status));
             stateWriter.submit("state",StatusTransport.encode(status));
         }catch(Throwable error){XposedBridge.log("LumaCurve status: "+error);}
     }

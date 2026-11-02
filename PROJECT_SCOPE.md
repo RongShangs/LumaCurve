@@ -1,5 +1,20 @@
 # HyperLux 项目范围与任务边界
 
+2026-11-02 当前正式发布目标：**4.4.1 /44100 /release-4.4.1**。用户授权正式发布，累计公开4.4.0后Beta01—04：开机恢复、普通手动100%标尺、作用域按需提示、独立实时/归档记忆及全项目兼容工程约束。175份Java，相对Beta04仅AppBuild身份变化，保留原设置/签名/raw10及453份旧APK/ZIP。官网/GitHub/LSPosed同一累计日志，完成以build/release-4.4.1-publish/public-verification.json为准；不安装设备，无本轮真机/功耗验证。见docs/releases/4.4.1.md、docs/reviews/review-4.4.1.md。下方为历史。
+
+
+2026-11-02 当前本地交付目标：**4.4.0 Beta 04 / 44004 / beta-4.4.0-beta04**。在Beta03收束基础上继续全项目审阅：24组收束登记、58项功能/120个功能-路线组合全部进入追加式防删除基线，77个登记测试入口接入总构建并自动校验，维护负向159项。175份Java；本轮相对Beta03仅AppBuild身份变化，业务逻辑相同。保留原设置、旧路线和raw10，保护450份旧APK/ZIP。仅本地不发布/安装，无在线ADB；见docs/reviews/review-compatibility-20261102.md、docs/releases/4.4.0-beta04.md、build/beta-4.4.0-beta04/。下方为历史。
+
+
+2026-11-02 当前本地交付目标：**4.4.0 Beta 03 / 44003 / beta-4.4.0-beta03**。按“差异处适配，共用管理前收束”审阅24组兼容；新增curve_contract与集中旧快照读取、后端能力接口及曲线构造入口。统一页面/绘图/转存/记忆管理，实时与归档分开读取，两种启动入口共用判定。175份Java，保留旧路线、全部设置和raw10，保护447份旧APK/ZIP；仅本地不发布、不安装。规范见docs/architecture/compatibility-convergence.md；日志docs/releases/4.4.0-beta03.md，复审docs/reviews/review-4.4.0-beta03.md。下方为历史。
+
+长期要求：设备差异必须在实际适配边界分叉，在进入共用管理前收束坐标、能力与状态；每组convergence登记必填。新兼容保留旧路线，覆盖升级保留全部设置；禁止页面/Root/管理器各添一套选择逻辑。
+
+
+2026-11-02 当前本地交付：**4.4.0 Beta 02 / 44002 / beta-4.4.0-beta02**。累计公开4.4.0后Beta01—02；普通手动曲线100%统一，逻辑/物理坐标分开、全设备编辑/持久化域保留；新增独立Root受管开机入口，保留Android Job并分别诊断。173份Java、58功能/24组路线，原签名/raw10、全部设置和444份旧APK/ZIP保持；仅本地，无本轮在线ADB或真机重启实测。见docs/releases/4.4.0-beta02.md、docs/reviews/review-4.4.0-beta02.md及build/beta-4.4.0-beta02/。下方为历史。
+
+2026-11-02 当前本地交付：**4.4.0 Beta 01 / 44001 / beta-4.4.0-beta01**。基线公开4.4.0，补充控制中心映射的解锁后有界恢复，避免依赖打开APP或切换开关；作用域仅相关修改按需提示，当前注入与未知数据库分开。新增启动自检/诊断，171份Java、57功能/24组路线；保留全部旧适配、保存设置、原签名/raw10和441份既有APK/ZIP。仅本地不发布或安装；无本轮设备重启/功耗结果。见docs/architecture/mapping-startup.md、docs/releases/4.4.0-beta01.md、docs/reviews/review-4.4.0-beta01.md及build/beta-4.4.0-beta01/。下方为历史。
+
 2026-11-01 当前正式发布目标：**4.4.0 / 44000 / release-4.4.0**。用户授权发布，合入公开4.3.3后的Beta01—09：应用亮度隔离、设备范围与百分比曲线编辑、V1普通输入及延迟回显、作用域和更新弹窗修复。169份Java，相对Beta09仅AppBuild身份变化，原签名/raw10及全部设置保留，保护438份旧APK/ZIP。官网/GitHub/LSPosed同一功能优先简要+详细日志，完成以build/release-4.4.0-publish/public-verification.json为准；不安装设备，无新增真机/功耗结果。见docs/releases/4.4.0.md及docs/reviews/review-4.4.0.md。下方为历史。
 
 

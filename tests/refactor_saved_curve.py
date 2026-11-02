@@ -70,6 +70,6 @@ public class SavedCurveTest {
  }
 }''',encoding='utf-8')
 C=O/'classes';C.mkdir(exist_ok=True)
-names=['CurvePlan','CurveBackend','SavedCurve','RefactorAdapter','PersistentMemory','MemoryOptions','CurveComparison','TraditionalCurve']
+names=['CurvePlan', 'CurveBackend', 'SavedCurve', 'CurveCompatibility', 'TraditionalCurve', 'RefactorAdapter', 'PersistentMemory', 'MemoryOptions', 'CurveComparison']
 subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(J),'-d',str(C),*[str(S/(n+'.java')) for n in names],str(p)],check=True)
 subprocess.run(['java','-cp',str(C)+';'+str(J),'top.rongshangs.lumacurve.refactor.SavedCurveTest'],check=True)

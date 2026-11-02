@@ -31,25 +31,9 @@ final class CurveComparison {
         return read(runtime,factors,floor,draft,null);
     }
     static CurveComparison read(JSONObject runtime,float[] factors,float floor,boolean draft,SavedCurve saved)throws JSONException{
-        float[] factoryLux=numbers(runtime.getJSONArray("factory_lux")),factoryNit=numbers(runtime.getJSONArray("factory_logical_nit"));
-        float min=(float)runtime.getDouble("min_logical_nit"),max=(float)runtime.getDouble("max_logical_nit");
-        float[] base=draft?new CurvePlan(factoryLux,saved==null?factoryNit:saved.controls(factoryLux),min,max,factors,floor).nits()
-            :runtime.has("active_logical_nit")?numbers(runtime.getJSONArray("active_logical_nit")):factoryNit;
-        Line reference=new Line(factoryLux,factoryNit),baseline=new Line(factoryLux,base);
-        if("physical_mapping".equals(runtime.optString("curve_backend"))){
-            TraditionalCurve full=new TraditionalCurve(numbers(runtime.getJSONArray("factory_full_lux")),numbers(runtime.getJSONArray("factory_full_nit")));
-            reference=new Line(full.lux(),full.nit());
-            float[] liveFactors=new float[]{1,1,1,1};for(int i=1;i<4;i++)liveFactors[i]=base[i]==0&&factoryNit[i]==0?1:base[i]/factoryNit[i];
-            if(!(draft&&saved!=null)&&!(!draft&&runtime.has("applied_base_lux")&&runtime.has("applied_base_nit")))baseline=new Line(full.lux(),draft?full.reshape(min,max,factors,floor):full.reshape(min,max,liveFactors,base[0]));
-        }
-        if(draft&&saved!=null){CurvePlan plan=SavedCurve.plan(saved,factoryLux,factoryNit,min,max,factors,floor);baseline=new Line(plan.lux(),plan.nits());}
-        if(!draft&&runtime.has("applied_base_lux")&&runtime.has("applied_base_nit"))baseline=new Line(numbers(runtime.getJSONArray("applied_base_lux")),numbers(runtime.getJSONArray("applied_base_nit")));
+        CurveCompatibility.Curves data=CurveCompatibility.curves(runtime,factors,floor,draft,saved);
         Line current=null;
-        JSONObject frame=runtime.optJSONObject("last_pipeline");String backend=runtime.optString("curve_backend");
-        boolean activeRoute=frame==null||"refactor".equals(backend)&&"refactor".equals(frame.optString("route"))
-            ||"physical_mapping".equals(backend)&&"mapping".equals(frame.optString("route"));
-        if(activeRoute&&(!"physical_mapping".equals(backend)||runtime.optBoolean("physical_mapping_active")))
-            try{current=new Line(numbers(runtime.getJSONArray("current_anchors_lux")),numbers(runtime.getJSONArray("current_anchors_nit")));}catch(JSONException|IllegalArgumentException unavailable){/* Show unavailable; never infer it from saved anchors. */}
-        return new CurveComparison(reference,baseline,current);
+        if(data.currentLux!=null&&data.currentNit!=null)try{current=new Line(data.currentLux,data.currentNit);}catch(IllegalArgumentException unavailable){/* No archive or synthetic curve substitutes for live memory. */}
+        return new CurveComparison(new Line(data.referenceLux,data.referenceNit),new Line(data.baselineLux,data.baselineNit),current);
     }
 }

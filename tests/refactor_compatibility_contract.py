@@ -39,6 +39,22 @@ reject(lambda m,c,s,b:next(f for f in m['families'] if f['id']=='hbm').pop('dime
 reject(lambda m,c,s,b:m['abi_variants'].append(m['abi_variants'][0]))
 reject(lambda m,c,s,b:m['abi_variants'][0].update(alternatives=[]))
 reject(lambda m,c,s,b:m['abi_variants'][0].update(rule=''))
+reject(lambda m,c,s,b:m['invariants'].remove('normalize_before_shared_management'))
+reject(lambda m,c,s,b:m['families'][0].pop('convergence'))
+reject(lambda m,c,s,b:m['families'][0]['convergence'].update(boundary=['MainActivity.java']))
+reject(lambda m,c,s,b:m['families'][0]['convergence'].update(coordinates=''))
+# Reintroducing ABI branches at a common consumer must fail, even if all route IDs survive.
+for name,text in [('CurveComparison.java','if("physical_mapping".equals(backend)){}'),('SavedCurve.java','String x="refactor_coefficients";'),('MemoryPersistence.java','if(kernel instanceof TraditionalAdapter){}'),('MemoryLifecycle.java','kernel.name().equals("refactor")'),('MainActivity.java','r.optString("curve_backend")'),('HookRuntime.java','kernel.name().equals("refactor")'),('CurveBackend.java','get("mAnchorLux")')]:
+    check(bool(tool.boundary_violations({name:text})))
+check(not tool.boundary_violations({'MainActivity.java':'String label="Refactor 曲线";','HookRuntime.java':'config.getString("curve_backend").equals(kernel.name())'}))
+# Every reviewed route, including later additions, is independently protected against deletion.
+for feature,routes in baseline['features'].items():
+    for route in routes:
+        c=copy.deepcopy(catalogue);c[feature]['routes']=[r for r in c[feature]['routes'] if r['id']!=route]
+        check('removed baseline route: '+feature in tool.validate(manifest,c,mapping,baseline))
+build=(ROOT/'tools/build_refactor_hook_test.py').read_text(encoding='utf-8')
+check(not tool.unexecuted_tests(manifest,build))
+check('tests/refactor_control_center_root.py' in tool.unexecuted_tests(manifest,build.replace("checked_test(ROOT/'tests/refactor_control_center_root.py'","only_package(ROOT/'tests/refactor_control_center_root.py'")))
 # A new actual route may be registered without editing or deleting the old baseline.
 m,c=copy.deepcopy(manifest),copy.deepcopy(catalogue)
 for feature in m['families'][0]['features']:

@@ -10,7 +10,7 @@
 
 - ControlCenterCalibration保留全域原路线与标定有效域；验证真实背光换算用于自动亮度时的物理比例回显。
 - ControlCenterHooks校验既有SystemUI控件ABI，默认主屏且真实用户拖动才发v3请求；原比例路线继续调用原方法，完整节点路线不执行原滑条软件裁剪。32ms合并中间位置、松手立即发最终值。SystemUI不执行su、不写sysfs。
-- ControlCenterRoot绑定当前Root可写节点、上限与系统进程，并准备已有原生C监听；普通手动面板已持有节点时不抢占。监听空闲不写，只有合法cc_租约才开始。重启后APP运行检查恢复监听；未连接时不伪报可写。
+- ControlCenterRoot绑定当前Root可写节点、上限与系统进程，并准备已有原生C监听；普通手动面板已持有节点时不抢占。监听空闲不写，只有合法cc_租约才开始。4.4.0 Beta 01起重启解锁后由有界系统任务恢复监听，保留APP运行检查连接；未连接时不伪报可写，见mapping-startup.md。
 - ControlCenterNodes集中校验v3请求，将目标交给既有BrightnessControl.armRaw。它不复制模式所有权、节点写入、锁屏或恢复状态机。旧v1请求不回放。
 - BrightnessControl/RawPanelLease/RawPanelOutputHooks及原生raw08共同沿用8秒租约、健康验证、2秒续约、锁屏暂停/解锁恢复及正亮度输出隔离；第一帧/零亮度和熄屏路径继续原生。再次开启自动亮度立即释放，严重温控/HDR退出完整节点保持。
 

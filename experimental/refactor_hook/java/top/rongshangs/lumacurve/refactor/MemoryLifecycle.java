@@ -24,7 +24,7 @@ final class MemoryLifecycle {
             for(Object o:new Object[]{state.owner,impl,abc,mapper,model})if(o!=null)links.put(o,this);
             Method modelSetter=TraditionalAdapter.method(model.getClass(),"setUserBrightness",float.class,float.class);modelSupported=modelSetter.getReturnType()==void.class&&TraditionalAdapter.find(model.getClass(),"mAnchor").getType()==float.class&&TraditionalAdapter.find(model.getClass(),"mBrightness").getType()==float.class&&TraditionalAdapter.find(model.getClass(),"mIsValid").getType()==boolean.class;
             observe(abc,"resetShortTermModel");boolean expiry=observe(model,"invalidate");observe(impl,"needResetShortTermModelPolicy");foreverSupported=modeSupported&&modelSupported&&expiry&&state.kernel.persistentMemorySupported();
-            if(state.kernel.name().equals("refactor")){Object target=state.kernel.target();links.put(target,this);observe(target,"shouldUseGoodCurve");}
+            Object target=state.kernel.memoryLifecycleTarget();if(target!=null){links.put(target,this);observe(target,"shouldUseGoodCurve");}
             try{installAmbient(abc);}catch(Throwable absent){}try{installDisplayPolicy(abc);}catch(Throwable absent){}installResetRule();installTimeout();
         }catch(Throwable optional){state.log("手动记忆交接观察接口未完整兼容："+optional.getClass().getSimpleName());}
     }
@@ -78,14 +78,14 @@ final class MemoryLifecycle {
     boolean normalMapper(Object target){try{return TraditionalAdapter.read(abc,"mCurrentBrightnessMapper")==target&&!Boolean.TRUE.equals(TraditionalAdapter.method(abc.getClass(),"isInIdleMode").invoke(abc));}catch(Throwable absent){return false;}}
     float ambientLux(){try{if(!Boolean.TRUE.equals(TraditionalAdapter.read(abc,"mAmbientLuxValid"))||!Boolean.TRUE.equals(TraditionalAdapter.read(abc,"mLightSensorEnabled")))return Float.NaN;return ((Number)TraditionalAdapter.read(abc,"mAmbientLux")).floatValue();}catch(Throwable unavailable){return Float.NaN;}}
     JSONObject modelRecord(){try{if(!modelSupported)return null;float lux=((Number)TraditionalAdapter.read(model,"mAnchor")).floatValue(),br=((Number)TraditionalAdapter.read(model,"mBrightness")).floatValue();if(!Float.isFinite(lux)||lux<0||!Float.isFinite(br)||br<0||br>1)return null;return new JSONObject().put("lux",lux).put("brightness",br).put("valid",TraditionalAdapter.read(model,"mIsValid"));}catch(Throwable unavailable){return null;}}
-    boolean restoreModel(JSONObject record){if(!state.kernel.name().equals("refactor")||record==null||!modelSupported)return false;
+    boolean restoreModel(JSONObject record){if(state.kernel.memoryLifecycleTarget()==null||record==null||!modelSupported)return false;
         try{float lux=(float)record.getDouble("lux"),brightness=(float)record.getDouble("brightness");if(!Float.isFinite(lux)||lux<0||lux>state.kernel.factoryLux[3]||!Float.isFinite(brightness)||brightness<0||brightness>1)return false;
             TraditionalAdapter.method(model.getClass(),"setUserBrightness",float.class,float.class).invoke(model,lux,brightness);return true;
         }catch(Throwable optional){state.log("曲线节点已恢复，但短期模型未同步");return false;}
     }
     void event(String kind){if(state.changing||state.persistentMemory.replaying||state.closed)return;
         try{lastEvent=kind;JSONObject j=new JSONObject().put("event",kind).put("uptime_ms",SystemClock.uptimeMillis()).put("time_ms",System.currentTimeMillis()).put("manual_points",state.kernel.manualPoints().length());JSONObject record=modelRecord();if(record!=null)j.put("short_term_model",record);
-            if(state.kernel.name().equals("refactor"))j.put("good_curve_available",state.kernel.get("mIsHaveGoodCurve"));if(events.size()>=16)events.removeFirst();events.addLast(j);state.queuePublish();
+            if(state.kernel.memoryLifecycleTarget()!=null)j.put("good_curve_available",state.kernel.get("mIsHaveGoodCurve"));if(events.size()>=16)events.removeFirst();events.addLast(j);state.queuePublish();
         }catch(Throwable optional){}}
     void put(JSONObject j)throws JSONException{j.put("memory_mode_supported",modeSupported).put("memory_forever_supported",foreverSupported).put("memory_reset_supported",resetSupported).put("memory_timeout_supported",timeoutSupported).put("memory_model_sync_supported",modelSupported).put("memory_last_system_event",lastEvent).put("memory_lifecycle",new JSONArray(events));JSONObject record=modelRecord();if(record!=null)j.put("memory_short_term_model",record);}
     void close(){synchronized(links){links.entrySet().removeIf(e->e.getValue()==this);}}

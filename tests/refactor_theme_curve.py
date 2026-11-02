@@ -57,5 +57,5 @@ public class ThemeTest {
  }
 }'''.replace('HANDOVER',handover).replace('FINISH',finish).replace('RESET',reset)
 p=O/'ThemeTest.java';p.write_text(java,encoding='utf-8');C=O/'classes';C.mkdir(exist_ok=True)
-subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(J),'-d',str(C),*[str(S/(n+'.java')) for n in ['ThemeCurveOptions','MemoryOptions','SavedCurve','CurvePlan']],str(p)],check=True)
+subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(J),'-d',str(C),*[str(S/(n+'.java')) for n in ['ThemeCurveOptions','MemoryOptions','SavedCurve','CurveCompatibility','TraditionalCurve','CurvePlan']],str(p)],check=True)
 subprocess.run(['java','-cp',str(C)+os.pathsep+str(J),'top.rongshangs.lumacurve.refactor.ThemeTest'],check=True)
