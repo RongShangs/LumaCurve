@@ -9,7 +9,7 @@
 | 项目 | 要求 |
 | --- | --- |
 | 触发 | Root桥需要读写配置事务文件或生成诊断，在实际身份下校验受管目录。 |
-| 需求与行为 | 私有受管目录优先，拒绝时可用受管临时目录；验证所有权、真实路径和权限，不把目录可写当成节点可写 |
+| 需求与行为 | 私有受管目录优先，拒绝时可用受管临时目录；验证所有权、真实路径和权限，不把目录可写当成节点可写 原生锁只规范可信Root自有目录和同inode文件的私有权限，不删除或强抢锁；导出可只读记录元数据。 |
 | 退出 / 失败 | 候选目录校验失败只拒绝对应工具；未知文件和链接保留，不移动原生节点。 |
 | 默认 | `on_request` · 按实际权限选择 |
 | 配置键 | 无独立持久化亮度配置键 |
@@ -42,7 +42,7 @@
 | 项目 | 要求 |
 | --- | --- |
 | 触发 | 用户请求节点控制或对应工具需要读取并验证APK中的原生资产。 |
-| 需求与行为 | 校验最终APK内程序、协议和执行身份；查看页面不启动写入器；资产失败只停对应工具 |
+| 需求与行为 | 校验最终APK内程序、协议和执行身份；查看页面不启动写入器；资产失败只停对应工具 候选程序先完成原生恢复再原子替换，失败保留原文件；目录/身份/占用失败明确分开，权限残留不以关闭校验绕过。 |
 | 退出 / 失败 | 资产、协议或执行校验失败停止对应原生工具，曲线和其他可用能力不回滚。 |
 | 默认 | `on_request` · 需要节点控制时加载 |
 | 配置键 | 无独立持久化亮度配置键 |
@@ -85,7 +85,7 @@
 
 ### 选择边界
 
-逐项检查私有存储、原始配置、当前 APK 资产和组合接口；不试写亮度，不擅自启动服务。 Root设置三入口互斥，原外部Provider优先；只读探测拒绝时尝试权限等价的cmd settings/settings CLI，不绕过系统权限。写入失败不重放，UID0不等于全权限。私有目录严格身份检查后才回退，原生节点不换目录。
+逐项检查私有存储、原始配置、当前 APK 资产和组合接口；不试写亮度，不擅自启动服务。 Root设置三入口互斥，原外部Provider优先；只读探测拒绝时尝试权限等价的cmd settings/settings CLI，不绕过系统权限。写入失败不重放，UID0不等于全权限。私有目录严格身份检查后才回退，原生节点不换目录。 原生程序使用同一Root私有锁检查，不按Root工具名称放行；候选载荷先完成原生恢复才原子替换。
 
 | 契约 | 内容 |
 | --- | --- |
@@ -95,7 +95,7 @@
 
 ### 清理及回滚
 
-短命 Root 桥和有界 IPC；诊断不写回用户配置，失败只禁本项。 节点写入错误保留自动停用锁存；只有用户主动保存并获引擎确认后，才经过原有完整校验重试启动，不重置用户设置。 Root自检只读；启动初始化操作目录。已确认核心与可选节点工具分别报告，节点失败不回滚已确认曲线。导出失败转APP Downloads并明确标记非实时不完整包。 自检显示选中目录当前失败原因和各备用目录只读结果。
+短命 Root 桥和有界 IPC；诊断不写回用户配置，失败只禁本项。 节点写入错误保留自动停用锁存；只有用户主动保存并获引擎确认后，才经过原有完整校验重试启动，不重置用户设置。 Root自检只读；启动初始化操作目录。已确认核心与可选节点工具分别报告，节点失败不回滚已确认曲线。导出失败转APP Downloads并明确标记非实时不完整包。 自检显示选中目录当前失败原因和各备用目录只读结果。 只规范可信Root自有目录与同inode锁权限；已持锁退让，错误身份/链接拒绝，不删除锁。候选恢复失败保留旧程序，仅清理本次临时文件。
 
 ## 已实现的兼容路线
 
@@ -115,7 +115,7 @@
 
 路线内部 ABI：`root_attribution`、`outdoor_root_panel_binding`；完整条件仅维护在 [ABI索引](../architecture/compatibility-index.md#abi-内部变体)。
 
-运行证据：`feature_self_check`、`root_feature_self_check`、`outdoor_node_device_profile`、`outdoor_node_guard.write_attempts`、`outdoor_node_guard.write_errno`、`outdoor_node_guard.write_stage`、`root_access`、`settings_route`、`settings_attempts`、`workspace_route`、`workspace_attempts`。
+运行证据：`feature_self_check`、`root_feature_self_check`、`outdoor_node_device_profile`、`outdoor_node_guard.write_attempts`、`outdoor_node_guard.write_errno`、`outdoor_node_guard.write_stage`、`root_access`、`settings_route`、`settings_attempts`、`workspace_route`、`workspace_attempts`、`native-storage.json`、`NATIVE_START_FAIL.private_stage`、`NATIVE_START_FAIL.uid/euid`。
 
 验证入口：
 
@@ -125,6 +125,7 @@
 - [refactor_outdoor_fold.py](../../tests/refactor_outdoor_fold.py)
 - [refactor_outdoor_write_retry.py](../../tests/refactor_outdoor_write_retry.py)
 - [refactor_root_access.py](../../tests/refactor_root_access.py)
+- [refactor_native_storage.py](../../tests/refactor_native_storage.py)
 
 ## 实现追溯
 
@@ -135,8 +136,8 @@
 | [OutdoorNodeRoot.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/OutdoorNodeRoot.java) | `9def729b0d7dc0bf` |
 | [RootAccess.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/RootAccess.java) | `eb2e765208fa31b1` |
 | [RootCommand.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/RootCommand.java) | `22091c80df72806c` |
-| [RootControl.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/RootControl.java) | `0a7cb3fb3546b581` |
+| [RootControl.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/RootControl.java) | `77cafa1017ad8e5c` |
 | [RootFeatureChecks.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/RootFeatureChecks.java) | `f801660ebbb8a387` |
 | [RootLaunch.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/RootLaunch.java) | `a681d9b5f44fe950` |
 | [RootSettings.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/RootSettings.java) | `3b21095ef09b28e0` |
-| [RootWorkspace.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/RootWorkspace.java) | `b55df43ca380ed9c` |
+| [RootWorkspace.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/RootWorkspace.java) | `a7620b43655d8bb4` |

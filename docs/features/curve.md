@@ -103,11 +103,13 @@
 - 后端通过installMappingHooks装配自己的Hook；原生学习容量与存档回放能力独立声明。
 - 主题、编辑、显示标尺和记忆转存使用同一已选后端；具体单位、约束及内部变体见下方契约与ABI索引。
 - 独立默认字段/默认消费者整体缺失时，完整原生reset/getLogicalBrt及9/22布局才可采用重建系数；原默认接口任一残片存在时仍走旧校验，不降级。
+- 物理后端模式编号及映射表标记均缺失时，按完整普通/休眠双对象与isForIdleMode校验；现代任一标记存在即要求完整现代ABI，不借旧接口降级。
+- 有效自动模式优先owner的boolean字段；明确缺失时，按主屏DPC/策略/ABC归属读取原生shouldUseAutoBrightness；不采用设置缓存或最后输出原因。
 
 | 契约 | 内容 |
 | --- | --- |
 | 组合方式 | `exclusive` |
-| 统一输出 | CurveBackend能力方法（含installMappingHooks、独立学习容量/存档回放） + curve_contract v1 + Curves；显示标尺与原生载荷分开；原生私有当前消费者通过currentInputLux接收同坐标末段约束 |
+| 统一输出 | CurveBackend能力方法（含installMappingHooks、独立学习容量/存档回放） + curve_contract v1 + Curves；显示标尺与原生载荷分开；原生私有当前消费者通过currentInputLux接收同坐标末段约束；有效自动模式通过相同get契约收束，读取错误独立进入状态，不伪造false或丢弃日志。 |
 | 坐标与身份 | 物理nit/逻辑nit明确区分；归档value保持原生坐标，display_nit在适配器转换；framework_brightness为0—1框架亮度，按普通手动上限显示百分比，不冒充物理nit。 |
 
 ### 清理及回滚
@@ -131,9 +133,9 @@
 | `aosp_physical_clamped` · 系统物理映射：标定端点裁剪 | 原机曲线超出标定范围，且实际双向标定样条及端点裁剪通过验证；按有效范围编辑，默认保持原曲线对象与原生保护。 |
 | `simple_mapping` · 系统亮度比例映射 | 实际使用 SimpleMappingStrategy 的照度/亮度比例数组及原生样条重建；保留手动学习与完整记忆转存，不将比例当作 nit。 |
 
-路线内部 ABI：`active_backend`、`mapper_memory_coordinates`、`mapper_drag_signature`、`inherited_mapper_members`、`refactor_curve_layout`、`physical_baseline_calibration`、`coefficient_terminal_domain`、`curve_manual_display_scale`、`curve_snapshot_contract`、`simple_native_baseline`、`simple_commit_user_scope`、`curve_hook_assembly`、`learning_replay_capabilities`、`reset_derived_baseline`；完整条件仅维护在 [ABI索引](../architecture/compatibility-index.md#abi-内部变体)。
+路线内部 ABI：`active_backend`、`mapper_memory_coordinates`、`mapper_drag_signature`、`inherited_mapper_members`、`refactor_curve_layout`、`physical_baseline_calibration`、`coefficient_terminal_domain`、`curve_manual_display_scale`、`curve_snapshot_contract`、`simple_native_baseline`、`simple_commit_user_scope`、`curve_hook_assembly`、`learning_replay_capabilities`、`reset_derived_baseline`、`physical_mapper_context`、`mapping_automatic_mode`；完整条件仅维护在 [ABI索引](../architecture/compatibility-index.md#abi-内部变体)。
 
-运行证据：`curve_backend`、`physical_mapper_class`、`baseline_id`、`user_serial`、`curve_route`、`physical_baseline_route`、`physical_calibration_min_nit`、`physical_calibration_max_nit`、`physical_original_min_nit`、`physical_original_max_nit`、`physical_clamped_points`、`theme_curve_enabled`、`theme_curve_dark`、`base_curve_name`、`theme_memory_mode`、`curve_display_range`、`curve_contract`、`memory_live_error`、`simple_mapper_class`、`simple_mapping_active`、`simple_curve_points`、`simple_curve_nit_calibrated`、`calculated_brightness`、`simple_curve_last_error`、`refactor_curve_verification.profile`、`refactor_curve_verification.baseline_source`。
+运行证据：`curve_backend`、`physical_mapper_class`、`baseline_id`、`user_serial`、`curve_route`、`physical_baseline_route`、`physical_calibration_min_nit`、`physical_calibration_max_nit`、`physical_original_min_nit`、`physical_original_max_nit`、`physical_clamped_points`、`theme_curve_enabled`、`theme_curve_dark`、`base_curve_name`、`theme_memory_mode`、`curve_display_range`、`curve_contract`、`memory_live_error`、`simple_mapper_class`、`simple_mapping_active`、`simple_curve_points`、`simple_curve_nit_calibrated`、`calculated_brightness`、`simple_curve_last_error`、`refactor_curve_verification.profile`、`refactor_curve_verification.baseline_source`、`physical_context_route`、`physical_context_description`、`automatic_mode_route`、`automatic_mode_error`。
 
 验证入口：
 
@@ -157,11 +159,17 @@
 - [refactor_simple_mapping_firmware.py](../../tests/refactor_simple_mapping_firmware.py)
 - [refactor_reset_curve.py](../../tests/refactor_reset_curve.py)
 - [refactor_reset_firmware.py](../../tests/refactor_reset_firmware.py)
+- [refactor_mapper_context.py](../../tests/refactor_mapper_context.py)
+- [refactor_mapper_context_firmware.py](../../tests/refactor_mapper_context_firmware.py)
+- [refactor_automatic_mode.py](../../tests/refactor_automatic_mode.py)
+- [refactor_automatic_mode_firmware.py](../../tests/refactor_automatic_mode_firmware.py)
+- [refactor_legacy_input_firmware.py](../../tests/refactor_legacy_input_firmware.py)
 
 ## 实现追溯
 
 | 文件 | 当前源码 SHA-256 前16位 |
 | --- | --- |
+| [AutomaticModeAccess.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/AutomaticModeAccess.java) | `89cb3474888f3cb7` |
 | [BackendSelection.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/BackendSelection.java) | `f4b0414f4dde77fa` |
 | [CurveBackend.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/CurveBackend.java) | `4425f4d11dac93f4` |
 | [CurveBackendFactory.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/CurveBackendFactory.java) | `838b0409ccf67a75` |
@@ -170,8 +178,9 @@
 | [CurveDisplayRange.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/CurveDisplayRange.java) | `372050d731634e9a` |
 | [CurveEditor.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/CurveEditor.java) | `66423535b50b13ee` |
 | [CurvePlan.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/CurvePlan.java) | `6064003310ae7433` |
-| [HookRuntime.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/HookRuntime.java) | `4639a1d9ec1322dc` |
-| [MainActivity.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/MainActivity.java) | `44f528ce0c67eac7` |
+| [HookRuntime.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/HookRuntime.java) | `4e3f51d5e9508d0c` |
+| [MainActivity.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/MainActivity.java) | `2c493852ffa1550e` |
+| [MapperContextAccess.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/MapperContextAccess.java) | `778e604c1ff57198` |
 | [MemoryLifecycle.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/MemoryLifecycle.java) | `d96929913c2291a0` |
 | [MemoryPersistence.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/MemoryPersistence.java) | `09c7bd896953ad71` |
 | [PersistentMemory.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/PersistentMemory.java) | `0bd2ff3ec3bf3ac8` |
@@ -181,9 +190,9 @@
 | [RefactorProfiles.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/RefactorProfiles.java) | `3e1f956a3a071894` |
 | [RefactorResetAdapter.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/RefactorResetAdapter.java) | `b168fcd324bf2f87` |
 | [SavedCurve.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/SavedCurve.java) | `3d8f7557f9e456a2` |
-| [SimpleCurveAdapter.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/SimpleCurveAdapter.java) | `287ae76f766225a0` |
+| [SimpleCurveAdapter.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/SimpleCurveAdapter.java) | `baf692ac613d1830` |
 | [ThemeCurveOptions.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ThemeCurveOptions.java) | `438f9376ed3ed9d5` |
 | [ThemeMemoryStore.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ThemeMemoryStore.java) | `d6db61812d73f5d5` |
-| [TraditionalAdapter.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/TraditionalAdapter.java) | `63a0f727699594cb` |
+| [TraditionalAdapter.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/TraditionalAdapter.java) | `5537819db1b1ee6d` |
 | [TraditionalCurve.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/TraditionalCurve.java) | `6d6dae27db1b9bf7` |
 | [TraditionalHooks.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/TraditionalHooks.java) | `ce1e61e19bdab0d6` |

@@ -825,14 +825,23 @@ public final class MainActivity extends Activity {
     }
     String curvePercent(double value){return String.format(Locale.ROOT,"%.4f",value).replaceAll("0+$","").replaceAll("\\.$","");}
     String format(double number){return String.format(Locale.ROOT,"%.1f",number);}
+    void renderDisconnected(JSONObject answer){
+        runtime=null;drawAdvanced();drawOutdoor();drawControls();factoryLux=factoryNit=null;lowLightSwitch.setEnabled(false);badge.setText("未连接");stateTitle.setText("尚未连接系统曲线");luxReading.setText("— nit");nitReading.setText("— nit");apply.setEnabled(false);thermalSwitch.setEnabled(false);memorySwitch.setEnabled(false);stateGraph.invalidate();pipeline.invalidate();
+        if(answer.optBoolean("lsp_loaded")){
+            badge.setText("已加载");
+            if(!answer.optString("hook_issue").equals("curve_incompatible")){
+                permissionBlocked=false;permissionNotice="";stateTitle.setText("等待读取系统运行状态");return;
+            }
+            permissionPrompt("abi","设备曲线尚未连接",answer.optString("hook_message","等待读取设备本地曲线；如持续未连接，请导出分析包。"));return;
+        }
+        permissionPrompt("lsp","LSPosed 尚未接入",answer.optString("hook_issue").equals("restart_required")?"Root 已获授权，但系统仍在运行旧版 Hook。请重启手机以加载新版本。":"Root 已授权。请在 LSPosed 启用 HyperLux，勾选系统框架，然后重启手机。\n从旧测试版迁移时，请先关闭旧版的 LSPosed 开关。");
+    }
     void render(JSONObject answer){
         MappingStartup.remember(this,answer.optJSONObject("config"));
         lastAnswer=answer;rememberLegacy(answer);if(logCompatibility!=null)logCompatibility.update(answer,rootFeatureReport);
         try{
             if(!answer.optBoolean("connected")&&(answer.optString("hook_issue").equals("root_settings_unavailable")||answer.optString("hook_issue").equals("root_process_visibility"))){runtime=null;factoryLux=factoryNit=null;apply.setEnabled(false);thermalSwitch.setEnabled(false);memorySwitch.setEnabled(false);badge.setText("权限受限");stateTitle.setText("Root 接口受限");lowLightSwitch.setEnabled(false);luxReading.setText("— nit");nitReading.setText("— nit");stateGraph.invalidate();pipeline.invalidate();drawControls();drawOutdoor();drawAdvanced();permissionPrompt("root-access","Root 权限受限",answer.optString("hook_message")+"\n已有设置保留。恢复 Root 或调整该应用的 Root 权限后，可点击重新检测；日志页仍可导出权限分析包。");return;}
-            if(!answer.optBoolean("connected")){runtime=null;drawAdvanced();drawOutdoor();drawControls();factoryLux=factoryNit=null;lowLightSwitch.setEnabled(false);badge.setText("未连接");stateTitle.setText("尚未连接系统曲线");luxReading.setText("— nit");nitReading.setText("— nit");apply.setEnabled(false);thermalSwitch.setEnabled(false);memorySwitch.setEnabled(false);stateGraph.invalidate();pipeline.invalidate();
-                if(answer.optBoolean("lsp_loaded")){badge.setText("已加载");if(!answer.optString("hook_issue").equals("curve_incompatible")){permissionBlocked=false;permissionNotice="";show(answer.optString("hook_message"));return;}permissionPrompt("abi","设备曲线尚未连接",answer.optString("hook_message","等待读取设备本地曲线；如持续未连接，请导出分析包。"));return;}
-                permissionPrompt("lsp","LSPosed 尚未接入",answer.optString("hook_issue").equals("restart_required")?"Root 已获授权，但系统仍在运行旧版 Hook。请重启手机以加载新版本。":"Root 已授权。请在 LSPosed 启用 HyperLux，勾选系统框架，然后重启手机。\n从旧测试版迁移时，请先关闭旧版的 LSPosed 开关。");return;}
+            if(!answer.optBoolean("connected")){renderDisconnected(answer);return;}
             runtime=answer.getJSONObject("runtime");if(!runtime.has("factory_lux")){factoryLux=factoryNit=null;badge.setText("不兼容");show("");apply.setEnabled(false);thermalSwitch.setEnabled(false);memorySwitch.setEnabled(false);permissionPrompt("abi","系统接口尚未兼容",runtime.optString("message"));return;}
             factoryLux=RootControl.numbers(runtime.getJSONArray("factory_lux"));factoryNit=RootControl.numbers(runtime.getJSONArray("factory_logical_nit"));minimum=(float)runtime.getDouble("min_logical_nit");maximum=(float)runtime.getDouble("max_logical_nit");
             String baseline=runtime.optString("baseline_id");
@@ -847,10 +856,10 @@ public final class MainActivity extends Activity {
             if(!dirty){advanced=config!=null&&config.optBoolean("enabled")?AdvancedOptions.parse(config):new AdvancedOptions();sceneOptions=config!=null&&config.optBoolean("enabled")?SceneOptions.parse(config):new SceneOptions();}
             if(!dirty){assistGateOptions.configure(config==null?new JSONObject():config);lowThresholds=LowLightThresholds.parse(config==null?new JSONObject():config);lowLightStability=config!=null&&config.optBoolean("enabled")&&config.optBoolean("low_light_stability");lowLightLimit=config==null?50:(float)config.optDouble("low_light_limit",50);lowLightBrighten=config==null?3000:config.optLong("low_light_brighten",3000);lowLightDarken=config==null?4000:config.optLong("low_light_darken",4000);}
 
-            String phase=runtime.optString("phase");boolean active=phase.equals("active"),auto=runtime.optBoolean("auto_mode");badge.setText(runtime.optJSONObject("brightness_control")!=null&&"dark".equals(runtime.getJSONObject("brightness_control").optString("owner"))?"暗光锁定":!auto?"手动亮度":active?"运行中":phase.equals("error")?"接入异常":"官方基准");
-            stateTitle.setText(active?(auto?"自动亮度已接入":"系统处于手动亮度"):phase.equals("error")?"已交回系统控制":"使用系统基础曲线");
+            String phase=runtime.optString("phase");boolean active=phase.equals("active"),auto=runtime.optBoolean("auto_mode"),autoKnown=runtime.opt("auto_mode") instanceof Boolean;badge.setText(!autoKnown?"模式待确认":runtime.optJSONObject("brightness_control")!=null&&"dark".equals(runtime.getJSONObject("brightness_control").optString("owner"))?"暗光锁定":!auto?"手动亮度":active?"运行中":phase.equals("error")?"接入异常":"官方基准");
+            stateTitle.setText(!autoKnown?"自动亮度模式尚未确认":active?(auto?"自动亮度已接入":"系统处于手动亮度"):phase.equals("error")?"已交回系统控制":"使用系统基础曲线");
             luxReading.setText(runtime.has("calculated_physical_nit")?format(runtime.optDouble("calculated_physical_nit"))+" nit":"等待计算");nitReading.setText(runtime.has("actual_nit")?format(runtime.optDouble("actual_nit"))+" nit":"等待输出");
-            flow.setText(runtime.optBoolean("auto_mode")?"照度定位曲线，换算亮度后交由系统平滑调节。":"当前为手动亮度，曲线将在开启自动亮度后参与调节。");
+            flow.setText(!autoKnown?"已保留本机曲线，可在日志页查看模式读取情况。":runtime.optBoolean("auto_mode")?"照度定位曲线，换算亮度后交由系统平滑调节。":"当前为手动亮度，曲线将在开启自动亮度后参与调节。");
             if(runtime.optJSONObject("brightness_control")!=null&&"dark".equals(runtime.optJSONObject("brightness_control").optString("owner"))){stateTitle.setText("暗光锁定，保持当前亮度");flow.setText("自动亮度暂停；主辅光感继续低频监听，持续变亮后恢复自动。");}
             if(runtime.optJSONObject("brightness_control")!=null&&"app".equals(runtime.optJSONObject("brightness_control").optString("owner"))){stateTitle.setText("应用暂停自动亮度");flow.setText("当前应用在暂停名单中；退出后恢复自动亮度。");}
             String thermal=!runtime.optBoolean("thermal_supported")?"该固件接口未兼容":!runtime.optBoolean("thermal_relax")?"系统温控生效":runtime.optBoolean("thermal_permitted")?"减少温控降亮已启用":!runtime.has("battery_temperature")||runtime.optInt("thermal_severity",-1)<0?"等待温度读数，系统温控生效":"温度较高，系统温控生效";

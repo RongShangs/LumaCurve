@@ -82,9 +82,9 @@ total+=run_java('CommandTest',['RootCommand.java'],command,'command')
 
 workspace={
 'android/os/Process.java':files['android/os/Process.java'],
-'android/system/StructStat.java':'package android.system;public class StructStat{public int st_uid,st_mode=0040700;}',
+'android/system/StructStat.java':'package android.system;public class StructStat{public int st_uid,st_mode=0040700;public long st_nlink=1,st_dev=1,st_ino=2;}',
 'android/system/ErrnoException.java':'package android.system;public class ErrnoException extends Exception{public int errno;public ErrnoException(int e){errno=e;}}',
-'android/system/OsConstants.java':'package android.system;public class OsConstants{public static int EEXIST=17;public static boolean S_ISDIR(int mode){return (mode&0170000)==0040000;}}',
+'android/system/OsConstants.java':'package android.system;public class OsConstants{public static int EEXIST=17;public static boolean S_ISDIR(int mode){return (mode&0170000)==0040000;}public static boolean S_ISREG(int mode){return (mode&0170000)==0100000;}}',
 'android/system/Os.java':r'''package android.system;import java.io.*;import java.util.*;
 public class Os{public static int mkdirs,chmods;public static String denied="",wrongOwner="",unsafe="",shared="";public static StructStat lstat(String p)throws Exception{if(p.equals(denied))throw new IOException("Permission denied");if(!new File(p).exists())throw new IOException("ENOENT");StructStat s=new StructStat();s.st_uid=p.equals(wrongOwner)?1000:0;s.st_mode=p.equals(unsafe)?0040777:p.equals(shared)?0040755:0040700;return s;}public static void mkdir(String p,int mode)throws Exception{mkdirs++;if(!new File(p).mkdir())throw new ErrnoException(17);}public static void chmod(String p,int mode){chmods++;shared="";}}''',
 P+'WorkspaceTest.java':r'''package top.rongshangs.lumacurve.refactor;import java.io.*;import android.system.*;import org.json.*;
@@ -100,6 +100,7 @@ public class WorkspaceTest{static int cases;static void check(boolean b){if(!b)t
   Os.denied="";Os.unsafe="";Os.wrongOwner=RootWorkspace.PRIMARY.toString();failure(()->RootWorkspace.requireNative());check(Os.chmods==0);
   Os.wrongOwner="";Os.shared=RootWorkspace.PRIMARY.toString();failure(()->RootWorkspace.secure(RootWorkspace.PRIMARY,false));check(Os.chmods==0);RootWorkspace.secure(RootWorkspace.PRIMARY,true);check(Os.chmods==1);
   android.os.Process.uid=1000;failure(()->RootWorkspace.requireNative());check(Os.chmods==1);
+  int beforeChmod=Os.chmods,beforeMkdir=Os.mkdirs;org.json.JSONObject evidence=RootWorkspace.nativeEvidence();check(evidence.getBoolean("read_only")&&evidence.getInt("uid")==1000);check(evidence.getJSONArray("files").length()==4);check(evidence.getJSONArray("files").getJSONObject(0).getInt("uid")==0);check(Os.chmods==beforeChmod&&Os.mkdirs==beforeMkdir);
   System.out.println("Root workspace host: "+cases+" cases PASS");
  }}'''}
 # Android fixed directories are relocated only in this host fixture; checks stay production.

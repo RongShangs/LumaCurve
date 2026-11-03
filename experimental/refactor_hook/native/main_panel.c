@@ -132,14 +132,50 @@ static int write_output(int value){
  }
  last_error=ERANGE;return -1;
 }
-static int private_lock(void){
- struct stat st;if(lstat(DIR,&st)||!S_ISDIR(st.st_mode)||st.st_uid||(st.st_mode&0077))return -1;
- lock_fd=open(DIR "/main-panel.lock",O_RDWR|O_CREAT|O_NOFOLLOW|O_CLOEXEC,0600);
- if(lock_fd<0||fstat(lock_fd,&st)||!S_ISREG(st.st_mode)||st.st_uid||(st.st_mode&0077)||flock(lock_fd,LOCK_EX|LOCK_NB))return -1;
- return 0;
+/* PRIVATE_STORAGE_BEGIN: shared manual/outdoor ownership, no node operations. */
+static const char *private_stage="none";
+static int private_fail(int directory,int file,const char *stage,int error){
+ if(file>=0)close(file);if(directory>=0)close(directory);private_stage=stage;errno=error?error:EIO;return -1;
 }
+static int private_directory(void){
+ if(geteuid()!=0)return private_fail(-1,-1,"root_identity",EPERM);
+ char parent[PATH_MAX]=DIR,resolved[PATH_MAX];char *slash=strrchr(parent,'/');
+ if(!slash||slash==parent)return private_fail(-1,-1,"directory_path",EINVAL);*slash=0;
+ struct stat p,path,opened;
+ if(lstat(parent,&p))return private_fail(-1,-1,"parent_stat",errno);
+ if(!S_ISDIR(p.st_mode)||p.st_uid||(p.st_mode&0022))return private_fail(-1,-1,"parent_identity",EACCES);
+ if(!realpath(DIR,resolved))return private_fail(-1,-1,"directory_realpath",errno);
+ if(strcmp(resolved,DIR))return private_fail(-1,-1,"directory_alias",ELOOP);
+ if(lstat(DIR,&path))return private_fail(-1,-1,"directory_stat",errno);
+ if(!S_ISDIR(path.st_mode)||path.st_uid)return private_fail(-1,-1,"directory_identity",EACCES);
+ int directory=open(DIR,O_RDONLY|O_DIRECTORY|O_CLOEXEC|O_NOFOLLOW);if(directory<0)return private_fail(-1,-1,"directory_open",errno);
+ if(fstat(directory,&opened))return private_fail(directory,-1,"directory_fstat",errno);
+ if(!S_ISDIR(opened.st_mode)||opened.st_uid||opened.st_dev!=path.st_dev||opened.st_ino!=path.st_ino)return private_fail(directory,-1,"directory_changed",ESTALE);
+ // Tighten only this verified root-owned private directory; never change its owner.
+ if((opened.st_mode&0777)!=0700&&fchmod(directory,0700))return private_fail(directory,-1,"directory_mode",errno);
+ if(fstat(directory,&opened)||lstat(DIR,&path))return private_fail(directory,-1,"directory_verify",errno);
+ if(!S_ISDIR(opened.st_mode)||!S_ISDIR(path.st_mode)||opened.st_uid||path.st_uid||(opened.st_mode&0777)!=0700||(path.st_mode&0777)!=0700||opened.st_dev!=path.st_dev||opened.st_ino!=path.st_ino)return private_fail(directory,-1,"directory_verify",ESTALE);
+ return directory;
+}
+static int private_open_lock(const char *name){
+ if(strcmp(name,"main-panel.lock")&&strcmp(name,"outdoor-node.lock"))return private_fail(-1,-1,"lock_name",EINVAL);
+ int directory=private_directory();if(directory<0)return -1;
+ int file=openat(directory,name,O_RDWR|O_CREAT|O_NOFOLLOW|O_CLOEXEC,0600);if(file<0)return private_fail(directory,-1,"lock_open",errno);
+ struct stat st,path,dir,dirpath;
+ if(fstat(file,&st))return private_fail(directory,file,"lock_fstat",errno);
+ if(!S_ISREG(st.st_mode)||st.st_uid)return private_fail(directory,file,"lock_identity",EACCES);
+ if(st.st_nlink!=1)return private_fail(directory,file,"lock_links",EMLINK);
+ if(flock(file,LOCK_EX|LOCK_NB))return private_fail(directory,file,"lock_acquire",errno);
+ // Contents are unused. Repair mode on the same locked inode, never unlink a lock.
+ if((st.st_mode&0777)!=0600&&fchmod(file,0600))return private_fail(directory,file,"lock_mode",errno);
+ if(fstat(file,&st)||fstatat(directory,name,&path,AT_SYMLINK_NOFOLLOW)||fstat(directory,&dir)||lstat(DIR,&dirpath))return private_fail(directory,file,"lock_verify",errno);
+ if(!S_ISREG(st.st_mode)||st.st_uid||path.st_uid||st.st_nlink!=1||path.st_nlink!=1||(st.st_mode&0777)!=0600||(path.st_mode&0777)!=0600||!S_ISREG(path.st_mode)||path.st_dev!=st.st_dev||path.st_ino!=st.st_ino||!S_ISDIR(dirpath.st_mode)||dirpath.st_uid||(dirpath.st_mode&0777)!=0700||dir.st_dev!=dirpath.st_dev||dir.st_ino!=dirpath.st_ino)return private_fail(directory,file,"lock_changed",ESTALE);
+ close(directory);private_stage="ready";return file;
+}
+/* PRIVATE_STORAGE_END */
+static int private_lock(void){lock_fd=private_open_lock("main-panel.lock");return lock_fd<0?-1:0;}
 static void response(int c,int ok,const char *reason){
- char out[2048];int n=snprintf(out,sizeof(out),"{\"ok\":%s,\"reason\":\"%s\",\"backend\":\"raw_main_node\",\"native_build\":\"raw10-slider\",\"path\":\"%s\",\"canonical_path\":\"%s\",\"fold_port\":%d,\"control_center_listener\":%s,\"control_center_pid\":%d,\"target\":%d,\"actual\":%d,\"maximum\":%d,\"armed\":%s,\"paused\":%s,\"session\":\"%s\",\"write_attempts\":%d,\"write_successes\":%d,\"corrections\":%d,\"errno\":%d}\n",ok?"true":"false",reason,node,real_node,active_fold_port,control_center_listener?"true":"false",control_center_pid,state.target,number(node),maximum,state.armed?"true":"false",state.paused?"true":"false",state.token,attempts,successes,corrections,last_error);
+ char out[2048];int n=snprintf(out,sizeof(out),"{\"ok\":%s,\"reason\":\"%s\",\"backend\":\"raw_main_node\",\"native_build\":\"raw11-slider\",\"path\":\"%s\",\"canonical_path\":\"%s\",\"fold_port\":%d,\"control_center_listener\":%s,\"control_center_pid\":%d,\"target\":%d,\"actual\":%d,\"maximum\":%d,\"armed\":%s,\"paused\":%s,\"session\":\"%s\",\"write_attempts\":%d,\"write_successes\":%d,\"corrections\":%d,\"errno\":%d}\n",ok?"true":"false",reason,node,real_node,active_fold_port,control_center_listener?"true":"false",control_center_pid,state.target,number(node),maximum,state.armed?"true":"false",state.paused?"true":"false",state.token,attempts,successes,corrections,last_error);
  if(n>0&&(size_t)n<sizeof(out))send(c,out,(size_t)n,MSG_NOSIGNAL);
 }
 static int read_lease(struct panel_lease *lease){
@@ -197,13 +233,14 @@ static int escape_freezer(void){
  for(size_t i=0;i<sizeof(paths)/sizeof(paths[0]);i++){if(access(paths[i],F_OK))continue;exists=1;int f=open(paths[i],O_WRONLY|O_CLOEXEC);if(f>=0){int ok=write(f,b,(size_t)n)==n;close(f);if(ok)return 0;}}
  return exists?-1:0;
 }
-static int startup_fail(int code,const char *stage){fprintf(stderr,"NATIVE_START_FAIL stage=%s exit=%d errno=%d (%s)\n",stage,code,errno,strerror(errno));return code;}
+static int startup_fail(int code,const char *stage){int error=errno?errno:EIO;fprintf(stderr,"NATIVE_START_FAIL stage=%s exit=%d errno=%d (%s) uid=%lu euid=%lu private_stage=%s\n",stage,code,error,strerror(error),(unsigned long)getuid(),(unsigned long)geteuid(),private_stage);return code;}
 #include "outdoor_node.h"
 int main(int argc,char **argv){
  if((argc==4||argc==5)&&!strcmp(argv[1],"--outdoor")&&!strcmp(argv[2],"--node")){
   if(geteuid()!=0)return 2;if(argc==5){if(strncmp(argv[4],"--fold-ids=",11)||!outdoor_fold_ids_parse(argv[4]+11,&outdoor_ids))return 2;snprintf(outdoor_ids_text,sizeof(outdoor_ids_text),"%s",argv[4]+11);}return outdoor_run(argv[3]);
  }
- if(geteuid()!=0||private_lock())return startup_fail(2,"root_private_lock");
+ if(geteuid()!=0){errno=EPERM;private_stage="root_identity";return startup_fail(2,"root_identity");}
+ if(private_lock())return startup_fail(2,"root_private_lock");
  if(load_boot())return startup_fail(3,"boot_identity");
  if(restore_record())return startup_fail(3,"restore_permissions");
  if(argc==2&&!strcmp(argv[1],"--recover"))return 0;
@@ -216,7 +253,7 @@ int main(int argc,char **argv){
  // Open-only check before Java asks the system to disable automatic brightness.
  int probe=open_output();if(probe<0)return startup_fail(4,"primary_node_open");close(probe);
  int server=bind_server();if(server<0)return startup_fail(5,"control_socket");
- fprintf(stderr,"NATIVE_READY build=raw10-slider pid=%d maximum=%d path=%s real=%s\n",getpid(),maximum,node,real_node);
+ fprintf(stderr,"NATIVE_READY build=raw11-slider pid=%d maximum=%d path=%s real=%s\n",getpid(),maximum,node,real_node);
  signal(SIGTERM,signal_stop);signal(SIGINT,signal_stop);signal(SIGHUP,signal_stop);signal(SIGPIPE,SIG_IGN);panel_clear(&state);
  // Lease rename wakes the guard immediately on screen-off/DOZE or automatic mode.
  int events=inotify_init1(IN_NONBLOCK|IN_CLOEXEC);

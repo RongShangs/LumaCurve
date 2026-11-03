@@ -315,6 +315,8 @@ public final class UiText {
         WORDS.put("回答6个简单的问题，找到适合自己的亮度预设","Answer six simple questions to find suitable brightness presets");
         WORDS.put("配置光感：","Configured ALS: ");
         WORDS.put("选择方式：","Selection: ");
+        WORDS.put("照度换算：","Lux conversion: ");
+        WORDS.put("输入校验：","Input validation: ");
         WORDS.put("系统 FOV 融合光感","Native FOV fused ALS");
         WORDS.put("沿用主屏原生光感选择器返回的 FOV 源和照度解析；不混用 ABC 保留的物理光感槽。","Uses the FOV source returned by the native default-display selector and its lux interpretation, without mixing the retained physical ALS slot.");
         WORDS.put("系统标准主光感","Native standard main ALS");
@@ -338,6 +340,15 @@ public final class UiText {
         WORDS.put("\n曲线路线：","\nCurve route: ");
         WORDS.put("旧式9项系数与22项状态完整；保留原生手动学习和输出，尚不提供虚拟拟合点的跨模式 / 锁屏 / 重启恢复或记忆转基础。","Complete native 9-coefficient / 22-state ABI. Keeps native learning and output; portable fitting-point replay and learned-base saving are not verified.");
         WORDS.put("使用本机 RefactorNitController 的逻辑锚点、手动点与曲线重建接口。","Uses the device RefactorNitController anchors, manual points and native curve rebuilding.");
+        WORDS.put("等待读取系统运行状态","Waiting for system runtime status");
+        WORDS.put("模式待确认","Mode unconfirmed");
+        WORDS.put("自动亮度模式尚未确认","Automatic brightness mode is unconfirmed");
+        WORDS.put("已保留本机曲线，可在日志页查看模式读取情况。","The device curve is retained. Check mode-reading details on the Logs page.");
+        WORDS.put("自动模式接口：","Automatic mode interface: ");
+        WORDS.put("模式读取：","Mode reading: ");
+        WORDS.put("普通模式归属：","Normal mapper ownership: ");
+        WORDS.put("普通与休眠双映射对象校验","Interactive and idle mapper ownership");
+        WORDS.put("模式编号与映射表校验","Mode number and mapper table validation");
         WORDS.put("小米传统物理映射","Xiaomi traditional physical mapper");
         WORDS.put("实际映射器为 MiuiPhysicalBrightnessMappingStrategy，保留完整设备曲线与应用修正。","Uses MiuiPhysicalBrightnessMappingStrategy and preserves the complete device curve and application corrections.");
         WORDS.put("系统亮度比例映射","Native brightness-proportion mapper");

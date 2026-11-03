@@ -23,6 +23,15 @@ final class RootWorkspace {
  }
  static void requireNative()throws Exception{if(android.os.Process.myUid()!=0)throw new IOException("直接控制屏幕节点需要 UID 0；其他功能按实际权限使用");secure(PRIMARY,true);}
  static void initialize(){try{require();}catch(Exception unavailable){selectionError=unavailable.toString();}}
+ static JSONObject nativeEvidence()throws JSONException{
+  JSONObject result=new JSONObject().put("uid",android.os.Process.myUid()).put("read_only",true);JSONArray files=new JSONArray();
+  for(String name:new String[]{"","main-panel.lock","outdoor-node.lock","main-panel-permissions"}){
+   File file=name.isEmpty()?PRIMARY:new File(PRIMARY,name);JSONObject row=new JSONObject().put("path",file.toString());
+   try{StructStat st=Os.lstat(file.toString());row.put("uid",st.st_uid).put("mode",Integer.toOctalString(st.st_mode&07777)).put("regular",OsConstants.S_ISREG(st.st_mode)).put("directory",OsConstants.S_ISDIR(st.st_mode)).put("links",st.st_nlink).put("device",st.st_dev).put("inode",st.st_ino);}
+   catch(Exception unavailable){row.put("error",unavailable.toString());}files.put(row);
+  }
+  return result.put("files",files);
+ }
  static synchronized JSONObject report()throws JSONException{
   JSONObject out=new JSONObject().put("selected",selected==null?"":selected.toString()).put("native_directory",PRIMARY.toString());JSONArray routes=new JSONArray();boolean usable=false;String selectedError="";
   for(File path:new File[]{PRIMARY,temporary()}){JSONObject row=new JSONObject().put("id",path.equals(PRIMARY)?"root_private_storage":"root_temporary_storage").put("path",path.toString()).put("selected",path.equals(selected));try{secure(path,false);if(path.equals(selected))usable=true;row.put("readable",true).put("writable",true);}catch(Exception missing){if(path.equals(selected))selectedError=missing.toString();row.put("readable",false).put("writable",false).put("detail",missing.toString());}routes.put(row);}

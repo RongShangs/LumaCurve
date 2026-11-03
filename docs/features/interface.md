@@ -40,7 +40,7 @@
 | 项目 | 要求 |
 | --- | --- |
 | 触发 | 对应页面可见或用户明确触发。 |
-| 需求与行为 | 按光感、场景、曲线、输出保护、实际亮度排列，卡片不随文字改变高度；常规视口不滚动，极端视口防裁切；蓝字可点，过期不造0。 |
+| 需求与行为 | 按光感、场景、曲线、输出保护、实际亮度排列，卡片不随文字改变高度；常规视口不滚动，极端视口防裁切；蓝字可点，过期不造0。 自动模式未知单独标明，不误判为手动；等待连接的后台刷新只显示页内状态，不持续Toast。 有效模式按owner字段、原生策略或整体缺策略的旧DPC实例字段分叉后统一读取，不以用户设置替代运行模式。 |
 | 退出 / 失败 | 离页停止无用界面刷新；未知读数不以0或旧值占位。 |
 | 默认 | `observe` · 只控制对应界面或用户明确操作，不自动调整屏幕亮度。 |
 | 配置键 | 无独立持久化亮度配置键 |
@@ -95,7 +95,7 @@
 | 项目 | 要求 |
 | --- | --- |
 | 触发 | 对应页面可见或用户明确触发。 |
-| 需求与行为 | 独立自检页面按功能展示采用/未采用路线、依据和固定检测时间；查看展开只读；分析包导出确认后打开系统分享。 |
+| 需求与行为 | 独立自检页面按功能展示采用/未采用路线、依据和固定检测时间；查看展开只读；分析包导出确认后打开系统分享。 自动亮度模式读取失败独立记录，保留曲线、运行日志及其他诊断，不使整份状态消失。 |
 | 退出 / 失败 | 查看/展开不执行控制；导出或分享失败保留原包，并明确不完整诊断范围。 |
 | 默认 | `observe` · 只控制对应界面或用户明确操作，不自动调整屏幕亮度。 |
 | 配置键 | 无独立持久化亮度配置键 |
@@ -117,9 +117,12 @@
 | 文件 | 当前源码 SHA-256 前16位 |
 | --- | --- |
 | [AboutPage.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/AboutPage.java) | `be37169affb0eacd` |
+| [AutomaticModeAccess.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/AutomaticModeAccess.java) | `89cb3474888f3cb7` |
 | [ConfigurationFile.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ConfigurationFile.java) | `a45f2429bd244e74` |
 | [FeatureCheckPage.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/FeatureCheckPage.java) | `c299b03f761fe6f0` |
 | [FloatingNavigation.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/FloatingNavigation.java) | `4aedf6324f3f0d15` |
+| [HookRuntime.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/HookRuntime.java) | `4e3f51d5e9508d0c` |
+| [MainActivity.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/MainActivity.java) | `2c493852ffa1550e` |
 | [QuickSetupPlan.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/QuickSetupPlan.java) | `ba3faf56456e4cc8` |
 | [SettingsSearch.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/SettingsSearch.java) | `e6d35527a7fccfc5` |
 | [StatusPageLayout.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/StatusPageLayout.java) | `82c2f0e363a062f6` |

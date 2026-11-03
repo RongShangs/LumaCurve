@@ -61,8 +61,31 @@ final class BrightnessSensorAccess {
         float value=((Number)HookEntry.get(dual,field)).floatValue();
         if(!Float.isFinite(value)||value<=0||value>100)throw new IllegalArgumentException("Invalid sensor lux scale: "+field);return value;
     }
+    static Field optionalField(Class<?> type,String name){
+        for(Class<?> c=type;c!=null;c=c.getSuperclass())try{Field field=c.getDeclaredField(name);field.setAccessible(true);return field;}catch(NoSuchFieldException absent){}
+        return null;
+    }
+    static boolean legacyUnitLux(Binding b)throws Exception{
+        // Absence is an ABI choice; a present null/invalid scale must stay an error.
+        if(optionalField(b.policy.getClass(),"mFovAmplifyFactor")!=null||optionalField(b.policy.getClass(),"mAssistFovAmplifyFactor")!=null)return false;
+        if(b.fov||b.main.getType()!=Sensor.TYPE_LIGHT||!b.policy.getClass().getName().equals("com.android.server.display.DualSensorPolicy"))throw new IllegalArgumentException("Unverified unscaled sensor input");
+        for(String name:new String[]{"mBrightnessControllerImpl","mSensorManager"}){
+            Field field=optionalField(b.policy.getClass(),name);
+            if(field==null||field.getType().isPrimitive()||Modifier.isStatic(field.getModifiers()))throw new IllegalArgumentException("Legacy sensor owner ABI");
+        }
+        if(HookEntry.get(b.policy,"mBrightnessControllerImpl")!=b.impl||HookEntry.get(b.policy,"mSensorManager")!=b.manager)throw new IllegalArgumentException("Legacy sensor ownership mismatch");
+        for(String name:new String[]{"mMainFastAmbientLux","mAssistFastAmbientLux"}){
+            Field field=optionalField(b.policy.getClass(),name);
+            if(field==null||field.getType()!=float.class||Modifier.isStatic(field.getModifiers()))throw new IllegalArgumentException("Legacy lux coordinate ABI");
+        }
+        for(String name:new String[]{"handleAssistLightSensorEvent","updateMainLuxStatus"}){
+            Method method=b.policy.getClass().getDeclaredMethod(name,name.startsWith("handle")?new Class<?>[]{long.class,float.class}:new Class<?>[]{float.class});
+            if(Modifier.isStatic(method.getModifiers())||method.getReturnType()!=void.class)throw new IllegalArgumentException("Legacy lux consumer ABI");
+        }
+        return true;
+    }
     static final class Binding {
-        Object impl,controller,policy,panelConfig;String physicalId="",profile="";SensorManager manager;Sensor configured,main,assist;float mainScale=1,assistScale=1;boolean fov;Method driving;
+        Object impl,controller,policy,panelConfig;String physicalId="",profile="",scaleRoute="single_unit_lux";SensorManager manager;Sensor configured,main,assist;float mainScale=1,assistScale=1;boolean fov;Method driving;
         boolean same(Binding other){return other!=null&&impl==other.impl&&profile.equals(other.profile)&&controller==other.controller&&policy==other.policy&&panelConfig==other.panelConfig
             &&physicalId.equals(other.physicalId)&&manager==other.manager&&BrightnessSensorAccess.same(main,other.main)
             &&BrightnessSensorAccess.same(configured,other.configured)&&BrightnessSensorAccess.same(assist,other.assist)&&mainScale==other.mainScale&&assistScale==other.assistScale;}
@@ -71,8 +94,9 @@ final class BrightnessSensorAccess {
         Binding b=new Binding();Selection selected=selection(owner);b.main=selected.main;b.configured=selected.configured;b.profile=selected.profile;b.impl=selected.impl;b.controller=selected.controller;b.fov=selected.fov;
         b.manager=(SensorManager)HookEntry.get(b.controller,"mSensorManager");if(b.manager==null)throw new IllegalStateException("Main sensor manager not ready");
         b.policy=optional(b.impl,"mDualSensorPolicy");
-        if(b.policy!=null){b.assist=(Sensor)HookEntry.get(b.policy,"mAssistLightSensor");b.mainScale=scale(b.policy,"mFovAmplifyFactor");b.assistScale=scale(b.policy,"mAssistFovAmplifyFactor");}
+        if(b.policy!=null){b.assist=(Sensor)HookEntry.get(b.policy,"mAssistLightSensor");if(legacyUnitLux(b))b.scaleRoute="legacy_dual_unit_lux";else{b.mainScale=scale(b.policy,"mFovAmplifyFactor");b.assistScale=scale(b.policy,"mAssistFovAmplifyFactor");b.scaleRoute="native_amplified_lux";}}
         if(b.fov){
+            b.scaleRoute="native_fov_lux";
             b.driving=method(b.impl,"getDrivingStatus",boolean.class);
             b.mainScale=((Number)method(b.impl,"getFovAmplifyFactor",float.class).invoke(b.impl)).floatValue();
             if(!Float.isFinite(b.mainScale)||b.mainScale<=0||b.mainScale>100)throw new IllegalArgumentException("Invalid FOV lux scale");
@@ -94,7 +118,7 @@ final class BrightnessSensorAccess {
         JSONObject j=new JSONObject().put("source","automatic_brightness_controller").put("extra_listener",false);
         try{Selection selected=selection(owner);Sensor sensor=selected.main;j.put("profile",selected.profile).put("binding_source",selected.fov?"oem_fov_override":"abc_main_slot").put("configured_sensor_name",selected.configured==null?"":selected.configured.getName()).put("sensor_name",sensor.getName()).put("sensor_type",sensor.getType()).put("sensor_string_type",sensor.getStringType()).put("display_id",0);}
         catch(Throwable unknown){j.put("profile","").put("detail",unknown.toString());}
-        try{Binding b=read(owner);j.put("input_mode",b.assist==null?"single_main":"dual_input").put("assist_source_present",b.assist!=null);}
+        try{Binding b=read(owner);j.put("input_mode",b.assist==null?"single_main":"dual_input").put("assist_source_present",b.assist!=null).put("lux_scale_route",b.scaleRoute);}
         catch(Throwable unknown){j.put("input_detail",unknown.toString());}
         return j;
     }

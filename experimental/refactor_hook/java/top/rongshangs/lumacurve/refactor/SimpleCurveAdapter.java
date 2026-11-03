@@ -20,6 +20,7 @@ final class SimpleCurveAdapter extends CurveBackend {
     private String lastError="";
     private static final class Base {final float[] lux,brightness;final Object spline;Base(float[] x,float[] y,Object s){lux=x.clone();brightness=y.clone();spline=s;}}
     private Boolean persistence;
+    private AutomaticModeAccess automatic;
 
     SimpleCurveAdapter(Object owner,Object mapper,Object abc,IntSupplier user)throws Exception {
         super(0,1);this.owner=owner;this.mapper=mapper;this.abc=abc;this.user=user;
@@ -79,8 +80,8 @@ final class SimpleCurveAdapter extends CurveBackend {
     public boolean savedCurveSupported(){return true;}
     public int savedPointLimit(){return SavedCurve.MAX_POINTS;}
     public String memoryDescription(){return "本机使用亮度比例曲线，手动模型支持 1 个偏好点";}
-    public void putCurveState(JSONObject s)throws Exception {s.put("simple_mapper_class",mapper.getClass().getName()).put("simple_mapping_active",memoryContextActive()).put("simple_curve_points",nativeLux.length).put("simple_curve_nit_calibrated",false).put("simple_curve_last_error",lastError);}
-    public Object get(String n)throws Exception {if(n.equals("mUserSerial"))return user.getAsInt();if(n.equals("mUseAutoBrightness"))return TraditionalAdapter.read(owner,n);if(n.equals("mIsHaveGoodCurve"))return null;return TraditionalAdapter.read(mapper,n);}
+    public void putCurveState(JSONObject s)throws Exception {s.put("simple_mapper_class",mapper.getClass().getName()).put("simple_mapping_active",memoryContextActive()).put("simple_curve_points",nativeLux.length).put("simple_curve_nit_calibrated",false).put("simple_curve_last_error",lastError);if(automatic!=null)s.put("automatic_mode_route",automatic.route);}
+    public Object get(String n)throws Exception {if(n.equals("mUserSerial"))return user.getAsInt();if(n.equals("mUseAutoBrightness")){if(automatic==null)automatic=new AutomaticModeAccess(owner,abc);return automatic.read();}if(n.equals("mIsHaveGoodCurve"))return null;return TraditionalAdapter.read(mapper,n);}
     public CurvePlan plan(){return active;}
     public float[] fullLux(){return original.lux();}
     public float[] fullNit(){return original.nit();}

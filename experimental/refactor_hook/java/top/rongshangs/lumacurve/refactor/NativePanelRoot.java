@@ -32,7 +32,7 @@ final class NativePanelRoot {
   try{StructStat opened=Os.fstat(fd);if(!OsConstants.S_ISREG(opened.st_mode)||expected.st_dev!=opened.st_dev||expected.st_ino!=opened.st_ino||!node.toPath().toRealPath().toString().equals(selected.getString("canonical_path")))throw new IOException("主屏节点在权限检查期间发生变化");}
   finally{Os.close(fd);}
  }
- static boolean matches(JSONObject node,JSONObject guard){return (!ActivePanelNode.PROFILE.equals(node.optString("discovery"))||node.optInt("fold_port",-2)==guard.optInt("fold_port",-3))&&guard.optBoolean("ok")&&("raw08-slider".equals(guard.optString("native_build"))||"raw09-slider".equals(guard.optString("native_build"))||"raw10-slider".equals(guard.optString("native_build")))&&node.optString("path").equals(guard.optString("path"))&&node.optString("canonical_path").equals(guard.optString("canonical_path"))&&node.optInt("maximum",-1)==guard.optInt("maximum",-2);}
+ static boolean matches(JSONObject node,JSONObject guard){return (!ActivePanelNode.PROFILE.equals(node.optString("discovery"))||node.optInt("fold_port",-2)==guard.optInt("fold_port",-3))&&guard.optBoolean("ok")&&("raw08-slider".equals(guard.optString("native_build"))||"raw09-slider".equals(guard.optString("native_build"))||"raw10-slider".equals(guard.optString("native_build"))||"raw11-slider".equals(guard.optString("native_build")))&&node.optString("path").equals(guard.optString("path"))&&node.optString("canonical_path").equals(guard.optString("canonical_path"))&&node.optInt("maximum",-1)==guard.optInt("maximum",-2);}
  static void install()throws Exception{
   RootWorkspace.requireNative();
   Os.chmod(RootControl.DATA.toString(),0700);
@@ -42,11 +42,15 @@ final class NativePanelRoot {
    byte[] want=MessageDigest.getInstance("SHA-256").digest(bytes);
    if(BIN.isFile()&&java.util.Arrays.equals(want,MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(BIN.toPath())))){Os.chmod(BIN.toString(),0700);return;}
    try{NativePanelClient.require("STOP");}catch(Exception ignored){}
-   if(BIN.isFile()){
-    for(int i=0;i<20;i++){try{NativePanelClient.call("STATUS");Thread.sleep(50);}catch(Exception stopped){break;}}
-    RootControl.process(BIN.toString(),"--recover");
-   }
-   File temp=new File(RootControl.DATA,"hyperlux-main-panel.new");Files.write(temp.toPath(),bytes);Os.chmod(temp.toString(),0700);Files.move(temp.toPath(),BIN.toPath(),StandardCopyOption.REPLACE_EXISTING,StandardCopyOption.ATOMIC_MOVE);
+   if(BIN.isFile())for(int i=0;i<20;i++){try{NativePanelClient.call("STATUS");Thread.sleep(50);}catch(Exception stopped){break;}}
+   File temp=Files.createTempFile(RootControl.DATA.toPath(),"hyperlux-main-panel-",".new").toFile();
+   try{
+    Files.write(temp.toPath(),bytes);Os.chmod(temp.toString(),0700);
+    // The new verified recovery code handles old private-mode residue before replacement.
+    // Recovery must still restore the original node-permission record successfully.
+    RootControl.process(temp.toString(),"--recover");
+    Files.move(temp.toPath(),BIN.toPath(),StandardCopyOption.REPLACE_EXISTING,StandardCopyOption.ATOMIC_MOVE);
+   }finally{Files.deleteIfExists(temp.toPath());}
   }
  }
  static void start(JSONObject selected)throws Exception{start(selected,false,0);}

@@ -37,7 +37,7 @@
 | --- | --- |
 | `abc_sensor_manager` · 自动亮度控制器的光感服务 | 复用本机 ABC 的 SensorManager；按传感器类型和句柄识别，锁定期间低频确认退出条件。 |
 
-路线内部 ABI：`sensor_identity`、`sensor_freshness`、`main_light_identity`、`manual_node_hold_policy`；完整条件仅维护在 [ABI索引](../architecture/compatibility-index.md#abi-内部变体)。
+路线内部 ABI：`sensor_identity`、`sensor_freshness`、`main_light_identity`、`manual_node_hold_policy`、`main_input_lux_scale`；完整条件仅维护在 [ABI索引](../architecture/compatibility-index.md#abi-内部变体)。
 
 运行证据：`brightness_control.owner`、`brightness_control.watch_main_lux`、`brightness_control.watch_assist_lux`、`brightness_control.watch_binding_active`、`brightness_control.watch_physical_display_id`、`brightness_control.watch_main_profile`。
 
@@ -51,6 +51,6 @@
 | 文件 | 当前源码 SHA-256 前16位 |
 | --- | --- |
 | [BrightnessControl.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/BrightnessControl.java) | `8e91d605934d21fc` |
-| [BrightnessSensorAccess.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/BrightnessSensorAccess.java) | `c008c2c248c52e33` |
+| [BrightnessSensorAccess.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/BrightnessSensorAccess.java) | `fdfeca59df5414c8` |
 | [DarkLockPolicy.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/DarkLockPolicy.java) | `c5f8a32a3c033eb6` |
-| [HookRuntime.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/HookRuntime.java) | `4639a1d9ec1322dc` |
+| [HookRuntime.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/HookRuntime.java) | `4e3f51d5e9508d0c` |

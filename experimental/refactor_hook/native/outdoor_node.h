@@ -43,14 +43,13 @@ static void outdoor_health(const struct outdoor_node_state *s,const char *reason
  int ok=n>0&&n<(int)sizeof(b)&&write(f,b,(size_t)n)==n;close(f);if(ok)rename(temp,OUTDOOR_HEALTH);else unlink(temp);
 }
 static int outdoor_lock(void){
- int f=open(DIR "/main-panel.lock",O_RDWR|O_CREAT|O_NOFOLLOW|O_CLOEXEC,0600);if(f<0)return -1;
- struct stat st;if(fstat(f,&st)||!S_ISREG(st.st_mode)||st.st_uid||(st.st_mode&0077)||flock(f,LOCK_EX|LOCK_NB)){close(f);return -1;}return f;
+ return private_open_lock("main-panel.lock");
 }
 /* OUTDOOR_WRITE_BEGIN: exercised with host I/O doubles. */
 static int outdoor_write_once(int expected,int target){
  outdoor_attempt_errno=0;outdoor_attempt_stage="compare";
  /* Shared manual guard lock; do not chmod the node or stop framework output. */
- int lock=outdoor_lock();if(lock<0)return 1;
+ int lock=outdoor_lock();if(lock<0){if(errno==EAGAIN||errno==EWOULDBLOCK)return 1;outdoor_attempt_errno=errno?errno:EIO;outdoor_attempt_stage="private_lock";return -1;}
  if(outdoor_folded()&&!fold_panel_live("/sys",active_fold_port)){close(lock);return 1;}
  if(target<0||target>number(max_node)||!same_node()){close(lock);return 1;}
  if(number(node)!=expected){close(lock);return 2;}
@@ -100,9 +99,7 @@ static int outdoor_write(int expected,int target,const struct outdoor_lease *per
 }
 /* OUTDOOR_WRITE_END */
 static int outdoor_run(const char *path){
- struct stat dir;if(lstat(DIR,&dir)||!S_ISDIR(dir.st_mode)||dir.st_uid||(dir.st_mode&0077))return 2;
- int singleton=open(DIR "/outdoor-node.lock",O_RDWR|O_CREAT|O_NOFOLLOW|O_CLOEXEC,0600);
- struct stat st;if(singleton<0||fstat(singleton,&st)||!S_ISREG(st.st_mode)||st.st_uid||(st.st_mode&0077)||flock(singleton,LOCK_EX|LOCK_NB))return 2;
+ int singleton=private_open_lock("outdoor-node.lock");if(singleton<0)return startup_fail(2,"outdoor_private_lock");
  int maximum;if(outdoor_folded()){maximum=outdoor_fold_initialize(path);if(maximum<0)return 4;}else{if(resolve_node(path))return 4;maximum=number(max_node);if(maximum<=10||maximum>65535)return 4;}
  if(setsid()<0||escape_freezer())return 6;
  signal(SIGTERM,signal_stop);signal(SIGINT,signal_stop);signal(SIGHUP,signal_stop);

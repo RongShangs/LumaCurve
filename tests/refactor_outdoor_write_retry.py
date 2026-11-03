@@ -16,7 +16,7 @@ static const char *outdoor_attempt_stage="none",*outdoor_report_stage="none";
 static const char *node="node",*max_node="max";static int active_fold_port;
 static struct outdoor_lease lease;
 static int number(const char *p){return p==max_node?maximum:current;}
-static int outdoor_lock(void){return locked?-1:10;}
+static int outdoor_lock(void){if(locked){errno=locked==2?EACCES:EAGAIN;return -1;}return 10;}
 static int outdoor_folded(void){return folded;}
 static int fold_panel_live(const char *p,int port){(void)p;(void)port;return live;}
 static int same_node(void){return same;}
@@ -71,6 +71,7 @@ int main(void){
  reset();CHECK(outdoor_write(2047,4095,NULL)==1&&calls==0);
  reset();revoked=1;CHECK(outdoor_write(2047,4095,&lease)==1&&calls==0);
  reset();locked=1;CHECK(outdoor_write(2047,4095,&lease)==1&&calls==0&&waits==0);
+ reset();locked=2;CHECK(outdoor_write(2047,4095,&lease)==-1&&calls==0&&waits==0&&outdoor_report_errno==EACCES&&!strcmp(outdoor_report_stage,"private_lock"));
  reset();mode=16;CHECK(outdoor_write(2047,4095,&lease)==0&&calls==1&&waits==1&&outdoor_report_errno==0);
  reset();current=0;CHECK(outdoor_write(2047,4095,&lease)==2&&calls==0);
  reset();folded=1;live=0;CHECK(outdoor_write(2047,4095,&lease)==1&&calls==0);

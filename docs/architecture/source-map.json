@@ -68,6 +68,11 @@
       "purpose": "设备接口与所有权"
     },
     {
+      "file": "AutomaticModeAccess.java",
+      "layer": "adapters",
+      "purpose": "原状态字段和原生自动亮度策略的只读模式契约及独立状态错误"
+    },
+    {
       "file": "AuxiliarySensorIdentity.java",
       "layer": "adapters",
       "purpose": "传感器身份、元信息及权限检查；仅核验候选，不注册监听"
@@ -416,6 +421,11 @@
       "file": "ManualPanelLimitSettings.java",
       "layer": "presentation",
       "purpose": "磁贴面板独立最高节点草稿、真实设备范围显示与输入验证，不触发运行写入"
+    },
+    {
+      "file": "MapperContextAccess.java",
+      "layer": "adapters",
+      "purpose": "普通与休眠映射上下文ABI校验与统一活动状态"
     },
     {
       "file": "MappingRecoveryService.java",

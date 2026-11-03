@@ -60,9 +60,11 @@
         "CurveCompatibility.java",
         "CurveBackendFactory.java",
         "SimpleCurveAdapter.java",
-        "RefactorResetAdapter.java"
+        "RefactorResetAdapter.java",
+        "MapperContextAccess.java",
+        "AutomaticModeAccess.java"
       ],
-      "selector": "以ABC实际活动策略为入口；Refactor已选但未就绪时不抢用物理对象，活动标记未知时才按完整对象选择。\nRefactor锚点结构优先；只有锚点标记整体缺失且9项系数、22项状态及原生消费者签名完整时采用系数路线。\n物理映射按真实类和双向标定选择；超出标定端点的完整原机曲线使用已验证裁剪分支，范围内旧路线不增加要求。\nSimple仅接完整的比例数组、样条和原生重建/学习接口，不作为物理接口残缺后的回退。\n后端通过installMappingHooks装配自己的Hook；原生学习容量与存档回放能力独立声明。\n主题、编辑、显示标尺和记忆转存使用同一已选后端；具体单位、约束及内部变体见下方契约与ABI索引。\n独立默认字段/默认消费者整体缺失时，完整原生reset/getLogicalBrt及9/22布局才可采用重建系数；原默认接口任一残片存在时仍走旧校验，不降级。",
+      "selector": "以ABC实际活动策略为入口；Refactor已选但未就绪时不抢用物理对象，活动标记未知时才按完整对象选择。\nRefactor锚点结构优先；只有锚点标记整体缺失且9项系数、22项状态及原生消费者签名完整时采用系数路线。\n物理映射按真实类和双向标定选择；超出标定端点的完整原机曲线使用已验证裁剪分支，范围内旧路线不增加要求。\nSimple仅接完整的比例数组、样条和原生重建/学习接口，不作为物理接口残缺后的回退。\n后端通过installMappingHooks装配自己的Hook；原生学习容量与存档回放能力独立声明。\n主题、编辑、显示标尺和记忆转存使用同一已选后端；具体单位、约束及内部变体见下方契约与ABI索引。\n独立默认字段/默认消费者整体缺失时，完整原生reset/getLogicalBrt及9/22布局才可采用重建系数；原默认接口任一残片存在时仍走旧校验，不降级。\n物理后端模式编号及映射表标记均缺失时，按完整普通/休眠双对象与isForIdleMode校验；现代任一标记存在即要求完整现代ABI，不借旧接口降级。\n有效自动模式优先owner的boolean字段；明确缺失时，按主屏DPC/策略/ABC归属读取原生shouldUseAutoBrightness；不采用设置缓存或最后输出原因。",
       "evidence": [
         "curve_backend",
         "physical_mapper_class",
@@ -89,7 +91,11 @@
         "calculated_brightness",
         "simple_curve_last_error",
         "refactor_curve_verification.profile",
-        "refactor_curve_verification.baseline_source"
+        "refactor_curve_verification.baseline_source",
+        "physical_context_route",
+        "physical_context_description",
+        "automatic_mode_route",
+        "automatic_mode_error"
       ],
       "cleanup": "停用、故障、基准或用户变化时，只撤回本次仍持有的曲线；保留原始对象与数组身份，系统已替换时不覆盖。\n配置和记忆转存先验证再提交，失败恢复事务快照；校验失败不清当前点，浮点归一不修改原始状态或其他设置。\n主题切换在显示Handler事务内取消旧待执行任务，按清除、共用或独立策略交接记忆；仅跨重启保持才落盘。关闭独立曲线不删除两条基础配置。\nSimple同步提交的临时用户许可在finally撤销；用户未知或中途变化时拒绝/回滚。清除记忆调用原生接口以清除残余调整。\n必需原生Hook沿用事务安装器；默认后端不安装未知Hook。未经验证的拟合点或回放接口不声明为可移植记忆。\n重建路线仅在同步显示事务内探测原生基线，结束时还原所有已核验数组的身份/内容和学习标记；读取不能把现有学习值当默认。修改前验证归属，重建失败完整回滚。",
       "tests": [
@@ -112,16 +118,23 @@
         "tests/refactor_simple_mapping.py",
         "tests/refactor_simple_mapping_firmware.py",
         "tests/refactor_reset_curve.py",
-        "tests/refactor_reset_firmware.py"
+        "tests/refactor_reset_firmware.py",
+        "tests/refactor_mapper_context.py",
+        "tests/refactor_mapper_context_firmware.py",
+        "tests/refactor_automatic_mode.py",
+        "tests/refactor_automatic_mode_firmware.py",
+        "tests/refactor_legacy_input_firmware.py"
       ],
       "composition": "exclusive",
       "convergence": {
         "boundary": [
           "CurveBackendFactory.java",
           "CurveBackend.java",
-          "CurveCompatibility.java"
+          "CurveCompatibility.java",
+          "MapperContextAccess.java",
+          "AutomaticModeAccess.java"
         ],
-        "contract": "CurveBackend能力方法（含installMappingHooks、独立学习容量/存档回放） + curve_contract v1 + Curves；显示标尺与原生载荷分开；原生私有当前消费者通过currentInputLux接收同坐标末段约束",
+        "contract": "CurveBackend能力方法（含installMappingHooks、独立学习容量/存档回放） + curve_contract v1 + Curves；显示标尺与原生载荷分开；原生私有当前消费者通过currentInputLux接收同坐标末段约束；有效自动模式通过相同get契约收束，读取错误独立进入状态，不伪造false或丢弃日志。",
         "coordinates": "物理nit/逻辑nit明确区分；归档value保持原生坐标，display_nit在适配器转换；framework_brightness为0—1框架亮度，按普通手动上限显示百分比，不冒充物理nit。",
         "consumers": [
           "HookRuntime.java",
@@ -149,7 +162,7 @@
         "SensorState.java",
         "BrightnessSensorAccess.java"
       ],
-      "selector": "优先保留当前默认逻辑屏 ABC 的 TYPE_LIGHT；新增 ABC 已直接选中的 xiaomi.sensor.light_secondary 非唤醒、按变化、无权限且量程 / 精度有效的照度源。不枚举，不按私有类型编号或机型选择，不将原始 / 工厂 / 流式通道当作 lux。 配置槽非标准且 OEM 开启 FOV 时，核验其默认屏标识、真实 FOV 对象和 Sensor→Sensor 选择器结果，仅使用选择器实际返回的源；虚拟 FOV 的 values[0] 已为 lux，确认驾驶数据包才读取 values[2] 并用原生倍率。优先接口残缺 / 抛错拒绝，不回落物理槽；标准 TYPE_LIGHT 优先原路径，不受新 FOV 判定影响。 当前未接入辅助源时独立沿用已确认主光感，状态读取 ABC 已接受照度；不伪造辅助样本，也不把未接入等同没有硬件。",
+      "selector": "优先保留当前默认逻辑屏 ABC 的 TYPE_LIGHT；新增 ABC 已直接选中的 xiaomi.sensor.light_secondary 非唤醒、按变化、无权限且量程 / 精度有效的照度源。不枚举，不按私有类型编号或机型选择，不将原始 / 工厂 / 流式通道当作 lux。 配置槽非标准且 OEM 开启 FOV 时，核验其默认屏标识、真实 FOV 对象和 Sensor→Sensor 选择器结果，仅使用选择器实际返回的源；虚拟 FOV 的 values[0] 已为 lux，确认驾驶数据包才读取 values[2] 并用原生倍率。优先接口残缺 / 抛错拒绝，不回落物理槽；标准 TYPE_LIGHT 优先原路径，不受新 FOV 判定影响。 当前未接入辅助源时独立沿用已确认主光感，状态读取 ABC 已接受照度；不伪造辅助样本，也不把未接入等同没有硬件。 旧DualSensorPolicy没有两项倍率时，按已验证的同主屏标准光感、实例float照度、原生消费方法及owner/manager归属采用单位lux；残缺倍率仍失败。",
       "evidence": [
         "sensor_status",
         "sensor_sampling_enabled",
@@ -157,7 +170,8 @@
         "main_fast_lux",
         "main_input_compatibility",
         "assist_source_present",
-        "main_reading_source"
+        "main_reading_source",
+        "main_input_compatibility.lux_scale_route"
       ],
       "cleanup": "只读观察，不拥有 OEM 监听。",
       "tests": [
@@ -165,7 +179,9 @@
         "tests/refactor_status_presentation.py",
         "tests/refactor_brightness_control.py",
         "tests/refactor_fold_sensor_firmware.py",
-        "tests/refactor_single_sensor_firmware.py"
+        "tests/refactor_single_sensor_firmware.py",
+        "tests/refactor_legacy_input.py",
+        "tests/refactor_legacy_input_firmware.py"
       ],
       "composition": "exclusive",
       "convergence": {
@@ -804,14 +820,18 @@
         "screen_nit_calibration.route",
         "brightness_read_error",
         "actual_brightness",
-        "actual_brightness_source"
+        "actual_brightness_source",
+        "native-storage.json",
+        "NATIVE_START_FAIL.private_stage",
+        "NATIVE_START_FAIL.uid/euid"
       ],
       "cleanup": "发现与权限检查只读，不启动写入器；实际租约写入另由原生事务负责，拒绝副屏 / 指示灯 / 手电。 折叠专用原生选项与 v3 权限恢复记录仅允许绑定端口节点；v2 / 旧节点拒绝规则不变。关闭、熄屏、DRM 改变结束旧接管；租约和框架输出隔离绑定物理屏，晚到命令拒绝，不复用旧目标。户外新增显式折叠协作分支，使用独立物理租约和原生 DSI 核验；控制中心动态折叠监听仍须独立核验，不能复用户外通过结论。 读数不启动写入器、不修改节点或权限；物理屏或标定不一致时不显示旧nit。",
       "tests": [
         "tests/refactor_panel_nodes.py",
         "tests/refactor_panel_access.py",
         "tests/refactor_fold_panel.py",
-        "tests/refactor_screen_brightness.py"
+        "tests/refactor_screen_brightness.py",
+        "tests/refactor_native_storage.py"
       ],
       "composition": "exclusive",
       "convergence": {
@@ -867,7 +887,7 @@
         "RootAccess.java",
         "AppRootDiagnostics.java"
       ],
-      "selector": "逐项检查私有存储、原始配置、当前 APK 资产和组合接口；不试写亮度，不擅自启动服务。 Root设置三入口互斥，原外部Provider优先；只读探测拒绝时尝试权限等价的cmd settings/settings CLI，不绕过系统权限。写入失败不重放，UID0不等于全权限。私有目录严格身份检查后才回退，原生节点不换目录。",
+      "selector": "逐项检查私有存储、原始配置、当前 APK 资产和组合接口；不试写亮度，不擅自启动服务。 Root设置三入口互斥，原外部Provider优先；只读探测拒绝时尝试权限等价的cmd settings/settings CLI，不绕过系统权限。写入失败不重放，UID0不等于全权限。私有目录严格身份检查后才回退，原生节点不换目录。 原生程序使用同一Root私有锁检查，不按Root工具名称放行；候选载荷先完成原生恢复才原子替换。",
       "evidence": [
         "feature_self_check",
         "root_feature_self_check",
@@ -879,16 +899,20 @@
         "settings_route",
         "settings_attempts",
         "workspace_route",
-        "workspace_attempts"
+        "workspace_attempts",
+        "native-storage.json",
+        "NATIVE_START_FAIL.private_stage",
+        "NATIVE_START_FAIL.uid/euid"
       ],
-      "cleanup": "短命 Root 桥和有界 IPC；诊断不写回用户配置，失败只禁本项。 节点写入错误保留自动停用锁存；只有用户主动保存并获引擎确认后，才经过原有完整校验重试启动，不重置用户设置。 Root自检只读；启动初始化操作目录。已确认核心与可选节点工具分别报告，节点失败不回滚已确认曲线。导出失败转APP Downloads并明确标记非实时不完整包。 自检显示选中目录当前失败原因和各备用目录只读结果。",
+      "cleanup": "短命 Root 桥和有界 IPC；诊断不写回用户配置，失败只禁本项。 节点写入错误保留自动停用锁存；只有用户主动保存并获引擎确认后，才经过原有完整校验重试启动，不重置用户设置。 Root自检只读；启动初始化操作目录。已确认核心与可选节点工具分别报告，节点失败不回滚已确认曲线。导出失败转APP Downloads并明确标记非实时不完整包。 自检显示选中目录当前失败原因和各备用目录只读结果。 只规范可信Root自有目录与同inode锁权限；已持锁退让，错误身份/链接拒绝，不删除锁。候选恢复失败保留旧程序，仅清理本次临时文件。",
       "tests": [
         "tests/refactor_feature_self_check.py",
         "tests/refactor_native_asset.py",
         "tests/refactor_outdoor_node_settings.py",
         "tests/refactor_outdoor_fold.py",
         "tests/refactor_outdoor_write_retry.py",
-        "tests/refactor_root_access.py"
+        "tests/refactor_root_access.py",
+        "tests/refactor_native_storage.py"
       ],
       "composition": "per_feature",
       "convergence": {
@@ -1739,6 +1763,39 @@
       ],
       "rule": "默认字段、getDefaultLogicalBrt和calculateBrt整体缺失；真实getLogicalBrt、原生重建/学习接口及9/22容器完整。同步快照原生重建基线后还原现场，不写固定曲线；已有接口残缺不回退。保留原生拟合、私有当前消费者读回与控制保护，未验证便携锚点不声明转存/回放支持。",
       "test": "tests/refactor_reset_curve.py"
+    },
+    {
+      "id": "physical_mapper_context",
+      "owner": "MapperContextAccess.java",
+      "alternatives": [
+        "mode_map",
+        "interactive_idle"
+      ],
+      "rule": "优先getMode与普通映射表；两者整体缺失才使用isForIdleMode与普通/休眠对象。核验主屏、普通对象归属和当前活动对象；残缺、错误或调用失败不回退。收束为普通映射是否活动，不改物理nit及原生学习坐标。",
+      "test": "tests/refactor_mapper_context.py"
+    },
+    {
+      "id": "mapping_automatic_mode",
+      "owner": "AutomaticModeAccess.java",
+      "alternatives": [
+        "owner_boolean",
+        "native_automatic_strategy",
+        "display_controller_boolean"
+      ],
+      "rule": "优先真实mUseAutoBrightness实例boolean；仅明确缺失时核验主屏DPC、原生AutomaticBrightnessStrategy/2与ABC同归属，读取shouldUseAutoBrightness。坏字段/签名或调用失败不回退，不把设置缓存当有效模式；错误单独发布，保留其他状态与日志。 原生策略字段整体缺失时，才核验旧DPC的实例boolean和DPC/owner/ABC同归属，读取DPC有效mUseAutoBrightness；策略字段存在但为空或错误不回退。",
+      "test": "tests/refactor_automatic_mode.py"
+    },
+    {
+      "id": "main_input_lux_scale",
+      "owner": "BrightnessSensorAccess.java",
+      "alternatives": [
+        "single_unit_lux",
+        "native_amplified_lux",
+        "native_fov_lux",
+        "legacy_dual_unit_lux"
+      ],
+      "rule": "保留单源、原生倍率及FOV输入；仅两个倍率字段整体缺失、标准TYPE_LIGHT、DualSensorPolicy原生方法/float状态与同owner/manager完整时采用旧版单位lux。现存空/损坏/部分倍率不得回退。",
+      "test": "tests/refactor_legacy_input.py"
     }
   ],
   "native_variants": [
@@ -1815,6 +1872,17 @@
       ],
       "rule": "保留普通手动面板租约失效的原退出路径。仅已显式绑定framework PID的控制中心监听，校验/补写之间租约撤销、过期或被替换时跳过该次写入，由原循环重新协调；不退出整个监听。主屏身份、权限、写入和读回失败仍退出；原inotify唤醒和无监听时250ms后备保留，不增加空闲轮询。raw09输出同协议，Root继续识别raw08状态，安装按APK实际资产哈希替换，不放行未知native_build。 raw10仅控制中心cc_写入读回不一致时最多3次、间隔20ms，每次重核租约/目标/PID/物理节点及亮屏。持续ERANGE释放本租约并写失败健康状态，监听保留，直到租约撤回或会话更换才接纳新目标；权限/身份/真实I/O仍退出。原raw08/raw09识别保留。",
       "test": "tests/refactor_native_panel.py"
+    },
+    {
+      "id": "native_private_storage",
+      "owner": "main_panel.c",
+      "alternatives": [
+        "verified_private_mode",
+        "verified_root_mode_repair",
+        "lock_busy_or_rejected_identity"
+      ],
+      "rule": "真实Root、可信父目录与路径及FD身份完整才规范目录0700、同inode独占锁0600；不unlink、不换inode、不采用错误所有者或硬/符号链接。占用退让与权限错误分开，候选原生恢复成功后才替换旧载荷。",
+      "test": "tests/refactor_native_storage.py"
     }
   ]
 }

@@ -92,7 +92,7 @@
 | [LauncherVisibility.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/LauncherVisibility.java) | `781a468b055306f9` |
 | [LogCompatibilityPanel.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/LogCompatibilityPanel.java) | `c3db0d25c6f3b8f2` |
 | [LogCompatibilityState.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/LogCompatibilityState.java) | `9943269d0f7fe58c` |
-| [MainActivity.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/MainActivity.java) | `44f528ce0c67eac7` |
+| [MainActivity.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/MainActivity.java) | `2c493852ffa1550e` |
 | [NavigationPolicy.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/NavigationPolicy.java) | `0c2ee299f2b23e4e` |
 | [ScrollElasticity.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ScrollElasticity.java) | `8beee69c1016aebb` |
 | [SettingsSearch.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/SettingsSearch.java) | `e6d35527a7fccfc5` |

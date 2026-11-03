@@ -2,7 +2,7 @@ package top.rongshangs.lumacurve.refactor;
 
 /** Shared identity for the UI, Hook and recovery helper. */
 public final class AppBuild {
-    public static final String BUILD="release-4.4.3",VERSION="4.4.3",ARTIFACT_VERSION="4.4.3";
+    public static final String BUILD="release-4.4.4",VERSION="4.4.4",ARTIFACT_VERSION="4.4.4";
     public static final boolean TEST=false;
     public static final boolean INTERNAL=false;
     public static final boolean BETA=false;

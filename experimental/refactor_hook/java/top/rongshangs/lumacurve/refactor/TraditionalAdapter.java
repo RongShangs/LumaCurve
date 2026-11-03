@@ -9,6 +9,8 @@ public final class TraditionalAdapter extends CurveBackend {
     final Object mapper,owner,abc,baseline;
     final TraditionalCurve original;
     final PhysicalCurveCalibration calibration;
+    final MapperContextAccess context;
+    private AutomaticModeAccess automatic;
     final Method setter,reset,convert,splineMethod;
     final Constructor<?> configConstructor;
     final IntSupplier user;
@@ -25,10 +27,7 @@ public final class TraditionalAdapter extends CurveBackend {
         if(!mapper.getClass().getName().equals("com.android.server.display.MiuiPhysicalBrightnessMappingStrategy")&&
            !mapper.getClass().getName().equals("com.android.server.display.BrightnessMappingStrategy$PhysicalMappingStrategy"))
             throw new IllegalArgumentException("未知物理映射策略："+mapper.getClass().getName());
-        if(((Number)read(owner,"mDisplayId")).intValue()!=0||((Number)method(mapper.getClass(),"getMode").invoke(mapper)).intValue()!=0)
-            throw new IllegalArgumentException("仅接入主屏普通模式");
-        Object map=read(abc,"mBrightnessMappingStrategyMap");
-        if(method(map.getClass(),"get",int.class).invoke(map,0)!=mapper)throw new IllegalStateException("主屏默认映射对象不一致");
+        context=new MapperContextAccess(owner,mapper,abc);
         baseline=read(mapper,"mConfig");if(baseline==null)throw new IllegalStateException("设备本地曲线尚未就绪");
         Object pair=method(baseline.getClass(),"getCurve").invoke(baseline);
         TraditionalCurve raw=new TraditionalCurve((float[])read(pair,"first"),(float[])read(pair,"second"));
@@ -63,15 +62,17 @@ public final class TraditionalAdapter extends CurveBackend {
     public boolean nativeMappingHooks(){return true;}
     public void installMappingHooks(Class<?> type)throws Exception{TraditionalHooks.install(type,true);}
     public float mappingOutputNit(float brightness)throws Exception{return ((Number)method(mapper.getClass(),"convertToNits",float.class).invoke(mapper,brightness)).floatValue();}
-    public boolean memoryContextActive()throws Exception{return read(abc,"mCurrentBrightnessMapper")==mapper;}
+    public boolean memoryContextActive()throws Exception{return context.active();}
     public boolean memoryRestoreIncludesModel(){return true;}
     public String memoryDescription(){return "本机保留完整基础曲线，手动模型支持 1 个偏好点";}
     public void putCurveState(org.json.JSONObject status)throws Exception{
-        status.put("physical_mapping_active",read(abc,"mCurrentBrightnessMapper")==mapper).put("physical_mapper_class",mapper.getClass().getName()).put("physical_user_lux_field",userLuxField)
+        status.put("physical_mapping_active",context.active()).put("physical_mapper_class",mapper.getClass().getName()).put("physical_user_lux_field",userLuxField)
+            .put("physical_context_route",context.route).put("physical_context_description",context.description())
             .put("physical_baseline_route",calibration.clamped?PhysicalCurveCalibration.CLAMPED_ROUTE:"direct")
             .put("physical_calibration_min_nit",min).put("physical_calibration_max_nit",max)
             .put("physical_original_min_nit",calibration.originalMinimum).put("physical_original_max_nit",calibration.originalMaximum)
             .put("physical_clamped_points",calibration.clippedPoints);
+        if(automatic!=null)status.put("automatic_mode_route",automatic.route);
     }
     public boolean persistentMemorySupported(){if(persistenceSupported==null)try{Method replay=method(abc.getClass(),"setScreenBrightnessByUser",float.class,float.class);persistenceSupported=manualPointCapacity()>0&&!Modifier.isStatic(replay.getModifiers())&&replay.getReturnType()==boolean.class;}catch(Exception unavailable){persistenceSupported=false;}return persistenceSupported;}
     public int manualPointCapacity(){try{Method value=method(mapper.getClass(),"getUserBrightness");return value.getReturnType()==float.class&&!Modifier.isStatic(value.getModifiers())&&!Modifier.isStatic(find(mapper.getClass(),userLuxField).getModifiers())?1:0;}catch(Exception unavailable){return 0;}}
@@ -83,7 +84,7 @@ public final class TraditionalAdapter extends CurveBackend {
     public void restoreManualPoints(org.json.JSONArray points)throws Exception {restore(points,false);}
     public void replaceManualPoints(org.json.JSONArray points)throws Exception {restore(points,true);}
     private void restore(org.json.JSONArray points,boolean replace)throws Exception {
-        PersistentMemory.validate(points);if(points.length()>1||read(abc,"mCurrentBrightnessMapper")!=mapper)throw new IllegalArgumentException("当前映射不能恢复此手动记忆");
+        PersistentMemory.validate(points);if(points.length()>1||!context.active())throw new IllegalArgumentException("当前映射不能恢复此手动记忆");
         for(int i=0;i<points.length();i++){org.json.JSONObject p=points.getJSONObject(i);if(p.getDouble("lux")>factoryLux[3]||p.getDouble("value")>1)throw new IllegalArgumentException("手动记忆超出设备映射范围");}
         Map<Field,Object> before=snapshot(mapper);Object model=read(abc,"mShortTermModel");Map<Field,Object> modelBefore=snapshot(model);
         try{if(replace)clearMemory();for(int i=0;i<points.length();i++){org.json.JSONObject p=points.getJSONObject(i);if(!Boolean.TRUE.equals(method(abc.getClass(),"setScreenBrightnessByUser",float.class,float.class).invoke(abc,(float)p.getDouble("lux"),(float)p.getDouble("value"))))throw new IllegalStateException("系统未采用手动记忆");}}
@@ -96,11 +97,11 @@ public final class TraditionalAdapter extends CurveBackend {
     public float[] baselineNit(){return active==null?original.nit():appliedBaseNit.clone();}
     public float currentAt(float lux)throws Exception{return ((Number)splineMethod.invoke(read(mapper,"mBrightnessSpline"),lux)).floatValue();}
     public float memoryAt(float lux)throws Exception{return adjustedInterpolation==null?((Number)convert.invoke(mapper,currentAt(lux))).floatValue():((Number)adjustedInterpolation.invoke(read(mapper,"mAdjustedNitsToBrightnessSpline"),currentAt(lux))).floatValue();}
-    public void clearMemory()throws Exception{if(read(abc,"mCurrentBrightnessMapper")==mapper)reset.invoke(abc);else method(mapper.getClass(),"clearUserDataPoints").invoke(mapper);}
+    public void clearMemory()throws Exception{if(context.active())reset.invoke(abc);else method(mapper.getClass(),"clearUserDataPoints").invoke(mapper);}
     public Object get(String name)throws Exception{
         // Compatibility surface used by shared state/tuning; never mix nit and drag coordinates.
         if(name.equals("mUserSerial"))return user.getAsInt();
-        if(name.equals("mUseAutoBrightness"))return read(owner,"mUseAutoBrightness");
+        if(name.equals("mUseAutoBrightness")){if(automatic==null)automatic=new AutomaticModeAccess(owner,abc);return automatic.read();}
         if(name.equals("mUserLux"))return read(mapper,userLuxField);
         if(name.equals("mIsHaveGoodCurve"))return null; // Refactor-only concept, unknown here.
         Field f=fields.get(name);if(f==null){f=find(mapper.getClass(),name);fields.put(name,f);}return f.get(mapper);
@@ -126,6 +127,7 @@ public final class TraditionalAdapter extends CurveBackend {
         configure(factors,0);
     }
     public void configure(float[] factors,float floor)throws Exception {
+        if(factors!=null)context.requireNormal();
         CurvePlan next=factors==null?null:proposed(factors,floor);
         Object current=read(mapper,"mConfig");
         if(factors==null&&active==null)return;
@@ -145,7 +147,7 @@ public final class TraditionalAdapter extends CurveBackend {
             if(!installed.equals(desired))throw new IllegalStateException("系统未采用提交的设备曲线");
             applied=next==null?null:installed;
             // Never reset idle/doze mappers as a side effect of editing the normal curve.
-            if(read(abc,"mCurrentBrightnessMapper")==mapper)reset.invoke(abc);
+            if(context.active())reset.invoke(abc);
             else method(mapper.getClass(),"clearUserDataPoints").invoke(mapper);
             active=next;
             appliedBaseLux=nextLux;appliedBaseNit=nextNit;

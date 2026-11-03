@@ -41,7 +41,7 @@ backlight 或明确标识显示的 leds；真实 sysfs 路径与上限配对且�
 
 路线内部 ABI：`native_payload_refresh`、`fold_physical_address`、`fold_kernel_binding`、`screen_brightness_readback`、`optional_output_type_failure`；完整条件仅维护在 [ABI索引](../architecture/compatibility-index.md#abi-内部变体)。
 
-运行证据：`main_panel_node.node_class`、`main_panel_node.node_path`、`main_panel_node.node_maximum`、`main_panel_node.node_discovery`、`main_panel_node.node_physical_display_id`、`main_panel_node.node_address_profile`、`main_panel_node.node_port_source`、`main_panel_node.node_detail`、`actual_nit_source`、`actual_node_source`、`screen_nit_calibration.route`、`brightness_read_error`、`actual_brightness`、`actual_brightness_source`。
+运行证据：`main_panel_node.node_class`、`main_panel_node.node_path`、`main_panel_node.node_maximum`、`main_panel_node.node_discovery`、`main_panel_node.node_physical_display_id`、`main_panel_node.node_address_profile`、`main_panel_node.node_port_source`、`main_panel_node.node_detail`、`actual_nit_source`、`actual_node_source`、`screen_nit_calibration.route`、`brightness_read_error`、`actual_brightness`、`actual_brightness_source`、`native-storage.json`、`NATIVE_START_FAIL.private_stage`、`NATIVE_START_FAIL.uid/euid`。
 
 验证入口：
 
@@ -49,6 +49,7 @@ backlight 或明确标识显示的 leds；真实 sysfs 路径与上限配对且�
 - [refactor_panel_access.py](../../tests/refactor_panel_access.py)
 - [refactor_fold_panel.py](../../tests/refactor_fold_panel.py)
 - [refactor_screen_brightness.py](../../tests/refactor_screen_brightness.py)
+- [refactor_native_storage.py](../../tests/refactor_native_storage.py)
 
 ## 实现追溯
 
@@ -57,7 +58,7 @@ backlight 或明确标识显示的 leds；真实 sysfs 路径与上限配对且�
 | [ActivePanelNode.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ActivePanelNode.java) | `31e258daa4e6bded` |
 | [BrightnessControl.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/BrightnessControl.java) | `8e91d605934d21fc` |
 | [ControlCenterRoot.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ControlCenterRoot.java) | `5d398d8c5b193afb` |
-| [NativePanelRoot.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/NativePanelRoot.java) | `2f3a64b07cca2f12` |
+| [NativePanelRoot.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/NativePanelRoot.java) | `4d45c14397f7f48b` |
 | [PanelNodeDiscovery.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/PanelNodeDiscovery.java) | `85b38c1512206283` |
-| [RootControl.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/RootControl.java) | `0a7cb3fb3546b581` |
+| [RootControl.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/RootControl.java) | `77cafa1017ad8e5c` |
 | [ScreenBrightnessReading.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ScreenBrightnessReading.java) | `d907847857002944` |

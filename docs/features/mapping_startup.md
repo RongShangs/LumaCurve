@@ -66,11 +66,11 @@
 | 文件 | 当前源码 SHA-256 前16位 |
 | --- | --- |
 | [ControlCenterRoot.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ControlCenterRoot.java) | `5d398d8c5b193afb` |
-| [FeatureCompatibility.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/FeatureCompatibility.java) | `4fd18e8d184534d4` |
+| [FeatureCompatibility.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/FeatureCompatibility.java) | `43cffc34234aed93` |
 | [MappingRecoveryService.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/MappingRecoveryService.java) | `bb5945884db22b08` |
 | [MappingRecoverySignal.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/MappingRecoverySignal.java) | `1db1ab21d1981f71` |
 | [MappingRecoveryState.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/MappingRecoveryState.java) | `846a31654e6cb880` |
 | [MappingStartup.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/MappingStartup.java) | `b10d03c77ba0b2c0` |
-| [RootControl.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/RootControl.java) | `0a7cb3fb3546b581` |
+| [RootControl.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/RootControl.java) | `77cafa1017ad8e5c` |
 | [RootMappingBoot.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/RootMappingBoot.java) | `c6502c10b0b44fd1` |
 | [RootPanelBridge.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/RootPanelBridge.java) | `d756398bad23b1d4` |
