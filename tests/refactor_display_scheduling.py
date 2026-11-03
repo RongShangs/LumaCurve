@@ -23,7 +23,7 @@ def method(signature):
 
 methods = '\n'.join(method(s) for s in [
     'void requestRecalculation()', 'void recalculate()', 'void sample(float',
-    'void queuePublish()', 'void queueControlPublish()', 'long publishInterval()',
+    'void queuePublish()', 'void queueControlPublish()', 'long publishInterval()', 'void sampleWithoutNit(',
 ])
 files = {
     'android/os/SystemClock.java': '''package android.os;public class SystemClock{
@@ -37,7 +37,7 @@ files = {
 import android.os.*;import java.util.*;import top.rongshangs.lumacurve.refactor.hooking.XposedBridge;
 public class HookRuntime{final Node outdoorNode=new Node();static class Node{void changed(){}}
  boolean closed,publishQueued,controlPublishQueued,recalculationQueued,recalculating,thread=true;
- long consumed,lastPublish,viewUntil;float lastLux=Float.NaN,lastNit=Float.NaN;
+ long consumed,lastPublish,viewUntil;float lastLux=Float.NaN,lastNit=Float.NaN,lastBrightness=Float.NaN;
  int publications;final Kernel kernel=new Kernel();final Queue handler=new Queue();
  final Owner owner=new Owner(this);
  boolean onDisplayThread(){return !closed&&thread;}
@@ -90,6 +90,7 @@ public class SchedulingTest{
   s=new HookRuntime();s.kernel.active=false;s.sample(1,2);check(s.publications==0&&s.consumed==0);
   s.handler.drain();check(s.publications==1);SystemClock.now+=10000;
   s.sample(2,3);check(s.publications==1);s.handler.drain();check(s.publications==2);
+  s=new HookRuntime();s.sample(1,50);s.sampleWithoutNit(2,.4f);check(s.lastLux==2&&Float.isNaN(s.lastNit)&&s.lastBrightness==.4f);check(s.publications==0&&s.handler.jobs.size()<=2);s.handler.drain();check(s.publications<=2);long count=s.consumed;s.sampleWithoutNit(-1,.5f);s.sampleWithoutNit(2,Float.NaN);s.sampleWithoutNit(2,1.1f);check(s.consumed==count);s.thread=false;s.sampleWithoutNit(3,.5f);check(s.consumed==count);s.thread=true;s.sample(4,60);check(Float.isNaN(s.lastBrightness)&&s.lastNit==60);
   System.out.println("Display scheduling: "+cases+" cases PASS; host call-order verification, affected phones not tested");
  }
 }''',

@@ -46,6 +46,13 @@ reject(lambda m,c,s,b:m['families'][0]['convergence'].update(coordinates=''))
 # Reintroducing ABI branches at a common consumer must fail, even if all route IDs survive.
 for name,text in [('CurveComparison.java','if("physical_mapping".equals(backend)){}'),('SavedCurve.java','String x="refactor_coefficients";'),('MemoryPersistence.java','if(kernel instanceof TraditionalAdapter){}'),('MemoryLifecycle.java','kernel.name().equals("refactor")'),('MainActivity.java','r.optString("curve_backend")'),('HookRuntime.java','kernel.name().equals("refactor")'),('CurveBackend.java','get("mAnchorLux")')]:
     check(bool(tool.boundary_violations({name:text})))
+# Later native adapters and routes must be covered, rather than only the original type.
+for name,text in [('CurveComparison.java','if("simple_mapping".equals(backend)){}'),('MemoryPersistence.java','if(kernel instanceof SimpleCurveAdapter){}'),('HookRuntime.java','if(kernel instanceof RefactorCoefficientsAdapter){}'),('MainActivity.java','r.getString("curve_route")'),('HookEntry.java','TraditionalHooks.install(type,true);'),('CurveBackend.java','boolean x=k instanceof SimpleCurveAdapter;')]:
+    check(bool(tool.boundary_violations({name:text})))
+for adapter in tool.curve_implementations():
+    for name in ['MainActivity.java','MemoryPersistence.java','HookRuntime.java']:
+        check(bool(tool.boundary_violations({name:'if (k instanceof '+adapter+') {}'})))
+check(not tool.boundary_violations({'HookRuntime.java':'// kernel instanceof SimpleCurveAdapter\nconfig.getString("curve_backend").equals(kernel.name());'}))
 check(not tool.boundary_violations({'MainActivity.java':'String label="Refactor 曲线";','HookRuntime.java':'config.getString("curve_backend").equals(kernel.name())'}))
 # Every reviewed route, including later additions, is independently protected against deletion.
 for feature,routes in baseline['features'].items():
@@ -63,5 +70,23 @@ m['families'][0]['routes'].append('future_verified_curve')
 check(not tool.validate(m,c,mapping,baseline))
 # Registry arrays are defensive copies and unknown features never become a guessed route.
 check('return FEATURES.clone()' in (tool.SOURCE/'CompatibilityCatalog.java').read_text(encoding='utf-8'))
+requirements=tool.feature_requirements()
+check(not tool.feature_requirements_errors(manifest,catalogue,mapping,requirements))
+def reject_requirements(edit):
+    data=copy.deepcopy(requirements);edit(data);check(bool(tool.feature_requirements_errors(manifest,catalogue,mapping,data)))
+reject_requirements(lambda d:d['features'].pop())
+reject_requirements(lambda d:d['features'].append(d['features'][0]))
+reject_requirements(lambda d:d['features'][0].update(family='wrong_owner'))
+reject_requirements(lambda d:d['features'][0].update(behavior=''))
+reject_requirements(lambda d:d['features'][0]['default'].update(mode='invented'))
+reject_requirements(lambda d:d['features'][0]['settings_keys'].append('missing_production_setting_123'))
+reject_requirements(lambda d:d['features'][0]['dependencies'].append('unknown_function'))
+reject_requirements(lambda d:d['interface_features'][0].update(implementation=['NotImplemented.java']))
+reject_requirements(lambda d:next(r for r in d['features'] if r['id']=='scene_night_driving')['source_refs'][0].update(item='made_up'))
+check(not tool.stable_document_errors())
+pages=tool.feature_documents(manifest,catalogue,requirements)
+check(len(pages)==len(manifest['families'])+2)
+for name,text in pages.items():check((ROOT/name).read_text(encoding='utf-8')==text)
+check('原生默认条件' in pages['docs/features/scenes.md'])
 check(tool.render(manifest,catalogue,mapping)==(tool.ARCH/'compatibility-index.md').read_text(encoding='utf-8'))
 print(f'Compatibility contract regression: {cases} cases PASS; metadata mutation checks, not device tests')

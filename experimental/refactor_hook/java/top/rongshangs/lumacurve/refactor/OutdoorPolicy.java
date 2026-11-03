@@ -30,6 +30,11 @@ final class OutdoorPolicy {
         // Raise only; bounds here are framework brightness coordinates, never nit/raw panel codes.
         return Math.max(base,Math.min(allowedMax,floor));
     }
+    static float withinRangeTarget(OutdoorOptions o,float lux,float base,float allowedMax){
+        if(!Float.isFinite(lux)||!valid(base)||!valid(allowedMax)||base>=allowedMax)return base;
+        double ramp=Math.max(0,Math.min(1,(lux-o.values[0]*o.values[4])/(o.values[1]-o.values[0]*o.values[4])));
+        return Math.max(base,Math.min(allowedMax,(float)(base+(allowedMax-base)*o.values[5]*ramp)));
+    }
     static boolean valid(float value){return Float.isFinite(value)&&value>=0&&value<=1;}
     static long budget(long window,long max,long minimum,double factor){
         if(window<=0||max<=0||minimum<0||minimum>max||max>window||!Double.isFinite(factor)||factor<1||factor>2)throw new IllegalArgumentException("无效的 HBM 时间预算");

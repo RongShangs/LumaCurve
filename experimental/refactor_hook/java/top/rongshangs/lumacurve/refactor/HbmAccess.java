@@ -7,7 +7,7 @@ import java.util.*;
 final class HbmAccess {
     final Object controller;final Field dataField;final Method maxMethod,normalMethod,allowedMethod,recalculate,luxMethod;
     final Field managedField;final Method managedMethod;final String controllerProfile;
-    Object original,applied;float appliedLux;long appliedBudget;final boolean copyable;
+    Object original,applied;float appliedLux;long appliedBudget;boolean copyable;
     static final String[] DATA_NAMES={"minimumLux","transitionPoint","timeWindowMillis","timeMaxMillis","timeMinMillis","allowInLowPowerMode","minimumHdrPercentOfScreen","sdrToHdrRatioSpline","refreshRateLimit","isHighBrightnessModeEnabled"};
     HbmAccess(Object c)throws Exception{
         controller=c;dataField=HookEntry.field(c.getClass(),"mHbmData");
@@ -26,7 +26,7 @@ final class HbmAccess {
         maxMethod=method(c.getClass(),"getCurrentBrightnessMax",float.class);normalMethod=method(c.getClass(),"getNormalBrightnessMax",float.class);
         allowedMethod=method(c.getClass(),"isHbmCurrentlyAllowed",boolean.class);recalculate=method(c.getClass(),"recalculateTimeAllowance",void.class);
         luxMethod=method(c.getClass(),"onAmbientLuxChange",void.class,float.class);original=dataField.get(c);
-        validateData(original);boolean cloneable;try{copyData(original);cloneable=true;}catch(Throwable unknown){cloneable=false;}copyable=cloneable;
+        validateProfile(original);copyable=cloneable(original);
         if(!OutdoorPolicy.valid(max())||!OutdoorPolicy.valid(normal())||normal()>max())throw new IllegalStateException("HBM brightness coordinates unavailable");
     }
     static void typed(Class<?> c,String name,Class<?> type)throws Exception{Field field=HookEntry.field(c,name);if(field.getType()!=type||Modifier.isStatic(field.getModifiers()))throw new IllegalStateException("HBM field type: "+name);}
@@ -41,11 +41,24 @@ final class HbmAccess {
         for(int i=0;i<DATA_NAMES.length;i++){Field f=HookEntry.field(source.getClass(),DATA_NAMES[i]);types[i]=f.getType();args[i]=f.get(source);}
         Constructor<?> ctor=source.getClass().getDeclaredConstructor(types);ctor.setAccessible(true);return ctor.newInstance(args);
     }
-    void observeReplacement()throws Exception{Object now=dataField.get(controller);if(now!=applied&&now!=original){applied=null;original=now;validateData(original);}}
+    boolean cloneable(Object data){try{copyData(data);return true;}catch(Throwable unknown){return false;}}
+    void validateProfile(Object data)throws Exception{
+        if(data!=null){validateData(data);return;}
+        // A genuine absent configuration can still expose an ordinary native range.
+        // Require the native support predicate to confirm absence, never infer support
+        // from a missing/malformed data field or manufacture HBM data and timers.
+        if(!dataField.getType().getName().equals("com.android.server.display.config.HighBrightnessModeData"))throw new IllegalStateException("HBM data type changed");
+        Method supports=method(controller.getClass(),"deviceSupportsHbm",boolean.class);
+        if(!Boolean.FALSE.equals(supports.invoke(controller)))throw new IllegalStateException("HBM support conflicts with absent data");
+        float normal=((Number)normalMethod.invoke(controller)).floatValue(),allowed=allowedMax();
+        if(!OutdoorPolicy.valid(normal)||!OutdoorPolicy.valid(allowed)||!OutdoorPolicy.valid(max())||normal>max()||allowed>max())throw new IllegalStateException("Native brightness range unavailable");
+    }
+    void observeReplacement()throws Exception{Object now=dataField.get(controller);if(now!=original&&(applied==null||now!=applied)){validateProfile(now);applied=null;original=now;copyable=cloneable(now);}}
+    boolean rangeOnly(){return original==null;}
     float max()throws Exception{return ((Number)HookEntry.get(controller,"mBrightnessMax")).floatValue();}
-    float normal()throws Exception{return ((Number)HookEntry.get(original,"transitionPoint")).floatValue();}
+    float normal()throws Exception{return original==null?((Number)normalMethod.invoke(controller)).floatValue():((Number)HookEntry.get(original,"transitionPoint")).floatValue();}
     float allowedMax()throws Exception{return ((Number)maxMethod.invoke(controller)).floatValue();}
-    boolean managed()throws Exception{return managedField!=null?managedField.getBoolean(controller):Boolean.TRUE.equals(managedMethod.invoke(controller));}
+    boolean managed()throws Exception{return original!=null&&(managedField!=null?managedField.getBoolean(controller):Boolean.TRUE.equals(managedMethod.invoke(controller)));}
     boolean allowed()throws Exception{return Boolean.TRUE.equals(allowedMethod.invoke(controller));}
     long originalLong(String f)throws Exception{return ((Number)HookEntry.get(original,f)).longValue();}
     float originalLux()throws Exception{return ((Number)HookEntry.get(original,"minimumLux")).floatValue();}

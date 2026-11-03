@@ -1,6 +1,6 @@
 package top.rongshangs.lumacurve.refactor;
 
-/** Both backends keep OEM sensor processing and output; only the baseline changes. */
+/** Native ABI boundaries expose capabilities; shared managers never select concrete backends. */
 public abstract class CurveBackend {
     public float[] factoryLux,factoryNit;
     public final float min,max;
@@ -23,6 +23,7 @@ public abstract class CurveBackend {
     public String compatibilityRoute(){return name();}
     public Object target(){throw new IllegalStateException("此后端没有 Refactor 对象");}
     public void afterReset()throws Exception{}
+    public float currentInputLux(float lux){return lux;}
     public boolean reconcile()throws Exception{return false;}
     public void putVerification(org.json.JSONObject status)throws Exception{}
     public void putCurveState(org.json.JSONObject status)throws Exception{}
@@ -34,6 +35,9 @@ public abstract class CurveBackend {
     public boolean strictOrder(){return false;}
     public int savedPointLimit(){return 0;}
     public String currentPipelineRoute(){return "";}
+    public boolean nativeMappingHooks(){return false;}
+    public void installMappingHooks(Class<?> type)throws Exception{}
+    public float mappingOutputNit(float brightness)throws Exception{return Float.NaN;}
     public boolean memoryContextActive()throws Exception{return true;}
     public boolean memoryRestoreIncludesModel(){return false;}
     public Object memoryLifecycleTarget(){return null;}
@@ -43,6 +47,7 @@ public abstract class CurveBackend {
     }
     public boolean memoryHandoverSupported(){return true;}
     public boolean persistentMemorySupported(){return false;}
+    /** Observable native learning capacity; independent of archive replay support. */
     public int manualPointCapacity(){return 0;}
     public org.json.JSONArray manualPoints()throws Exception{return new org.json.JSONArray();}
     public void restoreManualPoints(org.json.JSONArray points)throws Exception{throw new IllegalStateException("此设备的手动记忆恢复接口尚未兼容");}

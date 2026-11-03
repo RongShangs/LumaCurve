@@ -11,7 +11,9 @@ static int cases;static void check(boolean b){if(!b)throw new AssertionError("sc
 public static class Config{public float boundary=.25f,multiplier=1;public float getBacklightFromBrightness(float v){return v*multiplier;}public float getNitsFromBacklight(float v){return v<=.75f?v*2400:1800+(v-.75f)*5600;}}
 static class Owner{Config config=new Config();}
 public static void main(String[] args)throws Exception{
- Owner o=new Owner();JSONObject range=CurveDisplayRange.capture(o,"physical_mapping",2,3200);eq((float)range.getDouble("maximum_nit"),600);
+ Owner o=new Owner();
+ for(float boundary:new float[]{.25f,.6f,1f}){o.config.boundary=boundary;JSONObject simple=CurveDisplayRange.capture(o,"simple_mapping",0,1);check(simple.getString("coordinate").equals("framework_brightness"));eq((float)simple.getDouble("maximum_nit"),boundary);eq(CurveDisplayRange.percent(boundary,1,boundary),100);}
+ o.config.boundary=.25f;JSONObject range=CurveDisplayRange.capture(o,"physical_mapping",2,3200);eq((float)range.getDouble("maximum_nit"),600);
  JSONObject runtime=new JSONObject().put("curve_backend","physical_mapping").put("curve_coordinate","physical_nit").put("min_logical_nit",2).put("curve_display_range",range);eq(CurveDisplayRange.maximum(runtime,3200),600);
  for(String mapper:new String[]{"MiuiPhysicalBrightnessMappingStrategy","PhysicalMappingStrategy"}){runtime.put("physical_mapper_class",mapper);eq(CurveDisplayRange.maximum(runtime,3200),600);runtime.put("brightness_control",new JSONObject().put("range",new JSONObject().put("maximum",.1)));runtime.put("thermal_last_cap",.01);eq(CurveDisplayRange.maximum(runtime,3200),600);}
  for(String backend:new String[]{"refactor","refactor_coefficients"}){runtime.put("curve_backend","refactor").put("curve_route",backend).put("curve_coordinate","logical_nit");range=CurveDisplayRange.capture(o,"refactor",1,1060);runtime.put("curve_display_range",range);eq(CurveDisplayRange.maximum(runtime,1060),1060);eq(CurveDisplayRange.percent(1060,1060,1060),100);}

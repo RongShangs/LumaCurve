@@ -9,6 +9,7 @@ S=R/'experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor'
 O=R/'build/refactor-memory-tests'
 J=R/'build/refactor-diagnostics/json-20240303.jar'
 sources={
+'top/rongshangs/lumacurve/refactor/TraditionalHooks.java':'''package top.rongshangs.lumacurve.refactor;class TraditionalHooks {static void install(Class<?> type,boolean physical){throw new AssertionError("memory-only fixture must not assemble native mapping hooks");}}''',
 'android/content/Context.java':'''package android.content;public class Context {public Object getContentResolver(){return this;}}''',
 'android/provider/Settings.java':'''package android.provider;import java.util.*;public class Settings {public static class Global {public static Map<String,String> data=new HashMap<>();public static int writes;public static boolean fail;public static String getString(Object r,String k){return data.get(k);}public static boolean putString(Object r,String k,String v){if(fail)return false;writes++;if(v==null)data.remove(k);else data.put(k,v);return true;}}}''',
 'android/os/Handler.java':'''package android.os;import java.util.*;public class Handler {public boolean accept=true;public final List<Runnable> jobs=new ArrayList<>();public boolean post(Runnable r){return postDelayed(r,0);}public boolean postDelayed(Runnable r,long delay){if(!accept)return false;jobs.add(r);return true;}public void removeCallbacks(Runnable r){jobs.removeIf(x->x==r);}public void drain(){List<Runnable> copy=new ArrayList<>(jobs);jobs.clear();for(Runnable r:copy)r.run();}}''',

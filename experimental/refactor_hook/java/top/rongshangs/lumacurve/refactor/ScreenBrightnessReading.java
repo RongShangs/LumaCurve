@@ -6,6 +6,36 @@ import org.json.*;
 
 /** Read-only display telemetry. A requested node is never presented as measured output. */
 final class ScreenBrightnessReading {
+    static void capture(Object owner,JSONObject state){
+        try{
+            Object dpc=field(owner.getClass(),"mDisplayPowerController").get(owner);
+            Object display=dpc.getClass().getMethod("getDisplayPowerState").invoke(dpc);
+            try{state.put("screen_state",display.getClass().getMethod("getScreenState").invoke(display));}catch(Exception|LinkageError unavailable){}
+            float value=((Number)display.getClass().getMethod("getScreenBrightness").invoke(display)).floatValue();
+            if(!Float.isFinite(value)||value<0)return;
+            if(value<=1)state.put("actual_brightness",value).put("actual_brightness_source","display_power_state");
+            try{float n=((Number)owner.getClass().getMethod("convertBrightnessToNit",float.class).invoke(owner,value)).floatValue();
+                if(Float.isFinite(n)&&n>=0)state.put("actual_nit",n).put("actual_nit_source","device_backlight_mapping");
+            }catch(Exception|LinkageError unavailable){}
+        }catch(Exception|LinkageError unavailable){}
+    }
+    static String outputKind(JSONObject state){
+        if(state==null)return "unknown";
+        double n=state.optDouble("actual_nit",Double.NaN);if(Double.isFinite(n)&&n>=0)return "nit";
+        int node=state.optInt("actual_node",-1),max=state.optInt("actual_node_maximum",-1);
+        if(node>=0&&max>10&&max<=65535&&node<=max)return "node";
+        double value=state.optDouble("actual_brightness",Double.NaN);
+        if(!direct(state)&&"display_power_state".equals(state.optString("actual_brightness_source"))&&Double.isFinite(value)&&value>=0&&value<=1)return "fraction";
+        return "unknown";
+    }
+    static String outputTitle(JSONObject state){String kind=outputKind(state);return kind.equals("node")?"当前屏幕节点":kind.equals("fraction")?"当前亮度（系统比例）":directSafe(state)?"当前亮度（设备换算）":"当前屏幕亮度";}
+    static boolean directSafe(JSONObject state){return state!=null&&direct(state);}
+    static String outputText(JSONObject state){switch(outputKind(state)){
+        case "nit":return String.format(java.util.Locale.ROOT,"%.1f nit",state.optDouble("actual_nit"));
+        case "node":return state.optInt("actual_node")+" / "+state.optInt("actual_node_maximum");
+        case "fraction":return String.format(java.util.Locale.ROOT,"%.1f%%",state.optDouble("actual_brightness")*100);
+        default:return "—";
+    }}
     static Field field(Class<?> type,String name)throws NoSuchFieldException{for(Class<?> c=type;c!=null;c=c.getSuperclass())try{Field f=c.getDeclaredField(name);f.setAccessible(true);return f;}catch(NoSuchFieldException next){}throw new NoSuchFieldException(name);}
     static JSONObject calibration(Object owner)throws Exception{
         Object config=field(owner.getClass(),"mDisplayDeviceConfig").get(owner);
@@ -34,6 +64,7 @@ final class ScreenBrightnessReading {
     static boolean frameworkValue(JSONObject state){double n=state.optDouble("actual_nit",Double.NaN);return Double.isFinite(n)&&n>=0&&!state.optString("actual_nit_source").startsWith("node_");}
     static boolean litOutput(JSONObject state){
         if(frameworkValue(state)&&state.optDouble("actual_nit")>0)return true;
+        if("display_power_state".equals(state.optString("actual_brightness_source"))&&state.optDouble("actual_brightness",-1)>0&&state.optDouble("actual_brightness",-1)<=1)return true;
         JSONObject control=state.optJSONObject("brightness_control"),range=control==null?null:control.optJSONObject("range");
         double value=range==null?Double.NaN:range.optDouble("actual",Double.NaN);return Double.isFinite(value)&&value>0&&value<=1;
     }

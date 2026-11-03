@@ -7,6 +7,11 @@ import org.json.*;
 final class CurveDisplayRange {
     static JSONObject capture(Object owner,String backend,float minimum,float maximum)throws Exception{
         if("physical_mapping".equals(backend))return capture(owner,minimum,maximum).put("backend",backend).put("coordinate","physical_nit");
+        if("simple_mapping".equals(backend)){
+            JSONObject boundary=ControlCenterPartition.boundary(owner);float value=(float)boundary.getDouble("brightness");
+            if(!Float.isFinite(value)||value<=minimum||value>maximum)throw new IllegalArgumentException("普通手动亮度比例范围无效");
+            return new JSONObject().put("state","available").put("profile",boundary.getString("profile")).put("maximum_nit",value).put("backend",backend).put("coordinate","framework_brightness");
+        }
         if(!"refactor".equals(backend))throw new IllegalArgumentException("未知曲线坐标");
         Class<?> util=Class.forName("com.android.server.display.RefactorBrightnessUtil",false,owner.getClass().getClassLoader());Method convert=ControlCenterCalibration.method(util,"sliderToLogicalBrightness",float.class,float.class);
         if(!Modifier.isStatic(convert.getModifiers()))throw new IllegalArgumentException("未知逻辑手动亮度接口");float n=ControlCenterCalibration.value(convert,null,1);

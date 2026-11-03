@@ -10,6 +10,7 @@ final class CurveBackendFactory {
             return RefactorProfiles.create(source,min,max);
         }
         Object impl=HookEntry.get(owner,"mAutomaticBrightnessControllerImpl"),abc=HookEntry.get(impl,"mAutomaticBrightnessController");
+        if(source.getClass().getName().equals(SimpleCurveAdapter.TYPE))return new SimpleCurveAdapter(owner,source,abc,()->HookEntry.currentUser.serial());
         return new TraditionalAdapter(owner,source,abc,()->HookEntry.currentUser.serial());
     }
 }

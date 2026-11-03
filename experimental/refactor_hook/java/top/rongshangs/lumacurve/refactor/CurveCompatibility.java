@@ -25,7 +25,7 @@ final class CurveCompatibility {
             if(integer(c,"schema")!=1||!(c.get("strict_order") instanceof Boolean)||!(c.get("current_available") instanceof Boolean)||!(c.get("save_supported") instanceof Boolean))throw new JSONException("Invalid curve contract");
             String coordinate=c.getString("coordinate"),interpolation=c.getString("interpolation");
             int limit=integer(c,"saved_point_limit"),live=integer(c,"live_count");
-            if(!coordinate.equals(state.getString("curve_coordinate"))||!(coordinate.equals("physical_nit")||coordinate.equals("logical_nit"))||!(interpolation.equals("anchors")||interpolation.equals("physical_spline")||interpolation.equals("coefficients"))||interpolation.equals("physical_spline")!=coordinate.equals("physical_nit")||limit<0||limit>SavedCurve.MAX_POINTS||live<0||live>SavedCurve.MAX_POINTS||c.getBoolean("save_supported")&&limit<2)throw new JSONException("Invalid curve contract domain");
+            if(!coordinate.equals(state.getString("curve_coordinate"))||!(coordinate.equals("physical_nit")||coordinate.equals("logical_nit")||coordinate.equals("framework_brightness"))||!(interpolation.equals("anchors")||interpolation.equals("physical_spline")||interpolation.equals("coefficients")||interpolation.equals("brightness_spline"))||interpolation.equals("physical_spline")!=coordinate.equals("physical_nit")||interpolation.equals("brightness_spline")!=coordinate.equals("framework_brightness")||limit<0||limit>SavedCurve.MAX_POINTS||live<0||live>SavedCurve.MAX_POINTS||c.getBoolean("save_supported")&&limit<2)throw new JSONException("Invalid curve contract domain");
             return new Profile(coordinate,interpolation,c.getString("memory_description"),c.getBoolean("strict_order"),c.getBoolean("current_available"),c.getBoolean("save_supported"),limit,live);
         }catch(JSONException bad){throw new IllegalArgumentException("曲线兼容契约无效",bad);}
         return legacy(state);
@@ -54,7 +54,7 @@ final class CurveCompatibility {
         float min=(float)state.getDouble("min_logical_nit"),max=(float)state.getDouble("max_logical_nit");
         float[] base=draft?new CurvePlan(x,saved==null?y:saved.controls(x),min,max,factors,floor).nits():state.has("active_logical_nit")?numbers(state.getJSONArray("active_logical_nit")):y;
         out.referenceLux=x;out.referenceNit=y;out.baselineLux=x;out.baselineNit=base;
-        if(profile.interpolation.equals("physical_spline")){
+        if(profile.interpolation.equals("physical_spline")||profile.interpolation.equals("brightness_spline")){
             TraditionalCurve full=new TraditionalCurve(numbers(state.getJSONArray("factory_full_lux")),numbers(state.getJSONArray("factory_full_nit")));
             out.referenceLux=full.lux();out.referenceNit=full.nit();
             float[] live={1,1,1,1};for(int i=1;i<4;i++)live[i]=base[i]==0&&y[i]==0?1:base[i]/y[i];
@@ -66,7 +66,7 @@ final class CurveCompatibility {
         return out;
     }
     static void verifySaved(Profile profile,int points){if(!profile.save||points>profile.savedLimit)throw new IllegalArgumentException("当前曲线路径或节点数量不支持保存基础曲线");}
-    static void verifySaved(String backend,int points){int limit=backend.equals("refactor")?7:backend.equals("physical_mapping")?SavedCurve.MAX_POINTS:0;if(limit==0||points>limit)throw new IllegalArgumentException("当前曲线路径或节点数量不支持保存基础曲线");}
+    static void verifySaved(String backend,int points){int limit=backend.equals("refactor")?7:backend.equals("physical_mapping")||backend.equals("simple_mapping")?SavedCurve.MAX_POINTS:0;if(limit==0||points>limit)throw new IllegalArgumentException("当前曲线路径或节点数量不支持保存基础曲线");}
     static SavedCurve capture(JSONObject state)throws JSONException{
         Profile p=read(state);
         if(!p.save)throw new IllegalArgumentException("此曲线路径尚不支持记忆转基础曲线");

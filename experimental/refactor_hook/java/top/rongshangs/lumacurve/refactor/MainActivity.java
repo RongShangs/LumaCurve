@@ -958,7 +958,7 @@ public final class MainActivity extends Activity {
             }
             RectF fused=boxes[2];
             float thresholdY=(fused.bottom+boxes[3].top)/2+dp(3),thresholdGap=dp(6);if(!paused){labelEnd(c,runtime!=null&&runtime.has("darkening_lux_threshold")?"变暗 < "+format(runtime.optDouble("darkening_lux_threshold"))+" lux":"变暗 —",middle-thresholdGap,thresholdY,10,MUTED,w/2-dp(12));labelStart(c,runtime!=null&&runtime.has("brightening_lux_threshold")?"变亮 > "+format(runtime.optDouble("brightening_lux_threshold"))+" lux":"变亮 —",middle+thresholdGap,thresholdY,10,MUTED,w/2-dp(12));}
-            boolean rawReading=runtime!=null&&ScreenBrightnessReading.direct(runtime),nodeOnly=rawReading&&StatusPresentation.fresh(runtime,SystemClock.elapsedRealtime())&&!runtime.has("actual_nit")&&runtime.has("actual_node");readingText(readingTitles[2],tr(nodeOnly?"当前屏幕节点":rawReading?"当前亮度（设备换算）":"当前屏幕亮度"));readingText(readingValues[2],nodeOnly?runtime.optInt("actual_node")+" / "+runtime.optInt("actual_node_maximum"):reading("actual_nit"," nit"));if(animate)postInvalidateDelayed(100);
+            boolean freshOutput=StatusPresentation.fresh(runtime,SystemClock.elapsedRealtime());readingText(readingTitles[2],tr(ScreenBrightnessReading.outputTitle(runtime)));readingText(readingValues[2],freshOutput?ScreenBrightnessReading.outputText(runtime):"—");if(animate)postInvalidateDelayed(100);
         }
         void readingText(TextView view,String value){if(!value.contentEquals(view.getText()))view.setText(value);}
     }

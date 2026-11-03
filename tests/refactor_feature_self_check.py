@@ -36,7 +36,7 @@ class AdvancedTuning{static int fail=-1;static boolean supported(int i,Object o)
 class SceneOptions{static String[] IDS={"night_driving","step","touch","proximity","stream_proximity","reflection","night_wake","manual_sunlight","game"},NAMES=IDS;}
 class Scenes{void put(JSONObject j)throws JSONException{for(String id:SceneOptions.IDS)j.put("scene_"+id+"_supported",true);}}
 class Outdoor{boolean supported(){return true;}HbmAccess binding(){return new HbmAccess();}boolean rangeSupported(){return true;}boolean oprSupported(){return true;}float nitCeiling(int ignored){return 500;}}
-class HbmAccess{Object controller=new Object();HbmAccess(){}HbmAccess(Object c){controller=c;}static boolean timed=true;boolean budgetTunable(){return timed;}boolean tunable(){return true;}float max(){return 1;}}
+class HbmAccess{Object controller=new Object();HbmAccess(){}HbmAccess(Object c){controller=c;}static boolean timed=true;boolean rangeOnly(){return false;}boolean budgetTunable(){return timed;}boolean tunable(){return true;}float max(){return 1;}}
 class OutdoorTuning{static Set<Class<?>> owners=new HashSet<>(Arrays.asList(Object.class)),ranges=owners,peaks=owners,nitCaps=owners;}
 class OutdoorOpr{static Set<Class<?>> owners=OutdoorTuning.owners;}
 class NitBrightnessLimit{NitBrightnessLimit(Object o){}float resolve(double n,float min,float max){return max;}}

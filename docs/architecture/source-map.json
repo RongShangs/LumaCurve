@@ -195,7 +195,7 @@
     {
       "file": "CurveBackend.java",
       "layer": "policy",
-      "purpose": "策略与算子"
+      "purpose": "统一坐标、曲线/记忆能力、原生Hook装配及学习/回放独立契约；默认不绑定具体ABI"
     },
     {
       "file": "CurveBackendFactory.java",
@@ -620,7 +620,12 @@
     {
       "file": "RefactorProfiles.java",
       "layer": "adapters",
-      "purpose": "Refactor锚点 / 分段系数互斥选择与默认方法ABI"
+      "purpose": "真实锚点、独立默认系数、原生重建系数ABI互斥选择；残缺优先接口拒绝降级"
+    },
+    {
+      "file": "RefactorResetAdapter.java",
+      "layer": "adapters",
+      "purpose": "无独立默认系数的原生重建9/22布局；事务读取基线并还原学习现场、曲线编辑/重建交接/原生学习及回滚"
     },
     {
       "file": "RelativeNodeGesture.java",
@@ -735,7 +740,7 @@
     {
       "file": "ScreenBrightnessReading.java",
       "layer": "adapters",
-      "purpose": "只读主屏节点及标定；识别与亮屏实际输出矛盾的驱动0，常规保留框架输出、节点接管按实际读回换算"
+      "purpose": "只读实际屏幕遥测、nit/节点/框架比例收束及可选类型故障隔离"
     },
     {
       "file": "ScrollElasticity.java",
@@ -761,6 +766,11 @@
       "file": "SettingsSearchIndex.java",
       "layer": "presentation",
       "purpose": "设置搜索目的地与双语关键词目录，沿用现有入口"
+    },
+    {
+      "file": "SimpleCurveAdapter.java",
+      "layer": "adapters",
+      "purpose": "原生比例曲线及完整节点、临时提交用户作用域、独立原生学习/回放与事务Hook"
     },
     {
       "file": "StatusAdvice.java",

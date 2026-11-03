@@ -63,5 +63,12 @@ public class StatusPresentationTest{
  }
 }''',encoding='utf-8')
 classes=O/'classes';classes.mkdir(exist_ok=True)
-subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(J),'-d',str(classes),*[str(S/(n+'.java')) for n in ['SensorState', 'StatusPresentation', 'BranchReport', 'StatusAdvice', 'LiveLimitEvidence', 'UiText', 'CurveComparison', 'SavedCurve', 'CurveCompatibility', 'TraditionalCurve', 'CurvePlan']],str(stub),str(test)],check=True)
+extra=[]
+for name,body in {
+ 'android/os/SystemClock.java':'package android.os;public class SystemClock {public static long elapsedRealtime(){return 1000;}}',
+ 'top/rongshangs/lumacurve/refactor/ActivePanelNode.java':'package top.rongshangs.lumacurve.refactor;class ActivePanelNode {static org.json.JSONObject display(){return new org.json.JSONObject();}static org.json.JSONObject discover(){return new org.json.JSONObject();}}',
+ 'top/rongshangs/lumacurve/refactor/PanelNodeDiscovery.java':'package top.rongshangs.lumacurve.refactor;class PanelNodeDiscovery {static int number(java.io.File f){return 0;}}'
+}.items():
+ p=O/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_text(body,'utf-8');extra.append(str(p))
+subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(J),'-d',str(classes),*[str(S/(n+'.java')) for n in ['ScreenBrightnessReading', 'SensorState', 'StatusPresentation', 'BranchReport', 'StatusAdvice', 'LiveLimitEvidence', 'UiText', 'CurveComparison', 'SavedCurve', 'CurveCompatibility', 'TraditionalCurve', 'CurvePlan']],str(stub),str(test),*extra],check=True)
 subprocess.run(['java','-cp',str(classes)+os.pathsep+str(J),'top.rongshangs.lumacurve.refactor.StatusPresentationTest'],check=True)

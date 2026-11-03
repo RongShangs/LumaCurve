@@ -32,9 +32,11 @@
       "routes": [
         "refactor",
         "refactor_coefficients",
+        "refactor_reset_coefficients",
         "miui_physical",
         "aosp_physical",
-        "aosp_physical_clamped"
+        "aosp_physical_clamped",
+        "simple_mapping"
       ],
       "owners": [
         "BackendSelection.java",
@@ -56,9 +58,11 @@
         "TraditionalCurve.java",
         "CurveDisplayRange.java",
         "CurveCompatibility.java",
-        "CurveBackendFactory.java"
+        "CurveBackendFactory.java",
+        "SimpleCurveAdapter.java",
+        "RefactorResetAdapter.java"
       ],
-      "selector": "ABC 活动策略为准；Refactor 未就绪不得因物理映射对象存在而抢用，未知活动标记才按已验证对象选择。 Refactor内部分段锚点优先；任一旧锚点标记存在时不得回退绕过残缺旧结构；仅旧锚点整体缺失且9/22系数布局、实例字段与原生消费者签名完整时采用系数路径。 记忆转基础保持现有路径；仅对新鲜物理映射采样的4个float ULP以内边界/平台舍入误差归一，仍严格校验全节点、坐标与范围；Refactor锚点及持久化输入不放宽。 原机完整单调曲线超出真实标定范围时，只对已验证系统物理映射及双向原生样条追加端点裁剪分支；其他范围内旧路径不增加探测要求，残缺标定不回退绕过。；可选深色曲线复用同一已选后端和实际设备约束，仅按系统uiMode选择独立基础配置；不开启时旧配置原样选择。 深浅色模式记忆策略独立选择清除/共用/分开；独立作用域按本机用户与基础曲线隔离，仅启用跨重启保持才保存两份磁盘存档。 曲线编辑按实际min/max，取消倍率边界；联动相邻节点保持顺序，系数ABI保持可表示的严格递增；根验证、深色配置和后端共用CurvePlan，不修改已有合法配置。 UI所有基础曲线节点以实际曲线值/max显示0—100%，数值输入与拖动均提交绝对曲线坐标；保存仍用原倍率/下限结构，无升级迁移。输入0由实际接口最小值约束，系数路线仍严格递增。 显示100%以已验证的普通手动上限为准：Refactor读取原生sliderToLogicalBrightness(1)，传统映射读取DDC普通HBM边界并经原生brightness/backlight/nit换算。保持与后端同坐标；临时限亮不改变轴。未确认时沿用旧域并报告，不缩小存储/输出域；高亮点保留，编辑百分比允许表达100%以上的原设备范围。",
+      "selector": "以ABC实际活动策略为入口；Refactor已选但未就绪时不抢用物理对象，活动标记未知时才按完整对象选择。\nRefactor锚点结构优先；只有锚点标记整体缺失且9项系数、22项状态及原生消费者签名完整时采用系数路线。\n物理映射按真实类和双向标定选择；超出标定端点的完整原机曲线使用已验证裁剪分支，范围内旧路线不增加要求。\nSimple仅接完整的比例数组、样条和原生重建/学习接口，不作为物理接口残缺后的回退。\n后端通过installMappingHooks装配自己的Hook；原生学习容量与存档回放能力独立声明。\n主题、编辑、显示标尺和记忆转存使用同一已选后端；具体单位、约束及内部变体见下方契约与ABI索引。\n独立默认字段/默认消费者整体缺失时，完整原生reset/getLogicalBrt及9/22布局才可采用重建系数；原默认接口任一残片存在时仍走旧校验，不降级。",
       "evidence": [
         "curve_backend",
         "physical_mapper_class",
@@ -75,12 +79,19 @@
         "theme_curve_dark",
         "base_curve_name",
         "theme_memory_mode",
-        "theme_curve_dark",
         "curve_display_range",
         "curve_contract",
-        "memory_live_error"
+        "memory_live_error",
+        "simple_mapper_class",
+        "simple_mapping_active",
+        "simple_curve_points",
+        "simple_curve_nit_calibrated",
+        "calculated_brightness",
+        "simple_curve_last_error",
+        "refactor_curve_verification.profile",
+        "refactor_curve_verification.baseline_source"
       ],
-      "cleanup": "关闭 / 故障 / OTA 基准或用户变化恢复本次应用的曲线；只按所选保持范围恢复匹配记忆。 系数路线事务快照同时保存数组内容与身份；拒绝其他所有者替换的基线，未验证的虚拟拟合参考点不冒充可移植用户锚点。 转存前校验失败不调用配置应用，不清除当前手动点；精度归一不修改原始状态快照或其他已保存设置。 新分支中性参数保持原配置对象，编辑只提交有效标定范围内的节点；停用恢复未裁剪原始对象，元数据/记忆清理及失败回滚沿用旧事务。；启用独立曲线后真实主题切换在显示Handler事务内撤销待保存/恢复、清除活跃与归档记忆；永久保持不能复活旧主题记忆。关闭功能不删除两条基础配置。",
+      "cleanup": "停用、故障、基准或用户变化时，只撤回本次仍持有的曲线；保留原始对象与数组身份，系统已替换时不覆盖。\n配置和记忆转存先验证再提交，失败恢复事务快照；校验失败不清当前点，浮点归一不修改原始状态或其他设置。\n主题切换在显示Handler事务内取消旧待执行任务，按清除、共用或独立策略交接记忆；仅跨重启保持才落盘。关闭独立曲线不删除两条基础配置。\nSimple同步提交的临时用户许可在finally撤销；用户未知或中途变化时拒绝/回滚。清除记忆调用原生接口以清除残余调整。\n必需原生Hook沿用事务安装器；默认后端不安装未知Hook。未经验证的拟合点或回放接口不声明为可移植记忆。\n重建路线仅在同步显示事务内探测原生基线，结束时还原所有已核验数组的身份/内容和学习标记；读取不能把现有学习值当默认。修改前验证归属，重建失败完整回滚。",
       "tests": [
         "tests/refactor_traditional.py",
         "tests/refactor_curve_integrity.py",
@@ -97,7 +108,11 @@
         "tests/refactor_curve_editing.py",
         "tests/refactor_curve_percentage.py",
         "tests/refactor_curve_scale.py",
-        "tests/refactor_curve_boundary.py"
+        "tests/refactor_curve_boundary.py",
+        "tests/refactor_simple_mapping.py",
+        "tests/refactor_simple_mapping_firmware.py",
+        "tests/refactor_reset_curve.py",
+        "tests/refactor_reset_firmware.py"
       ],
       "composition": "exclusive",
       "convergence": {
@@ -106,8 +121,8 @@
           "CurveBackend.java",
           "CurveCompatibility.java"
         ],
-        "contract": "CurveBackend 能力方法 + curve_contract v1 + Curves；普通手动100%显示标尺独立于全域与原生存档",
-        "coordinates": "物理nit/逻辑nit明确区分；归档value保持原生坐标，display_nit在适配器转换",
+        "contract": "CurveBackend能力方法（含installMappingHooks、独立学习容量/存档回放） + curve_contract v1 + Curves；显示标尺与原生载荷分开；原生私有当前消费者通过currentInputLux接收同坐标末段约束",
+        "coordinates": "物理nit/逻辑nit明确区分；归档value保持原生坐标，display_nit在适配器转换；framework_brightness为0—1框架亮度，按普通手动上限显示百分比，不冒充物理nit。",
         "consumers": [
           "HookRuntime.java",
           "CurveComparison.java",
@@ -342,7 +357,7 @@
       "evidence": [
         "touch_override_supported"
       ],
-      "cleanup": "每次调用后恢复临时字段，包括原生异常。 临时字段统一由FieldOverride按当前值归属逆序恢复；系统在调用期间更新后不回写旧值。",
+      "cleanup": "每次调用结束或异常后由FieldOverride逆序恢复临时字段；系统在调用期间更新的字段不回写旧值。",
       "tests": [
         "tests/refactor_advanced_hooks.py",
         "tests/refactor_review_safety.py"
@@ -397,7 +412,7 @@
         "scene_options",
         "feature_self_check"
       ],
-      "cleanup": "临时场景字段按调用恢复；停止取消本次确认，恢复自己的步行 / 夜间设置。 临时字段统一由FieldOverride按当前值归属逆序恢复；系统在调用期间更新后不回写旧值。",
+      "cleanup": "调用结束或异常时由FieldOverride逆序恢复临时字段；停止时取消本次确认并恢复仍持有的步行/夜间设置，系统后来更新优先。",
       "tests": [
         "tests/refactor_scenes.py",
         "tests/refactor_scene_hooks.py",
@@ -553,17 +568,22 @@
       ],
       "routes": [
         "override_target",
-        "legacy_custom_target"
+        "legacy_custom_target",
+        "native_range_only"
       ],
       "owners": [
         "OutdoorTuning.java",
-        "OutdoorController.java"
+        "OutdoorController.java",
+        "HbmAccess.java",
+        "OutdoorPolicy.java"
       ],
-      "selector": "覆盖目标入口优先；明确缺入口且旧调用所有权完整时走传统自定义目标，残缺覆盖接口不回退。",
+      "selector": "覆盖目标入口优先；明确缺入口且旧调用所有权完整时走传统自定义目标，残缺覆盖接口不回退。 原生HBM数据确实为null且deviceSupportsHbm为false，普通范围和当前上限均有效时采用native_range_only；目标沿用同一自动SDR入口，限制到实时原生上限，不制造HBM配置或绕开原生下游保护。存在但残缺的数据仍拒绝。",
       "evidence": [
-        "outdoor.target_compatibility_profile"
+        "outdoor.target_compatibility_profile",
+        "outdoor.range_profile",
+        "outdoor.range_only"
       ],
-      "cleanup": "必需 Hook 成组事务安装，失败整组撤销；可选范围 / 跟踪失败独立，不撤销已经提交的核心。",
+      "cleanup": "必需 Hook 成组事务安装，失败整组撤销；可选范围 / 跟踪失败独立，不撤销已经提交的核心。 无HBM分支不写数据、计时和范围；数据替换先校验后切换，配置恢复可回原路线。",
       "tests": [
         "tests/refactor_outdoor.py",
         "tests/refactor_os3_compatibility.py",
@@ -572,10 +592,12 @@
       "composition": "exclusive",
       "convergence": {
         "boundary": [
-          "OutdoorTuning.java"
+          "OutdoorTuning.java",
+          "HbmAccess.java",
+          "OutdoorPolicy.java"
         ],
         "contract": "户外目标、进入条件与可逆参数应用",
-        "coordinates": "本机nit/逻辑坐标由曲线后端维护，不把百分比当nit",
+        "coordinates": "本机nit/逻辑坐标由曲线后端维护，不把百分比当nit；缺HBM配置时使用真实0—1框架亮度和实时允许上限，不推断nit。",
         "consumers": [
           "OutdoorController.java"
         ]
@@ -684,7 +706,7 @@
         "thermal_supported",
         "thermal_skipped"
       ],
-      "cleanup": "每次调用恢复暂存显示限亮字段，停止恢复系统控制。 临时字段统一由FieldOverride按当前值归属逆序恢复；系统在调用期间更新后不回写旧值。",
+      "cleanup": "调用结束或异常时由FieldOverride逆序恢复仍持有的显示限亮字段；停止后沿用系统控制。",
       "tests": [
         "tests/refactor_advanced_hooks.py",
         "tests/refactor_hook_firmware.py",
@@ -767,7 +789,7 @@
         "ActivePanelNode.java",
         "ScreenBrightnessReading.java"
       ],
-      "selector": "backlight 或明确标识显示的 leds；真实 sysfs 路径与上限配对且唯一主屏，不按机型写死上限。 新增手动面板折叠路线：实际原生布局至少两个不同默认物理屏；实时默认内部屏地址与布局、成对同控制器背光、唯一 DSI 亮屏端口一致，选当前端口，扫描后再确认物理屏未变化。无切换布局证据时原发现路径不变；有折叠证据但不完整则等待。 兼容实际 Physical / StablePhysical 地址对象，均直接调用原生 getPort；StablePhysical 的物理 ID 与端口独立，按内核成对 panelN 清单验证，不解码该 ID。 状态读数单独只读实际节点；可验证本机DisplayDeviceConfig背光标定时换算nit，不可换算时原生接管仅显示节点值，不复用框架旧亮度。",
+      "selector": "backlight 或明确标识显示的 leds；真实 sysfs 路径与上限配对且唯一主屏，不按机型写死上限。 新增手动面板折叠路线：实际原生布局至少两个不同默认物理屏；实时默认内部屏地址与布局、成对同控制器背光、唯一 DSI 亮屏端口一致，选当前端口，扫描后再确认物理屏未变化。无切换布局证据时原发现路径不变；有折叠证据但不完整则等待。 兼容实际 Physical / StablePhysical 地址对象，均直接调用原生 getPort；StablePhysical 的物理 ID 与端口独立，按内核成对 panelN 清单验证，不解码该 ID。 状态读数单独只读实际节点；可验证本机DisplayDeviceConfig背光标定时换算nit，不可换算时原生接管仅显示节点值，不复用框架旧亮度。 无nit但有已验证节点时，常规模式也展示真实节点；无节点时可显示DisplayPowerState实际输出比例，直接节点接管不复用该比例。",
       "evidence": [
         "main_panel_node.node_class",
         "main_panel_node.node_path",
@@ -780,9 +802,11 @@
         "actual_nit_source",
         "actual_node_source",
         "screen_nit_calibration.route",
-        "brightness_read_error"
+        "brightness_read_error",
+        "actual_brightness",
+        "actual_brightness_source"
       ],
-      "cleanup": "发现与权限检查只读，不启动写入器；实际租约写入另由原生事务负责，拒绝副屏 / 指示灯 / 手电。 折叠专用原生选项与 v3 权限恢复记录仅允许绑定端口节点；v2 / 旧节点拒绝规则不变。关闭、熄屏、DRM 改变结束旧接管；租约和框架输出隔离绑定物理屏，晚到命令拒绝，不复用旧目标。户外新增显式折叠协作分支，使用独立物理租约和原生 DSI 核验；隐藏映射仍不启用此分支。 读数不启动写入器、不修改节点或权限；物理屏或标定不一致时不显示旧nit。",
+      "cleanup": "发现与权限检查只读，不启动写入器；实际租约写入另由原生事务负责，拒绝副屏 / 指示灯 / 手电。 折叠专用原生选项与 v3 权限恢复记录仅允许绑定端口节点；v2 / 旧节点拒绝规则不变。关闭、熄屏、DRM 改变结束旧接管；租约和框架输出隔离绑定物理屏，晚到命令拒绝，不复用旧目标。户外新增显式折叠协作分支，使用独立物理租约和原生 DSI 核验；控制中心动态折叠监听仍须独立核验，不能复用户外通过结论。 读数不启动写入器、不修改节点或权限；物理屏或标定不一致时不显示旧nit。",
       "tests": [
         "tests/refactor_panel_nodes.py",
         "tests/refactor_panel_access.py",
@@ -798,7 +822,7 @@
           "ScreenBrightnessReading.java"
         ],
         "contract": "已绑定当前物理屏的节点、实际max、读回及换算来源",
-        "coordinates": "节点整数/physical nit分别标记；拒绝跨屏与失效绑定",
+        "coordinates": "节点整数/physical nit分别标记；拒绝跨屏与失效绑定；display_power_state比例仅为系统输出，不冒充物理nit或请求值。",
         "consumers": [
           "ControlCenterRoot.java",
           "BrightnessControl.java",
@@ -983,7 +1007,7 @@
         "MappingRecoveryState.java",
         "ControlCenterScreen.java"
       ],
-      "selector": "原mode=0/1/2保持原义：全区间严格单调坐标优先；端点平台仅在实际标定数组、原生双向样条和端点裁剪证明完整时使用有效域，逻辑101点表独立核验。独立mode=3/raw_node_v3复用标准坐标进行回显，并核验主屏输出隔离、物理ID、Root实际可写节点及监听进程；不按机型或版本放行，未知动态折叠监听不套用。只有显式拖动才接管完整节点，不在升级时迁移旧选择。 mode=4追加分区路线，读取DDC原始HBM transitionPoint或控制器普通亮度上限，在真实标定中转成节点比例；未知或无额外区间拒绝分区，不影响完整节点控制。 分区呈现普通75%/增强25%；普通物理边界仍读原机接口，独立上界默认真实max_brightness。配置上界只约束用户节点目标，不修改自动HBM范围。 分区普通段在已验证OEM V1逻辑滑块上保留完整原生输入范围，不将逻辑nit当物理nit提前封顶；gamma路线继续使用实际物理普通边界。增强段及回显仍走原节点标定，手势证明/Root权限及用户模式不放宽。 V1普通区延迟回显先由真实物理读数经同一本机V1标定反解为原生逻辑进度，再按实际控件端点压入75%；动画比较的反向换算使用同一对应关系。gamma、增强区、已确认节点保持和旧模式继续原物理路径，不缓存手势位置掩盖输出变化。",
+      "selector": "旧mode=0/1/2保留坐标语义：严格单调全域优先；端点平台只有原始数组、双向样条与裁剪证据完整才采用有效域，逻辑101点表独立核验。\n完整节点mode=3复用已验证坐标回显，并独立核验主屏隔离、物理ID、Root可写节点与监听进程；动态折叠监听未知时不套用。\n分区mode=4额外读取设备普通HBM边界并经真实标定换算；没有可靠边界或额外区间则只拒绝分区。\n分区普通段占75%、增强段占25%；普通V1使用原生逻辑输入全域，gamma使用物理普通边界；增强段及回显按实际节点标定。用户上界不修改自动HBM范围。\n普通V1的延迟回显先将真实物理读数反解为本机逻辑进度，再映射到75%，动画比较使用同一逆变换。作用域、手势和控制权为独立检查。",
       "evidence": [
         "control_center_slider.kind",
         "control_center_slider.error",
@@ -1009,7 +1033,7 @@
         "hyperlux_control_center_ui_v1.pid",
         "hyperlux_control_center_ui_v1.process_start"
       ],
-      "cleanup": "旧坐标路线不拥有模式/输出；停用、用户、配置、进程或对象变化撤销旧profile。mode=3拖动经既有raw_panel退出暗光锁定并关闭自动亮度，共用原生程序/租约/健康检查/锁屏暂停和解锁恢复；重开自动亮度清租约，auto_epoch拒绝此前排队手势。同节点且只更新其他设置时保留保持；关闭引擎复用原始所有权恢复。Root暂缺保留原配置，不阻止保存其他设置；不清理其他弹窗的会话。 普通段调用原系统回调以保留开启中的自动亮度和学习，超出段共用raw_panel且不学习；三秒内需先结束首笔再上滑。返回普通段按独立保存选项恢复自动或继续手动，超时/代次/范围/自动模式变化清确认。 首笔同步源滑块，在mExternalChange保护下setValue(position,null)封顶；系统自动反馈不进手势门禁、不写节点。自动高亮已在增强区时，明确新手势可直接接管，系统端以原FrameworkBrightness实际值和标定二次确认；失效证据不放行。动画仅当前可见设置页运行，暂停/切页/移除停止，不新增采样或守护。 首笔封顶后，第二笔尚在普通区间的向上接近保留本次已松手确认，不提前写节点；未越界就结束、超时或清理则撤销。可选控制器onStart/onStop提供独立手势边界，不再仅靠进度终止通知；原进度通知路线保留，可选子组失败独立回滚。 raw09仅修复显式控制中心监听在租约撤销/替换与补写并发时不应死亡的竞态，旧普通手动路径及真实I/O故障退出保留。握手保留最近8条阶段/错误；重启原生程序时保留上次最多64KiB日志，导出按需只读。 按需只读核对本模块primary-user的实际LSPosed作用域，与当前SystemUI注入分别显示；拒读/坏库/多库冲突是未知，不按未注入推断未勾选。只有明确按钮确认才重启精确SystemUI主进程，核对包UID、PID、cmdline及启动标识；不杀system_server、不写作用域数据库或重置选择。 用户显式节点保持的HDR规则局部调整：已确认cc_手动节点继续隔离背光，不影响HDR颜色；首笔HDR未持有仍拒绝，严重温控和真实故障保持退让。作用域未知只引导，不判为缺失。",
+      "cleanup": "停用或用户、配置、进程、对象变化时撤回旧profile。Root暂缺保留原配置和其他设置；同节点且无关设置变动不解除已有保持。\n节点拖动复用raw_panel、原生程序及健康检查，关闭自动亮度并放开暗光锁定；重开自动亮度撤销租约及旧手势。锁屏输入/回显退回原生，解锁仅恢复当前代次。\n分区普通段调用原生回调，保留开启中的自动亮度与学习；增强段不学习。首次在75%封顶，松手后三秒内再次上滑越界才接管；返回普通段按用户选择恢复自动或继续手动。\n首次封顶同步源滑块并保护外部变化；系统自动反馈不进入手势门禁。自动高亮已在增强段时，需新手势且框架实际值/标定再次确认。超时、换代或未越界结束均撤销确认。\n独立onStart/onStop通知为可选子组，失败不撤销既有进度路径。已确认的手动保持不因HDR退出，但保留图像处理、首笔HDR拒绝、严重温控与真实故障退让。\n作用域只在相关配置确实改变时按实际证据提示；手动重启仅针对核验后的SystemUI主进程。动画离页停止，监听与日志有界，协议细节见ABI及原生变体。",
       "tests": [
         "tests/refactor_control_center.py",
         "tests/refactor_control_center_root.py",
@@ -1477,7 +1501,8 @@
       "owner": "RefactorProfiles.java",
       "alternatives": [
         "anchors_7",
-        "coefficients_9_22"
+        "coefficients_9_22",
+        "reset_coefficients_9_22"
       ],
       "rule": "旧式锚点标记优先且不回退；真实9项系数、22项状态、9项拟合数据与实例方法全部通过才选择独立系数路线。系数路径的基准端点从设备实际系数与逻辑上限反解，不按型号、OS或固定照度推算。保留原生拟合 / 物理输出，跨模式、锁屏、重启恢复及记忆转基础暂不支持，保存配置不重置。",
       "test": "tests/refactor_coefficient_curve.py"
@@ -1531,9 +1556,10 @@
         "sysfs_brightness_readback",
         "display_config_backlight_to_nit",
         "node_readback_uncalibrated",
-        "driver_zero_conflicts_with_lit_output"
+        "driver_zero_conflicts_with_lit_output",
+        "display_power_state_fraction"
       ],
-      "rule": "保留有效驱动actual_brightness优先的原路径。亮屏、同设备brightness为正、未报告背光关闭，且独立框架实际输出为正时，将矛盾的驱动0标为不可用并采用该设备brightness读回；未知、实际熄屏或背光关闭不推断为假0。常规输出优先原有框架nit，直接节点接管才优先本机标定换算。记录驱动值、寄存器值、原框架nit及回退原因；范围外不外推，不使用请求目标或机型表。",
+      "rule": "保留有效驱动actual_brightness优先的原路径。亮屏、同设备brightness为正、未报告背光关闭，且独立框架实际输出为正时，将矛盾的驱动0标为不可用并采用该设备brightness读回；未知、实际熄屏或背光关闭不推断为假0。常规输出优先原有框架nit，直接节点接管才优先本机标定换算。记录驱动值、寄存器值、原框架nit及回退原因；范围外不外推，不使用请求目标或机型表。 无nit时所有控制模式均可显示已验证实际节点；仅非节点接管时再使用DisplayPowerState实际输出比例，拒绝计算目标、未知来源和无效范围。",
       "test": "tests/refactor_screen_brightness.py"
     },
     {
@@ -1640,6 +1666,79 @@
       ],
       "rule": "只依赖实际KeyguardManager及PowerManager；锁屏/息屏/未知状态完整与分区统一退回原生输入及回显，清除排队手势和动画。核心再次校验解锁；锁屏原生调亮后取消cc租约，磁贴的原锁屏暂停/解锁恢复保留。无定时轮询或设置回写。",
       "test": "tests/refactor_control_center.py"
+    },
+    {
+      "id": "simple_native_baseline",
+      "owner": "SimpleCurveAdapter.java",
+      "alternatives": [
+        "native_factory_arrays",
+        "selected_complete_baseline"
+      ],
+      "rule": "仅完整实际Simple ABI；原数组不修改，getAdjustedCurve参数与getUnadjustedBrightness共用同一已选完整节点；原生学习与保护继续执行，未知/残缺接口不回退。采样单位为framework_brightness，nit换算独立。",
+      "test": "tests/refactor_simple_mapping.py"
+    },
+    {
+      "id": "simple_commit_user_scope",
+      "owner": "SimpleCurveAdapter.java",
+      "alternatives": [
+        "transaction_foreground_user",
+        "committed_config_user"
+      ],
+      "rule": "仅原生同步配置事务暂用已验证当前用户，显示Handler与实例守卫保留；提交前后核对实际用户并在finally撤销临时许可，其他时刻沿用已提交配置用户。",
+      "test": "tests/refactor_simple_mapping.py"
+    },
+    {
+      "id": "outdoor_hbm_data_presence",
+      "owner": "HbmAccess.java",
+      "alternatives": [
+        "configured_hbm",
+        "native_range_only"
+      ],
+      "rule": "仅真实null、正确数据字段类型、原生deviceSupportsHbm为false和有效native normal/current上限才进入普通范围；非null数据严格校验原ABI，类型错误或支持矛盾不能降级。无HBM数据不解锁范围/OPR，不创建预算；当前允许上限及温控/HDR/电量/手动/场景控制保持。替换先校验后发布。",
+      "test": "tests/refactor_outdoor.py"
+    },
+    {
+      "id": "curve_hook_assembly",
+      "owner": "CurveBackend.java",
+      "alternatives": [
+        "no_mapping_hooks",
+        "physical_configuration_and_observers",
+        "simple_baseline_and_observers"
+      ],
+      "rule": "后端自行装配已验证原生Hook，默认无操作；公共入口只调用installMappingHooks，不按具体类猜测配置或比例学习Hook。保留原安装事务及旧install入口。",
+      "test": "tests/refactor_simple_mapping.py"
+    },
+    {
+      "id": "learning_replay_capabilities",
+      "owner": "CurveBackend.java",
+      "alternatives": [
+        "observable_native_learning",
+        "verified_archive_replay",
+        "replay_missing_learning_retained"
+      ],
+      "rule": "manualPointCapacity表达可观察原生学习容量，persistentMemorySupported独立校验真实回放接口；缺少回放方法不屏蔽已有学习/实时读数，不能因此启用未验证回放。",
+      "test": "tests/refactor_simple_mapping.py"
+    },
+    {
+      "id": "optional_output_type_failure",
+      "owner": "ScreenBrightnessReading.java",
+      "alternatives": [
+        "device_nit_available",
+        "uncalibrated_actual_output",
+        "optional_type_linkage_unavailable"
+      ],
+      "rule": "可选nit或遥测类无法加载时仅丢失对应观测，不拖停整包状态或独立控制中心坐标；实际校准入口失败仍拒绝，不借观测隔离降级主能力。",
+      "test": "tests/refactor_control_center_calibration.py"
+    },
+    {
+      "id": "reset_derived_baseline",
+      "owner": "RefactorResetAdapter.java",
+      "alternatives": [
+        "transactional_native_reset_baseline",
+        "restored_live_learning_state"
+      ],
+      "rule": "默认字段、getDefaultLogicalBrt和calculateBrt整体缺失；真实getLogicalBrt、原生重建/学习接口及9/22容器完整。同步快照原生重建基线后还原现场，不写固定曲线；已有接口残缺不回退。保留原生拟合、私有当前消费者读回与控制保护，未验证便携锚点不声明转存/回放支持。",
+      "test": "tests/refactor_reset_curve.py"
     }
   ],
   "native_variants": [

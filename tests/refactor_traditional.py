@@ -46,7 +46,7 @@ public class MiuiPhysicalBrightnessMappingStrategy {
 class HookEntry {static Map<Object,HookRuntime> states=new IdentityHashMap<>();static int reattached;static Object get(Object o,String n)throws Exception{return TraditionalAdapter.read(o,n);}static void reattach(Object owner,Object mapper){reattached++;}}''',
 'top/rongshangs/lumacurve/refactor/HookRuntime.java':'''package top.rongshangs.lumacurve.refactor;
 class HookRuntime {CurveBackend kernel;Object owner;boolean closed,changing,faultPending,userMatches=true,onThread=true;String phase="active";float memoryStrength=1;long lastManualAdjustment;int events,samples;float remembered,lastNit;MemoryPolicy memoryPolicy=new MemoryPolicy();MemoryPersistence persistentMemory=new MemoryPersistence();android.os.Handler handler=new android.os.Handler();
- boolean onDisplayThread(){return onThread&&!closed;}boolean appliesToUser(){return userMatches;}void memoryEvent(float l,float d,float r){events++;remembered=r;}void queuePublish(){}void sample(float l,float n){samples++;lastNit=n;}void fault(Throwable e){faultPending=true;}}
+ boolean onDisplayThread(){return onThread&&!closed;}boolean appliesToUser(){return userMatches;}void memoryEvent(float l,float d,float r){events++;remembered=r;}void queuePublish(){}void sample(float l,float n){samples++;lastNit=n;}void sampleWithoutNit(float l,float b){samples++;lastNit=Float.NaN;}void fault(Throwable e){faultPending=true;}}
 ''',
 'top/rongshangs/lumacurve/refactor/TraditionalHostTest.java':'''package top.rongshangs.lumacurve.refactor;
 import java.util.*;import android.hardware.display.BrightnessConfiguration;import com.android.server.display.MiuiPhysicalBrightnessMappingStrategy;import top.rongshangs.lumacurve.refactor.hooking.XposedBridge;
@@ -56,6 +56,7 @@ public class TraditionalHostTest {
  public static class BaseInterp{public float interpolate(float f){return 0;}}public static class ChildA extends BaseInterp{public float interpolate(float f){return 1;}}public static class ChildB extends BaseInterp{public float interpolate(float f){return 2;}}
  public static class Owner{int mDisplayId;boolean mUseAutoBrightness=true;}
  public static class Map0 {Object mapper;public Object get(int i){return i==0?mapper:null;}}
+ public static class NoReplayABC {Object mBrightnessMappingStrategyMap,mCurrentBrightnessMapper,mShortTermModel;public void resetShortTermModel(){}}
  public static class Model {float anchor=30;boolean valid=true;}
  public static class ABC {Map0 mBrightnessMappingStrategyMap=new Map0();Object mCurrentBrightnessMapper;Model mShortTermModel=new Model();int resets;
    public boolean setScreenBrightnessByUser(float lux,float value){try{TraditionalAdapter.method(mCurrentBrightnessMapper.getClass(),"addUserDataPoint",float.class,float.class).invoke(mCurrentBrightnessMapper,lux,value);mShortTermModel.anchor=lux;mShortTermModel.valid=true;return true;}catch(Exception e){throw new RuntimeException(e);}}
@@ -91,7 +92,7 @@ public class TraditionalHostTest {
   Object idle=new Object();abc.mCurrentBrightnessMapper=idle;int resets=abc.resets;a.configure(f);check(abc.resets==resets&&abc.mCurrentBrightnessMapper==idle);a.configure(null);abc.mCurrentBrightnessMapper=m;
   owner.mDisplayId=1;try{new TraditionalAdapter(owner,m,abc,()->0);throw new AssertionError();}catch(IllegalArgumentException expected){cases++;}owner.mDisplayId=0;
   abc.mBrightnessMappingStrategyMap.mapper=new Object();try{new TraditionalAdapter(owner,m,abc,()->0);throw new AssertionError();}catch(IllegalStateException expected){cases++;}abc.mBrightnessMappingStrategyMap.mapper=m;
-  HookRuntime s=new HookRuntime();s.kernel=a;s.owner=owner;HookEntry.states.put(m,s);TraditionalHooks.install(m.getClass());s.changing=true;a.configure(f);s.changing=false;
+  HookRuntime s=new HookRuntime();s.kernel=a;s.owner=owner;HookEntry.states.put(m,s);a.installMappingHooks(m.getClass());s.changing=true;a.configure(f);s.changing=false;
   s.memoryStrength=.5f;call(m,"addUserDataPoint",DRAG,30f,.2f,"video");near(m.mShortTermModelUserBrightness,.112f);check(s.events==1);android.os.SystemClock.time+=50;call(m,"addUserDataPoint",DRAG,30f,.3f,"video");near(m.mShortTermModelUserBrightness,.162f);check(s.events==2); // One gesture uses its start baseline.
   s.memoryStrength=0;s.persistentMemory.pendingRestore=true;int calls=m.dragCalls;call(m,"addUserDataPoint",new Class<?>[]{float.class,float.class},30f,.4f);check(m.dragCalls==calls&&Float.isNaN(s.remembered));check(!s.persistentMemory.pendingRestore);
   s.memoryStrength=1;s.userMatches=false;call(m,"addUserDataPoint",DRAG,30f,.4f,"video");near(m.mShortTermModelUserBrightness,.4f);s.userMatches=true;
@@ -101,6 +102,8 @@ public class TraditionalHostTest {
   int computes=m.computes;call(m,"setBrightnessConfiguration",CURVE,nativeConfig);check(m.mConfig==a.applied&&m.computes==computes);
   s.changing=true;a.configure(null);s.changing=false;check(m.mConfig==nativeConfig);s.phase="attached";call(m,"setBrightnessConfiguration",CURVE,(Object)null);check(m.mConfig==nativeConfig);
   s.phase="active";s.changing=true;a.configure(f);s.changing=false;BrightnessConfiguration external=config(x,dense.reshape(1,1000,new float[]{1,.9f,1,1}));call(m,"setBrightnessConfiguration",CURVE,external);check(s.faultPending&&m.mConfig==external);a.configure(null);check(m.mConfig==external&&a.plan()==null);check(s.handler.pending!=null);s.handler.pending.run();check(HookEntry.reattached==1);
+  MiuiPhysicalBrightnessMappingStrategy readableMapper=new MiuiPhysicalBrightnessMappingStrategy(nativeConfig);Map0 readableMap=new Map0();readableMap.mapper=readableMapper;NoReplayABC noReplay=new NoReplayABC();noReplay.mBrightnessMappingStrategyMap=readableMap;noReplay.mCurrentBrightnessMapper=readableMapper;noReplay.mShortTermModel=new Model();TraditionalAdapter readable=new TraditionalAdapter(owner,readableMapper,noReplay,()->0);
+  check(readable.manualPointCapacity()==1&&!readable.persistentMemorySupported());call(readableMapper,"addUserDataPoint",DRAG,30f,.4f,"pkg");check(readable.manualPoints().length()==1);near(readable.manualDisplayValue((float)readable.manualPoints().getJSONObject(0).getDouble("value")),400);
   System.out.println("Traditional curve/adapter/hooks: "+cases+" cases PASS; synthetic callback model, device not verified");
  }
 }'''
@@ -137,6 +140,7 @@ sources['top/rongshangs/lumacurve/refactor/TraditionalHostTest.java']=fixture
 
 sources['top/rongshangs/lumacurve/refactor/MemoryPersistence.java']='''package top.rongshangs.lumacurve.refactor;class MemoryPersistence {boolean replaying,pendingRestore;int captures,resets;void cancelRestore(){pendingRestore=false;}void manualApplied(){captures++;}void requestAfterReset(){resets++;}void requestRestore(){}}'''
 J=R/'build/refactor-diagnostics/json-20240303.jar'
+sources['top/rongshangs/lumacurve/refactor/SimpleCurveAdapter.java']='package top.rongshangs.lumacurve.refactor;class SimpleCurveAdapter{static void installHooks(Class<?> c,java.util.List<top.rongshangs.lumacurve.refactor.hooking.XC_MethodHook.Unhook> h){throw new AssertionError("physical route entered Simple hooks");}}'
 files=[]
 for name,value in sources.items():
     p=O/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_text(value,encoding='utf-8');files.append(p)

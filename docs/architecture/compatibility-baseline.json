@@ -7,56 +7,72 @@
       "miui_physical",
       "aosp_physical",
       "refactor_coefficients",
-      "aosp_physical_clamped"
+      "aosp_physical_clamped",
+      "simple_mapping",
+      "refactor_reset_coefficients"
     ],
     "manual_memory": [
       "refactor",
       "miui_physical",
       "aosp_physical",
       "refactor_coefficients",
-      "aosp_physical_clamped"
+      "aosp_physical_clamped",
+      "simple_mapping",
+      "refactor_reset_coefficients"
     ],
     "saved_curve": [
       "refactor",
       "miui_physical",
       "aosp_physical",
       "refactor_coefficients",
-      "aosp_physical_clamped"
+      "aosp_physical_clamped",
+      "simple_mapping",
+      "refactor_reset_coefficients"
     ],
     "persistent_memory": [
       "refactor",
       "miui_physical",
       "aosp_physical",
       "refactor_coefficients",
-      "aosp_physical_clamped"
+      "aosp_physical_clamped",
+      "simple_mapping",
+      "refactor_reset_coefficients"
     ],
     "memory_mode": [
       "refactor",
       "miui_physical",
       "aosp_physical",
       "refactor_coefficients",
-      "aosp_physical_clamped"
+      "aosp_physical_clamped",
+      "simple_mapping",
+      "refactor_reset_coefficients"
     ],
     "memory_forever": [
       "refactor",
       "miui_physical",
       "aosp_physical",
       "refactor_coefficients",
-      "aosp_physical_clamped"
+      "aosp_physical_clamped",
+      "simple_mapping",
+      "refactor_reset_coefficients"
     ],
     "memory_reset": [
       "refactor",
       "miui_physical",
       "aosp_physical",
       "refactor_coefficients",
-      "aosp_physical_clamped"
+      "aosp_physical_clamped",
+      "simple_mapping",
+      "refactor_reset_coefficients"
     ],
     "memory_timeout": [
       "refactor",
       "miui_physical",
       "aosp_physical",
       "refactor_coefficients",
-      "aosp_physical_clamped"
+      "aosp_physical_clamped",
+      "simple_mapping",
+      "refactor_reset_coefficients"
     ],
     "main_sensor": [
       "oem_main",
@@ -151,7 +167,8 @@
     ],
     "outdoor": [
       "override_target",
-      "legacy_custom_target"
+      "legacy_custom_target",
+      "native_range_only"
     ],
     "hbm": [
       "timed_budget",
@@ -239,5 +256,17 @@
       "root_service_directory"
     ]
   },
-  "extended_through": "4.4.0-beta04 / 44004; additive protection of all reviewed feature-route pairs"
+  "extended_through": "4.4.0-beta04 / 44004; additive protection of all reviewed feature-route pairs",
+  "interface_features": [
+    "welcome_tutorial",
+    "quick_setup",
+    "settings_search",
+    "fixed_status",
+    "floating_navigation",
+    "interface_theme",
+    "update_notice",
+    "configuration_tools",
+    "compatibility_diagnostics",
+    "about_credits"
+  ]
 }

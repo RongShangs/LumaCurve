@@ -1,12 +1,10 @@
-# HyperLux 工作约定
+# HyperLux 工作入口
 
-先读根目录 PROJECT.md、PROJECT_SCOPE.md 与 docs/architecture/README.md；当前主线为 experimental/refactor_hook，旧 KSU/C 及 API 102 研究不自动合入。
+开始前阅读根目录 [GLOBAL_RULES.md](GLOBAL_RULES.md)、[PROJECT.md](PROJECT.md)、[PROJECT_SCOPE.md](PROJECT_SCOPE.md)，再看 [当前状态](docs/work-status.md)及 [架构入口](docs/architecture/README.md)。这些稳定入口不追加版本日志。
 
-最高要求：新增兼容保留旧路线；覆盖升级保留用户全部已保存设置。兼容判断基于实际接口 / 对象；不得用型号或系统大版本放行功能，不得因检测失败回写默认。
+最高要求是新增兼容保留旧路线、覆盖升级保留全部已保存设置。详细全局约束以GLOBAL_RULES.md为准。
 
-所有功能或适配修改遵守 docs/architecture/compatibility-policy.md。新增路线 / ABI 变体需在对应适配器集中实现，更新 CompatibilityCatalog.java、docs/architecture/compatibility-manifest.json，新增 Java 登记 source-map.json；不删除 compatibility-baseline.json 的旧路线。修改后生成兼容索引，不在 UI、Root 桥和运行协调器各添一套兼容判断。
-
-检查入口：
+每项需求编辑 `docs/requirements/feature-requirements.json`；选路、ABI和收束编辑适配器及兼容清单；新增生产文件登记source-map。按功能文档和索引只生成，不手改，不把长期要求写进版本日志后遗忘。
 
 ```text
 python tools/verify_compatibility.py --write-doc
@@ -15,8 +13,4 @@ python tests/refactor_compatibility_contract.py
 python tools/build_refactor_hook_test.py --verify-only
 ```
 
-按变更跑对应旧 / 新 / 负向测试，再跑完整检查；区分主机、私有固件静态核验、真机与功耗结果。私有输入不进公开产物。
-
-用户已于2026-10-28明确长期授权：每轮实际功能/UI修改完成并验证后，默认打包新的本地Beta，Beta序号与versionCode递增，无需再次提醒或确认；明确仅讨论、仅分析或要求暂不打包时除外。保留已有APK/ZIP，不同轮不得静默替换；发布仍须用户授权并同时同步官网与GitHub/LSPosed。不要提交服务器认证、签名材料、固件或用户分析包。既有未提交改动不得重置。
-
-Beta 日志以其上一个已公开正式版为基线累计，每个 Beta 独立文件，文件内按各 Beta 分段；不只写前一 Beta 到本版的差异。具体规则见 docs/release-policy.md。
+实际功能修改按长期授权递增本地Beta，保留全部旧交付；发布和设备操作按当前明确授权。既有独立研究和未提交改动不得重置。私有输入、认证和签名不进入公开源码或产物。

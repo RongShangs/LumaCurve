@@ -171,7 +171,9 @@ classes=OUT/'classes';classes.mkdir(exist_ok=True);jar=ROOT/'build/refactor-diag
 paths += [SRC/(name+'.java') for name in ['hooking/HookTransaction','UiText','ControlCenterPartition','ControlCenterHooks','ControlCenterScreen','MappingRecoveryState','MappingRecoverySignal','ControlCenterMapping','ControlCenterCurve','ControlCenterCalibration','AppBuild']]
 paths += [SRC/'hooking'/(name+'.java') for name in ['XC_MethodHook','XposedBridge']]
 subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(jar),'-d',str(classes),*map(str,paths)],check=True)
-result=subprocess.run(['java','-cp',str(classes)+os.pathsep+str(jar),'top.rongshangs.lumacurve.refactor.InputTest'],check=True,timeout=20,capture_output=True,text=True);print(result.stdout,end='');ui_cases=int(re.search(r'(\d+) cases PASS',result.stdout).group(1))
+result=subprocess.run(['java','-cp',str(classes)+os.pathsep+str(jar),'top.rongshangs.lumacurve.refactor.InputTest'],check=False,timeout=20,capture_output=True,text=True);print(result.stdout,end='')
+if result.returncode:print(result.stderr,end='')
+result.check_returncode();ui_cases=int(re.search(r'(\d+) cases PASS',result.stdout).group(1))
 
 
 # JVM constant-pool rename: Java syntax cannot express the actual R8 synthetic method name.

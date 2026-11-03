@@ -10,7 +10,7 @@ final class RuntimeFeatureChecks {
     HbmAccess checkedHbm;
     HbmAccess hbm()throws Exception{if(checkedHbm==null)checkedHbm=new HbmAccess(HookEntry.get(s.owner,"mHbmController"));return checkedHbm;}
     boolean outdoor()throws Exception{return OutdoorTuning.owners.contains(s.owner.getClass())&&hbm()!=null;}
-    boolean range()throws Exception{return outdoor()&&OutdoorTuning.ranges.contains(hbm().controller.getClass())&&OutdoorTuning.peaks.contains(s.owner.getClass());}
+    boolean range()throws Exception{return outdoor()&&!hbm().rangeOnly()&&OutdoorTuning.ranges.contains(hbm().controller.getClass())&&OutdoorTuning.peaks.contains(s.owner.getClass());}
     boolean sensor(boolean assist)throws Exception{
         if(!assist)return !BrightnessSensorAccess.selection(s.owner).profile.isEmpty();
         Object value=HookEntry.get(HookEntry.get(HookEntry.get(s.owner,"mAutomaticBrightnessControllerImpl"),"mDualSensorPolicy"),"mAssistLightSensor");
@@ -60,6 +60,10 @@ final class RuntimeFeatureChecks {
         for(int i=0;i<SceneOptions.IDS.length;i++){final int group=i;final String id=SceneOptions.IDS[i];String inactive=SceneTuning.inactiveReason(s,group);if(!inactive.isEmpty())f.inactive("scene_"+id,SceneOptions.NAMES[i],"scene_"+id+"_supported",inactive);else f.check("scene_"+id,SceneOptions.NAMES[i],"scene_"+id+"_supported",false,()->SceneTuning.supported(s,group));}
         f.check("outdoor","户外增强","outdoor_supported",true,()->s.receiverRegistered&&outdoor());
         f.check("hbm","HBM 触发与预算","outdoor_hbm_supported",false,()->hbm().tunable());
+        if(checkedHbm!=null&&checkedHbm.rangeOnly()){
+            if(f.capabilities().optBoolean("outdoor_supported"))f.explain("outdoor","原生未提供 HBM 配置；可在系统当前允许的亮度范围内提高强光目标，保留原生限亮。");
+            f.explain("hbm","系统未提供 HBM 数据；不创建高亮范围或预算。户外目标增强可独立使用。");
+        }
         if(checkedHbm!=null&&checkedHbm.tunable()&&!checkedHbm.budgetTunable())f.explain("hbm","照度门槛可调；本机未启用 HBM 时间预算，保留系统的零计时配置。增强时长仍由户外会话设置控制。");
         f.check("outdoor_range","高亮范围","outdoor_range_supported",false,()->range());
         f.check("opr","画面限亮放宽","outdoor_opr_supported",false,()->range()&&OutdoorOpr.owners.contains(s.owner.getClass()));

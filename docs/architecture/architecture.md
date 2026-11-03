@@ -4,7 +4,7 @@
 
 `experimental/refactor_hook/` 是当前唯一 APP、Hook 与主屏原生工具主线；目录名是历史遗留，不代表实验版。`LegacyEntry` 使用 legacy API 82，通过模块自有 `hooking` 桥接层安装回调。API 102 研究、旧 KSU/C、official_curve 和 uevent 研究不自动加入主线。
 
-主线全量验证入口为 `tools/build_refactor_hook_test.py`。工作区保留、原被 Git 忽略的 `.github/workflows/release.yml` 如果启用，会在 `v*` 标签上构建并发布历史 KSU 产物；本轮将其改为手动、只读权限的历史检查。它不代表远端正在运行错误发布器，也不能当作当前 APK 发布入口。兼容维护 CI 已准备为可跟踪文件，推送后才生效。实际发布仍遵循 [发布规范](../release-policy.md)，需要同步官网及各仓库。
+主线全量验证入口为`tools/build_refactor_hook_test.py`；历史KSU工作流不能替代当前APK构建，验证与发布操作分开。当前任务与发布状态只见docs/work-status.md。
 
 ## 亮度数据与控制流
 
@@ -38,7 +38,7 @@ flowchart TD
 | --- | --- | --- |
 | 入口 | LegacyEntry、HookEntry | 核验系统进程、有限查找实际类加载器、安装独立功能、连接主屏实例；不堆放机型名单 |
 | 运行协调 | HookRuntime | 生命周期、用户与配置应用、自检触发、控制者连接、状态发布；新功能细节放入自己的适配器 / 控制器 |
-| 原生适配 | RefactorAdapter、TraditionalAdapter、ResponseTuning、HbmAccess、OutdoorSdrScope 等 | 自己核验完整 ABI、选择互斥路径、守住线程 / 对象 / 下游保护、提供证据及恢复；不依赖 APP 页面 |
+| 原生适配 | RefactorAdapter、RefactorCoefficientsAdapter、TraditionalAdapter、SimpleCurveAdapter、ResponseTuning、HbmAccess、OutdoorSdrScope 等 | 自己核验完整 ABI、选择互斥路径、守住线程 / 对象 / 下游保护、提供证据及恢复；不依赖 APP 页面 |
 | 业务控制 | BrightnessControl、OutdoorController、SceneController、MemoryPersistence | 仲裁进入、持续、退出，管理租约与本次状态；不为新机型复制第二套控制状态机 |
 | 配置 | 各 Options、ConfigurationFile、ConfigurationCompatibility | 解析和验证原始偏好；运行能力裁剪只作用于深拷贝，不能写回默认 |
 | 策略算子 | CurvePlan、DelayPolicy、DarkLockPolicy、OutdoorPolicy 等 | 独立计算及范围约束；纯计算模块尽量不接触 Android 或反射，已有配套证据算子单独标注归属 |

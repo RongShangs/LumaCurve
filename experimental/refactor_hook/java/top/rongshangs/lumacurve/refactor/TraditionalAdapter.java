@@ -60,6 +60,9 @@ public final class TraditionalAdapter extends CurveBackend {
     public boolean savedCurveSupported(){return true;}
     public int savedPointLimit(){return SavedCurve.MAX_POINTS;}
     public String currentPipelineRoute(){return "mapping";}
+    public boolean nativeMappingHooks(){return true;}
+    public void installMappingHooks(Class<?> type)throws Exception{TraditionalHooks.install(type,true);}
+    public float mappingOutputNit(float brightness)throws Exception{return ((Number)method(mapper.getClass(),"convertToNits",float.class).invoke(mapper,brightness)).floatValue();}
     public boolean memoryContextActive()throws Exception{return read(abc,"mCurrentBrightnessMapper")==mapper;}
     public boolean memoryRestoreIncludesModel(){return true;}
     public String memoryDescription(){return "本机保留完整基础曲线，手动模型支持 1 个偏好点";}
@@ -70,8 +73,8 @@ public final class TraditionalAdapter extends CurveBackend {
             .put("physical_original_min_nit",calibration.originalMinimum).put("physical_original_max_nit",calibration.originalMaximum)
             .put("physical_clamped_points",calibration.clippedPoints);
     }
-    public boolean persistentMemorySupported(){if(persistenceSupported==null)try{persistenceSupported=method(abc.getClass(),"setScreenBrightnessByUser",float.class,float.class).getReturnType()==boolean.class && method(mapper.getClass(),"getUserBrightness").getReturnType()==float.class;}catch(Exception unavailable){persistenceSupported=false;}return persistenceSupported;}
-    public int manualPointCapacity(){return persistentMemorySupported()?1:0;}
+    public boolean persistentMemorySupported(){if(persistenceSupported==null)try{Method replay=method(abc.getClass(),"setScreenBrightnessByUser",float.class,float.class);persistenceSupported=manualPointCapacity()>0&&!Modifier.isStatic(replay.getModifiers())&&replay.getReturnType()==boolean.class;}catch(Exception unavailable){persistenceSupported=false;}return persistenceSupported;}
+    public int manualPointCapacity(){try{Method value=method(mapper.getClass(),"getUserBrightness");return value.getReturnType()==float.class&&!Modifier.isStatic(value.getModifiers())&&!Modifier.isStatic(find(mapper.getClass(),userLuxField).getModifiers())?1:0;}catch(Exception unavailable){return 0;}}
     public org.json.JSONArray manualPoints()throws Exception {
         org.json.JSONArray points=new org.json.JSONArray();float lux=number("mUserLux");
         if(Float.isFinite(lux)&&lux>=0){float value=((Number)method(mapper.getClass(),"getUserBrightness").invoke(mapper)).floatValue();if(Float.isFinite(value)&&value>=0&&value<=1)points.put(new org.json.JSONObject().put("lux",lux).put("value",value));}return points;

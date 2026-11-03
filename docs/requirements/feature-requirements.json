@@ -1,0 +1,1335 @@
+{
+  "schema": 1,
+  "maintenance": "长期功能需求；路线和实现来源于兼容清单/代码，不记录版本更新历史。",
+  "features": [
+    {
+      "id": "curve",
+      "family": "curve",
+      "name": "基础亮度曲线",
+      "default": {
+        "mode": "native",
+        "detail": "本机原始曲线"
+      },
+      "settings_keys": [
+        "factors",
+        "curve_floor_nit",
+        "saved_base_curve",
+        "dark_mode_curve"
+      ],
+      "activation": "首次接入读取本机基线；用户修改蓝色曲线后保存并等待同revision应用确认。",
+      "behavior": "蓝色基础曲线按设备范围编辑；相邻点单调联动，最高点可向下调；深色独立曲线提供切换清除、共用、独立记忆选项",
+      "exit": "停用或恢复系统默认时撤回自己的基线；其他控制者替换后不覆盖。",
+      "dependencies": []
+    },
+    {
+      "id": "manual_memory",
+      "family": "curve",
+      "name": "原生手动记忆",
+      "default": {
+        "mode": "native",
+        "detail": "强度100%，保留原生学习"
+      },
+      "settings_keys": [
+        "memory_strength",
+        "memory_window",
+        "memory_lux_range"
+      ],
+      "activation": "自动亮度及可学习普通区间内，用户主动调节控制中心亮度；完整节点与增强段不学习。",
+      "behavior": "普通自动亮度区间主动调整后学习附近照度偏好，绿色只画真实实时曲线；学习容量和存档回放能力分别判断",
+      "exit": "按原生模型生命周期及用户保持选择重建；清除按钮只清当前主题记忆，不清基础曲线。",
+      "dependencies": []
+    },
+    {
+      "id": "saved_curve",
+      "family": "curve",
+      "name": "记忆转基础曲线",
+      "default": {
+        "mode": "on_request",
+        "detail": "仅明确点击保存"
+      },
+      "settings_keys": [
+        "saved_base_curve",
+        "dark_mode_curve"
+      ],
+      "activation": "用户明确点击当前主题绿色曲线转存，且实时曲线、坐标和保存能力均已核验。",
+      "behavior": "保存完整实际绿色节点到对应主题的基础曲线，不拟合四点；检查基准、单位和容量；清除记忆不清除基础曲线",
+      "exit": "完成后成为对应基础曲线；后续清除手动记忆不清除此保存结果。",
+      "dependencies": [
+        "curve",
+        "manual_memory"
+      ]
+    },
+    {
+      "id": "persistent_memory",
+      "family": "curve",
+      "name": "保持记忆与跨重启存档",
+      "default": {
+        "mode": "off",
+        "detail": "新配置关闭额外保持"
+      },
+      "settings_keys": [
+        "memory_persist",
+        "memory_restore_unlock",
+        "memory_hold_theme",
+        "memory_retention_days",
+        "memory_max_points"
+      ],
+      "activation": "用户选择对应保持范围，发生锁屏/亮屏、重启或主题切换，并满足原生点回放和当前环境确认。",
+      "behavior": "分别支持锁屏、重启及主题保持；仅需要跨重启时落盘，校验设备、基准、用户和主题；期限点数按实际后端能力",
+      "exit": "停用对应保持时取消其待恢复任务；坏存档独立报告并保留，身份/基准不符时不回放。",
+      "dependencies": []
+    },
+    {
+      "id": "memory_mode",
+      "family": "curve",
+      "name": "跨自动亮度开关保持",
+      "default": {
+        "mode": "off",
+        "detail": "新配置关闭"
+      },
+      "settings_keys": [
+        "memory_hold_switch"
+      ],
+      "activation": "选择跨开关保持后，用户重新开启自动亮度，当前用户/模型和环境已就绪。",
+      "behavior": "通过原有模式观察器保留偏好，重新开启自动亮度时按同一记忆管理器恢复",
+      "exit": "关闭跨开关保持后按原生模式生命周期处理；失败不清当前实时点或其他保持选择。",
+      "dependencies": [
+        "persistent_memory"
+      ]
+    },
+    {
+      "id": "memory_forever",
+      "family": "curve",
+      "name": "永久保持记忆",
+      "default": {
+        "mode": "off",
+        "detail": "新配置关闭"
+      },
+      "settings_keys": [
+        "memory_hold_forever"
+      ],
+      "activation": "明确选择永久保持，后端回放能力可用，发生已支持的模式、锁屏或系统模型重建事件。",
+      "behavior": "组合跨模式、锁屏、重启保持；仍校验身份和真实环境；无额外常驻进程",
+      "exit": "取消永久保持后恢复所选单项条件；仍拒绝过期身份或基准，不复活被主动清除的点。",
+      "dependencies": [
+        "persistent_memory"
+      ]
+    },
+    {
+      "id": "memory_reset",
+      "family": "curve",
+      "name": "记忆重置条件",
+      "default": {
+        "mode": "native",
+        "detail": "跟随系统"
+      },
+      "settings_keys": [
+        "memory_reset_override",
+        "memory_reset_off_minutes",
+        "memory_reset_force_minutes",
+        "memory_reset_lux"
+      ],
+      "activation": "用户明确启用原生重置条件覆盖，实际短期模型生命周期事件发生。",
+      "behavior": "仅修改已验证原生模型重置门槛，不重写用户存档或基础曲线",
+      "exit": "停用覆盖后恢复仍属于本次修改的原生重置参数，不清存档和基础曲线。",
+      "dependencies": []
+    },
+    {
+      "id": "memory_timeout",
+      "family": "curve",
+      "name": "记忆超时",
+      "default": {
+        "mode": "native",
+        "detail": "跟随系统"
+      },
+      "settings_keys": [
+        "memory_timeout_override",
+        "memory_timeout_minutes"
+      ],
+      "activation": "用户明确启用期限覆盖，实际原生短期模型进入或重置。",
+      "behavior": "调整原生短期模型期限，与存档保存天数分别处理",
+      "exit": "停用覆盖后恢复仍属于本次修改的原生期限，跨重启存档策略保持独立。",
+      "dependencies": []
+    },
+    {
+      "id": "main_sensor",
+      "family": "main_input",
+      "name": "主光感",
+      "default": {
+        "mode": "observe",
+        "detail": "沿用系统实际选择"
+      },
+      "settings_keys": [],
+      "activation": "系统为当前默认内部屏选定并注册实际主输入；不以传感器存在推断正在采样。",
+      "behavior": "标准主光感、已选私有主屏输入和FOV分别验证解码；真实0 lux与未采样分开，不为补适配另建采样器",
+      "exit": "光感或主屏对象变化后重新核验；失去读数显示未确认，不保留旧采样作为当前值。",
+      "dependencies": []
+    },
+    {
+      "id": "assist_sensor",
+      "family": "assist_input",
+      "name": "辅助光感",
+      "default": {
+        "mode": "observe",
+        "detail": "原生槽优先"
+      },
+      "settings_keys": [],
+      "activation": "原生辅助槽有效，或槽缺失且存在唯一通过身份/权限/方向等检查的备用辅助源。",
+      "behavior": "仅缺原生槽时按唯一可信辅助源补位，保留原生采样；没有辅助不拖停基础曲线和可用的单光感功能",
+      "exit": "补位失败回滚槽位与本次缓存；未接入或未采样独立显示，已有主输入继续工作。",
+      "dependencies": []
+    },
+    {
+      "id": "response",
+      "family": "response",
+      "name": "环境变化确认",
+      "default": {
+        "mode": "native",
+        "detail": "跟随系统"
+      },
+      "settings_keys": [
+        "response_override",
+        "brighten_delay",
+        "darken_delay"
+      ],
+      "activation": "用户开启响应预设/覆盖，系统在当前输入及场景中确认候选变亮或变暗。",
+      "behavior": "分别调整变亮、变暗确认时间，保留原生场景和过渡动画",
+      "exit": "停用或对象变化时恢复仍属于本次修改的确认期限，不重置系统光感缓冲。",
+      "dependencies": []
+    },
+    {
+      "id": "small_response",
+      "family": "response",
+      "name": "微小变亮确认",
+      "default": {
+        "mode": "native",
+        "detail": "跟随系统"
+      },
+      "settings_keys": [
+        "small_brighten_override",
+        "small_brighten_delay"
+      ],
+      "activation": "用户单独开启微小变亮覆盖，原生识别到受支持的小幅变亮候选。",
+      "behavior": "小幅变亮单独确认，不替代普通变化确认",
+      "exit": "离开小幅变亮条件时回普通确认路径；停用恢复本次期限修改。",
+      "dependencies": []
+    },
+    {
+      "id": "low_light",
+      "family": "response",
+      "name": "暗光稳定",
+      "default": {
+        "mode": "off",
+        "detail": "新配置关闭"
+      },
+      "settings_keys": [
+        "low_light_stability",
+        "low_light_limit",
+        "low_light_brighten",
+        "low_light_darken"
+      ],
+      "activation": "用户启用暗光稳定，当前照度处于所设暗光范围。",
+      "behavior": "暗处减少小幅波动，提供暗处保持等预设；单光感也可独立工作",
+      "exit": "离开暗光条件后回普通策略；停用恢复本次阈值和确认参数。",
+      "dependencies": []
+    },
+    {
+      "id": "low_threshold",
+      "family": "response",
+      "name": "暗光阈值",
+      "default": {
+        "mode": "native",
+        "detail": "跟随系统"
+      },
+      "settings_keys": [
+        "low_light_threshold",
+        "low_light_brighten_ratio",
+        "low_light_brighten_floor",
+        "low_light_darken_ratio",
+        "low_light_darken_floor"
+      ],
+      "activation": "启用暗光稳定和暗光阈值覆盖，实际变化处于该稳定作用域。",
+      "behavior": "在暗光稳定条件内按比例和绝对门槛决定确认，不改变其他区间",
+      "exit": "离开暗光稳定区间后不影响其他区间；停用撤回本次门槛覆盖。",
+      "dependencies": [
+        "low_light"
+      ]
+    },
+    {
+      "id": "threshold_override",
+      "family": "response",
+      "name": "光感变化门槛",
+      "default": {
+        "mode": "native",
+        "detail": "跟随系统"
+      },
+      "settings_keys": [
+        "threshold_override",
+        "threshold_brighten",
+        "threshold_darken",
+        "threshold_small",
+        "threshold_min_brighten",
+        "threshold_min_darken",
+        "threshold_limit"
+      ],
+      "activation": "用户开启高级阈值覆盖，系统请求普通光感变化门槛。",
+      "behavior": "只通过已验证原生阈值接口调整，不捏造输入或场景",
+      "exit": "停用恢复已核验且仍属于本次修改的原生阈值，输入和缓冲不重置。",
+      "dependencies": []
+    },
+    {
+      "id": "assist_gate",
+      "family": "response",
+      "name": "辅助光感暗光闸门",
+      "default": {
+        "mode": "off",
+        "detail": "新配置关闭"
+      },
+      "settings_keys": [
+        "low_light_assist_gate",
+        "low_light_assist_wait",
+        "low_light_assist_tolerance"
+      ],
+      "activation": "开启暗光稳定闸门，主辅输入和新鲜度证据齐全，实际变化需要辅助确认。",
+      "behavior": "用新鲜辅助输入确认暗光变化；单源设备仅暂停此项，保留原设置",
+      "exit": "辅助样本不新鲜或源被替换时释放本次确认，独立保留主光感处理。",
+      "dependencies": [
+        "low_light",
+        "assist_sensor"
+      ]
+    },
+    {
+      "id": "assist_override",
+      "family": "response",
+      "name": "辅助确认窗口",
+      "default": {
+        "mode": "native",
+        "detail": "跟随系统"
+      },
+      "settings_keys": [
+        "assist_override",
+        "assist_brighten",
+        "assist_darken",
+        "assist_small"
+      ],
+      "activation": "开启辅助确认覆盖，原生辅助输入在当前场景有效。",
+      "behavior": "调整原生辅助确认时间，不增加监听；缺辅助仅暂停对应运行副本",
+      "exit": "停用或辅助对象变化时撤回本次确认窗口，不注销OEM拥有的监听。",
+      "dependencies": [
+        "assist_sensor"
+      ]
+    },
+    {
+      "id": "animation_override",
+      "family": "animation",
+      "name": "亮度过渡",
+      "default": {
+        "mode": "native",
+        "detail": "跟随系统"
+      },
+      "settings_keys": [
+        "animation_override",
+        "animation_brighten",
+        "animation_darken"
+      ],
+      "activation": "开启过渡倍率且匹配已验证时长/传统速率ABI，系统执行允许调整的自动过渡。",
+      "behavior": "原生时长与传统速率路线互斥，分别调整变亮变暗倍率，保留原生上限与特殊过渡",
+      "exit": "离开普通慢速自动过渡时按系统处理；停用只恢复仍等于模块应用值的参数。",
+      "dependencies": []
+    },
+    {
+      "id": "sunlight_override",
+      "family": "sunlight",
+      "name": "手动阳光模式条件",
+      "default": {
+        "mode": "native",
+        "detail": "跟随系统"
+      },
+      "settings_keys": [
+        "sunlight_override",
+        "sunlight_enter",
+        "sunlight_exit"
+      ],
+      "activation": "开启现有阳光模式条件覆盖，原生手动阳光策略判断进入或退出。",
+      "behavior": "配置现有手动阳光模式照度条件，放在户外设置；区别于自动户外增强",
+      "exit": "关闭条件覆盖后返回原生手动阳光屏参数，不影响自动户外增强选择。",
+      "dependencies": []
+    },
+    {
+      "id": "touch_override",
+      "family": "touch",
+      "name": "触摸遮挡释放",
+      "default": {
+        "mode": "native",
+        "detail": "跟随系统"
+      },
+      "settings_keys": [
+        "touch_override",
+        "touch_release_seconds"
+      ],
+      "activation": "开启释放等待覆盖，原生触摸遮挡策略判断离开保护区。",
+      "behavior": "仅调整原生触摸遮挡释放等待；离开作用域按字段所有权恢复",
+      "exit": "每次调用或异常后恢复仍持有的临时触摸字段，系统后续更新优先。",
+      "dependencies": []
+    },
+    {
+      "id": "scene_night_driving",
+      "family": "scenes",
+      "name": "夜间驾驶",
+      "default": {
+        "mode": "native",
+        "detail": "跟随系统，允许对现有场景配置，不新增用户命名场景。"
+      },
+      "settings_keys": [
+        "scene_options"
+      ],
+      "activation": "系统事实成立、原生策略可用，且用户选择跟随或所设准入条件允许。",
+      "behavior": "对已有的夜间驾驶场景选择跟随、阻止或自定义准入；进入、效果和退出按实际能力展开，不创建新命名场景。",
+      "exit": "按照对应原生退出事实及已保存的确认条件退让，换对象只恢复自己的字段。",
+      "dependencies": [],
+      "source_refs": [
+        {
+          "file": "SceneCatalog.java",
+          "array": "CONDITIONS",
+          "keys_file": "SceneOptions.java",
+          "keys_array": "IDS",
+          "item": "night_driving",
+          "label": "原生默认条件"
+        },
+        {
+          "file": "SceneCatalog.java",
+          "array": "BRIEF",
+          "keys_file": "SceneOptions.java",
+          "keys_array": "IDS",
+          "item": "night_driving",
+          "label": "原生效果"
+        }
+      ]
+    },
+    {
+      "id": "scene_step",
+      "family": "scenes",
+      "name": "运动延迟",
+      "default": {
+        "mode": "native",
+        "detail": "跟随系统，允许对现有场景配置，不新增用户命名场景。"
+      },
+      "settings_keys": [
+        "scene_options"
+      ],
+      "activation": "系统事实成立、原生策略可用，且用户选择跟随或所设准入条件允许。",
+      "behavior": "对已有的运动延迟场景选择跟随、阻止或自定义准入；进入、效果和退出按实际能力展开，不创建新命名场景。",
+      "exit": "按照对应原生退出事实及已保存的确认条件退让，换对象只恢复自己的字段。",
+      "dependencies": [],
+      "source_refs": [
+        {
+          "file": "SceneCatalog.java",
+          "array": "CONDITIONS",
+          "keys_file": "SceneOptions.java",
+          "keys_array": "IDS",
+          "item": "step",
+          "label": "原生默认条件"
+        },
+        {
+          "file": "SceneCatalog.java",
+          "array": "BRIEF",
+          "keys_file": "SceneOptions.java",
+          "keys_array": "IDS",
+          "item": "step",
+          "label": "原生效果"
+        }
+      ]
+    },
+    {
+      "id": "scene_touch",
+      "family": "scenes",
+      "name": "触摸遮挡",
+      "default": {
+        "mode": "native",
+        "detail": "跟随系统，允许对现有场景配置，不新增用户命名场景。"
+      },
+      "settings_keys": [
+        "scene_options"
+      ],
+      "activation": "系统事实成立、原生策略可用，且用户选择跟随或所设准入条件允许。",
+      "behavior": "对已有的触摸遮挡场景选择跟随、阻止或自定义准入；进入、效果和退出按实际能力展开，不创建新命名场景。",
+      "exit": "按照对应原生退出事实及已保存的确认条件退让，换对象只恢复自己的字段。",
+      "dependencies": [],
+      "source_refs": [
+        {
+          "file": "SceneCatalog.java",
+          "array": "CONDITIONS",
+          "keys_file": "SceneOptions.java",
+          "keys_array": "IDS",
+          "item": "touch",
+          "label": "原生默认条件"
+        },
+        {
+          "file": "SceneCatalog.java",
+          "array": "BRIEF",
+          "keys_file": "SceneOptions.java",
+          "keys_array": "IDS",
+          "item": "touch",
+          "label": "原生效果"
+        }
+      ]
+    },
+    {
+      "id": "scene_proximity",
+      "family": "scenes",
+      "name": "普通距离遮挡",
+      "default": {
+        "mode": "native",
+        "detail": "跟随系统，允许对现有场景配置，不新增用户命名场景。"
+      },
+      "settings_keys": [
+        "scene_options"
+      ],
+      "activation": "系统事实成立、原生策略可用，且用户选择跟随或所设准入条件允许。",
+      "behavior": "对已有的普通距离遮挡场景选择跟随、阻止或自定义准入；进入、效果和退出按实际能力展开，不创建新命名场景。",
+      "exit": "按照对应原生退出事实及已保存的确认条件退让，换对象只恢复自己的字段。",
+      "dependencies": [],
+      "source_refs": [
+        {
+          "file": "SceneCatalog.java",
+          "array": "CONDITIONS",
+          "keys_file": "SceneOptions.java",
+          "keys_array": "IDS",
+          "item": "proximity",
+          "label": "原生默认条件"
+        },
+        {
+          "file": "SceneCatalog.java",
+          "array": "BRIEF",
+          "keys_file": "SceneOptions.java",
+          "keys_array": "IDS",
+          "item": "proximity",
+          "label": "原生效果"
+        }
+      ]
+    },
+    {
+      "id": "scene_stream_proximity",
+      "family": "scenes",
+      "name": "流式距离遮挡",
+      "default": {
+        "mode": "native",
+        "detail": "跟随系统，允许对现有场景配置，不新增用户命名场景。"
+      },
+      "settings_keys": [
+        "scene_options"
+      ],
+      "activation": "系统事实成立、原生策略可用，且用户选择跟随或所设准入条件允许。",
+      "behavior": "对已有的流式距离遮挡场景选择跟随、阻止或自定义准入；进入、效果和退出按实际能力展开，不创建新命名场景。",
+      "exit": "按照对应原生退出事实及已保存的确认条件退让，换对象只恢复自己的字段。",
+      "dependencies": [],
+      "source_refs": [
+        {
+          "file": "SceneCatalog.java",
+          "array": "CONDITIONS",
+          "keys_file": "SceneOptions.java",
+          "keys_array": "IDS",
+          "item": "stream_proximity",
+          "label": "原生默认条件"
+        },
+        {
+          "file": "SceneCatalog.java",
+          "array": "BRIEF",
+          "keys_file": "SceneOptions.java",
+          "keys_array": "IDS",
+          "item": "stream_proximity",
+          "label": "原生效果"
+        }
+      ]
+    },
+    {
+      "id": "scene_reflection",
+      "family": "scenes",
+      "name": "反射与 AON 确认",
+      "default": {
+        "mode": "native",
+        "detail": "跟随系统，允许对现有场景配置，不新增用户命名场景。"
+      },
+      "settings_keys": [
+        "scene_options"
+      ],
+      "activation": "系统事实成立、原生策略可用，且用户选择跟随或所设准入条件允许。",
+      "behavior": "对已有的反射与 AON 确认场景选择跟随、阻止或自定义准入；进入、效果和退出按实际能力展开，不创建新命名场景。",
+      "exit": "按照对应原生退出事实及已保存的确认条件退让，换对象只恢复自己的字段。",
+      "dependencies": [],
+      "source_refs": [
+        {
+          "file": "SceneCatalog.java",
+          "array": "CONDITIONS",
+          "keys_file": "SceneOptions.java",
+          "keys_array": "IDS",
+          "item": "reflection",
+          "label": "原生默认条件"
+        },
+        {
+          "file": "SceneCatalog.java",
+          "array": "BRIEF",
+          "keys_file": "SceneOptions.java",
+          "keys_array": "IDS",
+          "item": "reflection",
+          "label": "原生效果"
+        }
+      ]
+    },
+    {
+      "id": "scene_night_wake",
+      "family": "scenes",
+      "name": "夜间唤醒",
+      "default": {
+        "mode": "native",
+        "detail": "跟随系统，允许对现有场景配置，不新增用户命名场景。"
+      },
+      "settings_keys": [
+        "scene_options"
+      ],
+      "activation": "系统事实成立、原生策略可用，且用户选择跟随或所设准入条件允许。",
+      "behavior": "对已有的夜间唤醒场景选择跟随、阻止或自定义准入；进入、效果和退出按实际能力展开，不创建新命名场景。",
+      "exit": "按照对应原生退出事实及已保存的确认条件退让，换对象只恢复自己的字段。",
+      "dependencies": [],
+      "source_refs": [
+        {
+          "file": "SceneCatalog.java",
+          "array": "CONDITIONS",
+          "keys_file": "SceneOptions.java",
+          "keys_array": "IDS",
+          "item": "night_wake",
+          "label": "原生默认条件"
+        },
+        {
+          "file": "SceneCatalog.java",
+          "array": "BRIEF",
+          "keys_file": "SceneOptions.java",
+          "keys_array": "IDS",
+          "item": "night_wake",
+          "label": "原生效果"
+        }
+      ]
+    },
+    {
+      "id": "scene_manual_sunlight",
+      "family": "scenes",
+      "name": "手动模式阳光屏",
+      "default": {
+        "mode": "native",
+        "detail": "跟随系统，允许对现有场景配置，不新增用户命名场景。"
+      },
+      "settings_keys": [
+        "scene_options"
+      ],
+      "activation": "系统事实成立、原生策略可用，且用户选择跟随或所设准入条件允许。",
+      "behavior": "对已有的手动模式阳光屏场景选择跟随、阻止或自定义准入；进入、效果和退出按实际能力展开，不创建新命名场景。",
+      "exit": "按照对应原生退出事实及已保存的确认条件退让，换对象只恢复自己的字段。",
+      "dependencies": [],
+      "source_refs": [
+        {
+          "file": "SceneCatalog.java",
+          "array": "CONDITIONS",
+          "keys_file": "SceneOptions.java",
+          "keys_array": "IDS",
+          "item": "manual_sunlight",
+          "label": "原生默认条件"
+        },
+        {
+          "file": "SceneCatalog.java",
+          "array": "BRIEF",
+          "keys_file": "SceneOptions.java",
+          "keys_array": "IDS",
+          "item": "manual_sunlight",
+          "label": "原生效果"
+        }
+      ]
+    },
+    {
+      "id": "scene_game",
+      "family": "scenes",
+      "name": "游戏防误降亮",
+      "default": {
+        "mode": "native",
+        "detail": "跟随系统，允许对现有场景配置，不新增用户命名场景。"
+      },
+      "settings_keys": [
+        "scene_options"
+      ],
+      "activation": "系统事实成立、原生策略可用，且用户选择跟随或所设准入条件允许。",
+      "behavior": "对已有的游戏防误降亮场景选择跟随、阻止或自定义准入；进入、效果和退出按实际能力展开，不创建新命名场景。",
+      "exit": "按照对应原生退出事实及已保存的确认条件退让，换对象只恢复自己的字段。",
+      "dependencies": [],
+      "source_refs": [
+        {
+          "file": "SceneCatalog.java",
+          "array": "CONDITIONS",
+          "keys_file": "SceneOptions.java",
+          "keys_array": "IDS",
+          "item": "game",
+          "label": "原生默认条件"
+        },
+        {
+          "file": "SceneCatalog.java",
+          "array": "BRIEF",
+          "keys_file": "SceneOptions.java",
+          "keys_array": "IDS",
+          "item": "game",
+          "label": "原生效果"
+        }
+      ]
+    },
+    {
+      "id": "dark_lock",
+      "family": "dark_lock",
+      "name": "暗光锁定",
+      "default": {
+        "mode": "off",
+        "detail": "新配置关闭，手动后退出默认关闭"
+      },
+      "settings_keys": [
+        "dark_lock_enabled",
+        "dark_lock_manual_exit",
+        "dark_lock_enter_lux",
+        "dark_lock_exit_lux",
+        "dark_lock_minutes",
+        "dark_lock_exit_seconds"
+      ],
+      "activation": "用户明确启用，亮屏自动模式进入所设暗光范围且持续满足进入确认。",
+      "behavior": "达到暗光确认后取得可恢复的自动亮度控制权；可选手动后继续锁定新值或退出；光线达到退出阈值后自动恢复",
+      "exit": "达到退出照度并确认后恢复本模块取得的自动状态；手动调整按所选方案；停用/切用户及时释放。",
+      "dependencies": []
+    },
+    {
+      "id": "apps",
+      "family": "applications",
+      "name": "暂停自动亮度名单",
+      "default": {
+        "mode": "off",
+        "detail": "名单为空"
+      },
+      "settings_keys": [
+        "manual_brightness_apps"
+      ],
+      "activation": "当前默认屏上实际可见任务与用户名单匹配；缺多窗口支持时才按焦点判断。",
+      "behavior": "主屏可见任务优先，含小窗分屏；仅没有多窗口接口才回退焦点；全部名单不可见才恢复；尊重用户主动开启自动亮度",
+      "exit": "所有匹配的可见应用消失才恢复本模块暂停的自动亮度；用户主动开启优先。",
+      "dependencies": []
+    },
+    {
+      "id": "hbm",
+      "family": "hbm",
+      "name": "HBM触发与预算",
+      "default": {
+        "mode": "native",
+        "detail": "不额外修改"
+      },
+      "settings_keys": [
+        "outdoor_hbm_tuning",
+        "outdoor_hbm_lux_factor",
+        "outdoor_hbm_budget_factor"
+      ],
+      "activation": "户外会话生效且用户启用HBM调整，真实原生数据、照度与预算结构可调。",
+      "behavior": "控制器ABI与计时ABI分开；合法零计时仅调整照度，有限预算受原时间窗口限制；不制造HBM数据",
+      "exit": "停用时仅在字段仍指向本次克隆时恢复原对象，不覆盖系统新配置。",
+      "dependencies": [
+        "outdoor"
+      ]
+    },
+    {
+      "id": "outdoor",
+      "family": "outdoor",
+      "name": "户外增强目标",
+      "default": {
+        "mode": "off",
+        "detail": "新配置关闭"
+      },
+      "settings_keys": [
+        "outdoor_enabled",
+        "outdoor_enter_lux",
+        "outdoor_full_lux",
+        "outdoor_enter_ms",
+        "outdoor_exit_ms",
+        "outdoor_exit_ratio",
+        "outdoor_strength",
+        "outdoor_session_ms",
+        "outdoor_cooldown_ms"
+      ],
+      "activation": "明确启用，持续强光完成确认，普通自动亮度、用户/屏幕和保护条件允许。",
+      "behavior": "持续强光且普通自动亮度保护允许时提高目标；无HBM数据仅用原生普通范围；保留确认、强度、会话与冷却",
+      "exit": "离开强光、手动、熄屏、过热、会话超时或停用退出，并遵守冷却。",
+      "dependencies": []
+    },
+    {
+      "id": "outdoor_range",
+      "family": "range",
+      "name": "开放高亮范围",
+      "default": {
+        "mode": "off",
+        "detail": "新配置关闭"
+      },
+      "settings_keys": [
+        "outdoor_range_unlock"
+      ],
+      "activation": "户外会话与范围开关生效，本机HBM/动态范围接口和实际允许条件完整。",
+      "behavior": "只开放设备映射支持且当前允许的范围；动态范围是补充，缺HBM配置不冒充支持",
+      "exit": "户外会话结束后getter返回原生范围，不保留额外目标增强器。",
+      "dependencies": [
+        "outdoor"
+      ]
+    },
+    {
+      "id": "opr",
+      "family": "sdr",
+      "name": "强光下放宽画面限亮",
+      "default": {
+        "mode": "off",
+        "detail": "新配置关闭"
+      },
+      "settings_keys": [
+        "outdoor_opr_relax"
+      ],
+      "activation": "户外目标、范围和画面放宽开关生效，处于持续强光、普通自动SDR且保护允许。",
+      "behavior": "仅强光、自动SDR、户外范围已开放且保护允许时放宽已验证OPR路径；安全包络、温控、HDR与隐私保护保留",
+      "exit": "每次调用结束恢复ThreadLocal帧，只移除模块引入的原因位，系统保护继续执行。",
+      "dependencies": [
+        "outdoor",
+        "outdoor_range"
+      ]
+    },
+    {
+      "id": "nit_limit",
+      "family": "sdr",
+      "name": "户外nit上限",
+      "default": {
+        "mode": "native",
+        "detail": "0表示不额外限制"
+      },
+      "settings_keys": [
+        "outdoor_max_nit"
+      ],
+      "activation": "户外会话生效，上限非0，设备有可靠nit与背光换算。",
+      "behavior": "仅有可靠设备标定才换算；不能外推或套用捐赠机型数据，不能支持时独立报告",
+      "exit": "无可靠标定时独立拒绝nit限制；取消上限不改变其他户外选项或设备映射。",
+      "dependencies": [
+        "outdoor"
+      ]
+    },
+    {
+      "id": "thermal",
+      "family": "thermal",
+      "name": "显示层温控调整",
+      "default": {
+        "mode": "off",
+        "detail": "新配置关闭"
+      },
+      "settings_keys": [
+        "thermal_relax",
+        "thermal_ceiling",
+        "thermal_cooling"
+      ],
+      "activation": "用户明确开启显示温控调整，实际屏幕限亮策略调用处于允许修改的温度与保护条件。",
+      "behavior": "只调整屏幕限亮，不影响整机其他温控；严重温控、电量等保护保留；实际温度限亮时数值及单位标红",
+      "exit": "每次调用或异常后恢复仍持有的临时显示限亮字段，不写整机温控。",
+      "dependencies": []
+    },
+    {
+      "id": "manual_panel",
+      "family": "raw_output",
+      "name": "主屏手动节点面板",
+      "default": {
+        "mode": "on_request",
+        "detail": "允许打开，本身不自动接管"
+      },
+      "settings_keys": [
+        "manual_panel_enabled",
+        "manual_panel_maximum"
+      ],
+      "activation": "用户点击磁贴或面板并拖动/输入目标，当前物理屏、权限与真实节点可验证。",
+      "behavior": "磁贴拖动关闭自动亮度并复用统一节点保持；读取真实上限，可设独立最高节点；临时常亮仅本次锁屏前",
+      "exit": "打开自动亮度结束保持；锁屏暂停节点、解锁按租约恢复；临时常亮锁屏即清。",
+      "dependencies": []
+    },
+    {
+      "id": "node_output",
+      "family": "raw_output",
+      "name": "户外节点高亮入口",
+      "default": {
+        "mode": "off",
+        "detail": "仅显式启用"
+      },
+      "settings_keys": [
+        "outdoor_node_boost",
+        "outdoor_node_target"
+      ],
+      "activation": "用户显式启用节点增强及其范围/OPR依赖，原生自动输出已达到可验证上限，温控电量等保护允许。",
+      "behavior": "户外、范围、OPR及实际框架输出条件全部满足后，复用节点租约保持；真实上限单独设置，时长跟随户外会话",
+      "exit": "会话退出、熄屏、手动接管或系统有效改写后释放户外租约，冷却仍遵循户外会话。",
+      "dependencies": [
+        "outdoor",
+        "outdoor_range",
+        "opr",
+        "main_panel_node"
+      ]
+    },
+    {
+      "id": "main_panel_node",
+      "family": "node",
+      "name": "主屏节点发现及读数",
+      "default": {
+        "mode": "observe",
+        "detail": "只读发现不试写"
+      },
+      "settings_keys": [],
+      "activation": "Root只读检查或状态注释需要当前物理屏的节点与真实上限。",
+      "behavior": "实际默认内部屏与backlight/明确显示led或折叠端口唯一绑定；读真实节点与上限；缺nit显示节点，普通模式可退到实际系统比例",
+      "exit": "切屏或身份不一致时丢弃旧节点/nit读数；只读发现不启动写入或改权限。",
+      "dependencies": []
+    },
+    {
+      "id": "root_storage",
+      "family": "root_tools",
+      "name": "Root操作目录",
+      "default": {
+        "mode": "on_request",
+        "detail": "按实际权限选择"
+      },
+      "settings_keys": [],
+      "activation": "Root桥需要读写配置事务文件或生成诊断，在实际身份下校验受管目录。",
+      "behavior": "私有受管目录优先，拒绝时可用受管临时目录；验证所有权、真实路径和权限，不把目录可写当成节点可写",
+      "exit": "候选目录校验失败只拒绝对应工具；未知文件和链接保留，不移动原生节点。",
+      "dependencies": []
+    },
+    {
+      "id": "stored_config",
+      "family": "root_tools",
+      "name": "保存配置读取",
+      "default": {
+        "mode": "observe",
+        "detail": "只读保存结果"
+      },
+      "settings_keys": [],
+      "activation": "APP读取设置、恢复配置或导出当前已保存内容。",
+      "behavior": "区分草稿、持久化原文、运行裁剪副本和实际状态；坏数据保留证据，不回写默认",
+      "exit": "读取失败或坏数据保留原文和草稿，不能生成默认配置覆盖原记录。",
+      "dependencies": []
+    },
+    {
+      "id": "outdoor_node_device",
+      "family": "root_tools",
+      "name": "户外节点设备绑定",
+      "default": {
+        "mode": "off",
+        "detail": "显式节点增强时使用"
+      },
+      "settings_keys": [
+        "outdoor_node_boost",
+        "outdoor_node_target"
+      ],
+      "activation": "节点增强已请求，原生框架支持且当前内部主屏及节点唯一绑定。",
+      "behavior": "普通单主屏与折叠当前端口分别校验，复用同一租约；换屏释放旧目标，保留偏好",
+      "exit": "物理屏变化、熄屏或租约失效时结束旧屏协作，不跨屏复用目标。",
+      "dependencies": [
+        "node_output",
+        "main_panel_node"
+      ]
+    },
+    {
+      "id": "native_payload",
+      "family": "root_tools",
+      "name": "原生资产加载",
+      "default": {
+        "mode": "on_request",
+        "detail": "需要节点控制时加载"
+      },
+      "settings_keys": [],
+      "activation": "用户请求节点控制或对应工具需要读取并验证APK中的原生资产。",
+      "behavior": "校验最终APK内程序、协议和执行身份；查看页面不启动写入器；资产失败只停对应工具",
+      "exit": "资产、协议或执行校验失败停止对应原生工具，曲线和其他可用能力不回滚。",
+      "dependencies": []
+    },
+    {
+      "id": "root_identity",
+      "family": "root_tools",
+      "name": "Root权限身份",
+      "default": {
+        "mode": "observe",
+        "detail": "报告真实权限"
+      },
+      "settings_keys": [],
+      "activation": "Root桥启动或用户主动进行权限诊断。",
+      "behavior": "检查实际UID与限制，不能按KSU、Magisk或越狱模式名称假定完整权限；与LSPosed注入分开",
+      "exit": "无权限或读取失败标记对应操作未确认，不以此否定已核验LSPosed功能。",
+      "dependencies": []
+    },
+    {
+      "id": "root_settings",
+      "family": "root_tools",
+      "name": "系统设置桥",
+      "default": {
+        "mode": "on_request",
+        "detail": "Provider优先"
+      },
+      "settings_keys": [],
+      "activation": "需要读取/提交系统设置；Provider读取确实不可用时才评估同权限命令入口。",
+      "behavior": "读取可回退同权限系统命令，写失败不跨路线重复写；继续经过系统鉴权，保留确认及失败回退",
+      "exit": "写失败不跨入口重放，提交未确认则按revision回退并保留用户草稿。",
+      "dependencies": []
+    },
+    {
+      "id": "root_process_identity",
+      "family": "root_tools",
+      "name": "Root进程信息",
+      "default": {
+        "mode": "observe",
+        "detail": "只读真实进程"
+      },
+      "settings_keys": [],
+      "activation": "自检或导出需要实际进程身份与限制证据。",
+      "behavior": "区分实际身份、目录、设置桥、节点及注入能力，读取失败明确未确认，不推断所有功能都失败",
+      "exit": "每次按真实进程代次读取；不能使用旧PID或旧身份报告当前状态。",
+      "dependencies": []
+    },
+    {
+      "id": "launcher",
+      "family": "app_tools",
+      "name": "桌面图标显示",
+      "default": {
+        "mode": "native",
+        "detail": "默认显示图标"
+      },
+      "settings_keys": [],
+      "activation": "用户明确切换桌面图标显示。",
+      "behavior": "仅切换Launcher alias，保留LSPosed入口、欢迎完成状态和所有亮度设置",
+      "exit": "组件切换不重建偏好，隐藏后仍可从LSPosed入口进入；操作失败保留原选择。",
+      "dependencies": []
+    },
+    {
+      "id": "preferences",
+      "family": "app_tools",
+      "name": "界面偏好",
+      "default": {
+        "mode": "native",
+        "detail": "跟随系统及本地选择"
+      },
+      "settings_keys": [],
+      "activation": "APP启动恢复本地界面偏好，或用户修改刷新/主题/图标等偏好。",
+      "behavior": "欢迎、刷新、图标等独立保存，不因配置导入或切组件清空",
+      "exit": "组件切换、页面重建和配置导入不清个人界面偏好；销毁时取消UI回调。",
+      "dependencies": []
+    },
+    {
+      "id": "app_files",
+      "family": "app_tools",
+      "name": "文件及分享",
+      "default": {
+        "mode": "on_request",
+        "detail": "用户主动生成"
+      },
+      "settings_keys": [],
+      "activation": "用户主动导出分析包或文件，再明确确认分享。",
+      "behavior": "保留原始分析包，使用只读受控URI打开系统分享；取消分享不删除原包，不扩大文件访问范围",
+      "exit": "取消或分享失败保留已经导出的包；URI仅授予该文件临时只读权限。",
+      "dependencies": []
+    },
+    {
+      "id": "control_center_slider",
+      "family": "control_center",
+      "name": "控制中心坐标基础",
+      "default": {
+        "mode": "off",
+        "detail": "新配置关闭"
+      },
+      "settings_keys": [
+        "control_center_node_mode"
+      ],
+      "activation": "保存的映射已启用，真实SystemUI注入、坐标接口与同代配置表已就绪。",
+      "behavior": "标准与有效端点标定分别验证，提供同代坐标表；锁屏回原生，缺实际加载回执不假报已生效",
+      "exit": "锁屏退回原生坐标，配置或进程换代清旧profile；未知标定不回放旧坐标。",
+      "dependencies": []
+    },
+    {
+      "id": "control_center_raw",
+      "family": "control_center",
+      "name": "完整节点控制",
+      "default": {
+        "mode": "off",
+        "detail": "新配置关闭"
+      },
+      "settings_keys": [
+        "control_center_node_mode",
+        "control_center_node_maximum",
+        "control_center_node_path"
+      ],
+      "activation": "完整节点模式下，已解锁用户主动拖动，实际物理节点及同代控制权已确认。",
+      "behavior": "全条按真实节点比例显示，拖动关闭自动亮度并放开暗光锁定，复用面板保持，不学习；HDR保留系统图像处理",
+      "exit": "打开自动亮度结束保持；锁屏回原生亮度条，解锁按当前代次恢复映射。",
+      "dependencies": [
+        "control_center_slider",
+        "main_panel_node"
+      ]
+    },
+    {
+      "id": "control_center_partition",
+      "family": "control_center",
+      "name": "分区节点控制",
+      "default": {
+        "mode": "off",
+        "detail": "新配置关闭"
+      },
+      "settings_keys": [
+        "control_center_node_mode",
+        "control_center_partition_maximum",
+        "control_center_partition_restore_auto"
+      ],
+      "activation": "分区模式下，普通与额外节点边界已验证；首次触顶后3秒内再次上滑，或按真实自动高亮状态接续控制。",
+      "behavior": "普通75%保留原生学习；首次顶住分界并提示，3秒内再次上滑才进入增强25%；实际节点上限可设；返回普通段可恢复自动或继续手动",
+      "exit": "回普通段按所选恢复自动或继续手动；锁屏回原生；过期和换代拒绝旧手势。",
+      "dependencies": [
+        "control_center_slider",
+        "main_panel_node"
+      ]
+    },
+    {
+      "id": "dark_lock_schedule",
+      "family": "dark_lock_schedule",
+      "name": "日落后暗光锁定",
+      "default": {
+        "mode": "off",
+        "detail": "新配置关闭"
+      },
+      "settings_keys": [
+        "dark_lock_sunset_only"
+      ],
+      "activation": "暗光锁定及日落选项已启用，系统Twilight给出有效夜间状态。",
+      "behavior": "采用本机Twilight日出日落状态，作为暗光锁定准入，不凭固定时间推断；资料未知不能冒充夜间",
+      "exit": "日出释放本模块取得的锁定；停用/熄屏/切用户注销本次监听与边界任务，用户手动关闭不擅自恢复。",
+      "dependencies": [
+        "dark_lock"
+      ]
+    },
+    {
+      "id": "dim_aod",
+      "family": "dim_aod",
+      "name": "熄屏前降亮协调",
+      "default": {
+        "mode": "observe",
+        "detail": "保留系统休眠与AOD"
+      },
+      "settings_keys": [],
+      "activation": "当前处于已验证的自动DIM或全屏AOD阶段，曲线重算可能顶回系统降亮。",
+      "behavior": "仅在已验证自动DIM/AOD阶段协调，避免曲线反复顶回系统降亮；不更改熄屏策略",
+      "exit": "回普通显示后恢复原生链路，不改屏幕休眠策略。",
+      "dependencies": []
+    },
+    {
+      "id": "app_brightness_isolation",
+      "family": "app_brightness_isolation",
+      "name": "应用亮度隔离",
+      "default": {
+        "mode": "off",
+        "detail": "新配置关闭"
+      },
+      "settings_keys": [
+        "app_brightness_isolation"
+      ],
+      "activation": "隔离已启用，原生窗口覆盖同步来源、用户及屏幕可证明，且无更高优先级控制者。",
+      "behavior": "仅隔离可证明来源的应用窗口亮度同步；应用退出后回系统调节，原生无同步不重复Hook；不等于暂停自动亮度",
+      "exit": "应用退出、主动调节、用户或物理屏变化后清理本次来源限定，不回放旧亮度。",
+      "dependencies": []
+    },
+    {
+      "id": "mapping_startup",
+      "family": "mapping_startup",
+      "name": "Android开机恢复",
+      "default": {
+        "mode": "on_request",
+        "detail": "仅已保存启用映射才恢复"
+      },
+      "settings_keys": [
+        "control_center_node_mode"
+      ],
+      "activation": "已保存启用映射，开机/解锁或真实SystemUI就绪事件触发受管恢复。",
+      "behavior": "开机、解锁及系统界面就绪触发同一有界恢复，核验boot/进程/用户/revision/物理屏并等实际回执，不回放历史手势或亮度",
+      "exit": "关闭映射取消任务；Root拒绝即停止，接口未就绪仅有界重试，不回放旧手势或亮度。",
+      "dependencies": []
+    },
+    {
+      "id": "mapping_boot",
+      "family": "mapping_startup",
+      "name": "Root开机恢复",
+      "default": {
+        "mode": "on_request",
+        "detail": "仅真实权限允许时部署"
+      },
+      "settings_keys": [
+        "control_center_node_mode"
+      ],
+      "activation": "已保存启用映射且受管Root启动入口实际执行，身份、目录和本次boot证据有效。",
+      "behavior": "受管service.d入口与Android入口共用恢复契约；文件存在不等于本次已执行；停用仅清理自己的入口",
+      "exit": "仅更新/撤回内容哈希和受管标记吻合的启动文件；等待与连接次数有限，不建永久循环。",
+      "dependencies": []
+    }
+  ],
+  "interface_features": [
+    {
+      "id": "welcome_tutorial",
+      "name": "欢迎与五页教程",
+      "default": {
+        "mode": "first_run",
+        "detail": "只控制对应界面或用户明确操作，不自动调整屏幕亮度。"
+      },
+      "settings_keys": [],
+      "activation": "对应页面可见或用户明确触发。",
+      "behavior": "首次必经欢迎和五页教程，重看也从欢迎开始；无返回和直接进入；欢迎期间不请求Root；完成状态不因图标切换丢失。",
+      "exit": "完成后保存观看状态；重看不重置亮度设置，离页结束欢迎动画。",
+      "implementation": [
+        "WelcomeGuide.java"
+      ],
+      "dependencies": []
+    },
+    {
+      "id": "quick_setup",
+      "name": "快速设置",
+      "default": {
+        "mode": "on_request",
+        "detail": "只控制对应界面或用户明确操作，不自动调整屏幕亮度。"
+      },
+      "settings_keys": [],
+      "activation": "对应页面可见或用户明确触发。",
+      "behavior": "邀请后回答六个预设问题；未选择不修改，答题过程不改亮度，最后确认统一保存；取消保留原配置。",
+      "exit": "取消不应用答案；最终保存失败保留原配置和可继续编辑的草稿。",
+      "implementation": [
+        "QuickSetupPlan.java"
+      ],
+      "dependencies": []
+    },
+    {
+      "id": "settings_search",
+      "name": "设置搜索",
+      "default": {
+        "mode": "on_request",
+        "detail": "只控制对应界面或用户明确操作，不自动调整屏幕亮度。"
+      },
+      "settings_keys": [],
+      "activation": "对应页面可见或用户明确触发。",
+      "behavior": "功能关键词即时筛选，设置按控制逻辑分类，返回保留位置与草稿。",
+      "exit": "退出搜索恢复正常分组；返回二级页保留草稿和滚动位置。",
+      "implementation": [
+        "SettingsSearch.java"
+      ],
+      "dependencies": []
+    },
+    {
+      "id": "fixed_status",
+      "name": "状态页",
+      "default": {
+        "mode": "observe",
+        "detail": "只控制对应界面或用户明确操作，不自动调整屏幕亮度。"
+      },
+      "settings_keys": [],
+      "activation": "对应页面可见或用户明确触发。",
+      "behavior": "按光感、场景、曲线、输出保护、实际亮度排列，卡片不随文字改变高度；常规视口不滚动，极端视口防裁切；蓝字可点，过期不造0。",
+      "exit": "离页停止无用界面刷新；未知读数不以0或旧值占位。",
+      "implementation": [
+        "StatusPageLayout.java"
+      ],
+      "dependencies": []
+    },
+    {
+      "id": "floating_navigation",
+      "name": "悬浮导航与滚动",
+      "default": {
+        "mode": "native",
+        "detail": "只控制对应界面或用户明确操作，不自动调整屏幕亮度。"
+      },
+      "settings_keys": [],
+      "activation": "对应页面可见或用户明确触发。",
+      "behavior": "紧凑圆角阴影，指示器平移、按压和收放缩放；设置/关于按滚动方向隐藏，触底不强制弹出；隐藏系统导航栏也保留底距。",
+      "exit": "切页、隐藏或尺寸变化结束旧动画，程序定位和触底不伪造滚动手势。",
+      "implementation": [
+        "FloatingNavigation.java"
+      ],
+      "dependencies": []
+    },
+    {
+      "id": "interface_theme",
+      "name": "深浅色界面",
+      "default": {
+        "mode": "native",
+        "detail": "只控制对应界面或用户明确操作，不自动调整屏幕亮度。"
+      },
+      "settings_keys": [],
+      "activation": "对应页面可见或用户明确触发。",
+      "behavior": "底栏、卡片、未采用路线、弹窗和弹幕统一可读；与深色独立亮度曲线分开，切换保留草稿和滚动。",
+      "exit": "主题切换不重建亮度配置或偏好；界面动画按生命周期停止。",
+      "implementation": [
+        "ThemePalette.java"
+      ],
+      "dependencies": []
+    },
+    {
+      "id": "update_notice",
+      "name": "检查更新与下载",
+      "default": {
+        "mode": "on_request",
+        "detail": "只控制对应界面或用户明确操作，不自动调整屏幕亮度。"
+      },
+      "settings_keys": [],
+      "activation": "对应页面可见或用户明确触发。",
+      "behavior": "每次进入前台仅在状态页自动弹一次；忽略后该版本不弹，关于保留提示；官网与GitHub并排下载；操作按钮完整、日志可滚动，网络失败不能冒充无更新。",
+      "exit": "忽略仅针对该版本；网络失败显示无法检查，下次进入按已保存忽略状态处理。",
+      "implementation": [
+        "UpdateChecker.java"
+      ],
+      "dependencies": []
+    },
+    {
+      "id": "configuration_tools",
+      "name": "配置工具与恢复默认",
+      "default": {
+        "mode": "on_request",
+        "detail": "只控制对应界面或用户明确操作，不自动调整屏幕亮度。"
+      },
+      "settings_keys": [],
+      "activation": "对应页面可见或用户明确触发。",
+      "behavior": "配置导入导出用于个人备份，校验本机范围；保存等同revision确认，失败保留草稿并回退；恢复系统默认名称与功能一致。",
+      "exit": "提交失败回退此前配置并保留草稿；恢复默认需按本机实际支持的项目应用。",
+      "implementation": [
+        "ConfigurationFile.java"
+      ],
+      "dependencies": []
+    },
+    {
+      "id": "compatibility_diagnostics",
+      "name": "运行与兼容及诊断",
+      "default": {
+        "mode": "observe",
+        "detail": "只控制对应界面或用户明确操作，不自动调整屏幕亮度。"
+      },
+      "settings_keys": [],
+      "activation": "对应页面可见或用户明确触发。",
+      "behavior": "独立自检页面按功能展示采用/未采用路线、依据和固定检测时间；查看展开只读；分析包导出确认后打开系统分享。",
+      "exit": "查看/展开不执行控制；导出或分享失败保留原包，并明确不完整诊断范围。",
+      "implementation": [
+        "FeatureCheckPage.java"
+      ],
+      "dependencies": []
+    },
+    {
+      "id": "about_credits",
+      "name": "关于、感谢和贡献",
+      "default": {
+        "mode": "on_request",
+        "detail": "只控制对应界面或用户明确操作，不自动调整屏幕亮度。"
+      },
+      "settings_keys": [],
+      "activation": "对应页面可见或用户明确触发。",
+      "behavior": "方形大图标容器内慢速错落弹幕，关于资料紧凑；动态感谢仅网站JSON，测试/代码贡献独立容器，昵称完整换行并保留来源链接；离页停止弹幕。",
+      "exit": "离页或图标区域离开视口即暂停弹幕；名单获取失败沿用可用缓存，不启动后台服务。",
+      "implementation": [
+        "AboutPage.java"
+      ],
+      "dependencies": []
+    }
+  ]
+}

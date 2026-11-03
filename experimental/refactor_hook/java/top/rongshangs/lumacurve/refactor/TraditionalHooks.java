@@ -7,8 +7,9 @@ import top.rongshangs.lumacurve.refactor.hooking.*;
 /** Actual default mapper only; no sysfs writes or second output controller. */
 final class TraditionalHooks {
     static final Set<Class<?>> installed=new HashSet<>();
-    static HookRuntime state(Object mapper){HookRuntime s=HookEntry.states.get(mapper);return s!=null&&!s.closed&&s.onDisplayThread()&&s.kernel instanceof TraditionalAdapter?s:null;}
-    static void install(Class<?> type)throws Exception {
+    static void install(Class<?> type)throws Exception {install(type,true);}
+    static HookRuntime state(Object mapper){HookRuntime s=HookEntry.states.get(mapper);return s!=null&&!s.closed&&s.onDisplayThread()&&s.kernel.nativeMappingHooks()?s:null;}
+    static void install(Class<?> type,boolean configurationHooks)throws Exception {
         if(installed.contains(type))return;
         Method config=TraditionalAdapter.method(type,"setBrightnessConfiguration",Class.forName("android.hardware.display.BrightnessConfiguration",false,type.getClassLoader()));
         Method memory;try{memory=TraditionalAdapter.method(type,"addUserDataPoint",float.class,float.class,String.class);}catch(NoSuchMethodException two){memory=TraditionalAdapter.method(type,"addUserDataPoint",float.class,float.class);}
@@ -16,7 +17,7 @@ final class TraditionalHooks {
         if(config.getReturnType()!=boolean.class||memory.getReturnType()!=void.class||output.getReturnType()!=float.class)throw new IllegalArgumentException("传统映射 Hook 签名不兼容");
         List<XC_MethodHook.Unhook> added=new ArrayList<>();
         try {
-            added.add(XposedBridge.hookMethod(config,new XC_MethodHook(){protected void beforeHookedMethod(MethodHookParam p){
+            if(configurationHooks)added.add(XposedBridge.hookMethod(config,new XC_MethodHook(){protected void beforeHookedMethod(MethodHookParam p){
                 HookRuntime s=state(p.thisObject);if(s==null||s.changing||s.faultPending||!s.phase.equals("active")||!s.appliesToUser())return;
                 TraditionalAdapter a=(TraditionalAdapter)s.kernel;Object requested=p.args[0];
                 if(a.updating)return;
@@ -35,8 +36,8 @@ final class TraditionalHooks {
             added.add(XposedBridge.hookMethod(memory,new XC_MethodHook(){
                 protected void beforeHookedMethod(MethodHookParam p){
                     HookRuntime s=state(p.thisObject);if(s==null||s.changing||s.persistentMemory.replaying||!s.phase.equals("active")||!s.appliesToUser())return;
-                    try{TraditionalAdapter a=(TraditionalAdapter)s.kernel;
-                        if(!Boolean.TRUE.equals(s.kernel.get("mUseAutoBrightness"))||HookEntry.get(a.abc,"mCurrentBrightnessMapper")!=p.thisObject)return;
+                    try{CurveBackend a=s.kernel;
+                        if(!Boolean.TRUE.equals(a.get("mUseAutoBrightness"))||!a.memoryContextActive())return;
                         float lux=(Float)p.args[0],desired=(Float)p.args[1];if(!Float.isFinite(lux)||lux<0||!Float.isFinite(desired)||desired<0||desired>1)return;
                         s.lastManualAdjustment=SystemClock.uptimeMillis();
                         s.persistentMemory.cancelRestore();
@@ -50,11 +51,12 @@ final class TraditionalHooks {
             added.add(XposedBridge.hookMethod(TraditionalAdapter.method(type,"clearUserDataPoints"),new XC_MethodHook(){protected void afterHookedMethod(MethodHookParam p){HookRuntime s=state(p.thisObject);if(s!=null&&!s.changing&&!p.hasThrowable())s.persistentMemory.requestAfterReset();}}));
             added.add(XposedBridge.hookMethod(output,new XC_MethodHook(){protected void beforeHookedMethod(MethodHookParam p){HookRuntime s=state(p.thisObject);if(s!=null)s.persistentMemory.requestRestore();}protected void afterHookedMethod(MethodHookParam p){
                 if(p.hasThrowable())return;HookRuntime s=state(p.thisObject);if(s==null)return;
-                try{TraditionalAdapter a=(TraditionalAdapter)s.kernel;if(HookEntry.get(a.abc,"mCurrentBrightnessMapper")!=p.thisObject)return;
+                try{if(!s.kernel.memoryContextActive())return;
                     float br=(Float)p.getResult();if(!Float.isFinite(br)||br<0||br>1)return;
-                    float nit=((Number)TraditionalAdapter.method(type,"convertToNits",float.class).invoke(p.thisObject,br)).floatValue();s.sample((Float)p.args[0],nit);
+                    float nit=s.kernel.mappingOutputNit(br);if(Float.isFinite(nit)&&nit>=0)s.sample((Float)p.args[0],nit);else s.sampleWithoutNit((Float)p.args[0],br);
                 }catch(Throwable optional){}
             }}));
+            if(!configurationHooks)SimpleCurveAdapter.installHooks(type,added);
             installed.add(type);
         }catch(Throwable failure){HookTransaction.rollbackAll(added);throw new IllegalStateException("传统曲线 Hook 未建立",failure);}
     }

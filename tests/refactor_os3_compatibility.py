@@ -85,6 +85,7 @@ for scenario in ['native_old','modern_priority','wrong_enable','wrong_support','
     sources=dict(outdoor)
     sources.pop('top/rongshangs/lumacurve/refactor/OutdoorTest.java')
     key='com/android/server/display/HighBrightnessModeController.java';hbm=sources[key]
+    hbm=hbm.replace('private boolean deviceSupportsHbm(){return supportConflict||mHbmData!=null;}','')
     if scenario!='modern_priority':
         hbm=hbm.replace(',mHbmControllerIsEnabled=true','').replace('mHbmControllerIsEnabled','deviceSupportsHbm()')
     hbm=hbm.replace('public float peak=', 'public boolean support=true;public boolean deviceSupportsHbm(){return support&&mHbmData!=null&&mHighBrightnessModeMetadata!=null;} public float peak=')

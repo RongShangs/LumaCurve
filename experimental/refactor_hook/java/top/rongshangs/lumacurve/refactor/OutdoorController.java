@@ -19,7 +19,7 @@ final class OutdoorController {
     OutdoorController(HookRuntime s){this.s=s;wake=()->{deadline=-1;if(s.closed)return;tick();s.requestRecalculation();s.queuePublish();};}
     HbmAccess binding(){try{Object hbm=HookEntry.get(s.owner,"mHbmController");if(access==null||access.controller!=hbm){if(access!=null)access.restore();access=new HbmAccess(hbm);}access.observeReplacement();return access;}catch(Throwable unavailable){error=unavailable.toString();return null;}}
     boolean supported(){return OutdoorTuning.owners.contains(s.owner.getClass())&&binding()!=null;}
-    boolean rangeSupported(){return supported()&&OutdoorTuning.ranges.contains(access.controller.getClass())&&OutdoorTuning.peaks.contains(s.owner.getClass());}
+    boolean rangeSupported(){return supported()&&!access.rangeOnly()&&OutdoorTuning.ranges.contains(access.controller.getClass())&&OutdoorTuning.peaks.contains(s.owner.getClass());}
     boolean oprSupported(){return rangeSupported()&&OutdoorOpr.owners.contains(s.owner.getClass());}
     boolean oprAllowed(){return options.flags[3]&&rangeAllowed()&&Float.isFinite(lux())&&lux()>=options.values[0]*options.values[4];}
     float opr(float input,float limited){
@@ -84,7 +84,7 @@ final class OutdoorController {
     }
     void schedule(){long next=options.flags[0]?policy.next:-1;if(next==deadline)return;s.handler.removeCallbacks(wake);deadline=next;if(next>=0)s.handler.postDelayed(wake,Math.max(1,next-SystemClock.uptimeMillis()));}
     boolean rangeAllowed(){
-        if(!options.flags[0]||!options.flags[2]||!policy.active||access==null||block()!=null)return false;
+        if(!options.flags[0]||!options.flags[2]||!policy.active||access==null||access.rangeOnly()||block()!=null)return false;
         try{return !access.managed()||access.allowed();}catch(Throwable unknown){return false;}
     }
     float range(float original){nativeRange=original;float result=original;
@@ -94,7 +94,7 @@ final class OutdoorController {
     float target(float base){
         if(!options.flags[0])return base;
         tick();if(!policy.active||access==null||block()!=null)return base;
-        try{float max=access.allowedMax(),normal=access.normal();goal=limit(OutdoorPolicy.target(options,lux(),base,Math.min(normal,max),max));if(OutdoorPolicy.valid(goal))goalAt=SystemClock.uptimeMillis();if(goal>base)boosts++;return goal;}
+        try{float max=access.allowedMax(),normal=access.normal();goal=limit(access.rangeOnly()?OutdoorPolicy.withinRangeTarget(options,lux(),base,max):OutdoorPolicy.target(options,lux(),base,Math.min(normal,max),max));if(OutdoorPolicy.valid(goal))goalAt=SystemClock.uptimeMillis();if(goal>base)boosts++;return goal;}
         catch(Throwable failed){error=failed.toString();return base;}
     }
     float dynamicRange(float original){nativeDynamic=original;float result=original;
@@ -113,6 +113,7 @@ final class OutdoorController {
         HbmAccess h=binding();j.put("supported",supported()).put("hbm_tuning_supported",h!=null&&h.tunable()).put("range_supported",rangeSupported()).put("opr_supported",oprSupported());
         j.put("hbm_budget_supported",h!=null&&h.budgetTunable()).put("hbm_tuning_profile",h==null?"unsupported":h.tuningProfile());
         j.put("hbm_controller_profile",h==null?"unsupported":h.controllerProfile).put("target_compatibility_profile",OutdoorTuning.targetProfile(s.owner.getClass()));
+        j.put("range_only",h!=null&&h.rangeOnly()).put("range_profile",h==null?"unconfirmed":h.rangeOnly()?"native_range_only":"configured_hbm");
         j.put("sdr_compatibility_profile",OutdoorSdrScope.profile(s.owner.getClass()));
         j.put("opr_envelope_profile",oprEnvelope==null?(oprEnvelopeError.isEmpty()?"unconfirmed":"native_limit_retained"):oprEnvelope.profile);
         if(oprEnvelope!=null&&Float.isFinite(oprEnvelope.maximumNit))j.put("opr_envelope_max_nit",oprEnvelope.maximumNit).put("opr_envelope_max_brightness",oprEnvelope.maximumBrightness);
@@ -130,15 +131,17 @@ final class OutdoorController {
         if(!error.isEmpty())j.put("interface_detail",error);
         if(h!=null){probing=true;try{h.allowedMax();}finally{probing=false;}if(OutdoorPolicy.valid(nativeRange))j.put("native_range_max",nativeRange);if(OutdoorPolicy.valid(deliveredRange))j.put("effective_range_max",deliveredRange);
             j.put("controller_managed",h.managed()).put("hbm_allowed",h.allowed()).put("device_mapping_max",h.max()).put("normal_max",h.normal());
+            if(!h.rangeOnly()){
             j.put("original_minimum_lux",h.originalLux()).put("original_time_window_ms",h.originalLong("timeWindowMillis")).put("original_time_max_ms",h.originalLong("timeMaxMillis")).put("original_time_min_ms",h.originalLong("timeMinMillis"));
             Object data=h.dataField.get(h.controller);j.put("data_overridden",data==h.applied);for(String name:new String[]{"minimumLux","timeWindowMillis","timeMaxMillis","timeMinMillis"})j.put("effective_"+name,HookEntry.get(data,name));
+            }
             try{Object dpc=HookEntry.get(s.owner,"mDisplayPowerController"),range=HookEntry.get(dpc,"mBrightnessRangeController"),clamp=HookEntry.get(dpc,"mBrightnessClamperController");
                 try{Object dynamic=HookEntry.get(range,"mBrightnessRangeControllerImpl");j.put("dynamic_range_supported",OutdoorTuning.dynamicRanges.contains(dynamic.getClass())).put("dynamic_range_enabled",HookEntry.get(dynamic,"mSupportDynamicBrightnessRange"));
                     float dynamicMax=HookRuntime.optionalNumber(dynamic,"mMaxBrightness");if(OutdoorPolicy.valid(dynamicMax))j.put("dynamic_native_max",dynamicMax);}catch(Throwable absent){}
                 java.lang.reflect.Method rangeMax=HbmAccess.method(range.getClass(),"getCurrentBrightnessMax",float.class),clampMax=HbmAccess.method(clamp.getClass(),"getMaxBrightness",float.class);float r,c;probing=true;try{r=((Number)rangeMax.invoke(range)).floatValue();c=((Number)clampMax.invoke(clamp)).floatValue();}finally{probing=false;}if(OutdoorPolicy.valid(r))j.put("display_range_max",r);if(OutdoorPolicy.valid(c))j.put("clamper_max",c);if(OutdoorPolicy.valid(deliveredDynamic))j.put("dynamic_effective_max",deliveredDynamic);
             }catch(Throwable absent){}
             try{Object dpc=HookEntry.get(s.owner,"mDisplayPowerController"),display=dpc.getClass().getMethod("getDisplayPowerState").invoke(dpc);float actual=((Number)display.getClass().getMethod("getScreenBrightness").invoke(display)).floatValue();if(OutdoorPolicy.valid(actual))j.put("actual_brightness",actual);}catch(Throwable absent){}
-            long remaining=h.remaining(now);if(remaining>=0)j.put("hbm_remaining_estimate_ms",remaining);
+            long remaining=h.rangeOnly()?-1:h.remaining(now);if(remaining>=0)j.put("hbm_remaining_estimate_ms",remaining);
             for(String name:new String[]{"mIsTimeAvailable","mIsInAllowedAmbientRange","mIsBlockedByLowPowerMode","mIsHdrLayerPresent"})j.put(name,HookEntry.get(h.controller,name));
             if(policy.active){String limiter=block();if(limiter==null&&h.managed()&&!h.allowed())limiter=Boolean.TRUE.equals(HookRuntime.optionalBoolean(h.controller,"mIsTimeAvailable"))?"hbm_lux":"hbm_budget";if(limiter!=null)j.put("blocking_condition",limiter);}
         }

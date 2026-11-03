@@ -54,7 +54,7 @@ public class CoefficientTest{
  }
 }'''
 p=O/'CoefficientTest.java';p.write_text(java,encoding='utf-8');classes=O/'classes';classes.mkdir(exist_ok=True)
-names=['CurveEditor','CurveBackend','CurvePlan','SavedCurve','CurveCompatibility','TraditionalCurve','PersistentMemory','MemoryOptions','RefactorAdapter','RefactorProfiles','RefactorCoefficientsAdapter']
+names=['CurveEditor','CurveBackend','CurvePlan','SavedCurve','CurveCompatibility','TraditionalCurve','PersistentMemory','MemoryOptions','RefactorAdapter','RefactorProfiles','RefactorCoefficientsAdapter','RefactorResetAdapter']
 subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(J),'-d',str(classes),*[str(S/(n+'.java')) for n in names],str(p)],check=True)
 subprocess.run(['java','-cp',str(classes)+os.pathsep+str(J),'top.rongshangs.lumacurve.refactor.CoefficientTest',str(classes)],check=True)
 

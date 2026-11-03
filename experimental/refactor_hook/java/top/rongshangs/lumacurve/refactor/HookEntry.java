@@ -110,10 +110,12 @@ public final class HookEntry {
                 refactorHooks.add(XposedBridge.hookMethod(ref.getDeclaredMethod("resetDefaultSpline"),new XC_MethodHook(){protected void afterHookedMethod(MethodHookParam p){HookRuntime state=states.get(p.thisObject);if(state!=null&&state.onDisplayThread()&&!state.changing&&!p.hasThrowable()){
                     if(state.kernel.plan()!=null&&state.phase.equals("active")&&state.appliesToUser())try{state.kernel.afterReset();}catch(Throwable failure){state.handler.post(()->state.fault(failure));}
                     state.persistentMemory.requestAfterReset();}}}));
-                refactorHooks.add(XposedBridge.hookMethod(defaultCurve,new XC_MethodHook(){protected void afterHookedMethod(MethodHookParam p){HookRuntime state=states.get(p.thisObject);if(state!=null&&!p.hasThrowable()&&state.onDisplayThread()&&state.kernel.plan()!=null&&state.phase.equals("active")&&state.appliesToUser()){float lux=(Float)p.args[0];if(Float.isFinite(lux)&&lux>=0){float value=state.kernel.plan().at(lux);if(defaultCurve.getReturnType()==double.class)p.setResult(Double.valueOf(value));else p.setResult(Float.valueOf(value));}}}}));
+                if(defaultCurve!=null)refactorHooks.add(XposedBridge.hookMethod(defaultCurve,new XC_MethodHook(){protected void afterHookedMethod(MethodHookParam p){HookRuntime state=states.get(p.thisObject);if(state!=null&&!p.hasThrowable()&&state.onDisplayThread()&&state.kernel.plan()!=null&&state.phase.equals("active")&&state.appliesToUser()){float lux=(Float)p.args[0];if(Float.isFinite(lux)&&lux>=0){float value=state.kernel.plan().at(lux);if(defaultCurve.getReturnType()==double.class)p.setResult(Double.valueOf(value));else p.setResult(Float.valueOf(value));}}}}));
+                Method currentCurve=RefactorProfiles.currentMethod(ref);
+                if(currentCurve!=null)refactorHooks.add(XposedBridge.hookMethod(currentCurve,new XC_MethodHook(){protected void beforeHookedMethod(MethodHookParam p){HookRuntime s=states.get(p.thisObject);if(s!=null&&!s.closed&&!s.changing&&s.onDisplayThread()&&s.phase.equals("active")&&s.appliesToUser())p.args[0]=s.kernel.currentInputLux((Float)p.args[0]);}}));
                 // Coefficient curves have no native terminal plateau below the hardware maximum.
                 // Limit only this owner's actual arrays, and only after an explicit downward edit.
-                if(!RefactorProfiles.anchors(ref)){
+                if(!RefactorProfiles.anchors(ref)&&defaultCurve!=null){
                     Method calculation=ref.getDeclaredMethod("calculateBrt",float.class,double[].class);calculation.setAccessible(true);
                     refactorHooks.add(XposedBridge.hookMethod(calculation,new XC_MethodHook(){protected void beforeHookedMethod(MethodHookParam p){HookRuntime state=states.get(p.thisObject);if(state==null||state.closed||state.changing||!state.onDisplayThread()||!state.phase.equals("active")||!state.appliesToUser()||!(state.kernel instanceof RefactorCoefficientsAdapter))return;try{p.args[0]=((RefactorCoefficientsAdapter)state.kernel).limitedLux((Float)p.args[0],(double[])p.args[1]);}catch(Exception unavailable){}}}));
                 }
@@ -195,7 +197,7 @@ public final class HookEntry {
             if(Looper.myLooper()!=handler.getLooper()){handler.post(()->attach(owner));return;}
             // Validate the replacement before releasing an existing observer.
             HookRuntime state=new HookRuntime(owner,ref,handler);
-            if(state.kernel instanceof TraditionalAdapter)TraditionalHooks.install(ref.getClass());
+            state.kernel.installMappingHooks(ref.getClass());
             HookRuntime[] previous;
             synchronized(states){previous=states.values().toArray(new HookRuntime[0]);}
             for(HookRuntime old:previous)old.close();

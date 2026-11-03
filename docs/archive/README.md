@@ -7,3 +7,5 @@
 - 发布历史仍在 [releases/](../releases/)，版本和专项复审统一在 [reviews/](../reviews/)。
 
 当前入口是 [文档导航](../README.md)、[任务边界](../../PROJECT_SCOPE.md) 和 [当前交接](../../AGENT_HANDOFF.md)。原始许可及来源声明保留，不因文档归档删除。
+
+- [项目文档整理前快照](project-documents-20261103/README.md)：根项目、任务边界、交接、导航和发布约定的原字节备份；只供追溯，不恢复为当前规范。

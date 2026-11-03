@@ -19,8 +19,8 @@ public class FeatureCompatibilityTest{
   JSONObject r=new JSONObject().put("curve_backend","refactor");
   for(String route:new String[]{"app_override_scoped_sync","native_window_no_sync"}){r.put("app_brightness_isolation",new JSONObject().put("profile",route).put("blocked_syncs",7));picked("app_brightness_isolation",r,route);check(enrich("app_brightness_isolation","available",r).getString("evidence").contains("7"));check(selected(enrich("app_brightness_isolation","unsupported",r)).isEmpty());}
   String[] memory={"curve","manual_memory","saved_curve","persistent_memory","memory_mode","memory_forever","memory_reset","memory_timeout"};
-  for(String id:memory){picked(id,r,"refactor");JSONObject row=enrich(id,"available",r);check(row.getJSONArray("routes").length()==5);}
-  r.put("curve_route","refactor_coefficients");picked("curve",r,"refactor_coefficients");check(selected(enrich("persistent_memory","unsupported",r)).isEmpty());r.put("curve_route","unknown");check(selected(enrich("curve","available",r)).isEmpty());r.remove("curve_route");
+  for(String id:memory){picked(id,r,"refactor");JSONObject row=enrich(id,"available",r);check(row.getJSONArray("routes").length()==7);}
+  r.put("curve_route","refactor_coefficients");picked("curve",r,"refactor_coefficients");check(selected(enrich("persistent_memory","unsupported",r)).isEmpty());r.put("curve_route","refactor_reset_coefficients");picked("curve",r,"refactor_reset_coefficients");picked("manual_memory",r,"refactor_reset_coefficients");check(selected(enrich("saved_curve","unsupported",r)).isEmpty());r.put("curve_route","unknown");check(selected(enrich("curve","available",r)).isEmpty());r.remove("curve_route");
   r.put("curve_backend","physical_mapping").put("physical_mapper_class","com.android.server.display.MiuiPhysicalBrightnessMappingStrategy");for(String id:memory)picked(id,r,"miui_physical");
   r.put("physical_mapper_class","com.android.server.display.BrightnessMappingStrategy$PhysicalMappingStrategy");for(String id:memory)picked(id,r,"aosp_physical");
   r.put("physical_baseline_route","direct");picked("curve",r,"aosp_physical");
@@ -28,6 +28,8 @@ public class FeatureCompatibilityTest{
   check(enrich("curve","available",r).getString("evidence").contains("550"));check(enrich("curve","available",r).getString("evidence").contains("1000"));
   r.put("physical_baseline_route","unknown");check(selected(enrich("curve","available",r)).isEmpty());r.remove("physical_baseline_route");
   r.remove("physical_mapper_class");check(selected(enrich("curve","available",r)).isEmpty());check(enrich("curve","available",r).getString("route_name").contains("未确认"));r.put("curve_backend","unknown");check(selected(enrich("curve","available",r)).isEmpty());
+  r.put("curve_backend","simple_mapping").put("curve_route","simple_mapping").put("simple_mapper_class","com.android.server.display.BrightnessMappingStrategy$SimpleMappingStrategy");picked("curve",r,"simple_mapping");picked("manual_memory",r,"simple_mapping");check(selected(enrich("saved_curve","unsupported",r)).isEmpty());
+  r.put("simple_mapper_class","unknown");check(selected(enrich("curve","available",r)).isEmpty());r.put("curve_backend","unknown");
   check(selected(enrich("main_sensor","available",r)).isEmpty());
   r.put("main_input_compatibility",new JSONObject().put("profile","oem_selected_secondary").put("source","automatic_brightness_controller").put("sensor_name","selected").put("sensor_string_type","xiaomi.sensor.light_secondary"));picked("main_sensor",r,"oem_selected_secondary");
   check(enrich("main_sensor","available",r).getString("evidence").contains("xiaomi.sensor.light_secondary"));
@@ -81,6 +83,8 @@ public class FeatureCompatibilityTest{
   alt.put("workspace_attempts",new JSONArray().put(new JSONObject().put("id","root_private_storage").put("readable",false).put("detail","current storage denied")).put(new JSONObject().put("id","root_temporary_storage").put("readable",true)));
   JSONObject altRow=FeatureCompatibility.annotate(new JSONObject().put("features",new JSONArray().put(alt)),r,"root").getJSONArray("features").getJSONObject(0);check(altRow.getJSONArray("routes").getJSONObject(0).getString("reason").equals("current storage denied"));
   JSONObject startup=row("mapping_startup","available").put("startup",new JSONObject().put("route","android_boot_job").put("state","not_run").put("maximum_attempts",4));JSONObject startupReport=new JSONObject().put("features",new JSONArray().put(startup));JSONObject startupRow=FeatureCompatibility.annotate(startupReport,r,"app").getJSONArray("features").getJSONObject(0);check(selected(startupRow).contains("android_boot_job"));check(startupRow.getString("evidence").contains("0/4"));startup.getJSONObject("startup").put("state","restored").put("elapsed_ms",100).put("attempt",1);check(FeatureCompatibility.annotate(startupReport,r,"app").getJSONArray("features").getJSONObject(0).getString("evidence").contains("2/4"));startup.put("state","unsupported");check(selected(FeatureCompatibility.annotate(startupReport,r,"app").getJSONArray("features").getJSONObject(0)).isEmpty());
+  JSONObject ordinary=new JSONObject().put("outdoor",new JSONObject().put("target_compatibility_profile","override_target").put("range_profile","native_range_only"));picked("outdoor",ordinary,"native_range_only");
+  check(selected(enrich("outdoor","pending",ordinary)).isEmpty());ordinary.getJSONObject("outdoor").put("range_profile","configured_hbm");picked("outdoor",ordinary,"override_target");
   System.out.println("Feature compatibility catalogue: "+cases+" cases PASS; actual presentation model, no device or brightness probes");
  }
 }''',encoding='utf-8')

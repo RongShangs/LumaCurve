@@ -340,6 +340,8 @@ public final class UiText {
         WORDS.put("使用本机 RefactorNitController 的逻辑锚点、手动点与曲线重建接口。","Uses the device RefactorNitController anchors, manual points and native curve rebuilding.");
         WORDS.put("小米传统物理映射","Xiaomi traditional physical mapper");
         WORDS.put("实际映射器为 MiuiPhysicalBrightnessMappingStrategy，保留完整设备曲线与应用修正。","Uses MiuiPhysicalBrightnessMappingStrategy and preserves the complete device curve and application corrections.");
+        WORDS.put("系统亮度比例映射","Native brightness-proportion mapper");
+        WORDS.put("实际使用 SimpleMappingStrategy 的照度/亮度比例数组及原生样条重建；保留手动学习与完整记忆转存，不将比例当作 nit。","Uses actual SimpleMappingStrategy lux/brightness arrays and native spline rebuilding. Retains native learning and complete learned-base saving; brightness proportions are not nit.");
         WORDS.put("系统标准物理映射","Standard physical mapper");
         WORDS.put("实际映射器为 PhysicalMappingStrategy，使用其亮度 / nit 转换与短期模型。","Uses PhysicalMappingStrategy with its brightness/nit conversion and short-term model.");
         WORDS.put("系统原生主光感","Native primary light sensor");
@@ -1052,6 +1054,10 @@ public final class UiText {
         WORDS.put("等待系统连接","Waiting for the system");
         WORDS.put("当前亮度曲线","Current brightness curve");
         WORDS.put("当前屏幕亮度","Current screen brightness");
+        WORDS.put("当前亮度（系统比例）","Current brightness (system scale)");
+        WORDS.put("原生普通范围增强","Native ordinary-range boost");
+        WORDS.put("范围适配：native_range_only · 系统未提供 HBM 数据\n","Range: native_range_only · No native HBM configuration\n");
+        WORDS.put("原生明确没有 HBM 数据且支持谓词为否；在实际允许的亮度范围内提高强光目标，不新增 HBM 范围或预算。","The native HBM data is absent and its support predicate is false. Raise the sunlight target within the actual allowed range without adding HBM ranges or budgets.");
         WORDS.put("曲线计算亮度","Calculated brightness");
         WORDS.put("手动偏好记忆","Brightness memory");
         WORDS.put("减少温控降亮","Reduce thermal dimming");
@@ -2159,6 +2165,37 @@ public final class UiText {
         WORDS.put("映射已准备，等待系统界面确认","Mapping is prepared; waiting for SystemUI confirmation");
         WORDS.put("启动来源：","Startup trigger: ");
         WORDS.put("仅恢复已保存映射；启动/解锁或系统界面就绪事件触发有界任务，首次优先即时调度并保留原回退。准备后需当前系统界面确认同一代次才报成功；不回放手势，Root拒绝停止，无常驻APP服务。","A bounded job restores a saved mapping after boot, unlock, or protected SystemUI readiness. It prefers expedited dispatch with the original fallback, confirms the live UI generation, never replays gestures, stops on Root denial, and adds no resident app service.");
+        WORDS.put("Refactor 原生重建分段曲线","Refactor native reset-derived curve");
+        WORDS.put("无独立默认系数字段且原生重建、私有曲线消费者及9/22状态完整；事务读取本机基线后还原现场，保留原生学习，暂不提供记忆转存与跨状态回放。","No separate default coefficient field, with complete native reset, curve reader and 9/22 state. Reads the device baseline transactionally and restores live learning; portable memory export and replay are unverified.");
+        WORDS.put("本机采用原生重建分段曲线；仅报告最近一次手动输入","Native reset-derived fitting; only the latest manual input is reported.");
+        WORDS.put("独立默认系数字段存在，不能改用重建路线","A separate default coefficient field exists; the reset-derived route is not allowed.");
+        WORDS.put("默认系数接口残缺，不能改用重建路线","The default coefficient ABI is incomplete; reset-derived fallback is not allowed.");
+        WORDS.put("重建曲线字段不兼容：","Incompatible reset-derived curve field: ");
+        WORDS.put("重建曲线接口不兼容：","Incompatible reset-derived curve method: ");
+        WORDS.put("主屏逻辑亮度范围无效","Invalid primary-display logical brightness range.");
+        WORDS.put("原生重建未清除学习状态","Native reset did not clear its learning state.");
+        WORDS.put("原生重建基准无效","Invalid native reset baseline.");
+        WORDS.put("原生重建上限无效","Invalid native reset endpoint.");
+        WORDS.put("原生重建分段不连续","The native reset segments are discontinuous.");
+        WORDS.put("原生分段消费者不兼容","The native segmented curve reader is incompatible.");
+        WORDS.put("重建曲线容器不兼容：","Incompatible reset-derived curve array: ");
+        WORDS.put("重建曲线包含无效值","The reset-derived curve contains invalid values.");
+        WORDS.put("分段曲线无效","Invalid segmented curve.");
+        WORDS.put("原生逻辑亮度超出范围","Native logical brightness is out of range.");
+        WORDS.put("原生拟合要求相邻亮度递增","Native fitting requires strictly increasing neighboring brightness values.");
+        WORDS.put("重建结果不匹配本机原生基准，停止覆盖","The reset result differs from the device baseline; modification stopped.");
+        WORDS.put("重建曲线原生读回不一致","Native readback of the reset-derived curve does not match.");
+        WORDS.put("本机拟合曲线尚不支持记忆转存；保留已保存设置","Portable memory export is unverified for this native fitting ABI; saved choices are retained.");
+        WORDS.put("曲线已被其他所有者替换，停止覆盖","Another owner replaced the curve; modification stopped.");
+        WORDS.put("原生恢复结果不匹配","The native restoration result does not match.");
+        WORDS.put("重建曲线更新失败，已回滚","Reset-derived curve update failed and was rolled back.");
+        WORDS.put("重建曲线接续失败，已回滚","Reset-derived curve handover failed and was rolled back.");
+        WORDS.put("当前分段曲线所有权已变化","Ownership of the current segmented curve changed.");
+        WORDS.put("曲线所有权已变化，停止清除","Curve ownership changed; clearing stopped.");
+        WORDS.put("原生重置结果无效","Invalid native reset result.");
+        WORDS.put("清除记忆失败，已回滚","Clearing memory failed and was rolled back.");
+        WORDS.put("照度无效","Invalid ambient lux.");
+        WORDS.put("实时曲线区间无效","Invalid live curve domain.");
         PHRASES=new ArrayList<>(WORDS.entrySet());PHRASES.sort((a,b)->Integer.compare(b.getKey().length(),a.getKey().length()));
     }
     public static String translate(String text,boolean english){

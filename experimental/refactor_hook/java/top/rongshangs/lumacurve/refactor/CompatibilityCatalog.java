@@ -18,9 +18,11 @@ final class CompatibilityCatalog {
     static Route[] curveRoutes(){return new Route[]{
         route("refactor","Refactor 逻辑曲线","使用本机 RefactorNitController 的逻辑锚点、手动点与曲线重建接口。"),
         route("refactor_coefficients","Refactor 分段系数曲线","旧式9项系数与22项状态完整；保留原生手动学习和输出，尚不提供虚拟拟合点的跨模式 / 锁屏 / 重启恢复或记忆转基础。"),
+        route("refactor_reset_coefficients","Refactor 原生重建分段曲线","无独立默认系数字段且原生重建、私有曲线消费者及9/22状态完整；事务读取本机基线后还原现场，保留原生学习，暂不提供记忆转存与跨状态回放。"),
         route("miui_physical","小米传统物理映射","实际映射器为 MiuiPhysicalBrightnessMappingStrategy，保留完整设备曲线与应用修正。"),
         route("aosp_physical","系统标准物理映射","实际映射器为 PhysicalMappingStrategy，使用其亮度 / nit 转换与短期模型。"),
-        route("aosp_physical_clamped","系统物理映射：标定端点裁剪","原机曲线超出标定范围，且实际双向标定样条及端点裁剪通过验证；按有效范围编辑，默认保持原曲线对象与原生保护。")};}
+        route("aosp_physical_clamped","系统物理映射：标定端点裁剪","原机曲线超出标定范围，且实际双向标定样条及端点裁剪通过验证；按有效范围编辑，默认保持原曲线对象与原生保护。"),
+        route("simple_mapping","系统亮度比例映射","实际使用 SimpleMappingStrategy 的照度/亮度比例数组及原生样条重建；保留手动学习与完整记忆转存，不将比例当作 nit。")};}
     static Route[] catalogue(String id){
         if(Arrays.asList("curve","manual_memory","saved_curve","persistent_memory","memory_mode","memory_forever","memory_reset","memory_timeout").contains(id))return curveRoutes();
         switch(id){
@@ -48,7 +50,7 @@ final class CompatibilityCatalog {
         case "animation_override":return new Route[]{route("oem_animation","Refactor 原生时长过渡","调整已验证的原生过渡时长倍率，保持系统动画及主副屏隔离。"),route("traditional_ramp","传统自动亮度速率过渡","原生 Refactor 策略关闭且时长对象为空；匹配主屏双 RampAnimator、三参或四参目标入口及速率原因，只调整普通自动亮度速率，保留系统时长上限及特殊过渡。")};
         case "sunlight_override":return new Route[]{route("manual_sunlight","系统手动模式阳光屏","调整 SunlightController 的进入 / 退出等待，不代替自动 HBM。")};
         case "touch_override":return new Route[]{route("touch_release","系统触摸遮挡释放等待","调整 TouchCoverProtectionHelper 的移开等待，继续保留遮挡保护。")};
-        case "outdoor":return new Route[]{route("override_target","系统覆盖目标入口","通过 getOverrideLimitBrightness 增强自动目标，保留原生手动接管与下游保护。"),route("legacy_custom_target","传统物理曲线目标入口","没有覆盖目标接口且旧调用结构完整；在原生自定义曲线目标返回后增强，仍经场景否决、范围裁剪及温控输出。")};
+        case "outdoor":return new Route[]{route("override_target","系统覆盖目标入口","通过 getOverrideLimitBrightness 增强自动目标，保留原生手动接管与下游保护。"),route("legacy_custom_target","传统物理曲线目标入口","没有覆盖目标接口且旧调用结构完整；在原生自定义曲线目标返回后增强，仍经场景否决、范围裁剪及温控输出。"),route("native_range_only","原生普通范围增强","原生明确没有 HBM 数据且支持谓词为否；在实际允许的亮度范围内提高强光目标，不新增 HBM 范围或预算。")};
         case "main_panel_node":return new Route[]{route("fold_default_display","折叠屏当前主屏节点","原生折叠布局允许不同物理屏作为默认屏；根据实时默认屏地址、成对背光与唯一点亮 DSI 选择节点；显示端口与内核编号不一致时独立核验默认屏点亮状态，切屏释放旧接管。"),route("backlight_node","主屏 backlight 节点","扫描 backlight，验证主屏身份、真实路径及 brightness / max_brightness 配对。"),route("display_led_node","显示专用 leds 节点","仅接受明确标识为主屏背光的 leds 节点，排除通知灯、手电与背屏。")};
         case "root_storage":return new Route[]{route("root_private_storage","Root 私有数据目录","只检查配置 / 分析目录的读写能力，不安装或启动输出程序。"),route("root_temporary_storage","Root 独立操作目录","原目录受限时使用受验证的私有目录；不迁移原生输出程序或用户设置。")};
         case "root_identity":return new Route[]{route("root_actual_identity","实际进程权限信息","记录实际UID、Capabilities及SELinux上下文，不以Root管理器名称判定权限。")};

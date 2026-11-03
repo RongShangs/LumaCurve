@@ -34,7 +34,7 @@ final class HookRuntime {
     JSONArray compatibilityPaused=new JSONArray();
     String processedConfig;boolean configProcessed;
     long consumed,lastPublish,thermalSkipped,lastThermalLog,viewUntil;
-    float lastLux=Float.NaN,lastNit=Float.NaN,batteryTemperature=Float.NaN,thermalCeiling=43,lastOfficialCap=Float.NaN;
+    float lastLux=Float.NaN,lastNit=Float.NaN,lastBrightness=Float.NaN,batteryTemperature=Float.NaN,thermalCeiling=43,lastOfficialCap=Float.NaN;
     int thermalSeverity=-1,boundUser=-1,batteryLevel=-1;
     boolean closed,changing,faultPending,thermalEnabled,receiverRegistered,thermalRegistered,publishQueued;
     float memoryStrength=1;long memoryEvents,lastMemoryLog,lastManualAdjustment=-1;String lastReset="";
@@ -258,7 +258,7 @@ final class HookRuntime {
                     lastReset=reset;log("已清除当前与已保存的手动记忆，保留基础曲线");
                 }
             }
-            consumed=0;lastLux=lastNit=Float.NaN;AdvancedTuning.refreshThresholds(this);thermalAllowed=relaxThermal();publish();requestRecalculation();
+            consumed=0;lastLux=lastNit=lastBrightness=Float.NaN;AdvancedTuning.refreshThresholds(this);thermalAllowed=relaxThermal();publish();requestRecalculation();
         }catch(Throwable error){
             lowLightEnabled=false;
             disableOverrides();memoryStrength=1;try{kernel.configure(null);}catch(Throwable rollback){XposedBridge.log("LumaCurve fallback failed: "+rollback);}
@@ -312,11 +312,16 @@ final class HookRuntime {
     void userChanged(){disableOverrides();try{kernel.configure(null);phase="error";message="用户已切换，恢复官方策略";log(message);publish();}catch(Throwable error){fault(error);}}
     void sample(float lux,float nit){
         if(!onDisplayThread()||!Float.isFinite(lux)||!Float.isFinite(nit)||lux<0||nit<0)return;
-        lastLux=lux;lastNit=nit;if(kernel.plan()!=null)consumed++;
+        lastLux=lux;lastNit=nit;lastBrightness=Float.NaN;if(kernel.plan()!=null)consumed++;
         if(consumed==1)queueControlPublish();
         else if(SystemClock.elapsedRealtime()-lastPublish>=publishInterval())queuePublish();
     }
     long publishInterval(){return SystemClock.elapsedRealtime()<viewUntil?2000:10000;}
+    void sampleWithoutNit(float lux,float brightness){
+        if(!onDisplayThread()||!Float.isFinite(lux)||lux<0||!Float.isFinite(brightness)||brightness<0||brightness>1)return;
+        lastLux=lux;lastNit=Float.NaN;lastBrightness=brightness;if(kernel.plan()!=null)consumed++;
+        if(consumed==1)queueControlPublish();else if(SystemClock.elapsedRealtime()-lastPublish>=publishInterval())queuePublish();
+    }
     void publish(){
         if(closed)return;
         // Configuration confirmation must not depend on optional diagnostic fields.
@@ -368,14 +373,8 @@ final class HookRuntime {
             if(Float.isFinite(lastOfficialCap))status.put("thermal_last_cap",lastOfficialCap);
             if(Float.isFinite(lastLux))status.put("last_lux",lastLux);
             if(Float.isFinite(lastNit))status.put("calculated_physical_nit",lastNit);
-            try{
-                Object dpc=HookEntry.get(owner,"mDisplayPowerController");
-                Object display=dpc.getClass().getMethod("getDisplayPowerState").invoke(dpc);
-                float brightness=((Number)display.getClass().getMethod("getScreenBrightness").invoke(display)).floatValue();
-                float nit=((Number)owner.getClass().getMethod("convertBrightnessToNit",float.class).invoke(owner,brightness)).floatValue();
-                if(Float.isFinite(nit)&&nit>=0)status.put("actual_nit",nit).put("actual_nit_source","device_backlight_mapping");
-                status.put("screen_state",display.getClass().getMethod("getScreenState").invoke(display));
-            }catch(Throwable unavailable){}
+            if(Float.isFinite(lastBrightness))status.put("calculated_brightness",lastBrightness);
+            ScreenBrightnessReading.capture(owner,status);
             if(controlCenter.curveDisplayRange!=null)status.put("curve_display_range",controlCenter.curveDisplayRange);
             if(controlCenter.screenNitCalibration!=null)status.put("screen_nit_calibration",controlCenter.screenNitCalibration).put("screen_nit_physical",controlCenter.screenNitPhysical);
             CurvePlan plan=kernel.plan();if(plan!=null){float[] handles=new float[4];for(int i=0;i<4;i++)handles[i]=plan.at(kernel.factoryLux[i]);status.put("active_logical_nit",array(handles)).put("applied_base_lux",array(kernel.baselineLux())).put("applied_base_nit",array(kernel.baselineNit()));}

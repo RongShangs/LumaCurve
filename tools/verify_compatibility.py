@@ -5,7 +5,7 @@ JSON manifest = ownership, selection, evidence, teardown and validation responsi
 The Markdown index is generated, not a third manually maintained route list.
 """
 from pathlib import Path
-import argparse, base64, collections, json, re, subprocess
+import argparse, base64, collections, hashlib, json, re, subprocess
 
 ROOT=Path(__file__).resolve().parents[1]
 ARCH=ROOT/'docs/architecture'
@@ -134,6 +134,13 @@ def validate(manifest,catalogue,source_map,baseline,root=ROOT):
     for message in boundary_violations({name:(SOURCE/name).read_text(encoding='utf-8') for name in BOUNDARY_CONSUMERS}):errors.append(message)
     missing=unexecuted_tests(manifest,(root/'tools/build_refactor_hook_test.py').read_text(encoding='utf-8'))
     check(not missing,'registered tests not executed by full build: '+str(sorted(missing)))
+    errors.extend(feature_requirements_errors(manifest,catalogue,source_map,root=root))
+    try:
+        protected=baseline.get('interface_features',[])
+        check(isinstance(protected,list) and bool(protected),'missing interface requirement baseline')
+        check(set(protected).issubset({r['id'] for r in feature_requirements(root)['interface_features']}),'removed protected interface requirement')
+    except (OSError,ValueError,KeyError,TypeError):check(False,'interface requirement baseline unreadable')
+    errors.extend(stable_document_errors(root))
     return errors
 
 
@@ -145,39 +152,165 @@ def unexecuted_tests(manifest,build_text):
     return registered-calls
 
 
-BOUNDARY_CONSUMERS={'MainActivity.java','CurveComparison.java','SavedCurve.java','MemoryPersistence.java','MemoryLifecycle.java','HookRuntime.java','CurveBackend.java'}
+BOUNDARY_CONSUMERS={'MainActivity.java','CurveComparison.java','SavedCurve.java','MemoryPersistence.java','MemoryLifecycle.java','HookRuntime.java','HookEntry.java','CurveBackend.java'}
+
+def curve_implementations():
+    # Derive names from production subclasses, so a future adapter is protected too.
+    result=set()
+    for path in SOURCE.glob('*.java'):
+        result.update(re.findall(r'\bclass\s+(\w+)\s+extends\s+CurveBackend\b',path.read_text(encoding='utf-8')))
+    return result
+
 def boundary_violations(sources):
     errors=[]
+    implementations=curve_implementations()
+    types='(?:'+'|'.join(re.escape(v) for v in sorted(implementations))+')'
+    manifest=json.loads((ARCH/'compatibility-manifest.json').read_text(encoding='utf-8'))
+    routes=set(next(f['routes'] for f in manifest['families'] if f['id']=='curve'))
+    for implementation in implementations:
+        routes.update(re.findall(r'\bString\s+name\s*\(\s*\)\s*\{\s*return\s+"([^"]+)"',(SOURCE/(implementation+'.java')).read_text(encoding='utf-8')))
+    route_literals=r'"(?:'+'|'.join(re.escape(v) for v in routes)+r')"'
+    identity=r'\binstanceof\s+'+types+r'\b|\b'+types+r'\s*\.\s*class\b|\(\s*'+types+r'\s*\)'
     for name,text in sources.items():
-        # Diagnostics may print a route name; shared control cannot select an ABI by it.
-        if name in {'CurveComparison.java','SavedCurve.java','MemoryPersistence.java','MemoryLifecycle.java'} and re.search(r'"(?:physical_mapping|refactor_coefficients|mAnchorLux|mAnchorNit)"|instanceof\s+TraditionalAdapter|kernel\.name\(\)\s*\.\s*equals',text):
+        # Remove comments without changing literal strings or quoted comment characters.
+        text=re.sub(r'"(?:[^"\\]|\\.)*"|/\*.*?\*/|//[^\n]*',lambda m:m.group(0) if m.group(0).startswith('"') else ' ',text,flags=re.S)
+        if name in {'CurveComparison.java','SavedCurve.java','MemoryPersistence.java','MemoryLifecycle.java'} and re.search(route_literals+r'|"(?:mAnchorLux|mAnchorNit)"|'+identity+r'|kernel\.name\(\)\s*\.\s*equals',text):
             errors.append('native curve branch leaked into shared consumer: '+name)
-        if name=='MainActivity.java' and re.search(r'optString\s*\(\s*"curve_(?:backend|route)"',text):errors.append('UI selects native curve route')
-        if name=='HookRuntime.java' and re.search(r'kernel\s+instanceof\s+TraditionalAdapter|kernel\.name\(\)\s*\.\s*equals',text):errors.append('runtime selects curve capability by backend identity')
-        if name=='CurveBackend.java' and re.search(r'"(?:mAnchorLux|mAnchorNit)"|name\(\)\.equals',text):errors.append('shared backend defaults to a native ABI')
+        if name=='MainActivity.java' and re.search(r'(?:getString|optString)\s*\(\s*"curve_(?:backend|route)"|'+identity,text):errors.append('UI selects native curve route')
+        # Config identity checks remain valid; selecting behavior by a concrete class is not.
+        if name=='HookRuntime.java' and re.search(identity+r'|kernel\.name\(\)\s*\.\s*equals',text):errors.append('runtime selects curve capability by backend identity')
+        if name=='HookEntry.java' and re.search(r'\bTraditionalHooks\s*\.\s*install\s*\(',text):errors.append('bootstrap bypasses backend mapping hook contract')
+        if name=='CurveBackend.java' and re.search(r'"(?:mAnchorLux|mAnchorNit)"|name\(\)\.equals|'+identity,text):errors.append('shared backend defaults to a native ABI')
     return errors
 
+
+def feature_requirements(root=ROOT):
+    return json.loads((root/'docs/requirements/feature-requirements.json').read_text(encoding='utf-8'))
+
+
+def stable_document_errors(root=ROOT):
+    errors=[]
+    for name in ['GLOBAL_RULES.md','PROJECT.md','PROJECT_SCOPE.md','AGENT_HANDOFF.md','docs/README.md','docs/architecture/README.md']:
+        path=root/name
+        if not path.is_file():errors.append('stable document missing: '+name);continue
+        if re.search(r'^(?:20\d\d-\d\d-\d\d\s+)?当前(?:本地|正式|交付)|^(?:下方|以下)(?:为|保留)历史',path.read_text(encoding='utf-8'),re.M):errors.append('version history leaked into stable document: '+name)
+    if not (root/'docs/work-status.md').is_file():errors.append('current work status missing')
+    return errors
+
+
+def requirement_source(ref,root=ROOT):
+    def array(name,key):
+        text=(root/'experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor'/name).read_text(encoding='utf-8')
+        match=re.search(r'\b'+re.escape(key)+r'=\{(.*?)\};',text,re.S)
+        if not match:raise ValueError('requirement constant missing')
+        return json.loads('['+match.group(1).strip().rstrip(',')+']')
+    keys=array(ref['keys_file'],ref['keys_array']);values=array(ref['file'],ref['array'])
+    if len(keys)!=len(values) or len(keys)!=len(set(keys)) or ref['item'] not in keys:raise ValueError('requirement constant shape')
+    return values[keys.index(ref['item'])]
+
+
+def feature_requirements_errors(manifest,catalogue,source_map,data=None,root=ROOT):
+    errors=[]
+    def check(ok,message):
+        if not ok:errors.append('feature requirements: '+message)
+    try:data=feature_requirements(root) if data is None else data
+    except (OSError,ValueError):return ['feature requirements: missing or invalid structured source']
+    check(data.get('schema')==1,'schema')
+    rows=data.get('features',[]);interface=data.get('interface_features',[])
+    check(isinstance(rows,list) and isinstance(interface,list),'feature lists')
+    if not isinstance(rows,list) or not isinstance(interface,list):return errors
+    check({r.get('id') for r in rows}==set(catalogue),'self-check/catalogue coverage drift')
+    names={e['file'] for e in source_map['files']}
+    families={f:group['id'] for group in manifest['families'] for f in group['features']}
+    ids=[r.get('id') for r in rows+interface]
+    check(len(ids)==len(set(ids)),'duplicate feature id')
+    tokens=set()
+    for name in names:
+        tokens.update(re.findall(r'"([^"\n]*)"',(root/'experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor'/name).read_text(encoding='utf-8')))
+    for row in rows+interface:
+        id=row.get('id','')
+        check(bool(re.fullmatch('[a-z][a-z0-9_]*',id)),'invalid id')
+        for key in ['name','activation','behavior','exit']:
+            check(isinstance(row.get(key),str) and bool(row[key].strip()),id+': missing '+key)
+        default=row.get('default',{})
+        check(isinstance(default,dict) and default.get('mode') in {'native','off','observe','on_request','first_run'} and bool(default.get('detail')),id+': default')
+        for key in ['settings_keys','dependencies']:
+            values=row.get(key)
+            check(isinstance(values,list) and len(values)==len(set(values or [])),id+': '+key)
+        check(set(row.get('dependencies',[])).issubset(set(ids)) and id not in row.get('dependencies',[]),id+': unknown/self dependency')
+        for key in row.get('settings_keys',[]):check(isinstance(key,str) and key.split('.')[-1] in tokens,id+': configuration key absent from production: '+str(key))
+        for ref in row.get('source_refs',[]):
+            try:
+                check(ref['file'] in names and ref['keys_file'] in names and bool(ref['label']),id+': unknown constant owner')
+                check(bool(requirement_source(ref,root)),id+': empty native explanation')
+            except (OSError,ValueError,KeyError,TypeError):check(False,id+': invalid native explanation reference')
+        if id in families:check(row.get('family')==families[id],id+': family ownership drift')
+        else:check(bool(row.get('implementation')) and set(row.get('implementation',[])).issubset(names),id+': missing interface implementation')
+    return errors
+
+
+def feature_documents(manifest,catalogue,data,root=ROOT):
+    """One editable requirement source + actual catalogue/owners, no copied route list."""
+    result={};rows={r['id']:r for r in data['features']}
+    index=['# 按功能维护的需求与兼容文档','','这些页面自动生成，不手改。需求来源于 `docs/requirements/feature-requirements.json`，路线来自生产目录及兼容清单；源码指纹变化会使普通检查拒绝过期页面。','','依赖指能力或数据前提，不代表必须开启同名开关。接口支持、路线采用、用户启用和当前生效分开；这些文档不证明所有设备均已实测。','','| 功能组 | 功能 |','| --- | --- |']
+    def feature(row):
+        lines=['### '+row['name']+' · `'+row['id']+'`','','| 项目 | 要求 |','| --- | --- |']
+        for key,label in [('activation','触发'),('behavior','需求与行为'),('exit','退出 / 失败')]:lines.append('| '+label+' | '+row[key].replace('|','\\|').replace('\n','<br>')+' |')
+        for ref in row.get('source_refs',[]):lines.append('| '+ref['label']+' | '+requirement_source(ref,root).replace('|','\\|').replace('\n','<br>')+' |')
+        lines += ['| 默认 | `'+row['default']['mode']+'` · '+row['default']['detail']+' |','| 配置键 | '+('、'.join('`'+k+'`' for k in row['settings_keys']) or '无独立持久化亮度配置键')+' |','| 依赖能力 | '+('、'.join('`'+k+'`' for k in row['dependencies']) or '由本项实际接口独立判断')+' |']
+        return lines+['']
+    def implementation(names):
+        lines=['## 实现追溯','','| 文件 | 当前源码 SHA-256 前16位 |','| --- | --- |']
+        for name in sorted(set(names)):
+            path=root/'experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor'/name
+            lines.append('| ['+name+'](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/'+name+') | `'+hashlib.sha256(path.read_bytes().replace(b'\r\n',b'\n')).hexdigest()[:16]+'` |')
+        return lines+['']
+    def narrative(text):
+        parts=text.splitlines()
+        return ([('- '+part) if len(parts)>1 else part for part in parts])+['']
+    for family in manifest['families']:
+        id=family['id'];index.append('| ['+family['name']+']('+id+'.md) | '+'、'.join(rows[f]['name'] for f in family['features'])+' |')
+        lines=['# '+family['name']+'：需求与兼容契约','','> 自动生成；更新需求JSON、兼容清单及代码后，运行 `python tools/verify_compatibility.py --write-doc`。本页无版本更新日志。','','## 功能需求','']
+        for f in family['features']:lines+=feature(rows[f])
+        c=family['convergence'];lines += ['## 分叉与收束','','### 选择边界','']+narrative(family['selector'])
+        lines += ['| 契约 | 内容 |','| --- | --- |','| 组合方式 | `'+family['composition']+'` |','| 统一输出 | '+c['contract']+' |','| 坐标与身份 | '+c['coordinates']+' |','','### 清理及回滚','']+narrative(family['cleanup'])
+        lines += ['## 已实现的兼容路线','','| 路线 | 条件 |','| --- | --- |']
+        routes={r['id']:r for f in family['features'] for r in catalogue[f]['routes']}
+        for route in family['routes']:
+            item=routes[route];lines.append('| `'+route+'` · '+item['name']+' | '+item['condition'].replace('\n','<br>')+' |')
+        variants=[v for v in manifest['abi_variants'] if v['owner'] in family['owners']]
+        if variants:
+            lines+=['','路线内部 ABI：'+'、'.join('`'+v['id']+'`' for v in variants)+'；完整条件仅维护在 [ABI索引](../architecture/compatibility-index.md#abi-内部变体)。']
+        lines+=['','运行证据：'+'、'.join('`'+v+'`' for v in family['evidence'])+'。','','验证入口：','']
+        lines+=['- ['+Path(v).name+'](../../'+v+')' for v in family['tests']]
+        lines+=['']+implementation(family['owners']+c['consumers'])
+        result['docs/features/'+id+'.md']='\n'.join(lines).rstrip()+'\n'
+    lines=['# 界面与使用工具：长期需求','','> 自动生成；这些交互项不伪装为系统兼容路线，原生能力仍由对应适配器决定。','']
+    for row in data['interface_features']:lines+=feature(row)
+    lines+=implementation([name for r in data['interface_features'] for name in r['implementation']])
+    result['docs/features/interface.md']='\n'.join(lines).rstrip()+'\n'
+    index+=['| [界面与使用工具](interface.md) | '+'、'.join(v['name'] for v in data['interface_features'])+' |','','版本变化单独见 [releases](../releases/)，当前任务单独见 [work-status](../work-status.md)。']
+    result['docs/features/README.md']='\n'.join(index).rstrip()+'\n'
+    return result
+
+
 def render(manifest,catalogue,source_map):
-    lines=['# 兼容路线索引（自动生成）','','来源：`CompatibilityCatalog.java` ＋ `compatibility-manifest.json` ＋ `source-map.json`。修改来源后运行 `python tools/verify_compatibility.py --write-doc`；普通校验会拒绝过期索引。','','此索引说明已实现和验证责任，不代表所有功能已在所有设备启用或实测。','',f"共 {len(catalogue)} 项功能、{len(manifest['families'])} 组适配、{len(source_map['files'])} 份生产 Java。",'']
+    lines=['# 兼容路线索引（自动生成）','','本页只作路线导航、ABI变体和源码职责索引。每组完整需求、选择条件、统一契约、证据和验证只放在[按功能文档](../features/README.md)，不再重复整段维护。','','维护来源：生产CompatibilityCatalog、兼容清单、source-map及结构化功能需求；运行`python tools/verify_compatibility.py --write-doc`生成，普通检查拒绝漂移。','','共 '+str(len(catalogue))+' 项运行功能、'+str(len(manifest['families']))+' 组适配、'+str(len(source_map['files']))+' 份生产Java。目录不是设备白名单，也不代表全部设备已实测。','','| 功能组与契约 | 已实现路线 |','| --- | --- |']
     for f in manifest['families']:
-        lines += ['## '+f['name']+' · '+f['id'],'','功能：'+ '、'.join('`'+v+'`' for v in f['features'])+'。','','选择：'+f['selector'],'','组合关系：`'+f['composition']+'`；互斥、独立功能、双维度和补充组件分别处理。','','| 路线 | 条件 |','| --- | --- |']
-        routes={r['id']:r for feature in f['features'] for r in catalogue[feature]['routes']}
-        for rid in f['routes']:lines.append('| `'+rid+'` · '+routes[rid]['name']+' | '+routes[rid]['condition'].replace('\n','<br>')+' |')
-        lines += ['','实现：'+ '、'.join('['+n+'](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/'+n+')' for n in f['owners'])+'。','','证据：'+ '、'.join('`'+v+'`' for v in f['evidence'])+'。','','退出 / 回滚：'+f['cleanup'],'','验证：'+ '、'.join('['+Path(n).name+'](../../'+n+')' for n in f['tests'])+'。','']
-        c=f['convergence'];lines += ['收束边界：'+ '、'.join('`'+n+'`' for n in c['boundary'])+'。','','统一契约：'+c['contract']+'。','','坐标与语义：'+c['coordinates']+'。','','共同消费者：'+ '、'.join('`'+n+'`' for n in c['consumers'])+'。','']
-    lines += ['## ABI 内部变体','','以下是功能路线内部的字段、签名、协议或迁移选择；不应全部变成 APP 开关。相关测试表示验证入口，具体主机 / 固件 / 真机覆盖以测试输出与复审记录为准。','','| 变体与实现 | 已有分支 | 选择及保护 | 相关验证 |','| --- | --- | --- | --- |']
+        lines.append('| ['+f['name']+'](../features/'+f['id']+'.md) | '+'、'.join('`'+r+'`' for r in f['routes'])+' |')
+    lines+=['','## ABI 内部变体','','路线内部结构和选择规则只在这里展示，各功能页引用稳定ID。不是额外的用户开关。','','| 变体 / 责任文件 | 分支 | 选择与保护 | 验证 |','| --- | --- | --- | --- |']
     for v in manifest['abi_variants']:
-        lines.append('| `'+v['id']+'` · `'+v['owner']+'` | '+' / '.join('`'+a+'`' for a in v['alternatives'])+' | '+v['rule']+' | ['+Path(v['test']).name+'](../../'+v['test']+') |')
-    lines += ['','## 原生协议与运行分支','','| 分支与实现 | 已有路径 | 选择及保护 | 相关验证 |','| --- | --- | --- | --- |']
+        lines.append('| `'+v['id']+'` · `'+v['owner']+'` | '+' / '.join('`'+x+'`' for x in v['alternatives'])+' | '+v['rule']+' | ['+Path(v['test']).name+'](../../'+v['test']+') |')
+    lines+=['','## 原生协议与运行分支','','| 变体 / 实现 | 分支 | 选择与保护 | 验证 |','| --- | --- | --- | --- |']
     for v in manifest['native_variants']:
-        lines.append('| `'+v['id']+'` · `'+v['owner']+'` | '+' / '.join('`'+a+'`' for a in v['alternatives'])+' | '+v['rule']+' | ['+Path(v['test']).name+'](../../'+v['test']+') |')
-    lines += ['','## 源码职责索引','','每份生产 Java / C / 头文件必须有明确归属；新增文件漏登记会使检查失败。','']
+        lines.append('| `'+v['id']+'` · `'+v['owner']+'` | '+' / '.join('`'+x+'`' for x in v['alternatives'])+' | '+v['rule']+' | ['+Path(v['test']).name+'](../../'+v['test']+') |')
+    lines+=['','## 源码职责索引','','职责详情维护在source-map.json；此处仅按层提供文件导航。','']
     for layer in sorted(LAYERS):
         files=[e for e in source_map['files'] if e['layer']==layer]
-        lines += ['### '+layer+' · '+files[0]['purpose'],'','、'.join('`'+e['file']+'`' for e in files)+'。','']
-    lines += ['### native · 原生主屏工具','']
-    for entry in source_map['native_files']:lines.append('- `'+entry['file']+'`：'+entry['purpose'])
-    return '\n'.join(lines)+'\n'
+        lines+=['### '+layer,'','、'.join('['+e['file']+'](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/'+e['file']+')' for e in files)+'。','']
+    lines+=['### native','','、'.join('`'+e['file']+'`' for e in source_map['native_files'])+'。','']
+    return '\n'.join(lines).rstrip()+'\n'
+
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--write-doc',action='store_true');args=parser.parse_args()
@@ -189,6 +322,13 @@ def main():
     text=render(manifest,catalogue,mapping);document=ARCH/'compatibility-index.md'
     if args.write_doc:document.write_text(text,encoding='utf-8')
     elif not document.is_file() or document.read_text(encoding='utf-8')!=text:raise SystemExit('Compatibility index is stale; run --write-doc')
+    generated=feature_documents(manifest,catalogue,feature_requirements())
+    extra={p.relative_to(ROOT).as_posix() for p in (ROOT/'docs/features').glob('*.md')}-set(generated)
+    if extra:raise SystemExit('Unregistered generated feature pages: '+str(sorted(extra)))
+    for name,content in generated.items():
+        path=ROOT/name
+        if args.write_doc:path.parent.mkdir(parents=True,exist_ok=True);path.write_text(content,encoding='utf-8')
+        elif not path.is_file() or path.read_text(encoding='utf-8')!=content:raise SystemExit('Feature document is stale: '+name+'; run --write-doc')
     print(f'Compatibility maintenance: {len(catalogue)} features, {len(manifest["families"])} families, {len(mapping["files"])} Java files PASS; static contract only')
 
 if __name__=='__main__':main()
