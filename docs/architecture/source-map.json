@@ -385,7 +385,7 @@
     {
       "file": "LowLightAssistEvidence.java",
       "layer": "policy",
-      "purpose": "策略与算子"
+      "purpose": "只读辅助证据；pending 复位字段缺失时按无待复位处理"
     },
     {
       "file": "LowLightAssistGate.java",

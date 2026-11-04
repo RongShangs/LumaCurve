@@ -64,7 +64,7 @@
 | 项目 | 要求 |
 | --- | --- |
 | 触发 | 开启暗光稳定闸门，主辅输入和新鲜度证据齐全，实际变化需要辅助确认。 |
-| 需求与行为 | 用新鲜辅助输入确认暗光变化；单源设备仅暂停此项，保留原设置 |
+| 需求与行为 | 用新鲜辅助输入确认暗光变化；单源设备仅暂停此项，保留原设置。pending 复位字段仅作可选证据：存在时为 false 才确认，本机缺少该字段时按没有待复位继续确认。 |
 | 退出 / 失败 | 辅助样本不新鲜或源被替换时释放本次确认，独立保留主光感处理。 |
 | 默认 | `off` · 新配置关闭 |
 | 配置键 | `low_light_assist_gate`、`low_light_assist_wait`、`low_light_assist_tolerance` |
@@ -105,7 +105,7 @@
 | `native_without_driving` · 传统确认与场景保护 | 完整旧场景结构没有夜间驾驶接口；使用原生确认窗口，保留步行、遮挡、HDR 等判断，不额外采样。 |
 | `native_scene_aon` · 新式场景确认（AON 窗口） | 无任何驾驶残片，且旧瞬时遮挡/反射标记整体缺失；只核验新式场景字段、AON 照度窗口与 updateAmbientLux / checkAonFlareStatus，保留原生主辅确认与期限。 |
 
-路线内部 ABI：`driving_capability_absent`、`response_scene_layout`；完整条件仅维护在 [ABI索引](../architecture/compatibility-index.md#abi-内部变体)。
+路线内部 ABI：`driving_capability_absent`、`response_scene_layout`、`assist_pending_reset_optional`；完整条件仅维护在 [ABI索引](../architecture/compatibility-index.md#abi-内部变体)。
 
 运行证据：`response_scene_profile`。
 
@@ -121,6 +121,6 @@
 | --- | --- |
 | [AdvancedTuning.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/AdvancedTuning.java) | `99787f6a9676e36d` |
 | [HookRuntime.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/HookRuntime.java) | `818d117cff24ad7d` |
-| [LowLightAssistEvidence.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/LowLightAssistEvidence.java) | `89a41dbcd6733592` |
+| [LowLightAssistEvidence.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/LowLightAssistEvidence.java) | `d5145f8d643a2cf6` |
 | [LowLightTuning.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/LowLightTuning.java) | `66826507c957e3ce` |
 | [ResponseTuning.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ResponseTuning.java) | `b9fe1bacb8b05c72` |

@@ -1940,6 +1940,16 @@
       ],
       "rule": "旧路线要求五参 adjustSdrBrightness、adjustBrightnessWhenDimming(float,boolean)、全屏AOD探测与策略；新路线只在全库不存在 adjustBrightnessWhenDimming、四参 adjustSdrBrightness(float,boolean,BrightnessReason,boolean) 与 mAppliedDimming 布尔完整时安装，用 mAppliedDimming 替代被删第五参，并把原生结果中高于降亮输入的抬高夹回输入；原生降低保护保留，缺少全屏AOD探测属推断语义，高风险，需真机行为验证。残缺签名或类型错误一律拒绝；两套形状并存时优先旧路线，旧路线不完整则整项拒绝。",
       "test": "tests/refactor_dim_aod.py"
+    },
+    {
+      "id": "assist_pending_reset_optional",
+      "owner": "LowLightAssistEvidence.java",
+      "alternatives": [
+        "declared_boolean",
+        "field_absent"
+      ],
+      "rule": "辅助暗光闸门只把 pending 复位字段当作可选证据：字段存在时必须为非静态 boolean，值为 true 时不确认；字段整体缺失（本机 DualSensorPolicy 没有该状态）视为没有待复位，继续用辅助使能、预热时间和环形缓冲确认，不伪造复位状态。",
+      "test": "tests/refactor_advanced_hooks.py"
     }
   ],
   "native_variants": [
