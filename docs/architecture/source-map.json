@@ -170,7 +170,7 @@
     {
       "file": "ControlCenterPartition.java",
       "layer": "adapters",
-      "purpose": "读取实际普通亮度边界；一秒内独立二次上滑准入与有界提示策略，不复制节点保持程序"
+      "purpose": "读取实际普通亮度边界，接受 config.* 与 DisplayDeviceConfig 内嵌两种已验证 HBM 数据身份；一秒内独立二次上滑准入与有界提示策略，不复制节点保持程序"
     },
     {
       "file": "ControlCenterRoot.java",
@@ -330,12 +330,12 @@
     {
       "file": "HbmAccess.java",
       "layer": "adapters",
-      "purpose": "设备接口与所有权"
+      "purpose": "设备接口与所有权；HBM 数据身份七/十字段变体与 SDR/OPR 签名变体选择"
     },
     {
       "file": "HookEntry.java",
       "layer": "bootstrap",
-      "purpose": "入口与代次"
+      "purpose": "入口与代次；显示温控 SDR 四参/五参入口变体"
     },
     {
       "file": "HookRuntime.java",
@@ -505,7 +505,7 @@
     {
       "file": "OutdoorNodeBridge.java",
       "layer": "bridge",
-      "purpose": "Root 与原生程序桥"
+      "purpose": "Root 与原生程序桥；共用钳制上限选择器（内部 float 字段优先、旧访问器回退）"
     },
     {
       "file": "OutdoorNodeProfile.java",
@@ -525,7 +525,7 @@
     {
       "file": "OutdoorOpr.java",
       "layer": "adapters",
-      "purpose": "设备接口与所有权"
+      "purpose": "设备接口与所有权；OPR 两参优先、旧三参回退"
     },
     {
       "file": "OutdoorOprEnvelope.java",
@@ -555,7 +555,7 @@
     {
       "file": "OutdoorTuning.java",
       "layer": "adapters",
-      "purpose": "设备接口与所有权"
+      "purpose": "设备接口与所有权；户外 SDR 四参优先、五参回退"
     },
     {
       "file": "OutputProtection.java",
@@ -705,7 +705,7 @@
     {
       "file": "RuntimeFeatureChecks.java",
       "layer": "diagnostics",
-      "purpose": "只读证据与诊断"
+      "purpose": "只读证据与诊断；户外/HBM 探测失败时按能力降级，不中断独立节点检查"
     },
     {
       "file": "SavedCurve.java",

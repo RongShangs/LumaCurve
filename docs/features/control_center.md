@@ -30,7 +30,7 @@
 
 | 项目 | 要求 |
 | --- | --- |
-| 触发 | 分区模式下，普通与额外节点边界已验证；首次触顶后3秒内再次上滑，或按真实自动高亮状态接续控制。 |
+| 触发 | 分区模式下，普通与额外节点边界已验证（服务端边界接受 config.* 或 DisplayDeviceConfig 内嵌 HBM 数据身份）；首次触顶后3秒内再次上滑，或按真实自动高亮状态接续控制。系统界面 V1 新 ABI 仍单列待适配。 |
 | 需求与行为 | 普通75%保留原生学习；首次顶住分界并提示，3秒内再次上滑才进入增强25%；实际节点上限可设；返回普通段可恢复自动或继续手动 |
 | 退出 / 失败 | 回普通段按所选恢复自动或继续手动；锁屏回原生；过期和换代拒绝旧手势。 |
 | 默认 | `off` · 新配置关闭 |
@@ -45,7 +45,7 @@
 - 完整节点mode=3复用已验证坐标回显，并独立核验主屏隔离、物理ID、Root可写节点与监听进程；动态折叠监听未知时不套用。
 - 分区mode=4额外读取设备普通HBM边界并经真实标定换算；没有可靠边界或额外区间则只拒绝分区。
 - 分区普通段占75%、增强段占25%；普通V1使用原生逻辑输入全域，gamma使用物理普通边界；增强段及回显按实际节点标定。用户上界不修改自动HBM范围。
-- 普通V1的延迟回显先将真实物理读数反解为本机逻辑进度，再映射到75%，动画比较使用同一逆变换。作用域、手势和控制权为独立检查。
+- 普通V1的延迟回显先将真实物理读数反解为本机逻辑进度，再映射到75%，动画比较使用同一逆变换。作用域、手势和控制权为独立检查。 分区普通边界接受 config.* 与 DisplayDeviceConfig 内嵌两种已验证 HBM 数据身份；系统界面 HyperOSBrightnessPolicyV1 的新 ABI 仍为独立待适配项，不在本次边界修复内。
 
 | 契约 | 内容 |
 | --- | --- |
@@ -73,7 +73,7 @@
 | `partition_ddc_hbm` · 原机配置普通上限 | 优先读取原始HBM过渡点，按本机标定换算普通区间；类型或数据错误不降级绕过。 |
 | `partition_hbm_normal` · 控制器普通上限 | 原机配置没有该入口或合法无HBM数据时，读取实际普通亮度上限；不按固定比例猜测。 |
 
-路线内部 ABI：`sensor_identity`、`sensor_freshness`、`control_center_feedback`、`control_center_minimum`、`control_center_conversion`、`slider_calibration_domain`、`partition_manual_ceiling`、`control_center_tracking_lifecycle`、`system_ui_scope_reader`、`system_ui_explicit_restart`、`manual_node_hold_policy`、`mapping_recovery_confirmation`、`control_center_lockscreen`；完整条件仅维护在 [ABI索引](../architecture/compatibility-index.md#abi-内部变体)。
+路线内部 ABI：`sensor_identity`、`sensor_freshness`、`control_center_feedback`、`control_center_minimum`、`control_center_conversion`、`slider_calibration_domain`、`partition_manual_ceiling`、`control_center_tracking_lifecycle`、`system_ui_scope_reader`、`system_ui_explicit_restart`、`manual_node_hold_policy`、`mapping_recovery_confirmation`、`control_center_lockscreen`、`control_center_partition_boundary`；完整条件仅维护在 [ABI索引](../architecture/compatibility-index.md#abi-内部变体)。
 
 运行证据：`control_center_slider.kind`、`control_center_slider.error`、`hyperlux_control_center_tables_v2.enabled`、`hyperlux_control_center_tables_v2.revision`、`hyperlux_control_center_tables_v2.user_serial`、`control_center_slider.calibration_profile`、`control_center_slider.compatibility_state`、`control_center_slider.oem_v1_ready`、`control_center_raw_supported`、`control_center_slider.raw_ready`、`control_center_slider.raw_control`、`control_center_node_detail`、`control_center_partition_supported`、`control_center_slider.partition`、`control_center_slider.partition_error`、`hyperlux_control_center_tables_v2.partition_maximum`、`control_center_slider.raw_control.confirmation_trace`、`main-panel.previous.log`、`main-panel.log.NATIVE_EXIT`、`control_center_setup.scope_state`、`control_center_setup.injection_state`、`hyperlux_control_center_ui_v1.pid`、`hyperlux_control_center_ui_v1.process_start`。
 
@@ -103,7 +103,7 @@
 | [ControlCenterEngine.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ControlCenterEngine.java) | `46016e14936d7f35` |
 | [ControlCenterHooks.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ControlCenterHooks.java) | `015741447ea3287a` |
 | [ControlCenterNodes.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ControlCenterNodes.java) | `863d074a2629b048` |
-| [ControlCenterPartition.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ControlCenterPartition.java) | `80a00ea929bf8538` |
+| [ControlCenterPartition.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ControlCenterPartition.java) | `0b7dbda96aee0692` |
 | [ControlCenterRoot.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ControlCenterRoot.java) | `5d398d8c5b193afb` |
 | [ControlCenterScreen.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ControlCenterScreen.java) | `38370628b9178c79` |
 | [ControlCenterSettings.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ControlCenterSettings.java) | `47eab653db15059f` |

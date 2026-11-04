@@ -544,7 +544,7 @@
         "HbmAccess.java",
         "OutdoorController.java"
       ],
-      "selector": "控制器与计时为两个独立维度：启用字段优先；缺字段且完整旧结构才用原生能力方法。合法有限计时 / 三零计时互斥；不能制造预算。",
+      "selector": "控制器与计时为两个独立维度：启用字段优先；缺字段且完整旧结构才用原生能力方法。合法有限计时 / 三零计时互斥；不能制造预算。 HBM 数据身份优先 config.* 十字段；仅整体缺失才接受 DisplayDeviceConfig 内嵌七字段类，字段与构造必须逐项匹配。",
       "evidence": [
         "outdoor.hbm_controller_profile",
         "outdoor.hbm_tuning_profile"
@@ -593,7 +593,7 @@
         "HbmAccess.java",
         "OutdoorPolicy.java"
       ],
-      "selector": "覆盖目标入口优先；明确缺入口且旧调用所有权完整时走传统自定义目标，残缺覆盖接口不回退。 原生HBM数据确实为null且deviceSupportsHbm为false，普通范围和当前上限均有效时采用native_range_only；目标沿用同一自动SDR入口，限制到实时原生上限，不制造HBM配置或绕开原生下游保护。存在但残缺的数据仍拒绝。",
+      "selector": "覆盖目标入口优先；明确缺入口且旧调用所有权完整时走传统自定义目标，残缺覆盖接口不回退。 原生HBM数据确实为null且deviceSupportsHbm为false，普通范围和当前上限均有效时采用native_range_only；目标沿用同一自动SDR入口，限制到实时原生上限，不制造HBM配置或绕开原生下游保护。存在但残缺的数据仍拒绝。 HBM 数据身份按 HbmAccess 变体选择；两种身份之外的结构整体拒绝。",
       "evidence": [
         "outdoor.target_compatibility_profile",
         "outdoor.range_profile",
@@ -633,7 +633,7 @@
         "OutdoorTuning.java",
         "OutdoorController.java"
       ],
-      "selector": "HBM getter 与峰值基础范围；只有本机实际启用的动态范围对象才补充，不同时添加第二个目标增强器。",
+      "selector": "HBM getter 与峰值基础范围；只有本机实际启用的动态范围对象才补充，不同时添加第二个目标增强器。 HBM 数据身份变体就绪后才启用。",
       "evidence": [
         "outdoor.dynamic_range_supported",
         "outdoor.dynamic_range_enabled"
@@ -672,7 +672,7 @@
         "NitBrightnessLimit.java",
         "OutdoorOprEnvelope.java"
       ],
-      "selector": "完整隐私判断优先；完全没有隐私 / UHBM 残片且旧 OPR 完整才用传统路径。实际物理换算用于 nit 上限。调用失败不降级。 OPR额外放宽独立读取完整原生灰阶/nit包络，最多到该表最高档；不存在整组字段时保留旧映射路线，部分缺失/坏表/换算失败保留原生限亮。",
+      "selector": "完整隐私判断优先；完全没有隐私 / UHBM 残片且旧 OPR 完整才用传统路径。实际物理换算用于 nit 上限。调用失败不降级。 OPR额外放宽独立读取完整原生灰阶/nit包络，最多到该表最高档；不存在整组字段时保留旧映射路线，部分缺失/坏表/换算失败保留原生限亮。 OPR 入口优先 (brightness, reason)，仅完整两参缺失才用旧三参；SDR 入口四参优先、五参回退。",
       "evidence": [
         "outdoor.sdr_compatibility_profile",
         "outdoor.sdr_compatibility_detail",
@@ -717,7 +717,7 @@
         "HookRuntime.java",
         "FieldOverride.java"
       ],
-      "selector": "显示层 HDR / SDR 消费者完整，严重温控与电池门槛继续有效；不改 SoC / 充电温控。",
+      "selector": "显示层 HDR / SDR 消费者完整，严重温控与电池门槛继续有效；不改 SoC / 充电温控。 SDR 入口优先四参 adjustSdrBrightness(float, boolean, BrightnessReason, boolean)，仅完整四参缺失时回退旧五参。",
       "evidence": [
         "thermal_supported",
         "thermal_skipped"
@@ -760,7 +760,7 @@
         "RawPanelLease.java",
         "OutdoorOutputAccess.java"
       ],
-      "selector": "主屏输出 / 电源状态对象完整；租约、解锁、模式、屏幕状态均通过才隔离正亮度帧，第一帧留给系统。 户外协作独立匹配原生策略或完整旧自动对象 / 双原因，原手动面板检查不代替此检查。",
+      "selector": "主屏输出 / 电源状态对象完整；租约、解锁、模式、屏幕状态均通过才隔离正亮度帧，第一帧留给系统。 户外协作独立匹配原生策略或完整旧自动对象 / 双原因，原手动面板检查不代替此检查。 节点上限优先读取钳制器内部 float 字段，旧访问器仅在字段整体缺失时使用。",
       "evidence": [
         "brightness_control.owner",
         "outdoor_node_supported",
@@ -1031,7 +1031,7 @@
         "MappingRecoveryState.java",
         "ControlCenterScreen.java"
       ],
-      "selector": "旧mode=0/1/2保留坐标语义：严格单调全域优先；端点平台只有原始数组、双向样条与裁剪证据完整才采用有效域，逻辑101点表独立核验。\n完整节点mode=3复用已验证坐标回显，并独立核验主屏隔离、物理ID、Root可写节点与监听进程；动态折叠监听未知时不套用。\n分区mode=4额外读取设备普通HBM边界并经真实标定换算；没有可靠边界或额外区间则只拒绝分区。\n分区普通段占75%、增强段占25%；普通V1使用原生逻辑输入全域，gamma使用物理普通边界；增强段及回显按实际节点标定。用户上界不修改自动HBM范围。\n普通V1的延迟回显先将真实物理读数反解为本机逻辑进度，再映射到75%，动画比较使用同一逆变换。作用域、手势和控制权为独立检查。",
+      "selector": "旧mode=0/1/2保留坐标语义：严格单调全域优先；端点平台只有原始数组、双向样条与裁剪证据完整才采用有效域，逻辑101点表独立核验。\n完整节点mode=3复用已验证坐标回显，并独立核验主屏隔离、物理ID、Root可写节点与监听进程；动态折叠监听未知时不套用。\n分区mode=4额外读取设备普通HBM边界并经真实标定换算；没有可靠边界或额外区间则只拒绝分区。\n分区普通段占75%、增强段占25%；普通V1使用原生逻辑输入全域，gamma使用物理普通边界；增强段及回显按实际节点标定。用户上界不修改自动HBM范围。\n普通V1的延迟回显先将真实物理读数反解为本机逻辑进度，再映射到75%，动画比较使用同一逆变换。作用域、手势和控制权为独立检查。 分区普通边界接受 config.* 与 DisplayDeviceConfig 内嵌两种已验证 HBM 数据身份；系统界面 HyperOSBrightnessPolicyV1 的新 ABI 仍为独立待适配项，不在本次边界修复内。",
       "evidence": [
         "control_center_slider.kind",
         "control_center_slider.error",
@@ -1796,6 +1796,66 @@
       ],
       "rule": "保留单源、原生倍率及FOV输入；仅两个倍率字段整体缺失、标准TYPE_LIGHT、DualSensorPolicy原生方法/float状态与同owner/manager完整时采用旧版单位lux。现存空/损坏/部分倍率不得回退。",
       "test": "tests/refactor_legacy_input.py"
+    },
+    {
+      "id": "thermal_sdr_signature",
+      "owner": "HookEntry.java",
+      "alternatives": [
+        "applied_auto_boolean",
+        "legacy_fifth_boolean"
+      ],
+      "rule": "优先 Android 15 的 adjustSdrBrightness(float, boolean, BrightnessReason, boolean)；仅完整四参缺失时用旧五参 ABI。返回类型、静态性与必需字段任一错误即拒绝，不按机型放行。",
+      "test": "tests/refactor_advanced_hooks.py"
+    },
+    {
+      "id": "outdoor_sdr_signature",
+      "owner": "OutdoorTuning.java",
+      "alternatives": [
+        "applied_auto_boolean",
+        "legacy_fifth_boolean"
+      ],
+      "rule": "户外限亮与 OPR 帧共用同一 SDR 入口；四参优先、五参回退，均要求首个参数为亮度且第二个为自动标记，残缺签名不安装可选组。",
+      "test": "tests/refactor_outdoor.py"
+    },
+    {
+      "id": "opr_signature",
+      "owner": "OutdoorOpr.java",
+      "alternatives": [
+        "brightness_reason",
+        "brightness_float_reason"
+      ],
+      "rule": "优先 (float, BrightnessReason)；仅完整两参缺失时用旧三参并按其真实参数表定位原因对象。每次调用只撤回本次引入的 OPR 位，下游温控、电量与 HDR 保护不变。",
+      "test": "tests/refactor_outdoor_compatibility.py"
+    },
+    {
+      "id": "hbm_data_identity",
+      "owner": "HbmAccess.java",
+      "alternatives": [
+        "config_high_brightness_mode_data_10_fields",
+        "display_device_config_high_brightness_mode_data_7_fields"
+      ],
+      "rule": "优先 config.* 十字段身份；仅整体缺失时接受 DisplayDeviceConfig 内嵌七字段类，字段名、类型与构造顺序必须逐项匹配。缺任一字段或出现未知实例字段即拒绝克隆和计时，不接受部分结构。",
+      "test": "tests/refactor_os3_compatibility.py"
+    },
+    {
+      "id": "control_center_partition_boundary",
+      "owner": "ControlCenterPartition.java",
+      "alternatives": [
+        "config_high_brightness_mode_data",
+        "display_device_config_high_brightness_mode_data"
+      ],
+      "rule": "普通边界 getter 接受两种已验证 HBM 数据身份；要求非静态、返回 public float transitionPoint。空值才回退控制器普通上限，类型残缺不降级。",
+      "test": "tests/refactor_control_center_partition.py"
+    },
+    {
+      "id": "brightness_clamp_cap",
+      "owner": "OutdoorNodeBridge.java",
+      "alternatives": [
+        "internal_mBrightnessCap_float",
+        "getMaxBrightness_float"
+      ],
+      "rule": "节点写入上限优先读取 BrightnessClamperController.mBrightnessCap（clamp() 实际使用的 float）；该字段整体缺失时才用 getMaxBrightness() 旧访问器。字段存在但非 float、或旧访问器返回类型非 float 即拒绝安装，不以旧路线掩盖残缺。自检与写入判定共用同一选择器。",
+      "test": "tests/refactor_outdoor_node.py"
     }
   ],
   "native_variants": [

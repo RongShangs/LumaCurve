@@ -60,5 +60,5 @@
 | [BrightnessControl.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/BrightnessControl.java) | `8e91d605934d21fc` |
 | [BrightnessSensorAccess.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/BrightnessSensorAccess.java) | `fdfeca59df5414c8` |
 | [HookRuntime.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/HookRuntime.java) | `4e3f51d5e9508d0c` |
-| [RuntimeFeatureChecks.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/RuntimeFeatureChecks.java) | `8148b1629cab2827` |
+| [RuntimeFeatureChecks.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/RuntimeFeatureChecks.java) | `5cdff234d6de8d09` |
 | [SensorState.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/SensorState.java) | `793f6219eced1bd4` |
