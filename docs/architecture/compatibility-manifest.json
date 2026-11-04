@@ -1311,6 +1311,27 @@
       "test": "tests/refactor_memory_lifecycle.py"
     },
     {
+      "id": "traditional_animation_entry",
+      "owner": "TraditionalAnimation.java",
+      "alternatives": [
+        "facade_dual_ramp",
+        "owner_dual_ramp",
+        "refactor_policy_animators"
+      ],
+      "rule": "Refactor 策略标记整体缺失视为本机无 Refactor 策略；标记存在时必须为 false、类型正确且两个 Refactor 动画槽为空，否则拒绝。传统双 ramp 优先取 facade 的 mScreenBrightnessRampAnimator，整体缺失时才取 owner 的 mBrightnessRampAnimator；两组 ramp 类、三参/四参 target、速率签名、归属与显示对象必须完整，任一残片拒绝。",
+      "test": "tests/refactor_traditional_animation.py"
+    },
+    {
+      "id": "animation_strategy_selection",
+      "owner": "TraditionalAnimation.java",
+      "alternatives": [
+        "last_selected_strategy_getter",
+        "owner_automatic_strategy_field"
+      ],
+      "rule": "facade 的 getLastSelectedStrategy 返回 AutomaticBrightnessStrategy* 时采用；getter 缺失或抛错时，只接受 facade 的 mAutomaticBrightnessStrategy 槽指向本 ABC 的同名策略对象，其它对象/空槽返回 null，不按名称或机型放行。",
+      "test": "tests/refactor_traditional_animation.py"
+    },
+    {
       "id": "inherited_mapper_members",
       "owner": "TraditionalAdapter.java",
       "alternatives": [

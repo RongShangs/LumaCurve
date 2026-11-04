@@ -855,7 +855,7 @@
     {
       "file": "TraditionalAnimation.java",
       "layer": "adapters",
-      "purpose": "传统亮度过渡速率与原生原因隔离"
+      "purpose": "传统亮度过渡速率与原生原因隔离；Refactor 标记/双动画槽缺失按无 Refactor 策略处理，双 ramp 按 facade 或 owner 两种完整形状选择，自动策略支持最后选择 getter 或归属一致的原生策略槽"
     },
     {
       "file": "TraditionalCurve.java",

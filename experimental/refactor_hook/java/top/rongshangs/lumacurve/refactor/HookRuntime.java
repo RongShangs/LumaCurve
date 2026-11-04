@@ -305,7 +305,7 @@ final class HookRuntime {
     boolean screenOn(){try{Object dpc=HookEntry.get(owner,"mDisplayPowerController"),display=dpc.getClass().getMethod("getDisplayPowerState").invoke(dpc);return ((Number)display.getClass().getMethod("getScreenState").invoke(display)).intValue()==2;}catch(Throwable unavailable){return false;}}
     boolean animationTuningAllowed(Object abc,Object impl){
         if(!normalTuningAllowed(abc,impl)||(lastManualAdjustment>=0&&SystemClock.uptimeMillis()-lastManualAdjustment<=memoryWindow))return false;
-        try{return "AutomaticBrightnessStrategy".equals(outputStrategy(HookEntry.get(owner,"mDisplayPowerController")));}catch(Throwable missing){return false;}
+        try{return TraditionalAnimation.automaticStrategy(HookEntry.get(owner,"mDisplayPowerController"),abc)!=null;}catch(Throwable missing){return false;}
     }
     void refreshUserIdentity(){if(kernel.usesRuntimeUserIdentity())HookEntry.refreshCurrentUser(context);}
     boolean appliesToUser(){try{return ForegroundUser.matches(boundUser,kernel.integer("mUserSerial"));}catch(Throwable error){return false;}}

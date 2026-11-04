@@ -48,4 +48,4 @@
 | 文件 | 当前源码 SHA-256 前16位 |
 | --- | --- |
 | [DimAodCompatibility.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/DimAodCompatibility.java) | `980627aeae74414f` |
-| [HookRuntime.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/HookRuntime.java) | `4e3f51d5e9508d0c` |
+| [HookRuntime.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/HookRuntime.java) | `818d117cff24ad7d` |

@@ -29,14 +29,41 @@ final class TraditionalAnimation {
     static final class Binding {
         Object first,second,controller,record,display;Method reason;String firstName,secondName;int auto;
     }
+    /** Resolve the native automatic strategy name. Newer facades no longer expose the
+     *  last-selected getter; the surviving strategy slot only counts while it still points at
+     *  this exact controller, so a stale or manual-time object cannot open the route. */
+    static String automaticStrategy(Object dpc,Object abc){
+        try{Object selected=dpc.getClass().getMethod("getLastSelectedStrategy").invoke(dpc);
+            if(selected!=null){String name=selected.getClass().getSimpleName();if(name.startsWith("AutomaticBrightnessStrategy"))return name;}
+        }catch(Throwable absent){}
+        try{Object automatic=HookEntry.get(dpc,"mAutomaticBrightnessStrategy");if(automatic==null)return null;
+            if(HookEntry.get(automatic,"mAutomaticBrightnessController")!=abc)return null;
+            String name=automatic.getClass().getSimpleName();
+            return name.startsWith("AutomaticBrightnessStrategy")?name:null;
+        }catch(Throwable absent){return null;}
+    }
     static Binding read(HookRuntime s)throws Exception{
         Object owner=s.owner;
         if(((Number)HookEntry.get(owner,"mDisplayId")).intValue()!=0)throw new IllegalArgumentException("Not the primary display");
-        // A disabled native Refactor policy and two empty Refactor slots are required.
-        // An incomplete or temporarily unavailable active Refactor implementation must not fall back.
-        if(!Boolean.FALSE.equals(method(owner.getClass(),"supportRefactorBrightnessPolicy",boolean.class).invoke(owner))
-                ||HookEntry.get(owner,"mBrightnessAnimator")!=null||HookEntry.get(owner,"mSdrBrightnessAnimator")!=null)throw new IllegalStateException("Refactor policy owns animation");
-        Object dpc=HookEntry.get(owner,"mDisplayPowerController"),dual=HookEntry.get(dpc,"mScreenBrightnessRampAnimator");
+        // Newer builds dropped the Refactor policy marker together with its two animator slots.
+        // An absent marker means "no Refactor policy here"; a present marker must still be false,
+        // and any surviving slot must be empty, or the traditional route stays rejected.
+        Method policy=null;
+        for(Class<?> c=owner.getClass();c!=null&&c!=Object.class;c=c.getSuperclass()){
+            try{policy=c.getDeclaredMethod("supportRefactorBrightnessPolicy");break;}catch(NoSuchMethodException ignored){}
+        }
+        if(policy!=null){
+            policy.setAccessible(true);
+            if(policy.getReturnType()!=boolean.class||Modifier.isStatic(policy.getModifiers()))throw new IllegalStateException("Refactor policy ABI");
+            if(Boolean.TRUE.equals(policy.invoke(owner)))throw new IllegalStateException("Refactor policy owns animation");
+        }
+        for(String name:new String[]{"mBrightnessAnimator","mSdrBrightnessAnimator"}){
+            Field slot=null;try{slot=HookEntry.field(owner.getClass(),name);}catch(NoSuchFieldException absent){continue;}
+            if(slot.getType().isPrimitive()||slot.get(owner)!=null)throw new IllegalStateException("Refactor policy owns animation");
+        }
+        Object dpc=HookEntry.get(owner,"mDisplayPowerController"),dual=null;
+        try{dual=HookEntry.get(dpc,"mScreenBrightnessRampAnimator");}
+        catch(NoSuchFieldException absent){dual=HookEntry.get(owner,"mBrightnessRampAnimator");}
         Binding b=new Binding();b.first=HookEntry.get(dual,"mFirst");b.second=HookEntry.get(dual,"mSecond");
         if(b.first==null||b.second==null||b.first==b.second||b.first.getClass()!=b.second.getClass()||!installed.contains(b.first.getClass()))throw new IllegalStateException("Traditional dual ramp not ready");
         b.display=dpc.getClass().getMethod("getDisplayPowerState").invoke(dpc);

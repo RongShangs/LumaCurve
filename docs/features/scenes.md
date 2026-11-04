@@ -166,7 +166,7 @@
 | 文件 | 当前源码 SHA-256 前16位 |
 | --- | --- |
 | [FieldOverride.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/FieldOverride.java) | `6b47448ffaf6ac29` |
-| [HookRuntime.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/HookRuntime.java) | `4e3f51d5e9508d0c` |
+| [HookRuntime.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/HookRuntime.java) | `818d117cff24ad7d` |
 | [SceneCatalog.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/SceneCatalog.java) | `ee5c61d9efa6ed36` |
 | [SceneController.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/SceneController.java) | `2f40296a53139af9` |
 | [SceneSettings.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/SceneSettings.java) | `cc5e5a66ffd6f854` |

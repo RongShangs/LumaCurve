@@ -178,7 +178,7 @@
 | [CurveDisplayRange.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/CurveDisplayRange.java) | `372050d731634e9a` |
 | [CurveEditor.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/CurveEditor.java) | `66423535b50b13ee` |
 | [CurvePlan.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/CurvePlan.java) | `6064003310ae7433` |
-| [HookRuntime.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/HookRuntime.java) | `4e3f51d5e9508d0c` |
+| [HookRuntime.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/HookRuntime.java) | `818d117cff24ad7d` |
 | [MainActivity.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/MainActivity.java) | `2c493852ffa1550e` |
 | [MapperContextAccess.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/MapperContextAccess.java) | `778e604c1ff57198` |
 | [MemoryLifecycle.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/MemoryLifecycle.java) | `08f9b211c1d23966` |

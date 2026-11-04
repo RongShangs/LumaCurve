@@ -121,7 +121,7 @@
 | [ConfigurationFile.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ConfigurationFile.java) | `a45f2429bd244e74` |
 | [FeatureCheckPage.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/FeatureCheckPage.java) | `c299b03f761fe6f0` |
 | [FloatingNavigation.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/FloatingNavigation.java) | `4aedf6324f3f0d15` |
-| [HookRuntime.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/HookRuntime.java) | `4e3f51d5e9508d0c` |
+| [HookRuntime.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/HookRuntime.java) | `818d117cff24ad7d` |
 | [MainActivity.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/MainActivity.java) | `2c493852ffa1550e` |
 | [QuickSetupPlan.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/QuickSetupPlan.java) | `ba3faf56456e4cc8` |
 | [SettingsSearch.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/SettingsSearch.java) | `e6d35527a7fccfc5` |

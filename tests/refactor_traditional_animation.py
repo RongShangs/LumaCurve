@@ -127,4 +127,46 @@ for scenario in ['wrong_first_flag','wrong_modifier','wrong_reason_result','alia
  subprocess.run(['javac','--release','8','-encoding','UTF-8','-cp',str(J),'-d',str(c),*map(str,paths),*[str(S/n) for n in production]],check=True)
  result=subprocess.run(['java','-cp',str(c)+os.pathsep+str(J),'top.rongshangs.lumacurve.refactor.TraditionalAnimationTest'],capture_output=True,text=True,check=True)
  print(scenario+': '+result.stdout.strip());total+=int(re.search(r'(\d+) cases PASS',result.stdout).group(1))
+for scenario in ['no_policy_marker','malformed_policy','owner_dual_fallback']:
+ variants=dict(sources)
+ code=variants[base+'TraditionalAnimationTest.java']
+ if scenario=='no_policy_marker':code=code.replace('public boolean supportRefactorBrightnessPolicy(){return refactor;}','')
+ if scenario=='malformed_policy':code=code.replace('public boolean supportRefactorBrightnessPolicy(){return refactor;}','public int supportRefactorBrightnessPolicy(){return 0;}')
+ if scenario=='owner_dual_fallback':
+  # Newer owner keeps the dual ramp directly; the facade no longer owns the slot.
+  code=code.replace('public Dual mScreenBrightnessRampAnimator=new Dual();','')
+  code=code.replace('public Dpc mDisplayPowerController=new Dpc();public Impl','public Dpc mDisplayPowerController=new Dpc();public Dual mBrightnessRampAnimator=new Dual();public Impl')
+  code=code.replace('o.mDisplayPowerController.mScreenBrightnessRampAnimator','o.mBrightnessRampAnimator').replace('((Owner)s.owner).mDisplayPowerController.mScreenBrightnessRampAnimator','((Owner)s.owner).mBrightnessRampAnimator')
+ start=code.index(' public static void main(')
+ expected='check(TraditionalAnimation.supported(s));check(animate(first(s),.5f,.2f)==.1f);' if scenario!='malformed_policy' else 'check(!TraditionalAnimation.supported(s));check(animate(first(s),.5f,.2f)==.2f);'
+ variants[base+'TraditionalAnimationTest.java']=code[:start]+''' public static void main(String[] args)throws Exception{TraditionalAnimation.install(TraditionalAnimationTest.class.getClassLoader());HookRuntime s=runtime();'''+expected+'''System.out.println("Ramp entry: "+cases+" cases PASS");}}'''
+ out=O/scenario;paths=[]
+ for name,code in variants.items():
+  p=out/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_text(code,encoding='utf-8');paths.append(p)
+ c=out/'classes';c.mkdir(exist_ok=True)
+ subprocess.run(['javac','--release','8','-encoding','UTF-8','-cp',str(J),'-d',str(c),*map(str,paths),*[str(S/n) for n in production]],check=True)
+ result=subprocess.run(['java','-cp',str(c)+os.pathsep+str(J),'top.rongshangs.lumacurve.refactor.TraditionalAnimationTest'],capture_output=True,text=True,check=True)
+ print(scenario+': '+result.stdout.strip());total+=int(re.search(r'(\d+) cases PASS',result.stdout).group(1))
+for scenario in ['strategy_getter','strategy_field','strategy_foreign','strategy_malformed']:
+ variants=dict(sources)
+ code=variants[base+'TraditionalAnimationTest.java']
+ extra='public Object mLast,mAutomaticBrightnessStrategy;public Object getLastSelectedStrategy(){return mLast;}'
+ if scenario=='strategy_malformed':extra='public Object mAutomaticBrightnessStrategy;public int getLastSelectedStrategy(){return 1;}'
+ code=code.replace('public Display getDisplayPowerState(){return display;}','public Display getDisplayPowerState(){return display;}'+extra)
+ code=code.replace('public static class Owner{','public static class AutomaticBrightnessStrategy{}public static class AutomaticBrightnessStrategy2{public Object mAutomaticBrightnessController;}public static class Owner{')
+ start=code.index(' public static void main(')
+ body=''' TraditionalAnimation.install(TraditionalAnimationTest.class.getClassLoader());HookRuntime s=runtime();Owner o=(Owner)s.owner;Object abc=o.mAutomaticBrightnessControllerImpl.mAutomaticBrightnessController;Dpc d=o.mDisplayPowerController;
+ check(TraditionalAnimation.automaticStrategy(d,abc)==null);'''
+ if scenario=='strategy_getter':body+='d.mLast=new AutomaticBrightnessStrategy();check("AutomaticBrightnessStrategy".equals(TraditionalAnimation.automaticStrategy(d,abc)));d.mLast=new Object();check(TraditionalAnimation.automaticStrategy(d,abc)==null);'
+ if scenario=='strategy_field':body+='d.mAutomaticBrightnessStrategy=new AutomaticBrightnessStrategy2();check(TraditionalAnimation.automaticStrategy(d,abc)==null);((AutomaticBrightnessStrategy2)d.mAutomaticBrightnessStrategy).mAutomaticBrightnessController=abc;check("AutomaticBrightnessStrategy2".equals(TraditionalAnimation.automaticStrategy(d,abc)));'
+ if scenario=='strategy_foreign':body+='d.mAutomaticBrightnessStrategy=new AutomaticBrightnessStrategy2();((AutomaticBrightnessStrategy2)d.mAutomaticBrightnessStrategy).mAutomaticBrightnessController=new Object();check(TraditionalAnimation.automaticStrategy(d,abc)==null);'
+ if scenario=='strategy_malformed':body+='d.mAutomaticBrightnessStrategy=new AutomaticBrightnessStrategy2();check(TraditionalAnimation.automaticStrategy(d,abc)==null);((AutomaticBrightnessStrategy2)d.mAutomaticBrightnessStrategy).mAutomaticBrightnessController=abc;check("AutomaticBrightnessStrategy2".equals(TraditionalAnimation.automaticStrategy(d,abc)));'
+ variants[base+'TraditionalAnimationTest.java']=code[:start]+''' public static void main(String[] args)throws Exception{'''+body+'''System.out.println("Strategy route: "+cases+" cases PASS");}}'''
+ out=O/scenario;paths=[]
+ for name,code in variants.items():
+  p=out/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_text(code,encoding='utf-8');paths.append(p)
+ c=out/'classes';c.mkdir(exist_ok=True)
+ subprocess.run(['javac','--release','8','-encoding','UTF-8','-cp',str(J),'-d',str(c),*map(str,paths),*[str(S/n) for n in production]],check=True)
+ result=subprocess.run(['java','-cp',str(c)+os.pathsep+str(J),'top.rongshangs.lumacurve.refactor.TraditionalAnimationTest'],capture_output=True,text=True,check=True)
+ print(scenario+': '+result.stdout.strip());total+=int(re.search(r'(\d+) cases PASS',result.stdout).group(1))
 print(f'Traditional animation: {total} cases PASS; original, alternate and malformed ABIs; no target device execution')
