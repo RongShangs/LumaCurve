@@ -229,6 +229,22 @@ public class OutdoorTest{static int count;static void check(boolean b){if(!b)thr
   ordinaryOwner.mHbmController.mHbmData=timedBase;rangeAccess.observeReplacement();check(!rangeAccess.rangeOnly()&&rangeAccess.copyable&&rangeAccess.tunable());
   ordinaryOwner.mHbmController.mHbmData=null;rangeAccess.observeReplacement();check(rangeAccess.rangeOnly()&&!rangeAccess.copyable); // null is not an owned clone
   for(float baseValue:new float[]{0,.1f,.5f,.85f,1})for(float ceiling:new float[]{.4f,.85f,1})for(double strength:new double[]{.1,.5,1}){safeOptions.values[5]=strength;float result=OutdoorPolicy.withinRangeTarget(safeOptions,30000,baseValue,ceiling);check(result>=baseValue&&result<=Math.max(baseValue,ceiling));}
+  // Diagnostics stay bounded, latched transitions survive ring roll-over, JSON round-trips.
+  s.outdoor.stop();s.screen=s.user=s.thread=true;s.hdr=false;s.power.low=false;s.batteryTemperature=30;s.kernel.auto=true;s.strategy="AutomaticBrightnessStrategy";s.scene=true;owner.mAutomaticBrightnessControllerImpl.mIsOverrideDragPolicy=false;owner.mAutomaticBrightnessControllerImpl.mAutomaticBrightnessController.mAmbientLuxValid=true;owner.mAutomaticBrightnessControllerImpl.mAutomaticBrightnessController.mAmbientLux=30000;
+  activate(s);
+  JSONObject diag=s.outdoor.status();JSONArray critical=diag.getJSONArray("output_diagnostics_critical");
+  boolean seenEnter=false;for(int i=0;i<critical.length();i++)if(critical.getJSONObject(i).getString("kind").equals("session_enter"))seenEnter=true;check(seenEnter);
+  s.strategy="TemporaryBrightnessStrategy";check(s.outdoor.block().equals("output_override"));s.strategy="AutomaticBrightnessStrategy";
+  boolean seenOverride=false;for(int i=0;i<s.outdoor.status().getJSONArray("output_diagnostics_critical").length();i++)if(s.outdoor.status().getJSONArray("output_diagnostics_critical").getJSONObject(i).getString("kind").equals("active_output_override"))seenOverride=true;check(seenOverride);
+  s.outdoor.outputDiagnostics.clear();OutdoorOutputAccess.Decision rowDecision=new OutdoorOutputAccess.Decision();rowDecision.profile="automatic_strategy2_reason";rowDecision.name="AutomaticBrightnessStrategy";rowDecision.reason=4;rowDecision.temp=4;
+  for(int i=0;i<200;i++){owner.mAutomaticBrightnessControllerImpl.mAutomaticBrightnessController.mAmbientLux=i+1;s.outdoor.recordOutput(null,rowDecision);}
+  JSONObject bounded=s.outdoor.status();check(bounded.getJSONArray("output_diagnostics").length()==OutdoorController.OUTPUT_DIAGNOSTICS);
+  JSONObject tail=bounded.getJSONArray("output_diagnostics").getJSONObject(OutdoorController.OUTPUT_DIAGNOSTICS-1);check(tail.getString("reason_name").equals("automatic")&&tail.getString("temp_name").equals("automatic"));
+  boolean retained=false;for(int i=0;i<bounded.getJSONArray("output_diagnostics_critical").length();i++)if(bounded.getJSONArray("output_diagnostics_critical").getJSONObject(i).getString("kind").equals("session_enter"))retained=true;check(retained);
+  for(int i=0;i<60;i++){owner.mAutomaticBrightnessControllerImpl.mAutomaticBrightnessController.mAmbientLux=40000+i;s.outdoor.latch("probe");}
+  check(s.outdoor.status().getJSONArray("output_diagnostics_critical").length()==OutdoorController.OUTPUT_CRITICAL);
+  JSONObject round=new JSONObject(s.outdoor.status().toString());check(round.getJSONArray("output_diagnostics").length()==OutdoorController.OUTPUT_DIAGNOSTICS);check(round.getJSONArray("output_diagnostics_critical").length()==OutdoorController.OUTPUT_CRITICAL);
+  check(OutdoorController.reasonName(null).equals("unknown")&&OutdoorController.reasonName(0).equals("unknown")&&OutdoorController.reasonName(4).equals("automatic")&&OutdoorController.reasonName(14).equals("unrecognized"));
   System.out.println("Outdoor production hooks: "+count+" cases PASS; deterministic OEM model, device not verified");
  }
 }'''

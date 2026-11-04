@@ -65,7 +65,7 @@ ThreadLocal 帧按调用恢复；只移除本次引入的 OPR 原因位；温控
 | 文件 | 当前源码 SHA-256 前16位 |
 | --- | --- |
 | [NitBrightnessLimit.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/NitBrightnessLimit.java) | `dbc59a8af112187c` |
-| [OutdoorController.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/OutdoorController.java) | `ffbec3d000e35f0f` |
+| [OutdoorController.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/OutdoorController.java) | `249664b9a0afda95` |
 | [OutdoorOpr.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/OutdoorOpr.java) | `b19062af9b38d791` |
 | [OutdoorOprEnvelope.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/OutdoorOprEnvelope.java) | `9653d6d8496b4be3` |
 | [OutdoorSdrScope.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/OutdoorSdrScope.java) | `a207dd5f0fb872a2` |

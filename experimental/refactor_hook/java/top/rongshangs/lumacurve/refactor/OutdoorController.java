@@ -11,9 +11,13 @@ final class OutdoorController {
     long deadline=-1,boosts,rangeRaises,dynamicRaises,oprRaises,goalAt=-1;float goal=Float.NaN,nativeRange=Float.NaN,deliveredRange=Float.NaN,nativeDynamic=Float.NaN,deliveredDynamic=Float.NaN;
     final ArrayDeque<JSONObject> history=new ArrayDeque<>();final Map<String,JSONObject> lastStages=new HashMap<>();
     // Bounded, deduplicated record of the real output-provenance decision. It never
-    // changes the verdict; it only keeps the inputs that produced it.
-    static final int OUTPUT_DIAGNOSTICS=32;
+    // changes the verdict; it only keeps the inputs that produced it. Critical transitions
+    // are latched separately so a long indoor tail cannot erase the session evidence.
+    static final int OUTPUT_DIAGNOSTICS=128,OUTPUT_CRITICAL=32;
     final ArrayDeque<JSONObject> outputDiagnostics=new ArrayDeque<>();String lastOutputSignature="";boolean inTick;
+    final ArrayDeque<JSONObject> outputCritical=new ArrayDeque<>();
+    boolean activeOverrideLatched,aboveEnter,belowExit;long cooldownEndLatched=-1;
+    OutdoorOutputAccess.Decision lastDecision;String lastBlock;
     final LiveLimitEvidence liveLimits=new LiveLimitEvidence();
     NitBrightnessLimit nitLimit;
     OutdoorOprEnvelope oprEnvelope;
@@ -84,7 +88,7 @@ final class OutdoorController {
                 .append(',').append(decision.reason).append(',').append(decision.temp).append(',').append(decision.reasonMod).append(',').append(decision.tempMod).append(',').append(decision.selector).append(',').append(decision.error);
             String value=signature.toString();
             if(value.equals(lastOutputSignature))return;
-            lastOutputSignature=value;
+            lastOutputSignature=value;lastBlock=result;if(decision!=null)lastDecision=decision;
             JSONObject row=new JSONObject();row.put("uptime_ms",SystemClock.uptimeMillis()).put("unix_ms",System.currentTimeMillis());
             row.put("tick",inTick).put("block",result==null?"":result).put("active",policy.active).put("policy_reason",policy.reason).put("cooldown_left_ms",Math.max(0,policy.cooldownUntil-SystemClock.uptimeMillis()));
             if(lux==lux)row.put("lux",lux);
@@ -97,14 +101,47 @@ final class OutdoorController {
                 if(decision.enabled!=null)row.put("auto_enabled",decision.enabled.booleanValue());
                 if(decision.use!=null)row.put("auto_use",decision.use.booleanValue());
                 if(decision.applied!=null)row.put("auto_applied",decision.applied.booleanValue());
-                if(decision.reason!=null)row.put("reason",decision.reason);
-                if(decision.temp!=null)row.put("temp",decision.temp);
+                if(decision.reason!=null){row.put("reason",decision.reason);row.put("reason_name",reasonName(decision.reason));}
+                if(decision.temp!=null){row.put("temp",decision.temp);row.put("temp_name",reasonName(decision.temp));}
                 if(decision.reasonMod!=null)row.put("reason_modifier",decision.reasonMod);
                 if(decision.tempMod!=null)row.put("temp_modifier",decision.tempMod);
                 if(!decision.error.isEmpty())row.put("output_error",decision.error);
             }
             if(outputDiagnostics.size()>=OUTPUT_DIAGNOSTICS)outputDiagnostics.removeFirst();
-            outputDiagnostics.addLast(row);s.queuePublish();
+            outputDiagnostics.addLast(row);
+            if(policy.active&&result!=null&&!activeOverrideLatched){activeOverrideLatched=true;latch("active_output_override");}
+            s.queuePublish();
+        }catch(Throwable ignored){}
+    }
+    /** Verified against this device's BrightnessReason (services.jar classes2.dex). */
+    static String reasonName(Integer value){
+        if(value==null)return "unknown";
+        switch(value.intValue()){
+            case 0:return "unknown";case 1:return "manual";case 2:return "doze";case 3:return "doze_default";
+            case 4:return "automatic";case 5:return "screen_off";case 6:return "override";case 7:return "temporary";
+            case 8:return "boost";case 9:return "screen_off_brightness_sensor";case 10:return "follower";
+            case 11:return "offload";case 12:return "doze_manual";case 13:return "sunlight";
+            default:return "unrecognized";
+        }
+    }
+    /** Bounded latch outside the diagnostic ring; every call is a real observed transition. */
+    void latch(String kind){
+        try{
+            float lux=lux(),brightness=Float.NaN;
+            try{Object dpc=HookEntry.get(s.owner,"mDisplayPowerController"),display=dpc.getClass().getMethod("getDisplayPowerState").invoke(dpc);brightness=((Number)display.getClass().getMethod("getScreenBrightness").invoke(display)).floatValue();}catch(Throwable absent){}
+            JSONObject row=new JSONObject().put("kind",kind).put("uptime_ms",SystemClock.uptimeMillis()).put("unix_ms",System.currentTimeMillis()).put("block",lastBlock==null?"":lastBlock)
+                .put("active",policy.active).put("policy_reason",policy.reason).put("cooldown_left_ms",Math.max(0,policy.cooldownUntil-SystemClock.uptimeMillis()));
+            if(lux==lux)row.put("lux",lux);
+            if(OutdoorPolicy.valid(brightness))row.put("brightness",brightness);
+            if(Float.isFinite(goal))row.put("requested",goal);
+            if(lastDecision!=null){
+                if(lastDecision.profile!=null)row.put("profile",lastDecision.profile);
+                if(lastDecision.name!=null)row.put("output",lastDecision.name);
+                if(lastDecision.reason!=null){row.put("reason",lastDecision.reason);row.put("reason_name",reasonName(lastDecision.reason));}
+                if(lastDecision.temp!=null){row.put("temp",lastDecision.temp);row.put("temp_name",reasonName(lastDecision.temp));}
+            }
+            if(outputCritical.size()>=OUTPUT_CRITICAL)outputCritical.removeFirst();
+            outputCritical.addLast(row);s.queuePublish();
         }catch(Throwable ignored){}
     }
     void manual(float lux){if(!options.flags[0])return;policy.manual(lux,SystemClock.uptimeMillis());tick();schedule();s.queuePublish();}
@@ -112,7 +149,15 @@ final class OutdoorController {
         if(ticking||failed||!s.onDisplayThread())return;ticking=true;inTick=true;
         try{
             HbmAccess h=binding();String blocked=h==null?"unsupported":block();float lux=lux();
-            boolean before=policy.active;policy.step(options,lux,SystemClock.uptimeMillis(),blocked);if(!policy.active)goal=Float.NaN;
+            boolean before=policy.active;long cooldownBefore=policy.cooldownUntil;policy.step(options,lux,SystemClock.uptimeMillis(),blocked);if(!policy.active)goal=Float.NaN;
+            long now=SystemClock.uptimeMillis();
+            if(!before&&policy.active){activeOverrideLatched=false;latch("session_enter");}
+            else if(before&&!policy.active)latch("session_exit");
+            if(policy.cooldownUntil>cooldownBefore)latch("cooldown_start");
+            if(cooldownBefore>0&&now>=cooldownBefore&&cooldownEndLatched!=cooldownBefore){cooldownEndLatched=cooldownBefore;latch("cooldown_end");}
+            if(options.flags[0]&&lux==lux){float enter=(float)options.values[0],exit=(float)(options.values[0]*options.values[4]);
+                if(lux>=enter){belowExit=false;if(!aboveEnter){aboveEnter=true;latch("lux_enter");}}
+                else if(lux<exit){aboveEnter=false;if(!belowExit){belowExit=true;latch("lux_exit");}}}
             boolean dataChanged=h!=null&&h.configure(options,blocked==null&&policy.active);
             if(dataChanged)h.reevaluate(lux);
             // Entry/expiry timers also change the target/range without any new sensor event.
@@ -165,7 +210,7 @@ final class OutdoorController {
         if(nitLimit!=null&&Float.isFinite(nitLimit.maximumNit))j.put("mapping_max_nit",nitLimit.maximumNit).put("mapping_min_nit",nitLimit.minimumNit);
         if(options.values[OutdoorOptions.MAX_NIT]>0){j.put("maximum_nit",options.values[OutdoorOptions.MAX_NIT]);if(OutdoorPolicy.valid(cap))j.put("nit_limit_brightness",cap);else j.put("nit_limit_detail",nitLimitError);}
         j.put("enabled",options.flags[0]).put("active",policy.active).put("reason",policy.reason).put("text",description(policy.reason)).put("target_adjustments",boosts).put("range_adjustments",rangeRaises).put("dynamic_range_adjustments",dynamicRaises).put("opr_adjustments",oprRaises).put("opr_enabled",options.flags[3]);
-        JSONObject config=new JSONObject();options.put(config);j.put("options",config).put("limit_trace",new JSONArray(history)).put("output_diagnostics",new JSONArray(outputDiagnostics)).put("current_limits",liveLimits.snapshot(SystemClock.uptimeMillis()));
+        JSONObject config=new JSONObject();options.put(config);j.put("options",config).put("limit_trace",new JSONArray(history)).put("output_diagnostics",new JSONArray(outputDiagnostics)).put("output_diagnostics_critical",new JSONArray(outputCritical)).put("current_limits",liveLimits.snapshot(SystemClock.uptimeMillis()));
         long now=SystemClock.uptimeMillis();if(deadline>=0)j.put("next_transition_ms",Math.max(0,deadline-now));j.put("cooldown_left_ms",Math.max(0,policy.cooldownUntil-now));
         if(policy.active)j.put("session_left_ms",Math.max(0,(long)options.values[6]-(now-policy.started)));
         if(Float.isFinite(goal))j.put("requested_brightness",goal).put("request_age_ms",Math.max(0,now-goalAt));if(OutdoorPolicy.valid(nativeRange))j.put("native_range_max",nativeRange);if(OutdoorPolicy.valid(deliveredRange))j.put("effective_range_max",deliveredRange);
