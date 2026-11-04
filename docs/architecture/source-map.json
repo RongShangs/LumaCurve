@@ -280,7 +280,7 @@
     {
       "file": "DimAodCompatibility.java",
       "layer": "adapters",
-      "purpose": "按实际DIM/AOD接口与当前调用原因协调主屏熄屏前降亮，不改息屏、采样和节点所有权"
+      "purpose": "按实际DIM接口形状与当前调用原因协调主屏熄屏前降亮：旧五参路线保留息屏子阶段上限，新四参路线以 mAppliedDimming 判定降亮并只夹回抬高，不改息屏、采样和节点所有权"
     },
     {
       "file": "ElasticScrollView.java",

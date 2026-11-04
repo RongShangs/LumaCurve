@@ -184,6 +184,8 @@ public final class UiText {
         WORDS.put("熄屏前降亮协调","Pre-sleep dimming coordination");
         WORDS.put("自动降亮与息屏目标协调","Automatic dimming and AOD target coordination");
         WORDS.put("主屏仍亮且处于自动DIM降亮时，阻止全屏AOD目标重新抬高已降低的亮度；真正息屏、背屏、手动及HDR沿用系统。","While the primary screen is on and automatically dimming, prevent the full-screen AOD target from raising its dimmed input. Actual doze, rear displays, manual brightness and HDR keep system behavior。");
+        WORDS.put("自动降亮与息屏目标协调（新式SDR入口）","Automatic dimming and AOD target coordination (new SDR entry)");
+        WORDS.put("新式四参SDR入口删除息屏子阶段后，用 mAppliedDimming 作为降亮状态；只把原生结果中高于降亮输入的抬高夹回，原生降低保护仍执行。缺少全屏AOD探测，语义为推断，高风险。","The newer four-argument SDR entry dropped the dimming substage; mAppliedDimming supplies the dimmed state. Only a native result above the dim input is clamped back while native lowering protections still run. Full-AOD probing is unavailable, so this mapping is inferred and high risk.");
         WORDS.put("未启用独立曲线时，深浅色模式共用此曲线；启用后，此处用于浅色模式。","Light and dark modes share this curve unless an independent dark curve is enabled. When enabled, this curve is used in light mode.");
         WORDS.put("当前基础曲线：","Current base curve: ");
         WORDS.put("使用本机亮度到背光的转换表；可可靠单调反解才启用。保留自动亮度、手动记忆与暗光锁定的原有控制权。","Use this device's brightness-to-backlight table only when it can be reliably inverted. Keep auto brightness, manual memory and low light lock ownership unchanged.");

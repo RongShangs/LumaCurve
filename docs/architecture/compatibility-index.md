@@ -29,7 +29,7 @@
 | [APP 本地工具](../features/app_tools.md) | `launcher_alias`、`app_preferences`、`app_files` |
 | [控制中心节点映射](../features/control_center.md) | `coordinate_v2`、`coordinate_v2_calibrated`、`raw_node_v3`、`partition_node_v4`、`partition_ddc_hbm`、`partition_hbm_normal` |
 | [日落后暗光锁定](../features/dark_lock_schedule.md) | `system_twilight` |
-| [熄屏前降亮与息屏显示协调](../features/dim_aod.md) | `automatic_dim_aod_cap` |
+| [熄屏前降亮与息屏显示协调](../features/dim_aod.md) | `automatic_dim_aod_cap`、`automatic_dim_aod_cap_modern` |
 | [应用临时亮度隔离](../features/app_brightness_isolation.md) | `app_override_scoped_sync`、`native_window_no_sync` |
 | [控制中心开机恢复](../features/mapping_startup.md) | `android_boot_job`、`root_service_directory` |
 
@@ -103,6 +103,7 @@
 | `response_scene_layout` · `ResponseTuning.java` | `native_driving` / `native_without_driving` / `native_scene_aon` | 场景确认按形状分流：完整驾驶接口优先；否则仅当控制器与真实 SceneDetector 上不存在任何旧瞬时遮挡/反射字段、旧驾驶残片也不存在，且新式场景布尔字段（mUseProxAndTouchEnabled、mUseAonFlareEnabled、mUseProximityEnabled、mIsGameSceneEnable）、AON 上下限 float、updateAmbientLux(int,float,boolean) void、checkAonFlareStatus(float) void 全部匹配时才采用 AON 场景路径。任一旧标记残片、类型错误或缺失即拒绝，不猜测语义；核心期限门禁与场景确认布局解耦，避免单体门禁连带关闭 9 项能力。 | [refactor_os3_compatibility.py](../../tests/refactor_os3_compatibility.py) |
 | `scene_reflection_mapping` · `SceneTuning.java` | `legacy_isReflectiveScene` / `aon_window_updateAmbientLux` | 反射与 AON 确认按形状分流：旧 SceneDetector 存在 isReflectiveScene() 且共享场景消费者完整时沿用旧反射判定，阻止时返回 false；新布局整体缺少旧瞬时遮挡/反射标记时，只在 mUseAonFlareEnabled、mIsStepMode 布尔、mMinAonFlareEnableLux/mMaxAonFlareEnableLux float、updateAmbientLux(int,float,boolean) void、checkAonFlareStatus(float) void 全部匹配后才把 AON 窗口映射为反射确认，阻止时把窗口置为不可命中（min=MAX/max=-1）并在调用结束恢复。字段类型错误、旧标记残片或 checkAonFlareStatus 签名不符一律不开放，不猜测语义。 | [refactor_scene_hooks.py](../../tests/refactor_scene_hooks.py) |
 | `scene_stream_proximity_absent` · `SceneTuning.java` | `legacy_transient_proximity` / `new_layout_without_stream_consumer` | 流式距离遮挡要求 SceneDetector 同时具备 mTransientProximityEnabled、mNeedCheckProximitySensor/mNeedCheckAonFlare 与 isNeedSkipBrightnessChange()。新布局只有 updateAmbientLux(int,float,boolean) 而缺少跳过亮度变化入口与瞬时遮挡字段时，该项保持能力不可用：不安装 Hook、不伪造准入，也不把 updateAmbientLux 的 AON 窗口当作流式遮挡；该入口只承载已核验的反射/AON 抑制。 | [refactor_scene_hooks.py](../../tests/refactor_scene_hooks.py) |
+| `dim_aod_signature` · `DimAodCompatibility.java` | `legacy_five_param_with_inner` / `modern_four_param_mAppliedDimming` | 旧路线要求五参 adjustSdrBrightness、adjustBrightnessWhenDimming(float,boolean)、全屏AOD探测与策略；新路线只在全库不存在 adjustBrightnessWhenDimming、四参 adjustSdrBrightness(float,boolean,BrightnessReason,boolean) 与 mAppliedDimming 布尔完整时安装，用 mAppliedDimming 替代被删第五参，并把原生结果中高于降亮输入的抬高夹回输入；原生降低保护保留，缺少全屏AOD探测属推断语义，高风险，需真机行为验证。残缺签名或类型错误一律拒绝；两套形状并存时优先旧路线，旧路线不完整则整项拒绝。 | [refactor_dim_aod.py](../../tests/refactor_dim_aod.py) |
 
 ## 原生协议与运行分支
 

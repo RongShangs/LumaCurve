@@ -1135,12 +1135,13 @@
         "dim_aod"
       ],
       "routes": [
-        "automatic_dim_aod_cap"
+        "automatic_dim_aod_cap",
+        "automatic_dim_aod_cap_modern"
       ],
       "owners": [
         "DimAodCompatibility.java"
       ],
-      "selector": "实际完整SDR入口、DIM子阶段、主屏DPC/电源请求/原因及全屏AOD策略同时匹配；不按机型或版本放行。子阶段仅在当前自动DIM调用及活动用户和显示线程内参与，缺接口或异常独立跳过，不回退改写其他阶段。",
+      "selector": "实际完整SDR入口、主屏DPC/电源请求/原因及降亮状态同时匹配；旧版要求 DIM 子阶段与全屏AOD策略，新版四参入口以 mAppliedDimming 代替被删的第五参、且全库不存在 adjustBrightnessWhenDimming 时才走新路线；不按机型或版本放行。两路线都只在当前自动DIM调用及活动用户和显示线程内参与，缺接口或异常独立跳过，不回退改写其他阶段。",
       "evidence": [
         "dim_aod_compatibility",
         "feature_self_check"
@@ -1929,6 +1930,16 @@
       ],
       "rule": "流式距离遮挡要求 SceneDetector 同时具备 mTransientProximityEnabled、mNeedCheckProximitySensor/mNeedCheckAonFlare 与 isNeedSkipBrightnessChange()。新布局只有 updateAmbientLux(int,float,boolean) 而缺少跳过亮度变化入口与瞬时遮挡字段时，该项保持能力不可用：不安装 Hook、不伪造准入，也不把 updateAmbientLux 的 AON 窗口当作流式遮挡；该入口只承载已核验的反射/AON 抑制。",
       "test": "tests/refactor_scene_hooks.py"
+    },
+    {
+      "id": "dim_aod_signature",
+      "owner": "DimAodCompatibility.java",
+      "alternatives": [
+        "legacy_five_param_with_inner",
+        "modern_four_param_mAppliedDimming"
+      ],
+      "rule": "旧路线要求五参 adjustSdrBrightness、adjustBrightnessWhenDimming(float,boolean)、全屏AOD探测与策略；新路线只在全库不存在 adjustBrightnessWhenDimming、四参 adjustSdrBrightness(float,boolean,BrightnessReason,boolean) 与 mAppliedDimming 布尔完整时安装，用 mAppliedDimming 替代被删第五参，并把原生结果中高于降亮输入的抬高夹回输入；原生降低保护保留，缺少全屏AOD探测属推断语义，高风险，需真机行为验证。残缺签名或类型错误一律拒绝；两套形状并存时优先旧路线，旧路线不完整则整项拒绝。",
+      "test": "tests/refactor_dim_aod.py"
     }
   ],
   "native_variants": [
