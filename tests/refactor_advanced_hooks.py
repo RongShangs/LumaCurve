@@ -61,6 +61,10 @@ public final class AdvancedHookTest {
  public static class HbmData {public float minimumLux=5000;}public static class Hbm {public HbmData mHbmData=new HbmData();protected HbmData getHbmData(){return mHbmData;}}
  public static class Impl {public AutomaticBrightnessController mAutomaticBrightnessController;public HysteresisLevelsImpl mHysteresisLevelsImpl;public DualSensorPolicy mDualSensorPolicy=new DualSensorPolicy();public TouchCoverProtectionHelper mTouchAreaHelper=new TouchCoverProtectionHelper();public Scene mSceneDetector=new Scene();public boolean driving;public long nightDelay;public boolean getDrivingStatus(){return driving;}public long getNightDrivingDebounceConfig(){return nightDelay;}}
  public static class Scene {public boolean mIsNightDrivingMode;}
+ public static class ScenePlain {public boolean mIsStepMode;}
+ public static class AbsentDriving {public AutomaticBrightnessController mAutomaticBrightnessController;public ScenePlain mSceneDetector=new ScenePlain();}
+ public static class PartialDriving {public AutomaticBrightnessController mAutomaticBrightnessController;public ScenePlain mSceneDetector=new ScenePlain();public boolean mDrivingFlag;}
+ public static class MissingDetector {public AutomaticBrightnessController mAutomaticBrightnessController;}
  public static class Display {public int state=2;public int getScreenState(){return state;}}
  public static class Dpc {public Display display=new Display();public Display getDisplayPowerState(){return display;}}
  public static class Owner {public Dpc mDisplayPowerController=new Dpc();public Impl mAutomaticBrightnessControllerImpl=new Impl();public RefactorAutoBrightnessAnimator mBrightnessAnimator=new RefactorAutoBrightnessAnimator(),mSdrBrightnessAnimator=new RefactorAutoBrightnessAnimator();public SunlightController mSunlightController=new SunlightController();}
@@ -106,6 +110,9 @@ public final class AdvancedHookTest {
   main.mStepModeDarkenDebounceConfig=4000;check((Long)XposedBridge.call(main,"nextAmbientLightDarkeningTransition",new Class<?>[]{long.class},1000L)==6000); // Preserve longer OEM additions when no safe extension fits.
   main.mStepModeDarkenDebounceConfig=0;s.hdr=true;check((Long)XposedBridge.call(main,"nextAmbientLightBrighteningTransition",new Class<?>[]{long.class},1000L)==2000);s.hdr=false;
   o.mAutomaticBrightnessControllerImpl.driving=true;check((Long)XposedBridge.call(main,"nextAmbientLightBrighteningTransition",new Class<?>[]{long.class},1000L)==2000);o.mAutomaticBrightnessControllerImpl.driving=false;
+  ResponseTuning.drivingProfiles.clear();check(!ResponseTuning.driving(new AbsentDriving()));
+  try{ResponseTuning.driving(new PartialDriving());throw new AssertionError("partial driving accepted");}catch(IllegalStateException expected){cases++;}
+  try{ResponseTuning.driving(new MissingDetector());throw new AssertionError("missing detector accepted");}catch(Exception expected){cases++;}
   main.idle=true;check((Long)XposedBridge.call(main,"nextAmbientLightBrighteningTransition",new Class<?>[]{long.class},1000L)==2000);main.idle=false;
   s.kernel.auto=false;check((Long)XposedBridge.call(main,"nextAmbientLightBrighteningTransition",new Class<?>[]{long.class},1000L)==2000);s.kernel.auto=true;
   s.responseEnabled=false;s.lowLightEnabled=true;check((Long)XposedBridge.call(main,"nextAmbientLightBrighteningTransition",new Class<?>[]{long.class},1000L)==3750);check(s.lowLightMainAdjustments>0);

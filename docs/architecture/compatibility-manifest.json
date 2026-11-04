@@ -1856,6 +1856,16 @@
       ],
       "rule": "节点写入上限优先读取 BrightnessClamperController.mBrightnessCap（clamp() 实际使用的 float）；该字段整体缺失时才用 getMaxBrightness() 旧访问器。字段存在但非 float、或旧访问器返回类型非 float 即拒绝安装，不以旧路线掩盖残缺。自检与写入判定共用同一选择器。",
       "test": "tests/refactor_outdoor_node.py"
+    },
+    {
+      "id": "driving_capability_absent",
+      "owner": "ResponseTuning.java",
+      "alternatives": [
+        "native_driving_getDrivingStatus",
+        "native_without_driving"
+      ],
+      "rule": "门禁驾驶判定与场景确认布局解耦：getDrivingStatus 存在时要求非静态 boolean 与 getNightDrivingDebounceConfig 非静态 long；缺失时仅在控制器及其真实 SceneDetector 上都不存在任何 driving 字段/方法才判为无驾驶能力（false），mSceneDetector 缺失或出现任何 driving 残片仍视为歧义并抛异常，不伪造 true。场景确认路线的完整旧字段要求不变。",
+      "test": "tests/refactor_advanced_hooks.py"
     }
   ],
   "native_variants": [

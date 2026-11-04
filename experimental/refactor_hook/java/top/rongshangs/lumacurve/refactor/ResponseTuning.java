@@ -33,12 +33,35 @@ final class ResponseTuning {
             }
         }
     }
+    /** The gate asks "is the user driving", which does not depend on the legacy scene layout the
+     *  confirmation hooks need. Resolve it separately so a provably absent driving capability
+     *  reads as false, while any partial/replaced driving ABI stays rejected. */
+    static final Map<Class<?>,DrivingAccess> drivingProfiles=new HashMap<>();
+    static final class DrivingAccess {
+        final String name;final Method status;
+        DrivingAccess(Class<?> impl)throws Exception{
+            Method present=null;try{present=impl.getMethod("getDrivingStatus");}catch(NoSuchMethodException absent){}
+            if(present!=null){
+                if(present.getReturnType()!=boolean.class||Modifier.isStatic(present.getModifiers()))throw new IllegalStateException("driving status ABI");
+                Method delay=impl.getMethod("getNightDrivingDebounceConfig");
+                if(delay.getReturnType()!=long.class||Modifier.isStatic(delay.getModifiers()))throw new IllegalStateException("driving delay ABI");
+                status=present;name="native_driving";
+            }else{
+                // No status getter. Only a complete scan of the controller and its real detector
+                // proves the feature is absent; a missing detector or any leftover driving member
+                // stays ambiguous and keeps the gate closed.
+                rejectDriving(impl);rejectDriving(HookEntry.field(impl,"mSceneDetector").getType());
+                status=null;name="native_without_driving";
+            }
+        }
+    }
     static void rejectDriving(Class<?> type){for(Class<?> c=type;c!=null&&c!=Object.class;c=c.getSuperclass()){
         for(Field f:c.getDeclaredFields())if(f.getName().toLowerCase(Locale.ROOT).contains("driv"))throw new IllegalStateException("Incomplete driving scene ABI");
         for(Method m:c.getDeclaredMethods())if(m.getName().toLowerCase(Locale.ROOT).contains("driv"))throw new IllegalStateException("Incomplete driving scene ABI");
     }}
     static synchronized SceneAccess sceneAccess(Object impl)throws Exception{Class<?> type=impl.getClass();SceneAccess found=sceneProfiles.get(type);if(found==null){found=new SceneAccess(type);sceneProfiles.put(type,found);}return found;}
-    static boolean driving(Object impl)throws Exception{SceneAccess access=sceneAccess(impl);return access.driving!=null&&(Boolean)access.driving.invoke(impl);}
+    static synchronized DrivingAccess drivingAccess(Object impl)throws Exception{Class<?> type=impl.getClass();DrivingAccess found=drivingProfiles.get(type);if(found==null){found=new DrivingAccess(type);drivingProfiles.put(type,found);}return found;}
+    static boolean driving(Object impl)throws Exception{DrivingAccess access=drivingAccess(impl);return access.status!=null&&(Boolean)access.status.invoke(impl);}
     static long nightDelay(Object impl)throws Exception{SceneAccess access=sceneAccess(impl);return access.nightDelay==null?0:((Number)access.nightDelay.invoke(impl)).longValue();}
     static String sceneProfile(Object owner){try{Object impl=HookEntry.get(owner,"mAutomaticBrightnessControllerImpl");return supported(owner)?sceneAccess(impl).name:"unsupported";}catch(Throwable absent){return "unsupported";}}
     static void install(ClassLoader loader){

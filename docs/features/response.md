@@ -104,6 +104,8 @@
 | `native_driving` · 原生确认与夜间驾驶保护 | 使用已验证的主辅光感确认和阈值；保留原生夜间驾驶判断及附加等待。 |
 | `native_without_driving` · 传统确认与场景保护 | 完整旧场景结构没有夜间驾驶接口；使用原生确认窗口，保留步行、遮挡、HDR 等判断，不额外采样。 |
 
+路线内部 ABI：`driving_capability_absent`；完整条件仅维护在 [ABI索引](../architecture/compatibility-index.md#abi-内部变体)。
+
 运行证据：`response_scene_profile`。
 
 验证入口：
@@ -120,4 +122,4 @@
 | [HookRuntime.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/HookRuntime.java) | `4e3f51d5e9508d0c` |
 | [LowLightAssistEvidence.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/LowLightAssistEvidence.java) | `89a41dbcd6733592` |
 | [LowLightTuning.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/LowLightTuning.java) | `66826507c957e3ce` |
-| [ResponseTuning.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ResponseTuning.java) | `f7dd9b35ce71c151` |
+| [ResponseTuning.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ResponseTuning.java) | `79f1efc44d2953db` |

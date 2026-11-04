@@ -650,7 +650,7 @@
     {
       "file": "ResponseTuning.java",
       "layer": "adapters",
-      "purpose": "设备接口与所有权"
+      "purpose": "设备接口与所有权；门禁驾驶能力独立核验（无获取器且无 driving 残片才判未驾驶），场景确认布局仍单独要求完整旧字段"
     },
     {
       "file": "ResponsiveDialog.java",
