@@ -253,7 +253,8 @@
       ],
       "routes": [
         "native_driving",
-        "native_without_driving"
+        "native_without_driving",
+        "native_scene_aon"
       ],
       "owners": [
         "ResponseTuning.java",
@@ -261,7 +262,7 @@
         "AdvancedTuning.java",
         "LowLightAssistEvidence.java"
       ],
-      "selector": "完整驾驶接口优先；没有任何驾驶残片且完整旧场景 ABI 才允许无驾驶路径；残缺 / 类型错误 / 调用失败不降级。",
+      "selector": "完整驾驶接口优先；没有任何驾驶残片且完整旧场景 ABI 才允许无驾驶路径；旧瞬时遮挡 / 反射标记整体缺失、新式场景字段与 AON 照度窗口 / updateAmbientLux / checkAonFlareStatus 完整时才允许 AON 场景路径；残缺 / 类型错误 / 调用失败不降级。",
       "evidence": [
         "response_scene_profile"
       ],
@@ -1866,6 +1867,17 @@
       ],
       "rule": "门禁驾驶判定与场景确认布局解耦：getDrivingStatus 存在时要求非静态 boolean 与 getNightDrivingDebounceConfig 非静态 long；缺失时仅在控制器及其真实 SceneDetector 上都不存在任何 driving 字段/方法才判为无驾驶能力（false），mSceneDetector 缺失或出现任何 driving 残片仍视为歧义并抛异常，不伪造 true。场景确认路线的完整旧字段要求不变。",
       "test": "tests/refactor_advanced_hooks.py"
+    },
+    {
+      "id": "response_scene_layout",
+      "owner": "ResponseTuning.java",
+      "alternatives": [
+        "native_driving",
+        "native_without_driving",
+        "native_scene_aon"
+      ],
+      "rule": "场景确认按形状分流：完整驾驶接口优先；否则仅当控制器与真实 SceneDetector 上不存在任何旧瞬时遮挡/反射字段、旧驾驶残片也不存在，且新式场景布尔字段（mUseProxAndTouchEnabled、mUseAonFlareEnabled、mUseProximityEnabled、mIsGameSceneEnable）、AON 上下限 float、updateAmbientLux(int,float,boolean) void、checkAonFlareStatus(float) void 全部匹配时才采用 AON 场景路径。任一旧标记残片、类型错误或缺失即拒绝，不猜测语义；核心期限门禁与场景确认布局解耦，避免单体门禁连带关闭 9 项能力。",
+      "test": "tests/refactor_os3_compatibility.py"
     }
   ],
   "native_variants": [

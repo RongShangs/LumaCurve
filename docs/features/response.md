@@ -9,7 +9,7 @@
 | 项目 | 要求 |
 | --- | --- |
 | 触发 | 用户开启响应预设/覆盖，系统在当前输入及场景中确认候选变亮或变暗。 |
-| 需求与行为 | 分别调整变亮、变暗确认时间，保留原生场景和过渡动画 |
+| 需求与行为 | 分别调整变亮、变暗确认时间，保留原生场景和过渡动画；确认期限只依赖已安装期限 ABI 与场景确认形状（驾驶 / 完整旧场景 / AON 窗口三种），任一旧瞬时遮挡或反射残片都不连带关闭本身已具备的期限能力 |
 | 退出 / 失败 | 停用或对象变化时恢复仍属于本次修改的确认期限，不重置系统光感缓冲。 |
 | 默认 | `native` · 跟随系统 |
 | 配置键 | `response_override`、`brighten_delay`、`darken_delay` |
@@ -85,7 +85,7 @@
 
 ### 选择边界
 
-完整驾驶接口优先；没有任何驾驶残片且完整旧场景 ABI 才允许无驾驶路径；残缺 / 类型错误 / 调用失败不降级。
+完整驾驶接口优先；没有任何驾驶残片且完整旧场景 ABI 才允许无驾驶路径；旧瞬时遮挡 / 反射标记整体缺失、新式场景字段与 AON 照度窗口 / updateAmbientLux / checkAonFlareStatus 完整时才允许 AON 场景路径；残缺 / 类型错误 / 调用失败不降级。
 
 | 契约 | 内容 |
 | --- | --- |
@@ -103,8 +103,9 @@
 | --- | --- |
 | `native_driving` · 原生确认与夜间驾驶保护 | 使用已验证的主辅光感确认和阈值；保留原生夜间驾驶判断及附加等待。 |
 | `native_without_driving` · 传统确认与场景保护 | 完整旧场景结构没有夜间驾驶接口；使用原生确认窗口，保留步行、遮挡、HDR 等判断，不额外采样。 |
+| `native_scene_aon` · 新式场景确认（AON 窗口） | 无任何驾驶残片，且旧瞬时遮挡/反射标记整体缺失；只核验新式场景字段、AON 照度窗口与 updateAmbientLux / checkAonFlareStatus，保留原生主辅确认与期限。 |
 
-路线内部 ABI：`driving_capability_absent`；完整条件仅维护在 [ABI索引](../architecture/compatibility-index.md#abi-内部变体)。
+路线内部 ABI：`driving_capability_absent`、`response_scene_layout`；完整条件仅维护在 [ABI索引](../architecture/compatibility-index.md#abi-内部变体)。
 
 运行证据：`response_scene_profile`。
 
@@ -122,4 +123,4 @@
 | [HookRuntime.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/HookRuntime.java) | `4e3f51d5e9508d0c` |
 | [LowLightAssistEvidence.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/LowLightAssistEvidence.java) | `89a41dbcd6733592` |
 | [LowLightTuning.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/LowLightTuning.java) | `66826507c957e3ce` |
-| [ResponseTuning.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ResponseTuning.java) | `79f1efc44d2953db` |
+| [ResponseTuning.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ResponseTuning.java) | `b9fe1bacb8b05c72` |

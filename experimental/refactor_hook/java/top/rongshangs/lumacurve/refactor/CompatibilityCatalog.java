@@ -46,7 +46,8 @@ final class CompatibilityCatalog {
         case "thermal":return new Route[]{route("display_thermal","显示层温控接口","仅调整显示亮度限制；严重温控、电池温度门槛及其他系统温控继续有效。")};
         case "response":case "small_response":case "low_light":case "low_threshold":case "threshold_override":case "assist_gate":case "assist_override":return new Route[]{
             route("native_driving","原生确认与夜间驾驶保护","使用已验证的主辅光感确认和阈值；保留原生夜间驾驶判断及附加等待。"),
-            route("native_without_driving","传统确认与场景保护","完整旧场景结构没有夜间驾驶接口；使用原生确认窗口，保留步行、遮挡、HDR 等判断，不额外采样。")};
+            route("native_without_driving","传统确认与场景保护","完整旧场景结构没有夜间驾驶接口；使用原生确认窗口，保留步行、遮挡、HDR 等判断，不额外采样。"),
+            route("native_scene_aon","新式场景确认（AON 窗口）","无任何驾驶残片，且旧瞬时遮挡/反射标记整体缺失；只核验新式场景字段、AON 照度窗口与 updateAmbientLux / checkAonFlareStatus，保留原生主辅确认与期限。")};
         case "animation_override":return new Route[]{route("oem_animation","Refactor 原生时长过渡","调整已验证的原生过渡时长倍率，保持系统动画及主副屏隔离。"),route("traditional_ramp","传统自动亮度速率过渡","原生 Refactor 策略关闭且时长对象为空；匹配主屏双 RampAnimator、三参或四参目标入口及速率原因，只调整普通自动亮度速率，保留系统时长上限及特殊过渡。")};
         case "sunlight_override":return new Route[]{route("manual_sunlight","系统手动模式阳光屏","调整 SunlightController 的进入 / 退出等待，不代替自动 HBM。")};
         case "touch_override":return new Route[]{route("touch_release","系统触摸遮挡释放等待","调整 TouchCoverProtectionHelper 的移开等待，继续保留遮挡保护。")};

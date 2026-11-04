@@ -38,13 +38,19 @@ def run(group,scenario,sources,production,main):
 
 total=0
 advanced=fixtures('refactor_advanced_hooks.py')
-for scenario in ['native_old','partial_driving','wrong_flag','unknown_detector']:
+for scenario in ['native_old','partial_driving','wrong_flag','unknown_detector','aon_only','aon_partial']:
     sources=dict(advanced)
     detector='package com.android.server.display;public class SceneDetector{public boolean mIsStepMode,mIsReflectiveScene,mNeedCheckProximitySensor,mNeedCheckAonFlare;}'
     sources['com/android/server/display/SceneDetector.java']=detector.replace('mNeedCheckAonFlare','unknown' if scenario=='unknown_detector' else 'mNeedCheckAonFlare')
     impl='public AutomaticBrightnessController mAutomaticBrightnessController;public HysteresisLevelsImpl mHysteresisLevelsImpl;public DualSensorPolicy mDualSensorPolicy=new DualSensorPolicy();public TouchCoverProtectionHelper mTouchAreaHelper=new TouchCoverProtectionHelper();public SceneDetector mSceneDetector=new SceneDetector();public boolean mUseAonFlareEnabled,mUseProximityEnabled,mTransientProximityEnabled;'
     if scenario=='partial_driving':impl+='public boolean mUseDrivingModeForBrt;'
     if scenario=='wrong_flag':impl=impl.replace('mTransientProximityEnabled;','spare;public int mTransientProximityEnabled;')
+    if scenario in ('aon_only','aon_partial'):
+        # HyperOS 3 layout: no legacy transient/reflection members; the AON flare window lives
+        # inside SceneDetector.updateAmbientLux. aon_partial drops that entry point.
+        detector='package com.android.server.display;public class SceneDetector{public boolean mIsStepMode,mUseAonFlareEnabled;public float mMinAonFlareEnableLux,mMaxAonFlareEnableLux;public void updateAmbientLux(int e,float lux,boolean main){}'+('public void checkAonFlareStatus(float lux){}}' if scenario=='aon_only' else 'public void checkAonFlareStatus(int lux){}}')
+        sources['com/android/server/display/SceneDetector.java']=detector
+        impl='public AutomaticBrightnessController mAutomaticBrightnessController;public HysteresisLevelsImpl mHysteresisLevelsImpl;public DualSensorPolicy mDualSensorPolicy=new DualSensorPolicy();public TouchCoverProtectionHelper mTouchAreaHelper=new TouchCoverProtectionHelper();public SceneDetector mSceneDetector=new SceneDetector();public boolean mUseProxAndTouchEnabled,mUseAonFlareEnabled,mUseProximityEnabled,mIsGameSceneEnable;'
     # This test uses actual eligibility methods, not a mocked "OS3 supported" flag.
     double=sources['top/rongshangs/lumacurve/refactor/HookRuntime.java']
     double=re.sub(r'boolean normalTuningAllowed\(Object a,Object i\)\{[^\n]+?\}boolean animationTuningAllowed',method('    boolean normalTuningAllowed(')+' boolean screenOn(){return true;}boolean animationTuningAllowed',double)
@@ -60,7 +66,7 @@ public class AdvancedHookTest{
  public static class Owner{public Impl mAutomaticBrightnessControllerImpl=new Impl();public Dpc mDisplayPowerController=new Dpc();public RefactorAutoBrightnessAnimator mBrightnessAnimator=new RefactorAutoBrightnessAnimator(),mSdrBrightnessAnimator=new RefactorAutoBrightnessAnimator();public SunlightController mSunlightController=new SunlightController();}
  static int cases;static void check(boolean b){if(!b)throw new AssertionError("scene case "+cases);cases++;}
  public static void main(String[] args)throws Exception{
-  boolean supported=args[0].equals("native_old");Owner o=new Owner();Impl impl=o.mAutomaticBrightnessControllerImpl;AutomaticBrightnessController abc=new AutomaticBrightnessController();impl.mAutomaticBrightnessController=abc;abc.impl=impl;
+  boolean nativeLegacy=args[0].equals("native_old"),aoned=args[0].equals("aon_only");boolean supported=nativeLegacy||aoned;Owner o=new Owner();Impl impl=o.mAutomaticBrightnessControllerImpl;AutomaticBrightnessController abc=new AutomaticBrightnessController();impl.mAutomaticBrightnessController=abc;abc.impl=impl;
   HysteresisLevelsImpl h=new HysteresisLevelsImpl();impl.mHysteresisLevelsImpl=h;abc.h=h;impl.mDualSensorPolicy.h=h;
   HookRuntime s=new HookRuntime();s.owner=o;HookEntry.states.put(o,s);ClassLoader loader=AdvancedHookTest.class.getClassLoader();ResponseTuning.install(loader);LowLightTuning.install(loader);AdvancedTuning.install(loader);
   check(ResponseTuning.supported(o)==supported);check(ResponseTuning.smallSupported(o)==supported);
@@ -69,7 +75,8 @@ public class AdvancedHookTest{
   check(s.normalTuningAllowed(abc,impl)==!blocked);
   for(int group=0;group<5;group++)check(AdvancedTuning.supported(group,s)==supported);
   if(!supported){check(ResponseTuning.sceneProfile(o).equals("unsupported"));System.out.println("OS3 scene "+args[0]+": "+cases+" cases PASS");return;}
-  check(ResponseTuning.sceneProfile(o).equals("native_without_driving"));check(!ResponseTuning.driving(impl)&&ResponseTuning.nightDelay(impl)==0);
+  check(ResponseTuning.sceneProfile(o).equals(aoned?"native_scene_aon":"native_without_driving"));check(!ResponseTuning.driving(impl));
+  if(nativeLegacy)check(ResponseTuning.nightDelay(impl)==0);
   s.responseEnabled=true;s.brightenDelay=2000;s.darkenDelay=1800;abc.mStepModeDarkenDebounceConfig=1300;
   check((Long)XposedBridge.call(abc,"nextAmbientLightBrighteningTransition",new Class<?>[]{long.class},8000L)==10000);
   // The OEM 1300 ms walking delay remains; retained-history clamping may shorten only our override.

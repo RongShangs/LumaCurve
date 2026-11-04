@@ -2033,6 +2033,8 @@ public final class UiText {
         WORDS.put("使用已验证的主辅光感确认和阈值；保留原生夜间驾驶判断及附加等待。","Uses verified sensor confirmation and thresholds, retaining native night-driving checks and delays.");
         WORDS.put("传统确认与场景保护","Traditional confirmation and scene protection");
         WORDS.put("完整旧场景结构没有夜间驾驶接口；使用原生确认窗口，保留步行、遮挡、HDR 等判断，不额外采样。","For a complete older layout without night driving: retains native confirmation, walking, occlusion and HDR checks without extra sampling.");
+        WORDS.put("新式场景确认（AON 窗口）","Modern scene confirmation (AON window)");
+        WORDS.put("无任何驾驶残片，且旧瞬时遮挡/反射标记整体缺失；只核验新式场景字段、AON 照度窗口与 updateAmbientLux / checkAonFlareStatus，保留原生主辅确认与期限。","No driving remnants and no legacy transient-occlusion/reflection markers: verifies only the modern scene fields, the AON lux window and updateAmbientLux / checkAonFlareStatus while keeping native sensor confirmation and deadlines.");
         WORDS.put("系统覆盖目标入口","Native override target");
         WORDS.put("通过 getOverrideLimitBrightness 增强自动目标，保留原生手动接管与下游保护。","Enhances the automatic target through getOverrideLimitBrightness, retaining manual control and downstream protection.");
         WORDS.put("传统物理曲线目标入口","Traditional physical-curve target");

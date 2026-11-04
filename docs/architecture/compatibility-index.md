@@ -11,7 +11,7 @@
 | [曲线与手动记忆](../features/curve.md) | `refactor`、`refactor_coefficients`、`refactor_reset_coefficients`、`miui_physical`、`aosp_physical`、`aosp_physical_clamped`、`simple_mapping` |
 | [主光感](../features/main_input.md) | `oem_main`、`oem_selected_secondary`、`oem_selected_fov` |
 | [辅助光感](../features/assist_input.md) | `native_auxiliary`、`ported_auxiliary` |
-| [主辅确认与暗光策略](../features/response.md) | `native_driving`、`native_without_driving` |
+| [主辅确认与暗光策略](../features/response.md) | `native_driving`、`native_without_driving`、`native_scene_aon` |
 | [原生亮度过渡](../features/animation.md) | `oem_animation`、`traditional_ramp` |
 | [手动阳光屏](../features/sunlight.md) | `manual_sunlight` |
 | [触摸遮挡释放](../features/touch.md) | `touch_release` |
@@ -97,6 +97,7 @@
 | `control_center_partition_boundary` · `ControlCenterPartition.java` | `config_high_brightness_mode_data` / `display_device_config_high_brightness_mode_data` | 普通边界 getter 接受两种已验证 HBM 数据身份；要求非静态、返回 public float transitionPoint。空值才回退控制器普通上限，类型残缺不降级。 | [refactor_control_center_partition.py](../../tests/refactor_control_center_partition.py) |
 | `brightness_clamp_cap` · `OutdoorNodeBridge.java` | `internal_mBrightnessCap_float` / `getMaxBrightness_float` | 节点写入上限优先读取 BrightnessClamperController.mBrightnessCap（clamp() 实际使用的 float）；该字段整体缺失时才用 getMaxBrightness() 旧访问器。字段存在但非 float、或旧访问器返回类型非 float 即拒绝安装，不以旧路线掩盖残缺。自检与写入判定共用同一选择器。 | [refactor_outdoor_node.py](../../tests/refactor_outdoor_node.py) |
 | `driving_capability_absent` · `ResponseTuning.java` | `native_driving_getDrivingStatus` / `native_without_driving` | 门禁驾驶判定与场景确认布局解耦：getDrivingStatus 存在时要求非静态 boolean 与 getNightDrivingDebounceConfig 非静态 long；缺失时仅在控制器及其真实 SceneDetector 上都不存在任何 driving 字段/方法才判为无驾驶能力（false），mSceneDetector 缺失或出现任何 driving 残片仍视为歧义并抛异常，不伪造 true。场景确认路线的完整旧字段要求不变。 | [refactor_advanced_hooks.py](../../tests/refactor_advanced_hooks.py) |
+| `response_scene_layout` · `ResponseTuning.java` | `native_driving` / `native_without_driving` / `native_scene_aon` | 场景确认按形状分流：完整驾驶接口优先；否则仅当控制器与真实 SceneDetector 上不存在任何旧瞬时遮挡/反射字段、旧驾驶残片也不存在，且新式场景布尔字段（mUseProxAndTouchEnabled、mUseAonFlareEnabled、mUseProximityEnabled、mIsGameSceneEnable）、AON 上下限 float、updateAmbientLux(int,float,boolean) void、checkAonFlareStatus(float) void 全部匹配时才采用 AON 场景路径。任一旧标记残片、类型错误或缺失即拒绝，不猜测语义；核心期限门禁与场景确认布局解耦，避免单体门禁连带关闭 9 项能力。 | [refactor_os3_compatibility.py](../../tests/refactor_os3_compatibility.py) |
 
 ## 原生协议与运行分支
 
