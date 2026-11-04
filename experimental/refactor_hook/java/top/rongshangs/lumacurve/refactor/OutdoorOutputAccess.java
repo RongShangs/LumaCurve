@@ -56,13 +56,13 @@ final class OutdoorOutputAccess {
         return b;
     }
     static final class Decision {
-        String profile,name,selector,error="";Boolean enabled,use,applied;Integer reason,temp,reasonMod,tempMod;
+        String profile,name,selector,error="";Boolean enabled,use,applied;Integer reason,temp,reasonMod,tempMod,cosmetic;
     }
     /** Same predicate as {@link Binding#automatic()}, but keeps every input for diagnosis. */
     static Decision evaluate(HookRuntime s){
         Decision d=new Decision();
         try{
-            Binding b=read(s.owner);d.profile=b.profile;
+            Binding b=read(s.owner);d.profile=b.profile;d.cosmetic=b.cosmetic;
             if(b.selected!=null){
                 Object value=b.selected.invoke(b.dpc);d.selector=value==null?null:value.getClass().getSimpleName();
                 d.name=d.selector!=null&&d.selector.equals("AutomaticBrightnessStrategy")?"AutomaticBrightnessStrategy":"OtherBrightnessOutput";

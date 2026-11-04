@@ -17,6 +17,8 @@ final class OutdoorController {
     final ArrayDeque<JSONObject> outputDiagnostics=new ArrayDeque<>();String lastOutputSignature="";boolean inTick;
     final ArrayDeque<JSONObject> outputCritical=new ArrayDeque<>();
     boolean activeOverrideLatched,aboveEnter,belowExit;long cooldownEndLatched=-1;
+    // Exit debounce only; the write gate still consumes block() directly.
+    int exitFailures;long exitFirst,exitLast;boolean debounceFirstLatched,debounceRecoverLatched;
     OutdoorOutputAccess.Decision lastDecision;String lastBlock;
     final LiveLimitEvidence liveLimits=new LiveLimitEvidence();
     NitBrightnessLimit nitLimit;
@@ -72,11 +74,36 @@ final class OutdoorController {
                 else if(Boolean.TRUE.equals(HookRuntime.optionalBoolean(impl,"mIsOverrideDragPolicy")))result="manual";
                 else if(!s.normalTuningAllowed(abc,impl))result="scene";
                 else if(access.managed()&&!Boolean.TRUE.equals(HookRuntime.optionalBoolean(access.controller,"mIsAutoBrightnessEnabled")))result="auto_not_ready";
-                else{decision=OutdoorOutputAccess.evaluate(s);result="AutomaticBrightnessStrategy".equals(decision.name)?null:"output_override";}
+                else{decision=OutdoorOutputAccess.evaluate(s);
+                    if("AutomaticBrightnessStrategy".equals(decision.name))result=null;
+                    else{
+                        int failing=0;if(decision.reasonMod!=null)failing|=decision.reasonMod;if(decision.tempMod!=null)failing|=decision.tempMod;
+                        // Protected modifiers are an explicit owner signal, never a transient frame.
+                        result=decision.cosmetic!=null&&(failing&~decision.cosmetic)!=0?"output_modifier":"output_override";
+                    }}
             }
         }catch(Throwable unknown){result="unknown";}
         recordOutput(result,decision);
         return result;
+    }
+    /** Single-frame tolerance for output provenance only. Any upstream block or protected
+     *  modifier keeps exiting immediately; write callers still use {@link #block()}. */
+    String exitBlock(String gate){
+        if(!"output_override".equals(gate)||!policy.active){
+            if(exitFailures>0&&gate==null&&policy.active&&!debounceRecoverLatched){debounceRecoverLatched=true;latch("debounce_recover");}
+            exitFailures=0;exitFirst=exitLast=0;return gate;
+        }
+        long now=SystemClock.uptimeMillis();
+        if(exitFailures==0){
+            exitFirst=exitLast=now;exitFailures=1;
+            if(!debounceFirstLatched){debounceFirstLatched=true;latch("debounce_first");}
+            return null;
+        }
+        // Repeated reads inside the same frame (tick plus a write-path probe) count once.
+        if(now-exitLast>=4)exitFailures++;
+        exitLast=now;
+        if(exitFailures>=2||now-exitFirst>=50){latch("debounce_abort");exitFailures=0;exitFirst=exitLast=0;return gate;}
+        return null;
     }
     /** Read-only evidence at the real decision point; identical verdicts are skipped. */
     void recordOutput(String result,OutdoorOutputAccess.Decision decision){
@@ -140,6 +167,8 @@ final class OutdoorController {
                 if(lastDecision.reason!=null){row.put("reason",lastDecision.reason);row.put("reason_name",reasonName(lastDecision.reason));}
                 if(lastDecision.temp!=null){row.put("temp",lastDecision.temp);row.put("temp_name",reasonName(lastDecision.temp));}
             }
+            if(exitFailures>0){row.put("debounce_count",exitFailures).put("debounce_first_ms",exitFirst).put("debounce_elapsed_ms",SystemClock.uptimeMillis()-exitFirst);}
+            if(kind.startsWith("debounce_"))row.put("debounce_result",kind.equals("debounce_abort")?"abort":kind.equals("debounce_recover")?"recover":"first");
             if(outputCritical.size()>=OUTPUT_CRITICAL)outputCritical.removeFirst();
             outputCritical.addLast(row);s.queuePublish();
         }catch(Throwable ignored){}
@@ -148,17 +177,17 @@ final class OutdoorController {
     void tick(){
         if(ticking||failed||!s.onDisplayThread())return;ticking=true;inTick=true;
         try{
-            HbmAccess h=binding();String blocked=h==null?"unsupported":block();float lux=lux();
+            HbmAccess h=binding();String gate=h==null?"unsupported":block();String blocked=exitBlock(gate);float lux=lux();
             boolean before=policy.active;long cooldownBefore=policy.cooldownUntil;policy.step(options,lux,SystemClock.uptimeMillis(),blocked);if(!policy.active)goal=Float.NaN;
             long now=SystemClock.uptimeMillis();
-            if(!before&&policy.active){activeOverrideLatched=false;latch("session_enter");}
+            if(!before&&policy.active){activeOverrideLatched=false;debounceFirstLatched=debounceRecoverLatched=false;exitFailures=0;exitFirst=exitLast=0;latch("session_enter");}
             else if(before&&!policy.active)latch("session_exit");
             if(policy.cooldownUntil>cooldownBefore)latch("cooldown_start");
             if(cooldownBefore>0&&now>=cooldownBefore&&cooldownEndLatched!=cooldownBefore){cooldownEndLatched=cooldownBefore;latch("cooldown_end");}
             if(options.flags[0]&&lux==lux){float enter=(float)options.values[0],exit=(float)(options.values[0]*options.values[4]);
                 if(lux>=enter){belowExit=false;if(!aboveEnter){aboveEnter=true;latch("lux_enter");}}
                 else if(lux<exit){aboveEnter=false;if(!belowExit){belowExit=true;latch("lux_exit");}}}
-            boolean dataChanged=h!=null&&h.configure(options,blocked==null&&policy.active);
+            boolean dataChanged=h!=null&&h.configure(options,gate==null&&policy.active);
             if(dataChanged)h.reevaluate(lux);
             // Entry/expiry timers also change the target/range without any new sensor event.
             // Recompute through the OEM pipeline so activation and release take effect promptly.

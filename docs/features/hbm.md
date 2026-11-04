@@ -54,4 +54,4 @@
 | 文件 | 当前源码 SHA-256 前16位 |
 | --- | --- |
 | [HbmAccess.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/HbmAccess.java) | `1b60fcde7b4ab2b7` |
-| [OutdoorController.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/OutdoorController.java) | `249664b9a0afda95` |
+| [OutdoorController.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/OutdoorController.java) | `2be9157b433579d7` |

@@ -500,7 +500,7 @@
     {
       "file": "OutdoorController.java",
       "layer": "orchestration",
-      "purpose": "显示运行协调；在真实输出判定点采集有界诊断环（上限32条、去重），只记录不改变判定与冷却"
+      "purpose": "显示运行协调；在真实输出判定点采集有界诊断环（128 条、去重）与关键事件锁存（32 条）；写门保持严格，仅输出归属退出对单帧 temp 失败做有界去抖（2 帧或 50ms），上游 block 与受保护 modifier 立即退出"
     },
     {
       "file": "OutdoorNodeBridge.java",
@@ -540,7 +540,7 @@
     {
       "file": "OutdoorOutputAccess.java",
       "layer": "adapters",
-      "purpose": "户外输出归属的原生策略与独立自动对象 ABI，保留其他功能原路径；evaluate 记录 automatic 各子条件原值供诊断"
+      "purpose": "户外输出归属的原生策略与独立自动对象 ABI，保留其他功能原路径；evaluate 记录 automatic 各子条件原值（含 reason/temp 名称与装饰位掩码）供诊断与退出分类"
     },
     {
       "file": "OutdoorPolicy.java",
