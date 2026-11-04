@@ -62,7 +62,7 @@ sources={
 'android/os/Process.java':'package android.os;public class Process{public static int myPid(){return 123;}}',
 'android/system/Os.java':'package android.system;public class Os{public static void chmod(String s,int m){}public static void rename(String a,String b){throw new AssertionError("Host must use test sink");}}',
 'top/rongshangs/lumacurve/refactor/hooking/XposedBridge.java':'package top.rongshangs.lumacurve.refactor.hooking;public class XposedBridge{public static void log(String s){}}',
-'top/rongshangs/lumacurve/refactor/HookEntry.java':'''package top.rongshangs.lumacurve.refactor;class HookEntry{static Object get(Object o,String n)throws Exception{java.lang.reflect.Field f=o.getClass().getField(n);return f.get(o);}}''',
+'top/rongshangs/lumacurve/refactor/HookEntry.java':'''package top.rongshangs.lumacurve.refactor;class HookEntry{static Object get(Object o,String n)throws Exception{for(Class<?> c=o.getClass();c!=null;c=c.getSuperclass())try{java.lang.reflect.Field f=c.getDeclaredField(n);f.setAccessible(true);return f.get(o);}catch(NoSuchFieldException absent){}throw new NoSuchFieldException(n);}}''',
 'top/rongshangs/lumacurve/refactor/RawPanelOutputHooks.java':'package top.rongshangs.lumacurve.refactor;class RawPanelOutputHooks{static boolean ok=true;static boolean supports(Class<?> c){return ok;}}',
 'top/rongshangs/lumacurve/refactor/OutdoorSdrScope.java':'''package top.rongshangs.lumacurve.refactor;class OutdoorSdrScope{static OutdoorSdrScope instance=new OutdoorSdrScope();java.lang.reflect.Method privacy;boolean allow=true;static OutdoorSdrScope resolve(Class<?> c){return instance;}boolean allows(Object o){return allow;}}''',
 'top/rongshangs/lumacurve/refactor/HookRuntime.java':r'''package top.rongshangs.lumacurve.refactor;
@@ -73,8 +73,11 @@ class HookRuntime {
  public static class Power{boolean interactive=true,save;boolean isInteractive(){return interactive;}boolean isPowerSaveMode(){return save;}}
  public static class Handler{final java.util.Map<Runnable,Long> tasks=new java.util.IdentityHashMap<>();boolean post(Runnable r){tasks.put(r,android.os.SystemClock.now);return true;}boolean postDelayed(Runnable r,long t){tasks.put(r,android.os.SystemClock.now+t);return true;}void removeCallbacks(Runnable r){tasks.remove(r);}}
  public static class Owner{public Dpc mDisplayPowerController=new Dpc();public float mBatteryThermalLimitBrightness=1;}
- public static class Dpc{public Clamp mBrightnessClamperController=new Clamp();public Screen screen=new Screen();public Screen getDisplayPowerState(){return screen;}}
+ public static class Dpc{public Object mBrightnessClamperController=new Clamp();public Screen screen=new Screen();public Screen getDisplayPowerState(){return screen;}}
  public static class Clamp{public float cap=1;public float getMaxBrightness(){return cap;}}
+ public static class FieldClamp{private float mBrightnessCap=1;}
+ public static class WrongFieldClamp{private Object mBrightnessCap="x";public float getMaxBrightness(){return 1;}}
+ public static class NoCapClamp{}
  public static class Screen{public float value=1,sdr=1;public float getScreenBrightness(){return value;}public float getSdrScreenBrightness(){return sdr;}}
  public static class Control{String owner="none";boolean automatic=true,unlocked=true;boolean auto(){return automatic;}boolean unlocked(){return unlocked;}}
  public static class Outdoor{OutdoorOptions options=new OutdoorOptions();OutdoorPolicy policy=new OutdoorPolicy();Access access=new Access();String blocked;float lux=50000;Outdoor(){options.nodeBoost=true;options.flags[0]=options.flags[2]=options.flags[3]=true;options.values[5]=1;policy.active=true;policy.started=1000;}boolean rangeSupported(){return true;}String block(){return blocked;}float lux(){return lux;}}
@@ -91,10 +94,19 @@ public class NodeBridgeTest{
   s.owner.mDisplayPowerController.screen.value=.9f;check(!b.allowed());b.evaluate();check(!b.requested&&writes.get(1).endsWith("0 0\n")&&!s.handler.tasks.containsKey(b.check));s.owner.mDisplayPowerController.screen.value=1;
   for(int i=0;i<15;i++){
    s=new HookRuntime();b=new OutdoorNodeBridge(s,Runnable::run,writes::add);b.frame=1;
-   switch(i){case 0:s.on=false;break;case 1:s.hdr=true;break;case 2:s.user=false;break;case 3:s.thermalSeverity=1;break;case 4:s.batteryTemperature=44;break;case 5:s.batteryTemperature=Float.NaN;break;case 6:s.batteryLevel=29;break;case 7:s.brightnessControl.owner="raw_panel";break;case 8:s.brightnessControl.automatic=false;break;case 9:s.brightnessControl.unlocked=false;break;case 10:s.owner.mDisplayPowerController.mBrightnessClamperController.cap=.99f;break;case 11:s.owner.mBatteryThermalLimitBrightness=.9f;break;case 12:s.outdoor.options.values[10]=2000;break;case 13:s.outdoor.lux=20000;break;case 14:s.strategy="TemporaryBrightnessStrategy";}
+   switch(i){case 0:s.on=false;break;case 1:s.hdr=true;break;case 2:s.user=false;break;case 3:s.thermalSeverity=1;break;case 4:s.batteryTemperature=44;break;case 5:s.batteryTemperature=Float.NaN;break;case 6:s.batteryLevel=29;break;case 7:s.brightnessControl.owner="raw_panel";break;case 8:s.brightnessControl.automatic=false;break;case 9:s.brightnessControl.unlocked=false;break;case 10:((HookRuntime.Clamp)s.owner.mDisplayPowerController.mBrightnessClamperController).cap=.99f;break;case 11:s.owner.mBatteryThermalLimitBrightness=.9f;break;case 12:s.outdoor.options.values[10]=2000;break;case 13:s.outdoor.lux=20000;break;case 14:s.strategy="TemporaryBrightnessStrategy";}
    check(!b.allowed());int count=writes.size();b.evaluate();check(writes.size()==count&&!b.requested);
   }
   s=new HookRuntime();b=new OutdoorNodeBridge(s,Runnable::run,writes::add);b.frame=1;OutdoorSdrScope.instance.privacy=Object.class.getMethod("toString");OutdoorSdrScope.instance.allow=false;check(!b.allowed());OutdoorSdrScope.instance.privacy=null;OutdoorSdrScope.instance.allow=true;
+  s=new HookRuntime();b=new OutdoorNodeBridge(s,Runnable::run,writes::add);b.frame=1;
+  s.owner.mDisplayPowerController.mBrightnessClamperController=new HookRuntime.FieldClamp();
+  check(OutdoorNodeBridge.interfaces(s,true));check(b.allowed());
+  java.lang.reflect.Field cap=HookRuntime.FieldClamp.class.getDeclaredField("mBrightnessCap");cap.setAccessible(true);cap.set(s.owner.mDisplayPowerController.mBrightnessClamperController,.99f);check(!b.allowed());
+  s.owner.mDisplayPowerController.mBrightnessClamperController=new HookRuntime.WrongFieldClamp();
+  try{OutdoorNodeBridge.interfaces(s,true);throw new AssertionError("wrong cap type accepted");}catch(NoSuchFieldException expected){cases++;}
+  s.owner.mDisplayPowerController.mBrightnessClamperController=new HookRuntime.NoCapClamp();
+  try{OutdoorNodeBridge.interfaces(s,true);throw new AssertionError("missing cap accepted");}catch(NoSuchMethodException expected){cases++;}
+  s.owner.mDisplayPowerController.mBrightnessClamperController=new HookRuntime.Clamp();check(OutdoorNodeBridge.interfaces(s,true));
   List<Runnable> tasks=new ArrayList<>();writes.clear();b=new OutdoorNodeBridge(s,tasks::add,writes::add);b.send(true,1000);b.send(false,0);check(tasks.size()==1);tasks.remove(0).run();check(writes.size()==1&&writes.get(0).endsWith("0 0\n"));
   b=new OutdoorNodeBridge(s,Runnable::run,v->{throw new java.io.IOException("test");});b.frame=1;b.evaluate();check(b.failed);b.evaluate();check(!b.requested&&!s.handler.tasks.containsKey(b.check));
   for(int max:new int[]{11,4095,16383,65535})check(OutdoorNodeProfile.matches("physical_mapping",1200,max,true,true));
