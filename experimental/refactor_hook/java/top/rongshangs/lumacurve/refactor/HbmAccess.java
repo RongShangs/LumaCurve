@@ -9,6 +9,11 @@ final class HbmAccess {
     final Field managedField;final Method managedMethod;final String controllerProfile;
     Object original,applied;float appliedLux;long appliedBudget;boolean copyable;
     static final String[] DATA_NAMES={"minimumLux","transitionPoint","timeWindowMillis","timeMaxMillis","timeMinMillis","allowInLowPowerMode","minimumHdrPercentOfScreen","sdrToHdrRatioSpline","refreshRateLimit","isHighBrightnessModeEnabled"};
+    // Android 15 / HyperOS 3 embeds the HBM data class in DisplayDeviceConfig and keeps only
+    // the seven fields that still have consumers. The config.* identity stays as the first route.
+    static final String DATA_TYPE_CONFIG="com.android.server.display.config.HighBrightnessModeData";
+    static final String DATA_TYPE_DISPLAY_CONFIG="com.android.server.display.DisplayDeviceConfig$HighBrightnessModeData";
+    static final String[] DISPLAY_CONFIG_DATA_NAMES={"minimumLux","transitionPoint","timeWindowMillis","timeMaxMillis","timeMinMillis","allowInLowPowerMode","minimumHdrPercentOfScreen"};
     HbmAccess(Object c)throws Exception{
         controller=c;dataField=HookEntry.field(c.getClass(),"mHbmData");
         for(String f:new String[]{"mBrightnessMax","mBrightnessMin","mAmbientLux","mBrightness"})typed(c.getClass(),f,float.class);
@@ -19,7 +24,7 @@ final class HbmAccess {
             // The older controller derives support from live HBM data and metadata. Invoke
             // that native predicate; never invent a true enable flag or bypass its guards.
             Method supports=method(c.getClass(),"deviceSupportsHbm",boolean.class);
-            if(Modifier.isStatic(supports.getModifiers())||!dataField.getType().getName().equals("com.android.server.display.config.HighBrightnessModeData")||
+            if(Modifier.isStatic(supports.getModifiers())||!dataType(dataField.getType())||
                 !HookEntry.field(c.getClass(),"mHighBrightnessModeMetadata").getType().getName().equals("com.android.server.display.HighBrightnessModeMetadata"))throw new IllegalStateException("legacy HBM ownership ABI");
             managedField=null;managedMethod=supports;controllerProfile="native_support_method";
         }
@@ -31,14 +36,27 @@ final class HbmAccess {
     }
     static void typed(Class<?> c,String name,Class<?> type)throws Exception{Field field=HookEntry.field(c,name);if(field.getType()!=type||Modifier.isStatic(field.getModifiers()))throw new IllegalStateException("HBM field type: "+name);}
     static Method method(Class<?> c,String name,Class<?> result,Class<?>...args)throws Exception{Method m=c.getDeclaredMethod(name,args);if(m.getReturnType()!=result||Modifier.isStatic(m.getModifiers()))throw new IllegalStateException("HBM method type: "+name);m.setAccessible(true);return m;}
-    static void validateData(Object data)throws Exception{if(data==null||!data.getClass().getName().equals("com.android.server.display.config.HighBrightnessModeData"))throw new IllegalStateException("HBM data unavailable");
-        for(String name:new String[]{"minimumLux","transitionPoint"})typed(data.getClass(),name,float.class);
+    static boolean dataType(Class<?> type){String name=type.getName();return DATA_TYPE_CONFIG.equals(name)||DATA_TYPE_DISPLAY_CONFIG.equals(name);}
+    static String[] dataNames(Class<?> type){return DATA_TYPE_DISPLAY_CONFIG.equals(type.getName())?DISPLAY_CONFIG_DATA_NAMES:DATA_NAMES;}
+    /** Prefer the 4-parameter Android 15 signature, then keep the five-parameter ABI as fallback. */
+    static Method sdrMethod(Class<?> c,Class<?> reason)throws Exception{
+        try{return method(c,"adjustSdrBrightness",float.class,float.class,boolean.class,reason,boolean.class);}
+        catch(NoSuchMethodException absent){return method(c,"adjustSdrBrightness",float.class,float.class,boolean.class,reason,boolean.class,boolean.class);}
+    }
+    /** Prefer the current (brightness, reason) OPR entry, then keep the legacy three-parameter ABI. */
+    static Method oprMethod(Class<?> c,Class<?> reason)throws Exception{
+        try{return method(c,"adjustBrightnessByOpr",float.class,float.class,reason);}
+        catch(NoSuchMethodException absent){return method(c,"adjustBrightnessByOpr",float.class,float.class,float.class,reason);}
+    }
+    static void validateData(Object data)throws Exception{if(data==null||!dataType(data.getClass()))throw new IllegalStateException("HBM data unavailable");
+        for(String name:new String[]{"minimumLux","transitionPoint","minimumHdrPercentOfScreen"})typed(data.getClass(),name,float.class);
         for(String name:new String[]{"timeWindowMillis","timeMaxMillis","timeMinMillis"})typed(data.getClass(),name,long.class);
-        for(Field f:data.getClass().getDeclaredFields())if(!Modifier.isStatic(f.getModifiers())&&!Arrays.asList(DATA_NAMES).contains(f.getName()))throw new IllegalStateException("HBM data layout changed");
+        typed(data.getClass(),"allowInLowPowerMode",boolean.class);
+        for(Field f:data.getClass().getDeclaredFields())if(!Modifier.isStatic(f.getModifiers())&&!Arrays.asList(dataNames(data.getClass())).contains(f.getName()))throw new IllegalStateException("HBM data layout changed");
     }
     static Object copyData(Object source)throws Exception{
-        validateData(source);Class<?>[] types=new Class<?>[DATA_NAMES.length];Object[] args=new Object[DATA_NAMES.length];
-        for(int i=0;i<DATA_NAMES.length;i++){Field f=HookEntry.field(source.getClass(),DATA_NAMES[i]);types[i]=f.getType();args[i]=f.get(source);}
+        validateData(source);String[] names=dataNames(source.getClass());Class<?>[] types=new Class<?>[names.length];Object[] args=new Object[names.length];
+        for(int i=0;i<names.length;i++){Field f=HookEntry.field(source.getClass(),names[i]);types[i]=f.getType();args[i]=f.get(source);}
         Constructor<?> ctor=source.getClass().getDeclaredConstructor(types);ctor.setAccessible(true);return ctor.newInstance(args);
     }
     boolean cloneable(Object data){try{copyData(data);return true;}catch(Throwable unknown){return false;}}
@@ -47,7 +65,7 @@ final class HbmAccess {
         // A genuine absent configuration can still expose an ordinary native range.
         // Require the native support predicate to confirm absence, never infer support
         // from a missing/malformed data field or manufacture HBM data and timers.
-        if(!dataField.getType().getName().equals("com.android.server.display.config.HighBrightnessModeData"))throw new IllegalStateException("HBM data type changed");
+        if(!dataType(dataField.getType()))throw new IllegalStateException("HBM data type changed");
         Method supports=method(controller.getClass(),"deviceSupportsHbm",boolean.class);
         if(!Boolean.FALSE.equals(supports.invoke(controller)))throw new IllegalStateException("HBM support conflicts with absent data");
         float normal=((Number)normalMethod.invoke(controller)).floatValue(),allowed=allowedMax();
