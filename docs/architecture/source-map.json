@@ -745,7 +745,7 @@
     {
       "file": "SceneTuning.java",
       "layer": "adapters",
-      "purpose": "设备接口与所有权"
+      "purpose": "设备接口与所有权；场景各能力独立核验，新式 SceneDetector 只把已核验的 AON 窗口映射到反射确认，缺少瞬时遮挡与跳过亮度变化入口时流式距离保持不可用，不伪造传感器行为"
     },
     {
       "file": "ScreenBrightnessReading.java",

@@ -423,7 +423,7 @@
         "SceneCatalog.java",
         "FieldOverride.java"
       ],
-      "selector": "各场景独立实际消费者；普通 / 流式距离分别检测。OEM 未启用普通距离时报告 inactive，不强开传感器；只能约束现有场景。",
+      "selector": "各场景独立实际消费者；普通 / 流式距离分别检测。新版 SceneDetector 缺少瞬时遮挡与跳过亮度变化入口时流式距离保持不可用（不伪造）；反射确认在旧 isReflectiveScene 缺失时映射到已核验的 AON 照度窗口。OEM 未启用普通距离时报告 inactive，不强开传感器；只能约束现有场景。",
       "evidence": [
         "system_scene",
         "scene_options",
@@ -1909,6 +1909,26 @@
       ],
       "rule": "场景确认按形状分流：完整驾驶接口优先；否则仅当控制器与真实 SceneDetector 上不存在任何旧瞬时遮挡/反射字段、旧驾驶残片也不存在，且新式场景布尔字段（mUseProxAndTouchEnabled、mUseAonFlareEnabled、mUseProximityEnabled、mIsGameSceneEnable）、AON 上下限 float、updateAmbientLux(int,float,boolean) void、checkAonFlareStatus(float) void 全部匹配时才采用 AON 场景路径。任一旧标记残片、类型错误或缺失即拒绝，不猜测语义；核心期限门禁与场景确认布局解耦，避免单体门禁连带关闭 9 项能力。",
       "test": "tests/refactor_os3_compatibility.py"
+    },
+    {
+      "id": "scene_reflection_mapping",
+      "owner": "SceneTuning.java",
+      "alternatives": [
+        "legacy_isReflectiveScene",
+        "aon_window_updateAmbientLux"
+      ],
+      "rule": "反射与 AON 确认按形状分流：旧 SceneDetector 存在 isReflectiveScene() 且共享场景消费者完整时沿用旧反射判定，阻止时返回 false；新布局整体缺少旧瞬时遮挡/反射标记时，只在 mUseAonFlareEnabled、mIsStepMode 布尔、mMinAonFlareEnableLux/mMaxAonFlareEnableLux float、updateAmbientLux(int,float,boolean) void、checkAonFlareStatus(float) void 全部匹配后才把 AON 窗口映射为反射确认，阻止时把窗口置为不可命中（min=MAX/max=-1）并在调用结束恢复。字段类型错误、旧标记残片或 checkAonFlareStatus 签名不符一律不开放，不猜测语义。",
+      "test": "tests/refactor_scene_hooks.py"
+    },
+    {
+      "id": "scene_stream_proximity_absent",
+      "owner": "SceneTuning.java",
+      "alternatives": [
+        "legacy_transient_proximity",
+        "new_layout_without_stream_consumer"
+      ],
+      "rule": "流式距离遮挡要求 SceneDetector 同时具备 mTransientProximityEnabled、mNeedCheckProximitySensor/mNeedCheckAonFlare 与 isNeedSkipBrightnessChange()。新布局只有 updateAmbientLux(int,float,boolean) 而缺少跳过亮度变化入口与瞬时遮挡字段时，该项保持能力不可用：不安装 Hook、不伪造准入，也不把 updateAmbientLux 的 AON 窗口当作流式遮挡；该入口只承载已核验的反射/AON 抑制。",
+      "test": "tests/refactor_scene_hooks.py"
     }
   ],
   "native_variants": [
