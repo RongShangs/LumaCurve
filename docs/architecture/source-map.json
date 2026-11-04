@@ -450,7 +450,7 @@
     {
       "file": "MemoryLifecycle.java",
       "layer": "adapters",
-      "purpose": "原生短期模型与事件观察适配器，向统一记忆管理提供交接事件和模型快照；恢复按后端能力操作，不按名称猜测"
+      "purpose": "原生短期模型与事件观察适配器，向统一记忆管理提供交接事件和模型快照；自动亮度开关按旧 owner 布尔或新 facade 模式入口两种完整形状观察，恢复按后端能力操作，不按名称猜测"
     },
     {
       "file": "MemoryOptions.java",

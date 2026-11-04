@@ -37,6 +37,10 @@ public class LifecycleHostTest {
  }
  static class Impl {ABC mAutomaticBrightnessController=new ABC();long mLastCloseTime=1000;float mLastCloseScreenLux=30;boolean needResetShortTermModelPolicy(){return false;}boolean isNeedResetShortTermModel(float lux,long now){return false;}}
  static class Owner {boolean mUseAutoBrightness=true;void setAutoBrightnessState(boolean auto){mUseAutoBrightness=auto;}Impl mAutomaticBrightnessControllerImpl=new Impl();Mapper mBrightnessMapper=mAutomaticBrightnessControllerImpl.mAutomaticBrightnessController.mCurrentBrightnessMapper;}
+ static class Facade {boolean mAutoBrightnessEnable=true;Object mDisplayPowerControllerImpl;void setAutomaticScreenBrightnessMode(int mode){((OwnerNew)mDisplayPowerControllerImpl).mAutoBrightnessEnable=mode!=0;}}
+ static class OwnerNew {boolean mAutoBrightnessEnable=true;Facade mDisplayPowerController=new Facade();Impl mAutomaticBrightnessControllerImpl=new Impl();Mapper mBrightnessMapper=mAutomaticBrightnessControllerImpl.mAutomaticBrightnessController.mCurrentBrightnessMapper;}
+ static class FacadeWrong {Object mDisplayPowerControllerImpl;boolean setAutomaticScreenBrightnessMode(int mode){return true;}}
+ static class OwnerWrong {boolean mAutoBrightnessEnable;FacadeWrong mDisplayPowerController=new FacadeWrong();Impl mAutomaticBrightnessControllerImpl=new Impl();Mapper mBrightnessMapper=mAutomaticBrightnessControllerImpl.mAutomaticBrightnessController.mCurrentBrightnessMapper;}
  static class Backend extends CurveBackend {String kind="model";boolean auto=true,restoreModel;JSONArray points=new JSONArray();CurvePlan p;Backend(){super(1,1000);factoryLux=new float[]{0,30,600,5000};factoryNit=new float[]{2,20,100,1000};p=new CurvePlan(factoryLux,factoryNit,min,max,new float[]{1,1,1,1});}
   public Object get(String k){return k.equals("mUseAutoBrightness")?auto:k.equals("mUserSerial")?0:k.equals("mIsHaveGoodCurve")?false:null;}public String name(){return kind;}public Object memoryLifecycleTarget(){return restoreModel?this:null;}public CurvePlan plan(){return p;}public void configure(float[] f){}public void clearMemory(){points=new JSONArray();}public float currentAt(float x){return p.at(x);}public boolean persistentMemorySupported(){return true;}public int manualPointCapacity(){return 7;}public JSONArray manualPoints(){return points;}public void restoreManualPoints(JSONArray p){points=p;}
  }
@@ -63,6 +67,17 @@ public class LifecycleHostTest {
   // Mode callback captures before native clear; disk writes/restoration stay deferred.
   s.persistentMemory.options=new MemoryOptions(false,30).with("memory_hold_switch",true);s.persistentMemory.modeSettingKnown(true);k.points=new JSONArray().put(new JSONObject().put("lux",30).put("value",70));int writes=android.provider.Settings.Global.writes;
   call(owner,"setAutoBrightnessState",new Class<?>[]{boolean.class},false);check(s.persistentMemory.pendingWrite!=null&&android.provider.Settings.Global.writes==writes);s.persistentMemory.modeSettingChanged(false);k.clearMemory();s.handler.drain();s.persistentMemory.modeSettingChanged(true);s.handler.drain();check(k.points.length()==1&&k.points.getJSONObject(0).getInt("value")==70&&android.provider.Settings.Global.writes==writes);
+  // Newer firmware: the mode switch lives on the display-power facade, the boolean on the owner.
+  l.close();
+  OwnerNew ownerNew=new OwnerNew();ownerNew.mDisplayPowerController.mDisplayPowerControllerImpl=ownerNew;
+  HookRuntime newer=new HookRuntime(k,ownerNew);MemoryLifecycle nl=newer.memoryLifecycle;newer.persistentMemory.options=new MemoryOptions(false,30).with("memory_hold_switch",true);newer.persistentMemory.modeSettingKnown(true);k.points=new JSONArray().put(new JSONObject().put("lux",30).put("value",70));
+  nl.attach();check(nl.modeSupported);
+  call(ownerNew.mDisplayPowerController,"setAutomaticScreenBrightnessMode",new Class<?>[]{int.class},1);check(newer.persistentMemory.pendingWrite==null);
+  call(ownerNew.mDisplayPowerController,"setAutomaticScreenBrightnessMode",new Class<?>[]{int.class},0);check(newer.persistentMemory.pendingWrite!=null&&ownerNew.mAutoBrightnessEnable==false);
+  // A foreign or wrong-typed facade never opens the capability.
+  OwnerNew stale=new OwnerNew();stale.mDisplayPowerController.mDisplayPowerControllerImpl=ownerNew;HookRuntime foreign=new HookRuntime(k,stale);foreign.memoryLifecycle.attach();check(!foreign.memoryLifecycle.modeSupported);
+  OwnerWrong wrong=new OwnerWrong();HookRuntime typed=new HookRuntime(k,wrong);typed.memoryLifecycle.attach();check(!typed.memoryLifecycle.modeSupported);
+  nl.close();newer.persistentMemory.pendingWrite=null;
   k.kind="model";s.onThread=false;check((Long)call(mapper,"getShortTermModelTimeout",new Class<?>[]{})==1800000);s.onThread=true;l.close();check(MemoryLifecycle.active(mapper)==null);check((Long)call(mapper,"getShortTermModelTimeout",new Class<?>[]{})==1800000);
   HookRuntime replacement=new HookRuntime(new Backend(),owner);replacement.memoryLifecycle.attach();replacement.persistentMemory.options=replacement.persistentMemory.options.with("memory_timeout_override",true).with("memory_timeout_minutes",10);check((Long)call(mapper,"getShortTermModelTimeout",new Class<?>[]{})==600000);replacement.closed=true;check((Long)call(mapper,"getShortTermModelTimeout",new Class<?>[]{})==1800000);
   System.out.println("Native memory lifecycle: "+cases+" cases PASS; reflection/Hook doubles, no Android execution");

@@ -1301,6 +1301,16 @@
       "test": "tests/refactor_traditional.py"
     },
     {
+      "id": "memory_mode_switch",
+      "owner": "MemoryLifecycle.java",
+      "alternatives": [
+        "owner_setAutoBrightnessState_boolean",
+        "display_power_facade_setAutomaticScreenBrightnessMode_int"
+      ],
+      "rule": "旧路线优先：owner 的 setAutoBrightnessState(boolean) void 与 mUseAutoBrightness boolean 同时完整。两者任一缺失或类型不符时，才要求当前 owner 自己的 mDisplayPowerControllerImpl 归属一致、facade 的 setAutomaticScreenBrightnessMode(int) 非静态 void，且 owner 的 mAutoBrightnessEnable 为 boolean；跨屏/他人 facade、错误返回值或字段缺失一律拒绝，不按机型选择。",
+      "test": "tests/refactor_memory_lifecycle.py"
+    },
+    {
       "id": "inherited_mapper_members",
       "owner": "TraditionalAdapter.java",
       "alternatives": [
