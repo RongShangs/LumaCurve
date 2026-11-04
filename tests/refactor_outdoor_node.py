@@ -56,7 +56,7 @@ int main(void){
 exe=O/'test.exe';subprocess.run(['C:/msys64/mingw64/bin/gcc.exe','-std=c11','-static','-Wall','-Wextra','-Werror','-I',str(R/'experimental/refactor_hook/native'),str(C),'-o',str(exe)],check=True)
 native_output=subprocess.check_output([str(exe)],text=True,encoding="utf-8");print(native_output,end="")
 sources={
-'top/rongshangs/lumacurve/refactor/OutdoorOutputAccess.java':'''package top.rongshangs.lumacurve.refactor;class OutdoorOutputAccess{static String name(HookRuntime s){return s.outputStrategy(s.owner);}static String profile(HookRuntime s){return "selected_strategy";}static long physical(HookRuntime s){return 0;}}''',
+'top/rongshangs/lumacurve/refactor/OutdoorOutputAccess.java':'''package top.rongshangs.lumacurve.refactor;class OutdoorOutputAccess{static class Decision{String profile,name,selector,error="";Boolean enabled,use,applied;Integer reason,temp,reasonMod,tempMod;}static String name(HookRuntime s){return s.outputStrategy(s.owner);}static Decision evaluate(HookRuntime s){Decision d=new Decision();d.profile=profile(s);d.name=name(s);return d;}static String profile(HookRuntime s){return "selected_strategy";}static long physical(HookRuntime s){return 0;}}''',
 
 'android/os/SystemClock.java':'package android.os;public class SystemClock{public static long now=1000;public static long uptimeMillis(){return now;}}',
 'android/os/Process.java':'package android.os;public class Process{public static int myPid(){return 123;}}',

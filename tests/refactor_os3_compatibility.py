@@ -63,7 +63,10 @@ public class AdvancedHookTest{
   boolean supported=args[0].equals("native_old");Owner o=new Owner();Impl impl=o.mAutomaticBrightnessControllerImpl;AutomaticBrightnessController abc=new AutomaticBrightnessController();impl.mAutomaticBrightnessController=abc;abc.impl=impl;
   HysteresisLevelsImpl h=new HysteresisLevelsImpl();impl.mHysteresisLevelsImpl=h;abc.h=h;impl.mDualSensorPolicy.h=h;
   HookRuntime s=new HookRuntime();s.owner=o;HookEntry.states.put(o,s);ClassLoader loader=AdvancedHookTest.class.getClassLoader();ResponseTuning.install(loader);LowLightTuning.install(loader);AdvancedTuning.install(loader);
-  check(ResponseTuning.supported(o)==supported);check(ResponseTuning.smallSupported(o)==supported);check(s.normalTuningAllowed(abc,impl)==supported);
+  check(ResponseTuning.supported(o)==supported);check(ResponseTuning.smallSupported(o)==supported);
+  // The gate resolves driving on its own: a broken legacy scene layout no longer closes it.
+  boolean blocked=false;try{ResponseTuning.driving(impl);}catch(Exception rejected){blocked=true;}
+  check(s.normalTuningAllowed(abc,impl)==!blocked);
   for(int group=0;group<5;group++)check(AdvancedTuning.supported(group,s)==supported);
   if(!supported){check(ResponseTuning.sceneProfile(o).equals("unsupported"));System.out.println("OS3 scene "+args[0]+": "+cases+" cases PASS");return;}
   check(ResponseTuning.sceneProfile(o).equals("native_without_driving"));check(!ResponseTuning.driving(impl)&&ResponseTuning.nightDelay(impl)==0);

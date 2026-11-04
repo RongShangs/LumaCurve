@@ -10,6 +10,10 @@ final class OutdoorController {
     OutdoorOptions options=new OutdoorOptions();HbmAccess access;boolean ticking,failed,probing;String error="",lastReason="";
     long deadline=-1,boosts,rangeRaises,dynamicRaises,oprRaises,goalAt=-1;float goal=Float.NaN,nativeRange=Float.NaN,deliveredRange=Float.NaN,nativeDynamic=Float.NaN,deliveredDynamic=Float.NaN;
     final ArrayDeque<JSONObject> history=new ArrayDeque<>();final Map<String,JSONObject> lastStages=new HashMap<>();
+    // Bounded, deduplicated record of the real output-provenance decision. It never
+    // changes the verdict; it only keeps the inputs that produced it.
+    static final int OUTPUT_DIAGNOSTICS=32;
+    final ArrayDeque<JSONObject> outputDiagnostics=new ArrayDeque<>();String lastOutputSignature="";boolean inTick;
     final LiveLimitEvidence liveLimits=new LiveLimitEvidence();
     NitBrightnessLimit nitLimit;
     OutdoorOprEnvelope oprEnvelope;
@@ -49,26 +53,63 @@ final class OutdoorController {
         if(access!=null)try{boolean changed=access.restore();if(changed)access.reevaluate(lux());}catch(Throwable failed){error=failed.toString();s.log("户外增强恢复异常："+error);}}
     float lux(){try{Object impl=HookEntry.get(s.owner,"mAutomaticBrightnessControllerImpl"),abc=HookEntry.get(impl,"mAutomaticBrightnessController");if(!Boolean.TRUE.equals(HookRuntime.optionalBoolean(abc,"mAmbientLuxValid")))return Float.NaN;return HookRuntime.optionalNumber(abc,"mAmbientLux");}catch(Throwable unknown){return Float.NaN;}}
     String block(){
-        if(!options.flags[0])return "disabled";
-        if(s.closed||!s.phase.equals("active")||!s.appliesToUser())return "inactive";
-        if(!s.screenOn()||Boolean.TRUE.equals(HookRuntime.optionalBoolean(access.controller,"mIsAutoBrightnessOffByState")))return "screen_off";
+        String result;OutdoorOutputAccess.Decision decision=null;
         try{
-            if(!Boolean.TRUE.equals(s.kernel.get("mUseAutoBrightness")))return "manual_mode";
-            if(!Boolean.FALSE.equals(s.hdrActive())||!Boolean.FALSE.equals(HookRuntime.optionalBoolean(access.controller,"mIsHdrLayerPresent"))||!Boolean.FALSE.equals(HookRuntime.optionalBoolean(access.controller,"mDolbyEnable")))return "hdr";
-            if(s.power==null||s.power.isPowerSaveMode()||!Boolean.FALSE.equals(HookRuntime.optionalBoolean(access.controller,"mIsBlockedByLowPowerMode")))return "power_save";
-            thermal.configure(s.thermalCooling);if(!thermal.evaluate(true,true,s.thermalSeverity,s.batteryTemperature,s.thermalCeiling))return "temperature";
-            Object impl=HookEntry.get(s.owner,"mAutomaticBrightnessControllerImpl"),abc=HookEntry.get(impl,"mAutomaticBrightnessController");
-            if(Boolean.TRUE.equals(HookRuntime.optionalBoolean(impl,"mIsOverrideDragPolicy")))return "manual";
-            if(!s.normalTuningAllowed(abc,impl))return "scene";
-            if(access.managed()&&!Boolean.TRUE.equals(HookRuntime.optionalBoolean(access.controller,"mIsAutoBrightnessEnabled")))return "auto_not_ready";
-            String strategy=OutdoorOutputAccess.name(s);
-            if(!"AutomaticBrightnessStrategy".equals(strategy))return "output_override";
-            return null;
-        }catch(Throwable unknown){return "unknown";}
+            if(!options.flags[0])result="disabled";
+            else if(s.closed||!s.phase.equals("active")||!s.appliesToUser())result="inactive";
+            else if(!s.screenOn()||Boolean.TRUE.equals(HookRuntime.optionalBoolean(access.controller,"mIsAutoBrightnessOffByState")))result="screen_off";
+            else if(!Boolean.TRUE.equals(s.kernel.get("mUseAutoBrightness")))result="manual_mode";
+            else if(!Boolean.FALSE.equals(s.hdrActive())||!Boolean.FALSE.equals(HookRuntime.optionalBoolean(access.controller,"mIsHdrLayerPresent"))||!Boolean.FALSE.equals(HookRuntime.optionalBoolean(access.controller,"mDolbyEnable")))result="hdr";
+            else if(s.power==null||s.power.isPowerSaveMode()||!Boolean.FALSE.equals(HookRuntime.optionalBoolean(access.controller,"mIsBlockedByLowPowerMode")))result="power_save";
+            else{
+                thermal.configure(s.thermalCooling);
+                Object impl=HookEntry.get(s.owner,"mAutomaticBrightnessControllerImpl"),abc=HookEntry.get(impl,"mAutomaticBrightnessController");
+                if(!thermal.evaluate(true,true,s.thermalSeverity,s.batteryTemperature,s.thermalCeiling))result="temperature";
+                else if(Boolean.TRUE.equals(HookRuntime.optionalBoolean(impl,"mIsOverrideDragPolicy")))result="manual";
+                else if(!s.normalTuningAllowed(abc,impl))result="scene";
+                else if(access.managed()&&!Boolean.TRUE.equals(HookRuntime.optionalBoolean(access.controller,"mIsAutoBrightnessEnabled")))result="auto_not_ready";
+                else{decision=OutdoorOutputAccess.evaluate(s);result="AutomaticBrightnessStrategy".equals(decision.name)?null:"output_override";}
+            }
+        }catch(Throwable unknown){result="unknown";}
+        recordOutput(result,decision);
+        return result;
+    }
+    /** Read-only evidence at the real decision point; identical verdicts are skipped. */
+    void recordOutput(String result,OutdoorOutputAccess.Decision decision){
+        try{
+            float lux=lux();
+            StringBuilder signature=new StringBuilder(result==null?"":result).append('|').append(policy.active).append('|').append(policy.reason).append('|').append(inTick);
+            if(lux!=lux)signature.append("|nan");else signature.append('|').append(lux);
+            if(decision!=null)signature.append('|').append(decision.profile).append(',').append(decision.name).append(',').append(decision.enabled).append(',').append(decision.use).append(',').append(decision.applied)
+                .append(',').append(decision.reason).append(',').append(decision.temp).append(',').append(decision.reasonMod).append(',').append(decision.tempMod).append(',').append(decision.selector).append(',').append(decision.error);
+            String value=signature.toString();
+            if(value.equals(lastOutputSignature))return;
+            lastOutputSignature=value;
+            JSONObject row=new JSONObject();row.put("uptime_ms",SystemClock.uptimeMillis()).put("unix_ms",System.currentTimeMillis());
+            row.put("tick",inTick).put("block",result==null?"":result).put("active",policy.active).put("policy_reason",policy.reason).put("cooldown_left_ms",Math.max(0,policy.cooldownUntil-SystemClock.uptimeMillis()));
+            if(lux==lux)row.put("lux",lux);
+            if(Float.isFinite(goal))row.put("requested",goal);
+            try{Object dpc=HookEntry.get(s.owner,"mDisplayPowerController"),display=dpc.getClass().getMethod("getDisplayPowerState").invoke(dpc);float actual=((Number)display.getClass().getMethod("getScreenBrightness").invoke(display)).floatValue();if(OutdoorPolicy.valid(actual))row.put("brightness",actual);}catch(Throwable absent){}
+            if(decision!=null){
+                row.put("profile",decision.profile);
+                if(decision.name!=null)row.put("output",decision.name);
+                if(decision.selector!=null)row.put("selector",decision.selector);
+                if(decision.enabled!=null)row.put("auto_enabled",decision.enabled.booleanValue());
+                if(decision.use!=null)row.put("auto_use",decision.use.booleanValue());
+                if(decision.applied!=null)row.put("auto_applied",decision.applied.booleanValue());
+                if(decision.reason!=null)row.put("reason",decision.reason);
+                if(decision.temp!=null)row.put("temp",decision.temp);
+                if(decision.reasonMod!=null)row.put("reason_modifier",decision.reasonMod);
+                if(decision.tempMod!=null)row.put("temp_modifier",decision.tempMod);
+                if(!decision.error.isEmpty())row.put("output_error",decision.error);
+            }
+            if(outputDiagnostics.size()>=OUTPUT_DIAGNOSTICS)outputDiagnostics.removeFirst();
+            outputDiagnostics.addLast(row);s.queuePublish();
+        }catch(Throwable ignored){}
     }
     void manual(float lux){if(!options.flags[0])return;policy.manual(lux,SystemClock.uptimeMillis());tick();schedule();s.queuePublish();}
     void tick(){
-        if(ticking||failed||!s.onDisplayThread())return;ticking=true;
+        if(ticking||failed||!s.onDisplayThread())return;ticking=true;inTick=true;
         try{
             HbmAccess h=binding();String blocked=h==null?"unsupported":block();float lux=lux();
             boolean before=policy.active;policy.step(options,lux,SystemClock.uptimeMillis(),blocked);if(!policy.active)goal=Float.NaN;
@@ -80,7 +121,7 @@ final class OutdoorController {
             if(before!=policy.active||!lastReason.equals(policy.reason)){lastReason=policy.reason;s.log("户外增强："+description(policy.reason));s.queuePublish();}
             schedule();
         }catch(Throwable failure){failed=true;error=failure.toString();policy.reset();policy.reason="error";try{if(access!=null)access.restore();}catch(Throwable ignored){}s.handler.removeCallbacks(wake);deadline=-1;s.queuePublish();}
-        finally{ticking=false;}
+        finally{ticking=false;inTick=false;}
     }
     void schedule(){long next=options.flags[0]?policy.next:-1;if(next==deadline)return;s.handler.removeCallbacks(wake);deadline=next;if(next>=0)s.handler.postDelayed(wake,Math.max(1,next-SystemClock.uptimeMillis()));}
     boolean rangeAllowed(){
@@ -124,7 +165,7 @@ final class OutdoorController {
         if(nitLimit!=null&&Float.isFinite(nitLimit.maximumNit))j.put("mapping_max_nit",nitLimit.maximumNit).put("mapping_min_nit",nitLimit.minimumNit);
         if(options.values[OutdoorOptions.MAX_NIT]>0){j.put("maximum_nit",options.values[OutdoorOptions.MAX_NIT]);if(OutdoorPolicy.valid(cap))j.put("nit_limit_brightness",cap);else j.put("nit_limit_detail",nitLimitError);}
         j.put("enabled",options.flags[0]).put("active",policy.active).put("reason",policy.reason).put("text",description(policy.reason)).put("target_adjustments",boosts).put("range_adjustments",rangeRaises).put("dynamic_range_adjustments",dynamicRaises).put("opr_adjustments",oprRaises).put("opr_enabled",options.flags[3]);
-        JSONObject config=new JSONObject();options.put(config);j.put("options",config).put("limit_trace",new JSONArray(history)).put("current_limits",liveLimits.snapshot(SystemClock.uptimeMillis()));
+        JSONObject config=new JSONObject();options.put(config);j.put("options",config).put("limit_trace",new JSONArray(history)).put("output_diagnostics",new JSONArray(outputDiagnostics)).put("current_limits",liveLimits.snapshot(SystemClock.uptimeMillis()));
         long now=SystemClock.uptimeMillis();if(deadline>=0)j.put("next_transition_ms",Math.max(0,deadline-now));j.put("cooldown_left_ms",Math.max(0,policy.cooldownUntil-now));
         if(policy.active)j.put("session_left_ms",Math.max(0,(long)options.values[6]-(now-policy.started)));
         if(Float.isFinite(goal))j.put("requested_brightness",goal).put("request_age_ms",Math.max(0,now-goalAt));if(OutdoorPolicy.valid(nativeRange))j.put("native_range_max",nativeRange);if(OutdoorPolicy.valid(deliveredRange))j.put("effective_range_max",deliveredRange);

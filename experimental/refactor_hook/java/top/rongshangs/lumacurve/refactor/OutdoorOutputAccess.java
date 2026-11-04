@@ -55,7 +55,29 @@ final class OutdoorOutputAccess {
         for(String name:new String[]{"MODIFIER_THERMAL","MODIFIER_HDR","MODIFIER_DIMMED","MODIFIER_LOW_POWER","MODIFIER_THROTTLED"})if((constant(reason,name)&b.cosmetic)!=0)throw new NoSuchFieldException("Protected "+name);
         return b;
     }
-    static String name(HookRuntime s){try{return read(s.owner).automatic()?"AutomaticBrightnessStrategy":"OtherBrightnessOutput";}catch(Throwable unavailable){return null;}}
+    static final class Decision {
+        String profile,name,selector,error="";Boolean enabled,use,applied;Integer reason,temp,reasonMod,tempMod;
+    }
+    /** Same predicate as {@link Binding#automatic()}, but keeps every input for diagnosis. */
+    static Decision evaluate(HookRuntime s){
+        Decision d=new Decision();
+        try{
+            Binding b=read(s.owner);d.profile=b.profile;
+            if(b.selected!=null){
+                Object value=b.selected.invoke(b.dpc);d.selector=value==null?null:value.getClass().getSimpleName();
+                d.name=d.selector!=null&&d.selector.equals("AutomaticBrightnessStrategy")?"AutomaticBrightnessStrategy":"OtherBrightnessOutput";
+            }else{
+                d.enabled=(Boolean)b.enabled.invoke(b.strategy);d.use=(Boolean)b.use.invoke(b.strategy);d.applied=(Boolean)b.applied.invoke(b.strategy);
+                d.reason=(Integer)b.getReason.invoke(b.reason);d.temp=(Integer)b.getReason.invoke(b.pending);
+                d.reasonMod=(Integer)b.getModifier.invoke(b.reason);d.tempMod=(Integer)b.getModifier.invoke(b.pending);
+                d.name=d.enabled&&d.use&&d.applied&&d.reason==b.automatic&&d.temp==b.automatic
+                    &&(d.reasonMod&~b.cosmetic)==0&&(d.tempMod&~b.cosmetic)==0?"AutomaticBrightnessStrategy":"OtherBrightnessOutput";
+            }
+        }catch(Throwable unavailable){d.name=null;d.error=unavailable.toString();}
+        return d;
+    }
+    static String name(HookRuntime s){try{return evaluate(s).name;}catch(Throwable unavailable){return null;}}
+
     static String profile(HookRuntime s)throws Exception{return read(s.owner).profile;}
     static long physical(HookRuntime s){try{
         Object dpc=HookEntry.get(s.owner,"mDisplayPowerController");String id=(String)HookEntry.get(dpc,"mUniqueDisplayId");

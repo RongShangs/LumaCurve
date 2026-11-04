@@ -500,7 +500,7 @@
     {
       "file": "OutdoorController.java",
       "layer": "orchestration",
-      "purpose": "显示运行协调"
+      "purpose": "显示运行协调；在真实输出判定点采集有界诊断环（上限32条、去重），只记录不改变判定与冷却"
     },
     {
       "file": "OutdoorNodeBridge.java",
@@ -540,7 +540,7 @@
     {
       "file": "OutdoorOutputAccess.java",
       "layer": "adapters",
-      "purpose": "户外输出归属的原生策略与独立自动对象 ABI，保留其他功能原路径"
+      "purpose": "户外输出归属的原生策略与独立自动对象 ABI，保留其他功能原路径；evaluate 记录 automatic 各子条件原值供诊断"
     },
     {
       "file": "OutdoorPolicy.java",
