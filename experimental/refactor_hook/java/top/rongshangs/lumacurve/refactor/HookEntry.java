@@ -159,7 +159,7 @@ public final class HookEntry {
             if(field(owner,"mThermalMaxBrightness").getType()!=float.class)throw new IllegalStateException("thermal cap type");
             Class<?> reason=Class.forName("com.android.server.display.brightness.BrightnessReason",false,owner.getClassLoader());
             Method hdr=owner.getDeclaredMethod("adjustBrightness",float.class,reason);
-            Method sdr=owner.getDeclaredMethod("adjustSdrBrightness",float.class,boolean.class,reason,boolean.class,boolean.class);
+            Method sdr=HbmAccess.sdrMethod(owner,reason);
             if(hdr.getReturnType()!=float.class||sdr.getReturnType()!=float.class)throw new IllegalStateException("thermal ABI");
             XC_MethodHook hook=new XC_MethodHook(){
                 protected void beforeHookedMethod(MethodHookParam p){

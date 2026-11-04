@@ -81,7 +81,7 @@ final class OutdoorTuning {
         if(nitCaps.contains(owner))return;
         try{
             Class<?> reason=Class.forName("com.android.server.display.brightness.BrightnessReason",false,owner.getClassLoader());
-            Method sdr=HbmAccess.method(owner,"adjustSdrBrightness",float.class,float.class,boolean.class,reason,boolean.class,boolean.class);
+            Method sdr=HbmAccess.sdrMethod(owner,reason);
             OutdoorSdrScope scope=OutdoorSdrScope.resolve(owner);
             HbmAccess.typed(owner,"mAutoBrightnessEnable",boolean.class);
             XposedBridge.hookMethod(sdr,new XC_MethodHook(){
