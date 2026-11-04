@@ -10,7 +10,12 @@ final class RuntimeFeatureChecks {
     HbmAccess checkedHbm;
     HbmAccess hbm()throws Exception{if(checkedHbm==null)checkedHbm=new HbmAccess(HookEntry.get(s.owner,"mHbmController"));return checkedHbm;}
     boolean outdoor()throws Exception{return OutdoorTuning.owners.contains(s.owner.getClass())&&hbm()!=null;}
-    boolean range()throws Exception{return outdoor()&&!hbm().rangeOnly()&&OutdoorTuning.ranges.contains(hbm().controller.getClass())&&OutdoorTuning.peaks.contains(s.owner.getClass());}
+    boolean range(){
+        // A missing outdoor/HBM profile must not abort the independent node probe; the
+        // primary-panel path is checked separately and stays usable.
+        try{return outdoor()&&!hbm().rangeOnly()&&OutdoorTuning.ranges.contains(hbm().controller.getClass())&&OutdoorTuning.peaks.contains(s.owner.getClass());}
+        catch(Throwable unavailable){return false;}
+    }
     boolean sensor(boolean assist)throws Exception{
         if(!assist)return !BrightnessSensorAccess.selection(s.owner).profile.isEmpty();
         Object value=HookEntry.get(HookEntry.get(HookEntry.get(s.owner,"mAutomaticBrightnessControllerImpl"),"mDualSensorPolicy"),"mAssistLightSensor");
