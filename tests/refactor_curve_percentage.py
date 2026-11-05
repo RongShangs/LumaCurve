@@ -42,9 +42,9 @@ public class PercentageTest{
   System.out.println("Curve percentage dialog: "+cases+" cases PASS; production form and commits with widget doubles, Android pixels not tested");
  }
 }'''
-p=O/'PercentageTest.java';p.write_text(java,'utf-8');stub=O/'android/text/InputType.java';stub.parent.mkdir(parents=True,exist_ok=True);stub.write_text('package android.text;public class InputType{public static final int TYPE_CLASS_NUMBER=2,TYPE_NUMBER_FLAG_DECIMAL=8192;}','utf-8');C=O/'classes';C.mkdir(exist_ok=True)
+p=O/'PercentageTest.java';p.write_text(java,'utf-8');stub=O/'android/text/InputType.java';stub.parent.mkdir(parents=True,exist_ok=True);stub.write_text('package android.text;public class InputType{public static final int TYPE_CLASS_NUMBER=2,TYPE_NUMBER_FLAG_DECIMAL=8192;}','utf-8');hb=O/'HbmAccess.java';hb.write_text('package top.rongshangs.lumacurve.refactor;class HbmAccess{static boolean dataType(Class<?> type){String name=type.getName();return name.equals("com.android.server.display.config.HighBrightnessModeData")||name.equals("com.android.server.display.DisplayDeviceConfig$HighBrightnessModeData");}}','utf-8');C=O/'classes';C.mkdir(exist_ok=True)
 names=['CurveDisplayRange','ControlCenterCalibration','ControlCenterPartition','ControlCenterCurve','ControlCenterMapping','CurveEditor','CurvePlan','SavedCurve','CurveCompatibility','TraditionalCurve','ThemeCurveOptions']
-subprocess.run(['javac','--release','8','-encoding','UTF-8','-cp',str(J),'-d',str(C),*[str(S/(n+'.java')) for n in names],str(stub),str(p)],check=True)
+subprocess.run(['javac','--release','8','-encoding','UTF-8','-cp',str(J),'-d',str(C),*[str(S/(n+'.java')) for n in names],str(stub),str(hb),str(p)],check=True)
 subprocess.run(['java','-cp',str(C)+os.pathsep+str(J),'top.rongshangs.lumacurve.refactor.PercentageTest'],check=True)
 # Draft dragging must start from actual curve height and share the dialog's nit commit.
 assert 'startFactor=values[point];dragBounds=pointBounds(point);' in main

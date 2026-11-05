@@ -55,6 +55,6 @@
 | [AssistSensorCompat.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/AssistSensorCompat.java) | `3e7b4778ae5bdcf5` |
 | [AuxiliarySensorIdentity.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/AuxiliarySensorIdentity.java) | `4ddea2e5f1214051` |
 | [ConfigurationCompatibility.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ConfigurationCompatibility.java) | `71d50ae808331a81` |
-| [HookRuntime.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/HookRuntime.java) | `4e3f51d5e9508d0c` |
+| [HookRuntime.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/HookRuntime.java) | `f1cdc6bfa6a1d706` |
 | [RootControl.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/RootControl.java) | `77cafa1017ad8e5c` |
-| [RuntimeFeatureChecks.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/RuntimeFeatureChecks.java) | `8148b1629cab2827` |
+| [RuntimeFeatureChecks.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/RuntimeFeatureChecks.java) | `5cdff234d6de8d09` |

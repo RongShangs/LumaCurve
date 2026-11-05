@@ -184,6 +184,8 @@ public final class UiText {
         WORDS.put("熄屏前降亮协调","Pre-sleep dimming coordination");
         WORDS.put("自动降亮与息屏目标协调","Automatic dimming and AOD target coordination");
         WORDS.put("主屏仍亮且处于自动DIM降亮时，阻止全屏AOD目标重新抬高已降低的亮度；真正息屏、背屏、手动及HDR沿用系统。","While the primary screen is on and automatically dimming, prevent the full-screen AOD target from raising its dimmed input. Actual doze, rear displays, manual brightness and HDR keep system behavior。");
+        WORDS.put("自动降亮与息屏目标协调（新式SDR入口）","Automatic dimming and AOD target coordination (new SDR entry)");
+        WORDS.put("四参SDR入口缺少已验证的全屏AOD消费者语义；候选路线保留但不安装修正，所有亮度结果沿用系统。","The four-argument SDR entry lacks verified full-screen AOD consumer semantics. The candidate route is retained without installing a correction; all brightness results keep system behavior.");
         WORDS.put("未启用独立曲线时，深浅色模式共用此曲线；启用后，此处用于浅色模式。","Light and dark modes share this curve unless an independent dark curve is enabled. When enabled, this curve is used in light mode.");
         WORDS.put("当前基础曲线：","Current base curve: ");
         WORDS.put("使用本机亮度到背光的转换表；可可靠单调反解才启用。保留自动亮度、手动记忆与暗光锁定的原有控制权。","Use this device's brightness-to-backlight table only when it can be reliably inverted. Keep auto brightness, manual memory and low light lock ownership unchanged.");
@@ -436,7 +438,8 @@ public final class UiText {
         WORDS.put("系统手动阳光屏策略","Native manual sunlight policy");
         WORDS.put("未知场景接口","Unknown scene interface");
         WORDS.put("匹配 dropAmbientLuxIfNeeded 和普通距离开关；系统未开启时不强制启动。流式距离是另一项独立策略，不混用设置。","Matches dropAmbientLuxIfNeeded and the ordinary-proximity switch, without forcing it on. Stream proximity is a separate setting.");
-        WORDS.put("匹配 SceneDetector 的流式确认与跳过亮度变化接口；与普通距离分别设置。","Matches SceneDetector stream confirmation and skip-brightness interfaces. Ordinary proximity remains independent.");
+        WORDS.put("匹配 SceneDetector 的瞬时遮挡标记与跳过亮度变化接口；新版只有 updateAmbientLux(int,float,boolean) 而缺少这些入口时本项不可用，不伪造准入或传感器行为；与普通距离分别设置。","Matches SceneDetector transient-cover flags and skip-brightness interfaces. When the newer layout only exposes updateAmbientLux(int,float,boolean) without these entry points, this option stays unavailable rather than fabricating admission or sensor behavior. Ordinary proximity remains independent.");
+        WORDS.put("旧版使用 isReflectiveScene 反射判定；新版整体缺少旧标记时映射到已核验的 AON 照度窗口（updateAmbientLux / checkAonFlareStatus），阻止时只让窗口不可命中；两者都缺失时不开放。","Older layouts use the isReflectiveScene check; when all legacy flags are absent, the verified AON lux window (updateAmbientLux / checkAonFlareStatus) is used instead, and blocking only makes that window unreachable. If neither shape exists, the option stays unavailable.");
         WORDS.put("使用 ABC 原生步行额外降亮确认接口。","Uses the native ABC walking-related dimming confirmation interface.");
         WORDS.put("使用 TouchCoverProtectionHelper 的实时遮挡判断。","Uses the current TouchCoverProtectionHelper cover state.");
         WORDS.put("使用 ABC 的 updateNightWakeMode，不伪造夜间唤醒条件。","Uses ABC updateNightWakeMode without fabricating wake conditions.");
@@ -1609,6 +1612,7 @@ public final class UiText {
         WORDS.put("强光下减少画面内容造成的限亮，提高可用亮度上限；需先开放高亮范围。","Relaxes content-based dimming in strong light to raise the available brightness ceiling. Requires the high-brightness range above.");
         WORDS.put("两项仍受温控、电量和 HBM 时间预算限制。","Both remain subject to thermal, battery and HBM time limits.");
         WORDS.put("代码贡献","Code contributions");
+        WORDS.put("贡献小米12S Pro亮度接口适配，以及场景、记忆和动画兼容改进。","Contributed Xiaomi 12S Pro brightness interface adaptation and scene, memory and animation compatibility improvements.");
         WORDS.put("贡献手动接管恢复、系统进程重启与断连兜底、节点校验顺序修复，以及图片解码优化。","Contributed manual takeover recovery, system process restart and disconnect recovery, node validation ordering, and image decoding improvements.");
         WORDS.put("实时状态","Live status");
         WORDS.put("连接后显示亮度状态与建议","Connect to view brightness status and suggestions");
@@ -1886,8 +1890,8 @@ public final class UiText {
         WORDS.put("设备启用步行检测且收到步行事件；每次事件续期，超过系统有效时间退出。仅增加降亮确认时间，不改变基础曲线。","Step detection is enabled and a step event arrives. Events renew validity; the scene expires after the OEM timeout. It adds dimming confirmation without changing the base curve.");
         WORDS.put("手指进入系统定义的光感保护区域，或离开后尚未超过触摸释放等待。保护区域由机型、旋转和折叠姿态决定。","A touch enters the OEM light-sensor protection region, or its release delay has not elapsed. The region depends on device, rotation and fold posture.");
         WORDS.put("普通距离采样开启，距离读数非负且小于本机距离阈值。离开阈值后解除；本机可能没有启用此策略。","Standard proximity sampling is enabled and a nonnegative distance is below the device threshold. It clears outside the threshold. This device may not enable this policy.");
-        WORDS.put("系统游戏策略允许流式距离检测，发生待确认的变暗事件后读取流式传感器。系统按原始通道与两级阈值判定遮挡；无遮挡才继续降亮。位置以本机传感器为准。","The OEM game policy allows stream proximity detection and reads it for a pending dimming event. Raw channels and hysteresis thresholds classify cover; dimming resumes when clear. Physical location depends on the device.");
-        WORDS.put("主显示发生变暗候选，照度落在本机 AON 区间；服务返回反射判定或等待确认期间暂缓降亮。反射标记与等待标记分别显示，不把旧的反射标记当作当前正在阻止降亮。","The primary display has a dimming candidate within the OEM AON lux interval. Dimming may wait for service confirmation. Reflection and pending flags are separate; a latched reflection flag alone is not a current dimming block.");
+        WORDS.put("系统游戏策略允许流式距离检测，发生待确认的变暗事件后读取流式传感器。系统按原始通道与两级阈值判定遮挡；无遮挡才继续降亮。位置以本机传感器为准。新版场景接口只保留 updateAmbientLux 而缺少瞬时遮挡与跳过亮度变化入口时，本项保持不可用。","The OEM game policy allows stream proximity detection and reads it for a pending dimming event. Raw channels and hysteresis thresholds classify cover; dimming resumes when clear. Physical location depends on the device. When the newer scene interface only keeps updateAmbientLux and lacks transient-cover and skip-brightness entry points, this option stays unavailable.");
+        WORDS.put("主显示发生变暗候选，照度落在本机 AON 区间；旧版由反射判定、新版由 AON 窗口在 updateAmbientLux 内抑制降亮，均为系统原生确认，不额外采样传感器。","The primary display has a dimming candidate within the OEM AON lux interval. Older layouts use the reflection check; newer layouts suppress dimming through the AON window inside updateAmbientLux. Both are native confirmation and add no sensor sampling.");
         WORDS.put("上游夜间唤醒策略传入两个状态位；亮屏时使用夜间唤醒目标。解除由上游策略通知，具体识别时间段未在该亮度消费者中定义。","An upstream night-wake policy supplies two flags. While the screen is on it may select a wake target. The upstream policy clears it; this brightness consumer does not define the detection time window.");
         WORDS.put("系统自动亮度关闭、阳光屏开关开启、屏幕亮起、未被用户临时停用且未挂起；照度持续超过系统门槛后进入。与自动亮度 HBM 是两条不同链路。","Automatic brightness is off, manual sunlight is enabled, the screen is on, and the feature is neither temporarily disabled nor suspended. Sustained light above OEM thresholds triggers entry. This is separate from automatic HBM.");
         WORDS.put("应用在系统游戏名单内，且本机采用游戏触摸防误降亮分支；入场短期或最近触摸期间抑制降亮。设备的距离/触摸策略决定是否走此分支。","The app is in the OEM game list and the device uses its touch-based dimming guard. Entry grace time or a recent touch can suppress dimming. The device proximity/touch policy determines whether this branch applies.");
@@ -2033,6 +2037,8 @@ public final class UiText {
         WORDS.put("使用已验证的主辅光感确认和阈值；保留原生夜间驾驶判断及附加等待。","Uses verified sensor confirmation and thresholds, retaining native night-driving checks and delays.");
         WORDS.put("传统确认与场景保护","Traditional confirmation and scene protection");
         WORDS.put("完整旧场景结构没有夜间驾驶接口；使用原生确认窗口，保留步行、遮挡、HDR 等判断，不额外采样。","For a complete older layout without night driving: retains native confirmation, walking, occlusion and HDR checks without extra sampling.");
+        WORDS.put("新式场景确认（AON 窗口）","Modern scene confirmation (AON window)");
+        WORDS.put("无任何驾驶残片，且旧瞬时遮挡/反射标记整体缺失；只核验新式场景字段、AON 照度窗口与 updateAmbientLux / checkAonFlareStatus，保留原生主辅确认与期限。","No driving remnants and no legacy transient-occlusion/reflection markers: verifies only the modern scene fields, the AON lux window and updateAmbientLux / checkAonFlareStatus while keeping native sensor confirmation and deadlines.");
         WORDS.put("系统覆盖目标入口","Native override target");
         WORDS.put("通过 getOverrideLimitBrightness 增强自动目标，保留原生手动接管与下游保护。","Enhances the automatic target through getOverrideLimitBrightness, retaining manual control and downstream protection.");
         WORDS.put("传统物理曲线目标入口","Traditional physical-curve target");

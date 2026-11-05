@@ -5,6 +5,7 @@ R=Path(__file__).resolve().parents[1];S=R/'experimental/refactor_hook/java/top/r
 files={
 'com/android/server/display/config/HighBrightnessModeData.java':'package com.android.server.display.config;public class HighBrightnessModeData{public float transitionPoint=.5f;}',
 'ControlCenterCalibration.java':'''package top.rongshangs.lumacurve.refactor;class ControlCenterCalibration{static Object configuration(Object o){return o;}static java.lang.reflect.Field field(Class<?> c,String n)throws Exception{java.lang.reflect.Field f=c.getDeclaredField(n);f.setAccessible(true);return f;}}''',
+'HbmAccess.java':'''package top.rongshangs.lumacurve.refactor;class HbmAccess{static boolean dataType(Class<?> type){String name=type.getName();return name.equals("com.android.server.display.config.HighBrightnessModeData")||name.equals("com.android.server.display.DisplayDeviceConfig$HighBrightnessModeData");}}''',
 'PartitionTest.java':r'''package top.rongshangs.lumacurve.refactor;
 import org.json.*;import com.android.server.display.config.HighBrightnessModeData;
 public class PartitionTest{

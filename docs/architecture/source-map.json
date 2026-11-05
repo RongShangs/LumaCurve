@@ -170,7 +170,7 @@
     {
       "file": "ControlCenterPartition.java",
       "layer": "adapters",
-      "purpose": "读取实际普通亮度边界；一秒内独立二次上滑准入与有界提示策略，不复制节点保持程序"
+      "purpose": "读取实际普通亮度边界，接受 config.* 与 DisplayDeviceConfig 内嵌两种已验证 HBM 数据身份；一秒内独立二次上滑准入与有界提示策略，不复制节点保持程序"
     },
     {
       "file": "ControlCenterRoot.java",
@@ -280,7 +280,7 @@
     {
       "file": "DimAodCompatibility.java",
       "layer": "adapters",
-      "purpose": "按实际DIM/AOD接口与当前调用原因协调主屏熄屏前降亮，不改息屏、采样和节点所有权"
+      "purpose": "按实际DIM接口形状与当前调用原因协调主屏熄屏前降亮：旧五参路线保留息屏子阶段上限，新四参路线以 mAppliedDimming 判定降亮并只夹回抬高，不改息屏、采样和节点所有权"
     },
     {
       "file": "ElasticScrollView.java",
@@ -330,12 +330,12 @@
     {
       "file": "HbmAccess.java",
       "layer": "adapters",
-      "purpose": "设备接口与所有权"
+      "purpose": "设备接口与所有权；HBM 数据身份七/十字段变体与 SDR/OPR 签名变体选择"
     },
     {
       "file": "HookEntry.java",
       "layer": "bootstrap",
-      "purpose": "入口与代次"
+      "purpose": "入口与代次；显示温控 SDR 四参/五参入口变体"
     },
     {
       "file": "HookRuntime.java",
@@ -385,7 +385,7 @@
     {
       "file": "LowLightAssistEvidence.java",
       "layer": "policy",
-      "purpose": "策略与算子"
+      "purpose": "只读辅助证据；pending 复位字段缺失时按无待复位处理"
     },
     {
       "file": "LowLightAssistGate.java",
@@ -450,7 +450,7 @@
     {
       "file": "MemoryLifecycle.java",
       "layer": "adapters",
-      "purpose": "原生短期模型与事件观察适配器，向统一记忆管理提供交接事件和模型快照；恢复按后端能力操作，不按名称猜测"
+      "purpose": "原生短期模型与事件观察适配器，向统一记忆管理提供交接事件和模型快照；自动亮度开关按旧 owner 布尔或新 facade 模式入口两种完整形状观察，恢复按后端能力操作，不按名称猜测"
     },
     {
       "file": "MemoryOptions.java",
@@ -500,12 +500,12 @@
     {
       "file": "OutdoorController.java",
       "layer": "orchestration",
-      "purpose": "显示运行协调"
+      "purpose": "显示运行协调；在真实输出判定点采集有界诊断环（128 条、去重）与关键事件锁存（32 条）；写门保持严格，仅输出归属退出对单帧 temp 失败做有界去抖（2 帧或 50ms），上游 block 与受保护 modifier 立即退出"
     },
     {
       "file": "OutdoorNodeBridge.java",
       "layer": "bridge",
-      "purpose": "Root 与原生程序桥"
+      "purpose": "Root 与原生程序桥；共用钳制上限选择器（内部 float 字段优先、旧访问器回退）"
     },
     {
       "file": "OutdoorNodeProfile.java",
@@ -525,7 +525,7 @@
     {
       "file": "OutdoorOpr.java",
       "layer": "adapters",
-      "purpose": "设备接口与所有权"
+      "purpose": "设备接口与所有权；OPR 两参优先、旧三参回退"
     },
     {
       "file": "OutdoorOprEnvelope.java",
@@ -540,7 +540,7 @@
     {
       "file": "OutdoorOutputAccess.java",
       "layer": "adapters",
-      "purpose": "户外输出归属的原生策略与独立自动对象 ABI，保留其他功能原路径"
+      "purpose": "户外输出归属的原生策略与独立自动对象 ABI，保留其他功能原路径；evaluate 记录 automatic 各子条件原值（含 reason/temp 名称与装饰位掩码）供诊断与退出分类"
     },
     {
       "file": "OutdoorPolicy.java",
@@ -555,7 +555,7 @@
     {
       "file": "OutdoorTuning.java",
       "layer": "adapters",
-      "purpose": "设备接口与所有权"
+      "purpose": "设备接口与所有权；户外 SDR 四参优先、五参回退"
     },
     {
       "file": "OutputProtection.java",
@@ -650,7 +650,7 @@
     {
       "file": "ResponseTuning.java",
       "layer": "adapters",
-      "purpose": "设备接口与所有权"
+      "purpose": "设备接口与所有权；门禁驾驶能力独立核验（无获取器且无 driving 残片才判未驾驶），场景确认布局仍单独要求完整旧字段"
     },
     {
       "file": "ResponsiveDialog.java",
@@ -705,7 +705,7 @@
     {
       "file": "RuntimeFeatureChecks.java",
       "layer": "diagnostics",
-      "purpose": "只读证据与诊断"
+      "purpose": "只读证据与诊断；户外/HBM 探测失败时按能力降级，不中断独立节点检查"
     },
     {
       "file": "SavedCurve.java",
@@ -745,7 +745,7 @@
     {
       "file": "SceneTuning.java",
       "layer": "adapters",
-      "purpose": "设备接口与所有权"
+      "purpose": "设备接口与所有权；场景各能力独立核验，新式 SceneDetector 只把已核验的 AON 窗口映射到反射确认，缺少瞬时遮挡与跳过亮度变化入口时流式距离保持不可用，不伪造传感器行为"
     },
     {
       "file": "ScreenBrightnessReading.java",
@@ -855,7 +855,7 @@
     {
       "file": "TraditionalAnimation.java",
       "layer": "adapters",
-      "purpose": "传统亮度过渡速率与原生原因隔离"
+      "purpose": "传统亮度过渡速率与原生原因隔离；Refactor 标记/双动画槽缺失按无 Refactor 策略处理，双 ramp 按 facade 或 owner 两种完整形状选择，自动策略支持最后选择 getter 或归属一致的原生策略槽"
     },
     {
       "file": "TraditionalCurve.java",

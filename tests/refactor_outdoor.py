@@ -10,7 +10,7 @@ OUT=ROOT/'build/refactor-outdoor-tests'
 OUT.mkdir(exist_ok=True)
 JSON=ROOT/'build/refactor-diagnostics/json-20240303.jar'
 sources={
-'top/rongshangs/lumacurve/refactor/OutdoorOutputAccess.java':'''package top.rongshangs.lumacurve.refactor;class OutdoorOutputAccess{static String name(HookRuntime s){return s.outputStrategy(s.owner);}static String profile(HookRuntime s){return "selected_strategy";}static long physical(HookRuntime s){return 0;}}''',
+'top/rongshangs/lumacurve/refactor/OutdoorOutputAccess.java':'''package top.rongshangs.lumacurve.refactor;class OutdoorOutputAccess{static class Decision{String profile,name,selector,error="";Boolean enabled,use,applied;Integer reason,temp,reasonMod,tempMod,cosmetic;}static boolean modifier;static String name(HookRuntime s){return s.outputStrategy(s.owner);}static Decision evaluate(HookRuntime s){Decision d=new Decision();d.profile=profile(s);d.cosmetic=1;d.name=modifier?"OtherBrightnessOutput":name(s);if(modifier){d.reasonMod=2;d.tempMod=2;}return d;}static String profile(HookRuntime s){return "selected_strategy";}static long physical(HookRuntime s){return 0;}}''',
 
 'android/os/SystemClock.java':'''package android.os; public class SystemClock {public static long now=1000;public static long uptimeMillis(){return now;}public static long elapsedRealtime(){return now;}}''',
 'android/os/Handler.java':'''package android.os;import java.util.*;public class Handler {public Map<Runnable,Long> pending=new HashMap<>();public void removeCallbacks(Runnable r){pending.remove(r);}public boolean postDelayed(Runnable r,long delay){pending.put(r,SystemClock.now+delay);return true;}public void advance(long now){SystemClock.now=now;int count=0;while(true){Runnable due=null;for(Map.Entry<Runnable,Long> e:pending.entrySet())if(e.getValue()<=now){due=e.getKey();break;}if(due==null)return;if(++count>100)throw new AssertionError("timer loop");pending.remove(due);due.run();}}}''',
@@ -229,6 +229,38 @@ public class OutdoorTest{static int count;static void check(boolean b){if(!b)thr
   ordinaryOwner.mHbmController.mHbmData=timedBase;rangeAccess.observeReplacement();check(!rangeAccess.rangeOnly()&&rangeAccess.copyable&&rangeAccess.tunable());
   ordinaryOwner.mHbmController.mHbmData=null;rangeAccess.observeReplacement();check(rangeAccess.rangeOnly()&&!rangeAccess.copyable); // null is not an owned clone
   for(float baseValue:new float[]{0,.1f,.5f,.85f,1})for(float ceiling:new float[]{.4f,.85f,1})for(double strength:new double[]{.1,.5,1}){safeOptions.values[5]=strength;float result=OutdoorPolicy.withinRangeTarget(safeOptions,30000,baseValue,ceiling);check(result>=baseValue&&result<=Math.max(baseValue,ceiling));}
+  // Exit debounce: one transient frame keeps the session; two frames or >=50ms exit.
+  for(int round=0;round<4;round++){
+   s.outdoor.stop();s.screen=s.user=s.thread=true;s.hdr=false;s.power.low=false;s.batteryTemperature=30;s.kernel.auto=true;s.strategy="AutomaticBrightnessStrategy";s.scene=true;owner.mAutomaticBrightnessControllerImpl.mIsOverrideDragPolicy=false;owner.mAutomaticBrightnessControllerImpl.mAutomaticBrightnessController.mAmbientLuxValid=true;owner.mAutomaticBrightnessControllerImpl.mAutomaticBrightnessController.mAmbientLux=30000;
+   activate(s);check(s.outdoor.policy.active);
+   if(round==0){
+    s.strategy="TemporaryBrightnessStrategy";s.outdoor.tick();check(s.outdoor.policy.active);eq(owner.mAutomaticBrightnessControllerImpl.getOverrideLimitBrightness(.3f,false,30000),.3f);
+    s.strategy="AutomaticBrightnessStrategy";s.outdoor.tick();check(s.outdoor.policy.active);check(s.outdoor.target(.3f)>.3f);
+   }
+   if(round==1){s.strategy="TemporaryBrightnessStrategy";s.outdoor.tick();check(s.outdoor.policy.active);s.handler.advance(SystemClock.now+5);s.outdoor.tick();check(!s.outdoor.policy.active&&s.outdoor.policy.cooldownUntil>=SystemClock.now+59999);}
+   if(round==2){s.strategy="TemporaryBrightnessStrategy";s.outdoor.tick();check(s.outdoor.deadline==SystemClock.now+50);s.handler.advance(SystemClock.now+50);check(!s.outdoor.policy.active&&s.outdoor.policy.cooldownUntil>=SystemClock.now+59999);}
+   if(round==3){OutdoorOutputAccess.modifier=true;check(s.outdoor.block().equals("output_modifier"));s.outdoor.tick();check(!s.outdoor.policy.active);OutdoorOutputAccess.modifier=false;}
+  }
+  JSONObject debounceLog=s.outdoor.status();boolean sawFirst=false,sawAbort=false;
+  for(int i=0;i<debounceLog.getJSONArray("output_diagnostics_critical").length();i++){String kind=debounceLog.getJSONArray("output_diagnostics_critical").getJSONObject(i).getString("kind");if(kind.equals("debounce_first"))sawFirst=true;if(kind.equals("debounce_abort"))sawAbort=true;}check(sawFirst&&sawAbort);
+  s.outdoor.stop();s.batteryTemperature=30;s.scene=true;s.strategy="AutomaticBrightnessStrategy";activate(s);s.scene=false;s.outdoor.tick();check(!s.outdoor.policy.active&&s.outdoor.policy.reason.equals("scene"));
+  s.outdoor.stop();s.scene=true;activate(s);s.batteryTemperature=Float.NaN;s.outdoor.tick();check(!s.outdoor.policy.active&&s.outdoor.policy.reason.equals("temperature"));s.batteryTemperature=30;
+  // Diagnostics stay bounded, latched transitions survive ring roll-over, JSON round-trips.
+  s.outdoor.stop();s.screen=s.user=s.thread=true;s.hdr=false;s.power.low=false;s.batteryTemperature=30;s.kernel.auto=true;s.strategy="AutomaticBrightnessStrategy";s.scene=true;owner.mAutomaticBrightnessControllerImpl.mIsOverrideDragPolicy=false;owner.mAutomaticBrightnessControllerImpl.mAutomaticBrightnessController.mAmbientLuxValid=true;owner.mAutomaticBrightnessControllerImpl.mAutomaticBrightnessController.mAmbientLux=30000;
+  activate(s);
+  JSONObject diag=s.outdoor.status();JSONArray critical=diag.getJSONArray("output_diagnostics_critical");
+  boolean seenEnter=false;for(int i=0;i<critical.length();i++)if(critical.getJSONObject(i).getString("kind").equals("session_enter"))seenEnter=true;check(seenEnter);
+  s.strategy="TemporaryBrightnessStrategy";check(s.outdoor.block().equals("output_override"));s.strategy="AutomaticBrightnessStrategy";
+  boolean seenOverride=false;for(int i=0;i<s.outdoor.status().getJSONArray("output_diagnostics_critical").length();i++)if(s.outdoor.status().getJSONArray("output_diagnostics_critical").getJSONObject(i).getString("kind").equals("active_output_override"))seenOverride=true;check(seenOverride);
+  s.outdoor.outputDiagnostics.clear();OutdoorOutputAccess.Decision rowDecision=new OutdoorOutputAccess.Decision();rowDecision.profile="automatic_strategy2_reason";rowDecision.name="AutomaticBrightnessStrategy";rowDecision.reason=4;rowDecision.temp=4;
+  for(int i=0;i<200;i++){owner.mAutomaticBrightnessControllerImpl.mAutomaticBrightnessController.mAmbientLux=i+1;s.outdoor.recordOutput(null,rowDecision);}
+  JSONObject bounded=s.outdoor.status();check(bounded.getJSONArray("output_diagnostics").length()==OutdoorController.OUTPUT_DIAGNOSTICS);
+  JSONObject tail=bounded.getJSONArray("output_diagnostics").getJSONObject(OutdoorController.OUTPUT_DIAGNOSTICS-1);check(tail.getString("reason_name").equals("automatic")&&tail.getString("temp_name").equals("automatic"));
+  boolean retained=false;for(int i=0;i<bounded.getJSONArray("output_diagnostics_critical").length();i++)if(bounded.getJSONArray("output_diagnostics_critical").getJSONObject(i).getString("kind").equals("session_enter"))retained=true;check(retained);
+  for(int i=0;i<60;i++){owner.mAutomaticBrightnessControllerImpl.mAutomaticBrightnessController.mAmbientLux=40000+i;s.outdoor.latch("probe");}
+  check(s.outdoor.status().getJSONArray("output_diagnostics_critical").length()==OutdoorController.OUTPUT_CRITICAL);
+  JSONObject round=new JSONObject(s.outdoor.status().toString());check(round.getJSONArray("output_diagnostics").length()==OutdoorController.OUTPUT_DIAGNOSTICS);check(round.getJSONArray("output_diagnostics_critical").length()==OutdoorController.OUTPUT_CRITICAL);
+  check(OutdoorController.reasonName(null).equals("unknown")&&OutdoorController.reasonName(0).equals("unknown")&&OutdoorController.reasonName(4).equals("automatic")&&OutdoorController.reasonName(14).equals("unrecognized"));
   System.out.println("Outdoor production hooks: "+count+" cases PASS; deterministic OEM model, device not verified");
  }
 }'''

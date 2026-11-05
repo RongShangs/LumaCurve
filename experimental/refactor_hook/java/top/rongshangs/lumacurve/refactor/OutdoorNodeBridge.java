@@ -21,9 +21,21 @@ final class OutdoorNodeBridge {
         Object power=dpc.getClass().getMethod("getDisplayPowerState").invoke(dpc);if(power==null)return false;
         for(String name:new String[]{"getScreenBrightness","getSdrScreenBrightness"})if(power.getClass().getMethod(name).getReturnType()!=float.class)throw new NoSuchMethodException(name+" return type");
         Object clamp=HookEntry.get(dpc,"mBrightnessClamperController");if(clamp==null)return false;
-        if(clamp.getClass().getMethod("getMaxBrightness").getReturnType()!=float.class)throw new NoSuchMethodException("getMaxBrightness return type");
+        clampCap(clamp);
         if(!(HookEntry.get(s.owner,"mBatteryThermalLimitBrightness") instanceof Number))throw new NoSuchFieldException("mBatteryThermalLimitBrightness type");
         OutdoorSdrScope.resolve(s.owner.getClass());OutdoorOutputAccess.profile(s);return s.hdrActive()!=null;
+    }
+    /** Same selector for the probe and the write decision: internal cap first, accessor as legacy ABI. */
+    static float clampCap(Object clamp)throws Exception{
+        java.lang.reflect.Field cap=null;
+        try{cap=HookEntry.field(clamp.getClass(),"mBrightnessCap");}catch(NoSuchFieldException absent){}
+        if(cap!=null){
+            if(cap.getType()!=float.class||java.lang.reflect.Modifier.isStatic(cap.getModifiers()))throw new IllegalStateException("mBrightnessCap ABI");
+            return cap.getFloat(clamp);
+        }
+        java.lang.reflect.Method legacy=clamp.getClass().getMethod("getMaxBrightness");
+        if(legacy.getReturnType()!=float.class||java.lang.reflect.Modifier.isStatic(legacy.getModifiers()))throw new NoSuchMethodException("getMaxBrightness ABI");
+        return ((Number)legacy.invoke(clamp)).floatValue();
     }
     void frame(float value){frame=value;changed();}
     void changed(){if(closed||s.closed||!s.outdoor.options.nodeBoost&&!requested||queued)return;queued=true;if(!s.handler.post(check))queued=false;}
@@ -37,7 +49,7 @@ final class OutdoorNodeBridge {
         Object dpc=HookEntry.get(s.owner,"mDisplayPowerController"),power=dpc.getClass().getMethod("getDisplayPowerState").invoke(dpc);
         float actual=((Number)power.getClass().getMethod("getScreenBrightness").invoke(power)).floatValue();
         float sdr=((Number)power.getClass().getMethod("getSdrScreenBrightness").invoke(power)).floatValue();
-        Object clamp=HookEntry.get(dpc,"mBrightnessClamperController");float cap=((Number)clamp.getClass().getMethod("getMaxBrightness").invoke(clamp)).floatValue();
+        Object clamp=HookEntry.get(dpc,"mBrightnessClamperController");float cap=clampCap(clamp);
         float battery=((Number)HookEntry.get(s.owner,"mBatteryThermalLimitBrightness")).floatValue();
         return frame==1f&&actual==1f&&sdr==1f&&cap==1f&&battery==1f&&"AutomaticBrightnessStrategy".equals(OutdoorOutputAccess.name(s));
     }

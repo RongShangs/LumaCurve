@@ -8,8 +8,8 @@
 
 | 项目 | 要求 |
 | --- | --- |
-| 触发 | 用户明确开启显示温控调整，实际屏幕限亮策略调用处于允许修改的温度与保护条件。 |
-| 需求与行为 | 只调整屏幕限亮，不影响整机其他温控；严重温控、电量等保护保留；实际温度限亮时数值及单位标红 |
+| 触发 | 用户明确开启显示温控调整，实际屏幕限亮策略调用处于允许修改的温度与保护条件，且匹配四参 SDR 入口或完整旧五参。 |
+| 需求与行为 | 只调整屏幕限亮，不影响整机其他温控；严重温控、电量等保护保留；实际温度限亮时数值及单位标红；SDR ABI 优先四参、旧五参回退 |
 | 退出 / 失败 | 每次调用或异常后恢复仍持有的临时显示限亮字段，不写整机温控。 |
 | 默认 | `off` · 新配置关闭 |
 | 配置键 | `thermal_relax`、`thermal_ceiling`、`thermal_cooling` |
@@ -19,7 +19,7 @@
 
 ### 选择边界
 
-显示层 HDR / SDR 消费者完整，严重温控与电池门槛继续有效；不改 SoC / 充电温控。
+显示层 HDR / SDR 消费者完整，严重温控与电池门槛继续有效；不改 SoC / 充电温控。 SDR 入口优先四参 adjustSdrBrightness(float, boolean, BrightnessReason, boolean)，仅完整四参缺失时回退旧五参。
 
 | 契约 | 内容 |
 | --- | --- |
@@ -37,7 +37,7 @@
 | --- | --- |
 | `display_thermal` · 显示层温控接口 | 仅调整显示亮度限制；严重温控、电池温度门槛及其他系统温控继续有效。 |
 
-路线内部 ABI：`module_loader_discovery`；完整条件仅维护在 [ABI索引](../architecture/compatibility-index.md#abi-内部变体)。
+路线内部 ABI：`animation_strategy_selection`、`module_loader_discovery`、`thermal_sdr_signature`；完整条件仅维护在 [ABI索引](../architecture/compatibility-index.md#abi-内部变体)。
 
 运行证据：`thermal_supported`、`thermal_skipped`。
 
@@ -52,6 +52,6 @@
 | 文件 | 当前源码 SHA-256 前16位 |
 | --- | --- |
 | [FieldOverride.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/FieldOverride.java) | `6b47448ffaf6ac29` |
-| [HookEntry.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/HookEntry.java) | `54d97a0f8f874090` |
-| [HookRuntime.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/HookRuntime.java) | `4e3f51d5e9508d0c` |
+| [HookEntry.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/HookEntry.java) | `0d3b85e0fffd36a5` |
+| [HookRuntime.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/HookRuntime.java) | `f1cdc6bfa6a1d706` |
 | [ThermalPolicy.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ThermalPolicy.java) | `673d032fdaea9f5b` |

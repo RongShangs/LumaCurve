@@ -39,7 +39,7 @@ final class ControlCenterPartition {
         Method data=null;
         try{data=config.getClass().getMethod("getHighBrightnessModeData");}catch(NoSuchMethodException absent){}
         if(data!=null){
-            if(Modifier.isStatic(data.getModifiers())||!data.getReturnType().getName().equals("com.android.server.display.config.HighBrightnessModeData"))throw new IllegalArgumentException("普通亮度边界接口格式变化");
+            if(Modifier.isStatic(data.getModifiers())||!HbmAccess.dataType(data.getReturnType()))throw new IllegalArgumentException("普通亮度边界接口格式变化");
             Object value=data.invoke(config);
             if(value!=null){Field point=value.getClass().getField("transitionPoint");if(point.getType()!=float.class||Modifier.isStatic(point.getModifiers()))throw new IllegalArgumentException("普通亮度边界类型变化");ceiling=point.getFloat(value);profile="ddc_hbm_transition";}
             else{ceiling=normal(owner);profile="hbm_normal_ceiling";}

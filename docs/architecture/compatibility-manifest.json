@@ -253,7 +253,8 @@
       ],
       "routes": [
         "native_driving",
-        "native_without_driving"
+        "native_without_driving",
+        "native_scene_aon"
       ],
       "owners": [
         "ResponseTuning.java",
@@ -261,7 +262,7 @@
         "AdvancedTuning.java",
         "LowLightAssistEvidence.java"
       ],
-      "selector": "完整驾驶接口优先；没有任何驾驶残片且完整旧场景 ABI 才允许无驾驶路径；残缺 / 类型错误 / 调用失败不降级。",
+      "selector": "完整驾驶接口优先；没有任何驾驶残片且完整旧场景 ABI 才允许无驾驶路径；旧瞬时遮挡 / 反射标记整体缺失、新式场景字段与 AON 照度窗口 / updateAmbientLux / checkAonFlareStatus 完整时才允许 AON 场景路径；残缺 / 类型错误 / 调用失败不降级。",
       "evidence": [
         "response_scene_profile"
       ],
@@ -422,7 +423,7 @@
         "SceneCatalog.java",
         "FieldOverride.java"
       ],
-      "selector": "各场景独立实际消费者；普通 / 流式距离分别检测。OEM 未启用普通距离时报告 inactive，不强开传感器；只能约束现有场景。",
+      "selector": "各场景独立实际消费者；普通 / 流式距离分别检测。新版 SceneDetector 缺少瞬时遮挡与跳过亮度变化入口时流式距离保持不可用（不伪造）；反射确认在旧 isReflectiveScene 缺失时映射到已核验的 AON 照度窗口。OEM 未启用普通距离时报告 inactive，不强开传感器；只能约束现有场景。",
       "evidence": [
         "system_scene",
         "scene_options",
@@ -544,7 +545,7 @@
         "HbmAccess.java",
         "OutdoorController.java"
       ],
-      "selector": "控制器与计时为两个独立维度：启用字段优先；缺字段且完整旧结构才用原生能力方法。合法有限计时 / 三零计时互斥；不能制造预算。",
+      "selector": "控制器与计时为两个独立维度：启用字段优先；缺字段且完整旧结构才用原生能力方法。合法有限计时 / 三零计时互斥；不能制造预算。 HBM 数据身份优先 config.* 十字段；仅整体缺失才接受 DisplayDeviceConfig 内嵌七字段类，字段与构造必须逐项匹配。",
       "evidence": [
         "outdoor.hbm_controller_profile",
         "outdoor.hbm_tuning_profile"
@@ -593,7 +594,7 @@
         "HbmAccess.java",
         "OutdoorPolicy.java"
       ],
-      "selector": "覆盖目标入口优先；明确缺入口且旧调用所有权完整时走传统自定义目标，残缺覆盖接口不回退。 原生HBM数据确实为null且deviceSupportsHbm为false，普通范围和当前上限均有效时采用native_range_only；目标沿用同一自动SDR入口，限制到实时原生上限，不制造HBM配置或绕开原生下游保护。存在但残缺的数据仍拒绝。",
+      "selector": "覆盖目标入口优先；明确缺入口且旧调用所有权完整时走传统自定义目标，残缺覆盖接口不回退。 原生HBM数据确实为null且deviceSupportsHbm为false，普通范围和当前上限均有效时采用native_range_only；目标沿用同一自动SDR入口，限制到实时原生上限，不制造HBM配置或绕开原生下游保护。存在但残缺的数据仍拒绝。 HBM 数据身份按 HbmAccess 变体选择；两种身份之外的结构整体拒绝。",
       "evidence": [
         "outdoor.target_compatibility_profile",
         "outdoor.range_profile",
@@ -633,7 +634,7 @@
         "OutdoorTuning.java",
         "OutdoorController.java"
       ],
-      "selector": "HBM getter 与峰值基础范围；只有本机实际启用的动态范围对象才补充，不同时添加第二个目标增强器。",
+      "selector": "HBM getter 与峰值基础范围；只有本机实际启用的动态范围对象才补充，不同时添加第二个目标增强器。 HBM 数据身份变体就绪后才启用。",
       "evidence": [
         "outdoor.dynamic_range_supported",
         "outdoor.dynamic_range_enabled"
@@ -672,7 +673,7 @@
         "NitBrightnessLimit.java",
         "OutdoorOprEnvelope.java"
       ],
-      "selector": "完整隐私判断优先；完全没有隐私 / UHBM 残片且旧 OPR 完整才用传统路径。实际物理换算用于 nit 上限。调用失败不降级。 OPR额外放宽独立读取完整原生灰阶/nit包络，最多到该表最高档；不存在整组字段时保留旧映射路线，部分缺失/坏表/换算失败保留原生限亮。",
+      "selector": "完整隐私判断优先；完全没有隐私 / UHBM 残片且旧 OPR 完整才用传统路径。实际物理换算用于 nit 上限。调用失败不降级。 OPR额外放宽独立读取完整原生灰阶/nit包络，最多到该表最高档；不存在整组字段时保留旧映射路线，部分缺失/坏表/换算失败保留原生限亮。 OPR 入口优先 (brightness, reason)，仅完整两参缺失才用旧三参；SDR 入口四参优先、五参回退。",
       "evidence": [
         "outdoor.sdr_compatibility_profile",
         "outdoor.sdr_compatibility_detail",
@@ -717,7 +718,7 @@
         "HookRuntime.java",
         "FieldOverride.java"
       ],
-      "selector": "显示层 HDR / SDR 消费者完整，严重温控与电池门槛继续有效；不改 SoC / 充电温控。",
+      "selector": "显示层 HDR / SDR 消费者完整，严重温控与电池门槛继续有效；不改 SoC / 充电温控。 SDR 入口优先四参 adjustSdrBrightness(float, boolean, BrightnessReason, boolean)，仅完整四参缺失时回退旧五参。",
       "evidence": [
         "thermal_supported",
         "thermal_skipped"
@@ -760,7 +761,7 @@
         "RawPanelLease.java",
         "OutdoorOutputAccess.java"
       ],
-      "selector": "主屏输出 / 电源状态对象完整；租约、解锁、模式、屏幕状态均通过才隔离正亮度帧，第一帧留给系统。 户外协作独立匹配原生策略或完整旧自动对象 / 双原因，原手动面板检查不代替此检查。",
+      "selector": "主屏输出 / 电源状态对象完整；租约、解锁、模式、屏幕状态均通过才隔离正亮度帧，第一帧留给系统。 户外协作独立匹配原生策略或完整旧自动对象 / 双原因，原手动面板检查不代替此检查。 节点上限优先读取钳制器内部 float 字段，旧访问器仅在字段整体缺失时使用。",
       "evidence": [
         "brightness_control.owner",
         "outdoor_node_supported",
@@ -1031,7 +1032,7 @@
         "MappingRecoveryState.java",
         "ControlCenterScreen.java"
       ],
-      "selector": "旧mode=0/1/2保留坐标语义：严格单调全域优先；端点平台只有原始数组、双向样条与裁剪证据完整才采用有效域，逻辑101点表独立核验。\n完整节点mode=3复用已验证坐标回显，并独立核验主屏隔离、物理ID、Root可写节点与监听进程；动态折叠监听未知时不套用。\n分区mode=4额外读取设备普通HBM边界并经真实标定换算；没有可靠边界或额外区间则只拒绝分区。\n分区普通段占75%、增强段占25%；普通V1使用原生逻辑输入全域，gamma使用物理普通边界；增强段及回显按实际节点标定。用户上界不修改自动HBM范围。\n普通V1的延迟回显先将真实物理读数反解为本机逻辑进度，再映射到75%，动画比较使用同一逆变换。作用域、手势和控制权为独立检查。",
+      "selector": "旧mode=0/1/2保留坐标语义：严格单调全域优先；端点平台只有原始数组、双向样条与裁剪证据完整才采用有效域，逻辑101点表独立核验。\n完整节点mode=3复用已验证坐标回显，并独立核验主屏隔离、物理ID、Root可写节点与监听进程；动态折叠监听未知时不套用。\n分区mode=4额外读取设备普通HBM边界并经真实标定换算；没有可靠边界或额外区间则只拒绝分区。\n分区普通段占75%、增强段占25%；普通V1使用原生逻辑输入全域，gamma使用物理普通边界；增强段及回显按实际节点标定。用户上界不修改自动HBM范围。\n普通V1的延迟回显先将真实物理读数反解为本机逻辑进度，再映射到75%，动画比较使用同一逆变换。作用域、手势和控制权为独立检查。 分区普通边界接受 config.* 与 DisplayDeviceConfig 内嵌两种已验证 HBM 数据身份；系统界面 HyperOSBrightnessPolicyV1 的新 ABI 仍为独立待适配项，不在本次边界修复内。",
       "evidence": [
         "control_center_slider.kind",
         "control_center_slider.error",
@@ -1134,12 +1135,13 @@
         "dim_aod"
       ],
       "routes": [
-        "automatic_dim_aod_cap"
+        "automatic_dim_aod_cap",
+        "automatic_dim_aod_cap_modern"
       ],
       "owners": [
         "DimAodCompatibility.java"
       ],
-      "selector": "实际完整SDR入口、DIM子阶段、主屏DPC/电源请求/原因及全屏AOD策略同时匹配；不按机型或版本放行。子阶段仅在当前自动DIM调用及活动用户和显示线程内参与，缺接口或异常独立跳过，不回退改写其他阶段。",
+      "selector": "完整旧五参SDR、DIM子阶段与双全屏AOD探测、主屏/活动用户/显示线程均验证后才安装修正；四参候选语义待验证，保留代码但不安装、不更改原生结果，独立报告不支持。",
       "evidence": [
         "dim_aod_compatibility",
         "feature_self_check"
@@ -1298,6 +1300,37 @@
       ],
       "rule": "完整三参数签名缺失才用二参数，返回值必须 void。",
       "test": "tests/refactor_traditional.py"
+    },
+    {
+      "id": "memory_mode_switch",
+      "owner": "MemoryLifecycle.java",
+      "alternatives": [
+        "owner_setAutoBrightnessState_boolean",
+        "display_power_facade_setAutomaticScreenBrightnessMode_int"
+      ],
+      "rule": "旧 setAutoBrightnessState(boolean) 非静态 void 与 mUseAutoBrightness 实例boolean完整时优先；只有两者整体缺失时才采用归属于当前owner的非静态facade setAutomaticScreenBrightnessMode(int) void及mAutoBrightnessEnable实例boolean。任一旧残片、类型错误、安装失败或归属不符立即拒绝，不运行失败降级。",
+      "test": "tests/refactor_memory_lifecycle.py"
+    },
+    {
+      "id": "traditional_animation_entry",
+      "owner": "TraditionalAnimation.java",
+      "alternatives": [
+        "facade_dual_ramp",
+        "owner_dual_ramp",
+        "refactor_policy_animators"
+      ],
+      "rule": "Refactor 策略标记整体缺失视为本机无 Refactor 策略；标记存在时必须为 false、类型正确且两个 Refactor 动画槽为空，否则拒绝。传统双 ramp 优先取 facade 的 mScreenBrightnessRampAnimator，整体缺失时才取 owner 的 mBrightnessRampAnimator；两组 ramp 类、三参/四参 target、速率签名、归属与显示对象必须完整，任一残片拒绝。",
+      "test": "tests/refactor_traditional_animation.py"
+    },
+    {
+      "id": "animation_strategy_selection",
+      "owner": "HookRuntime.java",
+      "alternatives": [
+        "last_selected_strategy_getter",
+        "owner_automatic_strategy_field"
+      ],
+      "rule": "动画门禁复用OutdoorOutputAccess的统一输出契约。优先getter存在时必须是非静态引用返回类型，非自动/null、错误类型或调用失败均关闭；仅getter缺失时采用已验证AutomaticBrightnessStrategy2，核验主屏/ABC归属、enabled/use/applied及当前和临时reason、保护modifier。不以保留槽或名称前缀推断当前控制权。",
+      "test": "tests/refactor_outdoor_fold.py"
     },
     {
       "id": "inherited_mapper_members",
@@ -1507,7 +1540,7 @@
         "selected_strategy",
         "automatic_strategy2_reason"
       ],
-      "rule": "户外控制专用：优先 getLastSelectedStrategy，存在但错误或调用失败不降级；仅该方法缺失且独立 AutomaticBrightnessStrategy2 主屏归属、同一 ABC、启用/使用/已应用三个状态及已提交和当前计算的原生自动原因都完整时采用旧 ABI。仅允许已验证的 BCBC/OPR/PEAK 修饰，不绕开临时、手动、HDR、温控及其他修饰。能力检查不依赖当前是否已启用自动模式。",
+      "rule": "户外与动画共用输出归属契约：优先 getLastSelectedStrategy，存在但错误或调用失败不降级；仅该方法缺失且独立 AutomaticBrightnessStrategy2 主屏归属、同一 ABC、启用/使用/已应用三个状态及已提交和当前计算的原生自动原因都完整时采用旧 ABI。仅允许已验证的 BCBC/OPR/PEAK 修饰，不绕开临时、手动、HDR、温控及其他修饰。能力检查不依赖当前是否已启用自动模式。",
       "test": "tests/refactor_outdoor_fold.py"
     },
     {
@@ -1796,6 +1829,127 @@
       ],
       "rule": "保留单源、原生倍率及FOV输入；仅两个倍率字段整体缺失、标准TYPE_LIGHT、DualSensorPolicy原生方法/float状态与同owner/manager完整时采用旧版单位lux。现存空/损坏/部分倍率不得回退。",
       "test": "tests/refactor_legacy_input.py"
+    },
+    {
+      "id": "thermal_sdr_signature",
+      "owner": "HookEntry.java",
+      "alternatives": [
+        "applied_auto_boolean",
+        "legacy_fifth_boolean"
+      ],
+      "rule": "优先 Android 15 的 adjustSdrBrightness(float, boolean, BrightnessReason, boolean)；仅完整四参缺失时用旧五参 ABI。返回类型、静态性与必需字段任一错误即拒绝，不按机型放行。",
+      "test": "tests/refactor_advanced_hooks.py"
+    },
+    {
+      "id": "outdoor_sdr_signature",
+      "owner": "OutdoorTuning.java",
+      "alternatives": [
+        "applied_auto_boolean",
+        "legacy_fifth_boolean"
+      ],
+      "rule": "户外限亮与 OPR 帧共用同一 SDR 入口；四参优先、五参回退，均要求首个参数为亮度且第二个为自动标记，残缺签名不安装可选组。",
+      "test": "tests/refactor_outdoor.py"
+    },
+    {
+      "id": "opr_signature",
+      "owner": "OutdoorOpr.java",
+      "alternatives": [
+        "brightness_reason",
+        "brightness_float_reason"
+      ],
+      "rule": "优先 (float, BrightnessReason)；仅完整两参缺失时用旧三参并按其真实参数表定位原因对象。每次调用只撤回本次引入的 OPR 位，下游温控、电量与 HDR 保护不变。",
+      "test": "tests/refactor_outdoor_compatibility.py"
+    },
+    {
+      "id": "hbm_data_identity",
+      "owner": "HbmAccess.java",
+      "alternatives": [
+        "config_high_brightness_mode_data_10_fields",
+        "display_device_config_high_brightness_mode_data_7_fields"
+      ],
+      "rule": "优先 config.* 十字段身份；仅整体缺失时接受 DisplayDeviceConfig 内嵌七字段类，字段名、类型与构造顺序必须逐项匹配。缺任一字段或出现未知实例字段即拒绝克隆和计时，不接受部分结构。",
+      "test": "tests/refactor_os3_compatibility.py"
+    },
+    {
+      "id": "control_center_partition_boundary",
+      "owner": "ControlCenterPartition.java",
+      "alternatives": [
+        "config_high_brightness_mode_data",
+        "display_device_config_high_brightness_mode_data"
+      ],
+      "rule": "普通边界 getter 接受两种已验证 HBM 数据身份；要求非静态、返回 public float transitionPoint。空值才回退控制器普通上限，类型残缺不降级。",
+      "test": "tests/refactor_control_center_partition.py"
+    },
+    {
+      "id": "brightness_clamp_cap",
+      "owner": "OutdoorNodeBridge.java",
+      "alternatives": [
+        "internal_mBrightnessCap_float",
+        "getMaxBrightness_float"
+      ],
+      "rule": "自检与写入共用clampCap；mBrightnessCap存在时必须为非静态float，残缺不回退；仅字段缺失时读非静态float getMaxBrightness()。字段、方法静态性、类型、空值及读取异常均严格拒绝，不以旧路线掩盖错误。",
+      "test": "tests/refactor_outdoor_node.py"
+    },
+    {
+      "id": "driving_capability_absent",
+      "owner": "ResponseTuning.java",
+      "alternatives": [
+        "native_driving_getDrivingStatus",
+        "native_without_driving"
+      ],
+      "rule": "门禁驾驶判定与场景确认布局解耦：getDrivingStatus 存在时要求非静态 boolean 与 getNightDrivingDebounceConfig 非静态 long；缺失时仅在控制器及其真实 SceneDetector 上都不存在任何 driving 字段/方法才判为无驾驶能力（false），mSceneDetector 缺失或出现任何 driving 残片仍视为歧义并抛异常，不伪造 true。场景确认路线的完整旧字段要求不变。",
+      "test": "tests/refactor_advanced_hooks.py"
+    },
+    {
+      "id": "response_scene_layout",
+      "owner": "ResponseTuning.java",
+      "alternatives": [
+        "native_driving",
+        "native_without_driving",
+        "native_scene_aon"
+      ],
+      "rule": "场景确认按形状分流：完整驾驶接口优先；否则仅当控制器与真实 SceneDetector 上不存在任何旧瞬时遮挡/反射字段、旧驾驶残片也不存在，且新式场景布尔字段（mUseProxAndTouchEnabled、mUseAonFlareEnabled、mUseProximityEnabled、mIsGameSceneEnable）、AON 上下限 float、updateAmbientLux(int,float,boolean) void、checkAonFlareStatus(float) void 全部匹配时才采用 AON 场景路径。任一旧标记残片、类型错误或缺失即拒绝，不猜测语义；核心期限门禁与场景确认布局解耦，避免单体门禁连带关闭 9 项能力。",
+      "test": "tests/refactor_os3_compatibility.py"
+    },
+    {
+      "id": "scene_reflection_mapping",
+      "owner": "SceneTuning.java",
+      "alternatives": [
+        "legacy_isReflectiveScene",
+        "aon_window_updateAmbientLux"
+      ],
+      "rule": "反射与 AON 确认按形状分流：旧 SceneDetector 存在 isReflectiveScene() 且共享场景消费者完整时沿用旧反射判定，阻止时返回 false；新布局整体缺少旧瞬时遮挡/反射标记时，只在 mUseAonFlareEnabled、mIsStepMode 布尔、mMinAonFlareEnableLux/mMaxAonFlareEnableLux float、updateAmbientLux(int,float,boolean) void、checkAonFlareStatus(float) void 全部匹配后才把 AON 窗口映射为反射确认，阻止时把窗口置为不可命中（min=MAX/max=-1）并在调用结束恢复。字段类型错误、旧标记残片或 checkAonFlareStatus 签名不符一律不开放，不猜测语义。",
+      "test": "tests/refactor_scene_hooks.py"
+    },
+    {
+      "id": "scene_stream_proximity_absent",
+      "owner": "SceneTuning.java",
+      "alternatives": [
+        "legacy_transient_proximity",
+        "new_layout_without_stream_consumer"
+      ],
+      "rule": "流式距离遮挡要求 SceneDetector 同时具备 mTransientProximityEnabled、mNeedCheckProximitySensor/mNeedCheckAonFlare 与 isNeedSkipBrightnessChange()。新布局只有 updateAmbientLux(int,float,boolean) 而缺少跳过亮度变化入口与瞬时遮挡字段时，该项保持能力不可用：不安装 Hook、不伪造准入，也不把 updateAmbientLux 的 AON 窗口当作流式遮挡；该入口只承载已核验的反射/AON 抑制。",
+      "test": "tests/refactor_scene_hooks.py"
+    },
+    {
+      "id": "dim_aod_signature",
+      "owner": "DimAodCompatibility.java",
+      "alternatives": [
+        "legacy_five_param_with_inner",
+        "modern_four_param_mAppliedDimming"
+      ],
+      "rule": "保留五参SDR及完整息屏子阶段、双全屏AOD探测的旧路线。四参mAppliedDimming路线缺少已验证AOD消费者语义，本次禁用：不安装Hook、不修改任何原生结果，独立报告unsupported；不增加设置或更改保存配置。候选实现仅保留供后续验证，不能由接口匹配自动启用。",
+      "test": "tests/refactor_dim_aod.py"
+    },
+    {
+      "id": "assist_pending_reset_optional",
+      "owner": "LowLightAssistEvidence.java",
+      "alternatives": [
+        "declared_boolean",
+        "field_absent"
+      ],
+      "rule": "辅助暗光闸门只把 pending 复位字段当作可选证据：字段存在时必须为非静态 boolean，值为 true 时不确认；字段整体缺失（本机 DualSensorPolicy 没有该状态）视为没有待复位，继续用辅助使能、预热时间和环形缓冲确认，不伪造复位状态。",
+      "test": "tests/refactor_advanced_hooks.py"
     }
   ],
   "native_variants": [

@@ -53,7 +53,7 @@
 | 项目 | 要求 |
 | --- | --- |
 | 触发 | 选择跨开关保持后，用户重新开启自动亮度，当前用户/模型和环境已就绪。 |
-| 需求与行为 | 通过原有模式观察器保留偏好，重新开启自动亮度时按同一记忆管理器恢复 |
+| 需求与行为 | 通过原有模式观察器保留偏好，重新开启自动亮度时按同一记忆管理器恢复；自动亮度开关调用按旧 owner 布尔入口或新 facade 模式入口两种完整形状观察，残缺或跨屏入口视为不支持，不按机型放行 |
 | 退出 / 失败 | 关闭跨开关保持后按原生模式生命周期处理；失败不清当前实时点或其他保持选择。 |
 | 默认 | `off` · 新配置关闭 |
 | 配置键 | `memory_hold_switch` |
@@ -133,7 +133,7 @@
 | `aosp_physical_clamped` · 系统物理映射：标定端点裁剪 | 原机曲线超出标定范围，且实际双向标定样条及端点裁剪通过验证；按有效范围编辑，默认保持原曲线对象与原生保护。 |
 | `simple_mapping` · 系统亮度比例映射 | 实际使用 SimpleMappingStrategy 的照度/亮度比例数组及原生样条重建；保留手动学习与完整记忆转存，不将比例当作 nit。 |
 
-路线内部 ABI：`active_backend`、`mapper_memory_coordinates`、`mapper_drag_signature`、`inherited_mapper_members`、`refactor_curve_layout`、`physical_baseline_calibration`、`coefficient_terminal_domain`、`curve_manual_display_scale`、`curve_snapshot_contract`、`simple_native_baseline`、`simple_commit_user_scope`、`curve_hook_assembly`、`learning_replay_capabilities`、`reset_derived_baseline`、`physical_mapper_context`、`mapping_automatic_mode`；完整条件仅维护在 [ABI索引](../architecture/compatibility-index.md#abi-内部变体)。
+路线内部 ABI：`active_backend`、`mapper_memory_coordinates`、`mapper_drag_signature`、`memory_mode_switch`、`inherited_mapper_members`、`refactor_curve_layout`、`physical_baseline_calibration`、`coefficient_terminal_domain`、`curve_manual_display_scale`、`curve_snapshot_contract`、`simple_native_baseline`、`simple_commit_user_scope`、`curve_hook_assembly`、`learning_replay_capabilities`、`reset_derived_baseline`、`physical_mapper_context`、`mapping_automatic_mode`；完整条件仅维护在 [ABI索引](../architecture/compatibility-index.md#abi-内部变体)。
 
 运行证据：`curve_backend`、`physical_mapper_class`、`baseline_id`、`user_serial`、`curve_route`、`physical_baseline_route`、`physical_calibration_min_nit`、`physical_calibration_max_nit`、`physical_original_min_nit`、`physical_original_max_nit`、`physical_clamped_points`、`theme_curve_enabled`、`theme_curve_dark`、`base_curve_name`、`theme_memory_mode`、`curve_display_range`、`curve_contract`、`memory_live_error`、`simple_mapper_class`、`simple_mapping_active`、`simple_curve_points`、`simple_curve_nit_calibrated`、`calculated_brightness`、`simple_curve_last_error`、`refactor_curve_verification.profile`、`refactor_curve_verification.baseline_source`、`physical_context_route`、`physical_context_description`、`automatic_mode_route`、`automatic_mode_error`。
 
@@ -178,10 +178,10 @@
 | [CurveDisplayRange.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/CurveDisplayRange.java) | `372050d731634e9a` |
 | [CurveEditor.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/CurveEditor.java) | `66423535b50b13ee` |
 | [CurvePlan.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/CurvePlan.java) | `6064003310ae7433` |
-| [HookRuntime.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/HookRuntime.java) | `4e3f51d5e9508d0c` |
+| [HookRuntime.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/HookRuntime.java) | `f1cdc6bfa6a1d706` |
 | [MainActivity.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/MainActivity.java) | `2c493852ffa1550e` |
 | [MapperContextAccess.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/MapperContextAccess.java) | `778e604c1ff57198` |
-| [MemoryLifecycle.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/MemoryLifecycle.java) | `d96929913c2291a0` |
+| [MemoryLifecycle.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/MemoryLifecycle.java) | `ee4d215c8a92a43b` |
 | [MemoryPersistence.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/MemoryPersistence.java) | `09c7bd896953ad71` |
 | [PersistentMemory.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/PersistentMemory.java) | `0bd2ff3ec3bf3ac8` |
 | [PhysicalCurveCalibration.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/PhysicalCurveCalibration.java) | `23a9952a5cbc182a` |

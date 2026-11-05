@@ -127,4 +127,24 @@ for scenario in ['wrong_first_flag','wrong_modifier','wrong_reason_result','alia
  subprocess.run(['javac','--release','8','-encoding','UTF-8','-cp',str(J),'-d',str(c),*map(str,paths),*[str(S/n) for n in production]],check=True)
  result=subprocess.run(['java','-cp',str(c)+os.pathsep+str(J),'top.rongshangs.lumacurve.refactor.TraditionalAnimationTest'],capture_output=True,text=True,check=True)
  print(scenario+': '+result.stdout.strip());total+=int(re.search(r'(\d+) cases PASS',result.stdout).group(1))
+for scenario in ['no_policy_marker','malformed_policy','owner_dual_fallback']:
+ variants=dict(sources)
+ code=variants[base+'TraditionalAnimationTest.java']
+ if scenario=='no_policy_marker':code=code.replace('public boolean supportRefactorBrightnessPolicy(){return refactor;}','')
+ if scenario=='malformed_policy':code=code.replace('public boolean supportRefactorBrightnessPolicy(){return refactor;}','public int supportRefactorBrightnessPolicy(){return 0;}')
+ if scenario=='owner_dual_fallback':
+  # Newer owner keeps the dual ramp directly; the facade no longer owns the slot.
+  code=code.replace('public Dual mScreenBrightnessRampAnimator=new Dual();','')
+  code=code.replace('public Dpc mDisplayPowerController=new Dpc();public Impl','public Dpc mDisplayPowerController=new Dpc();public Dual mBrightnessRampAnimator=new Dual();public Impl')
+  code=code.replace('o.mDisplayPowerController.mScreenBrightnessRampAnimator','o.mBrightnessRampAnimator').replace('((Owner)s.owner).mDisplayPowerController.mScreenBrightnessRampAnimator','((Owner)s.owner).mBrightnessRampAnimator')
+ start=code.index(' public static void main(')
+ expected='check(TraditionalAnimation.supported(s));check(animate(first(s),.5f,.2f)==.1f);' if scenario!='malformed_policy' else 'check(!TraditionalAnimation.supported(s));check(animate(first(s),.5f,.2f)==.2f);'
+ variants[base+'TraditionalAnimationTest.java']=code[:start]+''' public static void main(String[] args)throws Exception{TraditionalAnimation.install(TraditionalAnimationTest.class.getClassLoader());HookRuntime s=runtime();'''+expected+'''System.out.println("Ramp entry: "+cases+" cases PASS");}}'''
+ out=O/scenario;paths=[]
+ for name,code in variants.items():
+  p=out/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_text(code,encoding='utf-8');paths.append(p)
+ c=out/'classes';c.mkdir(exist_ok=True)
+ subprocess.run(['javac','--release','8','-encoding','UTF-8','-cp',str(J),'-d',str(c),*map(str,paths),*[str(S/n) for n in production]],check=True)
+ result=subprocess.run(['java','-cp',str(c)+os.pathsep+str(J),'top.rongshangs.lumacurve.refactor.TraditionalAnimationTest'],capture_output=True,text=True,check=True)
+ print(scenario+': '+result.stdout.strip());total+=int(re.search(r'(\d+) cases PASS',result.stdout).group(1))
 print(f'Traditional animation: {total} cases PASS; original, alternate and malformed ABIs; no target device execution')

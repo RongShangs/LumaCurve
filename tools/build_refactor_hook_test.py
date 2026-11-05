@@ -279,7 +279,7 @@ meta.update({'feature_compatibility_cases':feature_compatibility_cases,'feature_
     'outdoor_compatibility_cases':outdoor_compatibility_cases,'outdoor_compatibility_firmware_cases':outdoor_compatibility_firmware_cases,
     'outdoor_sdr_profiles':['privacy_aware','legacy_opr'],'outdoor_sdr_profiles_mutually_exclusive':True,
     'os3_compatibility_cases':os3_compatibility_cases,'os3_device_tested':False,
-    'response_scene_profiles':['native_driving','native_without_driving'],
+    'response_scene_profiles':['native_driving','native_without_driving','native_scene_aon'],
     'hbm_controller_profiles':['enabled_field','native_support_method'],
     'outdoor_target_profiles':['override_target','legacy_custom_target'],
     'feature_check_page_open_rechecks':False,'feature_check_resume_rechecks':False,

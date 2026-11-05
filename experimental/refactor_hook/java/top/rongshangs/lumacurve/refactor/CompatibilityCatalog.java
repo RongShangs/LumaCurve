@@ -26,7 +26,7 @@ final class CompatibilityCatalog {
     static Route[] catalogue(String id){
         if(Arrays.asList("curve","manual_memory","saved_curve","persistent_memory","memory_mode","memory_forever","memory_reset","memory_timeout").contains(id))return curveRoutes();
         switch(id){
-        case "dim_aod":return new Route[]{route("automatic_dim_aod_cap","自动降亮与息屏目标协调","主屏仍亮且处于自动DIM降亮时，阻止全屏AOD目标重新抬高已降低的亮度；真正息屏、背屏、手动及HDR沿用系统。")};
+        case "dim_aod":return new Route[]{route("automatic_dim_aod_cap","自动降亮与息屏目标协调","主屏仍亮且处于自动DIM降亮时，阻止全屏AOD目标重新抬高已降低的亮度；真正息屏、背屏、手动及HDR沿用系统。"),route("automatic_dim_aod_cap_modern","自动降亮与息屏目标协调（新式SDR入口）","四参SDR入口缺少已验证的全屏AOD消费者语义；候选路线保留但不安装修正，所有亮度结果沿用系统。")};
         case "main_sensor":return new Route[]{route("oem_main","系统标准主光感","读取当前主屏 ABC 选用的 TYPE_LIGHT 光感，沿用原适配。"),route("oem_selected_secondary","系统选用的折叠光感","当前主屏 ABC 直接选用已验证的私有照度光感；拒绝原始、工厂、流式及其他屏幕候选。"),route("oem_selected_fov","系统 FOV 融合光感","沿用主屏原生光感选择器返回的 FOV 源和照度解析；不混用 ABC 保留的物理光感槽。")};
         case "assist_sensor":return new Route[]{
             route("native_auxiliary","系统原生辅助光感","原生辅助槽已有传感器时优先使用，继续沿用系统采样和融合。"),
@@ -46,7 +46,8 @@ final class CompatibilityCatalog {
         case "thermal":return new Route[]{route("display_thermal","显示层温控接口","仅调整显示亮度限制；严重温控、电池温度门槛及其他系统温控继续有效。")};
         case "response":case "small_response":case "low_light":case "low_threshold":case "threshold_override":case "assist_gate":case "assist_override":return new Route[]{
             route("native_driving","原生确认与夜间驾驶保护","使用已验证的主辅光感确认和阈值；保留原生夜间驾驶判断及附加等待。"),
-            route("native_without_driving","传统确认与场景保护","完整旧场景结构没有夜间驾驶接口；使用原生确认窗口，保留步行、遮挡、HDR 等判断，不额外采样。")};
+            route("native_without_driving","传统确认与场景保护","完整旧场景结构没有夜间驾驶接口；使用原生确认窗口，保留步行、遮挡、HDR 等判断，不额外采样。"),
+            route("native_scene_aon","新式场景确认（AON 窗口）","无任何驾驶残片，且旧瞬时遮挡/反射标记整体缺失；只核验新式场景字段、AON 照度窗口与 updateAmbientLux / checkAonFlareStatus，保留原生主辅确认与期限。")};
         case "animation_override":return new Route[]{route("oem_animation","Refactor 原生时长过渡","调整已验证的原生过渡时长倍率，保持系统动画及主副屏隔离。"),route("traditional_ramp","传统自动亮度速率过渡","原生 Refactor 策略关闭且时长对象为空；匹配主屏双 RampAnimator、三参或四参目标入口及速率原因，只调整普通自动亮度速率，保留系统时长上限及特殊过渡。")};
         case "sunlight_override":return new Route[]{route("manual_sunlight","系统手动模式阳光屏","调整 SunlightController 的进入 / 退出等待，不代替自动 HBM。")};
         case "touch_override":return new Route[]{route("touch_release","系统触摸遮挡释放等待","调整 TouchCoverProtectionHelper 的移开等待，继续保留遮挡保护。")};
@@ -70,6 +71,6 @@ final class CompatibilityCatalog {
         }
     }
     static String sceneName(String id){switch(id){case "proximity":return "普通距离策略";case "stream_proximity":return "流式距离策略";case "night_driving":return "系统夜间驾驶策略";case "night_wake":return "系统夜间唤醒策略";case "step":return "系统步行延迟策略";case "touch":return "系统触摸遮挡策略";case "reflection":return "系统反射 / AON 策略";case "game":return "系统游戏防误降亮策略";case "manual_sunlight":return "系统手动阳光屏策略";default:return "未知场景接口";}}
-    static String sceneCondition(String id){switch(id){case "proximity":return "匹配 dropAmbientLuxIfNeeded 和普通距离开关；系统未开启时不强制启动。流式距离是另一项独立策略，不混用设置。";case "stream_proximity":return "匹配 SceneDetector 的流式确认与跳过亮度变化接口；与普通距离分别设置。";case "step":return "使用 ABC 原生步行额外降亮确认接口。";case "touch":return "使用 TouchCoverProtectionHelper 的实时遮挡判断。";case "night_wake":return "使用 ABC 的 updateNightWakeMode，不伪造夜间唤醒条件。";case "manual_sunlight":return "使用 SunlightController 原生状态与条件。";default:return "匹配本机该场景的原生消费者，仅限制参与条件，不强制进入场景。";}}
+    static String sceneCondition(String id){switch(id){case "proximity":return "匹配 dropAmbientLuxIfNeeded 和普通距离开关；系统未开启时不强制启动。流式距离是另一项独立策略，不混用设置。";case "stream_proximity":return "匹配 SceneDetector 的瞬时遮挡标记与跳过亮度变化接口；新版只有 updateAmbientLux(int,float,boolean) 而缺少这些入口时本项不可用，不伪造准入或传感器行为；与普通距离分别设置。";case "reflection":return "旧版使用 isReflectiveScene 反射判定；新版整体缺少旧标记时映射到已核验的 AON 照度窗口（updateAmbientLux / checkAonFlareStatus），阻止时只让窗口不可命中；两者都缺失时不开放。";case "step":return "使用 ABC 原生步行额外降亮确认接口。";case "touch":return "使用 TouchCoverProtectionHelper 的实时遮挡判断。";case "night_wake":return "使用 ABC 的 updateNightWakeMode，不伪造夜间唤醒条件。";case "manual_sunlight":return "使用 SunlightController 原生状态与条件。";default:return "匹配本机该场景的原生消费者，仅限制参与条件，不强制进入场景。";}}
     static int group(String id){if(Arrays.asList("curve","manual_memory","saved_curve","persistent_memory","memory_mode","memory_forever","memory_reset","memory_timeout").contains(id))return 0;if(id.startsWith("scene_")||Arrays.asList("main_sensor","assist_sensor","response","small_response","low_light","low_threshold","assist_gate","threshold_override","assist_override","animation_override","sunlight_override","touch_override","dim_aod").contains(id))return 1;if(Arrays.asList("outdoor","hbm","outdoor_range","opr","nit_limit","node_output","thermal","dark_lock","dark_lock_schedule").contains(id))return 2;return 3;}
 }

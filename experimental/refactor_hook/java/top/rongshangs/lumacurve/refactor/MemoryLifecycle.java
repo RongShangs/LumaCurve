@@ -19,7 +19,7 @@ final class MemoryLifecycle {
     boolean allowed(){return !state.closed&&!state.changing&&!state.persistentMemory.replaying&&state.phase.equals("active")&&state.appliesToUser();}
     void attach(){
         if(!state.kernel.memoryHandoverSupported())return;
-        links.put(state.owner,this);try{installMode(state.owner);modeSupported=true;}catch(Throwable absent){}
+        links.put(state.owner,this);try{installMode();modeSupported=true;}catch(Throwable absent){}
         try{impl=TraditionalAdapter.read(state.owner,"mAutomaticBrightnessControllerImpl");abc=TraditionalAdapter.read(impl,"mAutomaticBrightnessController");mapper=TraditionalAdapter.read(state.owner,"mBrightnessMapper");model=TraditionalAdapter.read(abc,"mShortTermModel");
             for(Object o:new Object[]{state.owner,impl,abc,mapper,model})if(o!=null)links.put(o,this);
             Method modelSetter=TraditionalAdapter.method(model.getClass(),"setUserBrightness",float.class,float.class);modelSupported=modelSetter.getReturnType()==void.class&&TraditionalAdapter.find(model.getClass(),"mAnchor").getType()==float.class&&TraditionalAdapter.find(model.getClass(),"mBrightness").getType()==float.class&&TraditionalAdapter.find(model.getClass(),"mIsValid").getType()==boolean.class;
@@ -41,9 +41,28 @@ final class MemoryLifecycle {
             JSONArray points=state.kernel.manualPoints();for(int i=0;i<points.length();i++)if(Math.abs(points.getJSONObject(i).getDouble("lux")-current.getDouble("lux"))<.5)return true;
         }catch(Throwable unavailable){}return false;
     }
-    static void installMode(Object owner)throws Exception{
-        Method method=TraditionalAdapter.method(owner.getClass(),"setAutoBrightnessState",boolean.class);if(method.getReturnType()!=void.class||TraditionalAdapter.find(owner.getClass(),"mUseAutoBrightness").getType()!=boolean.class)throw new NoSuchMethodException("mode lifecycle");
-        hook(method,new XC_MethodHook(){protected void beforeHookedMethod(MethodHookParam p){MemoryLifecycle m=active(p.thisObject);if(m==null||!m.allowed())return;try{boolean was=(Boolean)TraditionalAdapter.read(p.thisObject,"mUseAutoBrightness"),now=(Boolean)p.args[0];if(was&&!now)m.state.persistentMemory.captureForHandover();}catch(Throwable unavailable){}}});
+    void installMode()throws Exception{
+        Method legacy=null;Field legacyMode=null;
+        try{legacy=TraditionalAdapter.method(state.owner.getClass(),"setAutoBrightnessState",boolean.class);}catch(NoSuchMethodException absent){}
+        try{legacyMode=TraditionalAdapter.find(state.owner.getClass(),"mUseAutoBrightness");}catch(NoSuchFieldException absent){}
+        if(legacy!=null||legacyMode!=null){
+            if(legacy==null||legacyMode==null||legacy.getReturnType()!=void.class||Modifier.isStatic(legacy.getModifiers())||legacyMode.getType()!=boolean.class||Modifier.isStatic(legacyMode.getModifiers()))throw new IllegalStateException("Incomplete mode lifecycle ABI");
+            Method method=legacy;
+            hook(method,new XC_MethodHook(){protected void beforeHookedMethod(MethodHookParam p){MemoryLifecycle m=active(p.thisObject);if(m==null||!m.allowed())return;try{boolean was=(Boolean)TraditionalAdapter.read(p.thisObject,"mUseAutoBrightness"),now=(Boolean)p.args[0];if(was&&!now)m.state.persistentMemory.captureForHandover();}catch(Throwable unavailable){}}});
+            return;
+        }
+        // Newer builds keep the boolean on the controller and expose the mode switch on the
+        // display-power facade. Only the owner's own facade is accepted; a stale or unrelated
+        // controller link stays rejected rather than hooking a foreign display.
+        Object facade=TraditionalAdapter.read(state.owner,"mDisplayPowerController");
+        if(facade==null)throw new NoSuchMethodException("mode lifecycle");
+        if(TraditionalAdapter.read(facade,"mDisplayPowerControllerImpl")!=state.owner)throw new IllegalStateException("mode facade owner");
+        Method method=TraditionalAdapter.method(facade.getClass(),"setAutomaticScreenBrightnessMode",int.class);
+        if(method.getReturnType()!=void.class||Modifier.isStatic(method.getModifiers()))throw new NoSuchMethodException("mode lifecycle");
+        Field mode=TraditionalAdapter.find(state.owner.getClass(),"mAutoBrightnessEnable");
+        if(mode.getType()!=boolean.class||Modifier.isStatic(mode.getModifiers()))throw new NoSuchMethodException("mode lifecycle");
+        links.put(facade,this);
+        hook(method,new XC_MethodHook(){protected void beforeHookedMethod(MethodHookParam p){MemoryLifecycle m=active(p.thisObject);if(m==null||!m.allowed())return;try{boolean was=(Boolean)TraditionalAdapter.read(m.state.owner,"mAutoBrightnessEnable"),now=((Number)p.args[0]).intValue()!=0;if(was&&!now)m.state.persistentMemory.captureForHandover();}catch(Throwable unavailable){}}});
     }
     static void installAmbient(Object abc)throws Exception {
         for(Class<?> type=abc.getClass();type!=null;type=type.getSuperclass())for(Method method:type.getDeclaredMethods())if(method.getName().equals("setAmbientLux")){

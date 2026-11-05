@@ -9,7 +9,7 @@
 | 项目 | 要求 |
 | --- | --- |
 | 触发 | 开启过渡倍率且匹配已验证时长/传统速率ABI，系统执行允许调整的自动过渡。 |
-| 需求与行为 | 原生时长与传统速率路线互斥，分别调整变亮变暗倍率，保留原生上限与特殊过渡 |
+| 需求与行为 | 原生时长与传统速率路线互斥，分别调整变亮变暗倍率，保留原生上限与特殊过渡；传统路线在 Refactor 策略标记与双动画槽整体缺失时按无 Refactor 策略处理，双 ramp 入口按 facade / owner 两种完整形状选择，自动策略名支持最后选择 getter 或归属一致的原生策略槽 |
 | 退出 / 失败 | 离开普通慢速自动过渡时按系统处理；停用只恢复仍等于模块应用值的参数。 |
 | 默认 | `native` · 跟随系统 |
 | 配置键 | `animation_override`、`animation_brighten`、`animation_darken` |
@@ -38,7 +38,7 @@
 | `oem_animation` · Refactor 原生时长过渡 | 调整已验证的原生过渡时长倍率，保持系统动画及主副屏隔离。 |
 | `traditional_ramp` · 传统自动亮度速率过渡 | 原生 Refactor 策略关闭且时长对象为空；匹配主屏双 RampAnimator、三参或四参目标入口及速率原因，只调整普通自动亮度速率，保留系统时长上限及特殊过渡。 |
 
-路线内部 ABI：`traditional_animation_reason`、`traditional_animation_target_signature`；完整条件仅维护在 [ABI索引](../architecture/compatibility-index.md#abi-内部变体)。
+路线内部 ABI：`traditional_animation_entry`、`traditional_animation_reason`、`traditional_animation_target_signature`；完整条件仅维护在 [ABI索引](../architecture/compatibility-index.md#abi-内部变体)。
 
 运行证据：`animation_override_supported`、`animation_compatibility_profile`。
 
@@ -53,5 +53,5 @@
 | 文件 | 当前源码 SHA-256 前16位 |
 | --- | --- |
 | [AdvancedTuning.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/AdvancedTuning.java) | `99787f6a9676e36d` |
-| [HookRuntime.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/HookRuntime.java) | `4e3f51d5e9508d0c` |
-| [TraditionalAnimation.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/TraditionalAnimation.java) | `ae0bdab13dd52881` |
+| [HookRuntime.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/HookRuntime.java) | `f1cdc6bfa6a1d706` |
+| [TraditionalAnimation.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/TraditionalAnimation.java) | `950c0af5416a3b49` |

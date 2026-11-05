@@ -82,3 +82,49 @@ public class SceneHookTest{
 classes=O/'classes';classes.mkdir(exist_ok=True)
 subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(J),'-d',str(classes),*[str(S/(n+'.java')) for n in ['SceneOptions','ScenePolicy','SceneController','SceneTuning','FieldOverride']],*[str(f) for f in files],str(p),str(S/'hooking/HookTransaction.java')],check=True)
 subprocess.run(['java','-cp',str(classes)+os.pathsep+str(J),'top.rongshangs.lumacurve.refactor.SceneHookTest'],check=True)
+# Newer layout: no isReflectiveScene / transient-proximity flags; reflection maps to the AON window.
+aon=dict(sources)
+aon['com/android/server/display/SceneDetector.java']='''package com.android.server.display;public class SceneDetector{
+ public boolean mIsStepMode=true,mUseAonFlareEnabled=true;public float mMinAonFlareEnableLux=17,mMaxAonFlareEnableLux=200;public boolean sawAon;public int applies;
+ public void updateAmbientLux(int event,float lux,boolean dark){sawAon=lux>=mMinAonFlareEnableLux&&lux<=mMaxAonFlareEnableLux;}public void checkAonFlareStatus(float lux){}
+}'''
+aon_test=r'''package top.rongshangs.lumacurve.refactor;
+import com.android.server.display.*;import top.rongshangs.lumacurve.refactor.hooking.*;import android.os.*;
+public class SceneAonTest{
+ static int cases;static void check(boolean b){if(!b)throw new AssertionError("case "+cases);cases++;}
+ static class Owner{AutomaticBrightnessControllerImpl mAutomaticBrightnessControllerImpl=new AutomaticBrightnessControllerImpl();SunlightController mSunlightController=new SunlightController();}
+ static Object call(Object o,String name,Class<?>[] args,Object...values){return XposedBridge.call(o,name,args,values);}
+ static void block(HookRuntime s,int...ids)throws Exception{org.json.JSONObject policies=new org.json.JSONObject();for(int i:ids)policies.put(SceneOptions.IDS[i],new org.json.JSONObject().put("mode","block"));s.scenes.configure(SceneOptions.parse(new org.json.JSONObject().put("scene_options",new org.json.JSONObject().put("policies",policies))));}
+ public static void main(String[] args)throws Exception{
+  SceneTuning.install(SceneAonTest.class.getClassLoader());Owner o=new Owner();HookRuntime s=new HookRuntime(o);HookEntry.states.put(o,s);
+  AutomaticBrightnessControllerImpl impl=o.mAutomaticBrightnessControllerImpl;SceneDetector scene=impl.mSceneDetector;
+  check(!SceneTuning.supported(s,4));check(SceneTuning.supported(s,5));check(SceneTuning.supported(s,3));
+  block(s,5);call(scene,"updateAmbientLux",new Class<?>[]{int.class,float.class,boolean.class},0,50f,true);
+  check(!scene.sawAon);check(scene.mMinAonFlareEnableLux==17f&&scene.mMaxAonFlareEnableLux==200f);
+  s.scenes.stop();call(scene,"updateAmbientLux",new Class<?>[]{int.class,float.class,boolean.class},0,50f,true);check(scene.sawAon);
+  scene.mUseAonFlareEnabled=false;check(!SceneTuning.supported(s,5));check(SceneTuning.inactiveReason(s,5).contains("系统未启用"));
+  System.out.println("AON scene mapping: "+cases+" cases PASS; verified window only, stream occlusion stays unavailable");
+ }
+}'''
+aon_test_base=aon_test
+for variant,wrong in [('aon',False),('aon_partial',True),('aon_legacy_marker',True),('aon_static_window',True)]:
+ aon_test=aon_test_base
+ src=dict(aon)
+ if wrong:
+  src['com/android/server/display/SceneDetector.java']='''package com.android.server.display;public class SceneDetector{public boolean mIsStepMode=true,mUseAonFlareEnabled=true;public float mMinAonFlareEnableLux=17,mMaxAonFlareEnableLux=200;public void updateAmbientLux(int event,float lux,boolean dark){}public void checkAonFlareStatus(int lux){}}'''
+  if variant!='aon_partial':src['com/android/server/display/SceneDetector.java']=src['com/android/server/display/SceneDetector.java'].replace('checkAonFlareStatus(int lux)','checkAonFlareStatus(float lux)')
+  if variant=='aon_legacy_marker':src['com/android/server/display/SceneDetector.java']=src['com/android/server/display/SceneDetector.java'].replace('public class SceneDetector{','public class SceneDetector{public boolean mIsReflectiveScene;')
+  if variant=='aon_static_window':src['com/android/server/display/SceneDetector.java']=src['com/android/server/display/SceneDetector.java'].replace('public float mMinAonFlareEnableLux','public static float mMinAonFlareEnableLux')
+  aon_test=aon_test.replace('check(SceneTuning.supported(s,5));check(SceneTuning.supported(s,3));','check(SceneTuning.supported(s,3));check(!SceneTuning.supported(s,5));')
+  body='''  block(s,5);call(scene,"updateAmbientLux",new Class<?>[]{int.class,float.class,boolean.class},0,50f,true);
+  check(!scene.sawAon);check(scene.mMinAonFlareEnableLux==17f&&scene.mMaxAonFlareEnableLux==200f);
+  s.scenes.stop();call(scene,"updateAmbientLux",new Class<?>[]{int.class,float.class,boolean.class},0,50f,true);check(scene.sawAon);
+  scene.mUseAonFlareEnabled=false;check(!SceneTuning.supported(s,5));check(SceneTuning.inactiveReason(s,5).contains("系统未启用"));'''
+  aon_test=aon_test.replace(body,'''  check(SceneTuning.capabilities.get(SceneDetector.class)==null||!SceneTuning.capabilities.get(SceneDetector.class).contains(5));''')
+ out=R/'build'/('refactor-scene-'+variant+'-tests');out.mkdir(parents=True,exist_ok=True);paths=[]
+ for name,code in src.items():
+  q=out/name;q.parent.mkdir(parents=True,exist_ok=True);q.write_text(code,encoding='utf-8');paths.append(str(q))
+ t=out/'SceneAonTest.java';t.write_text(aon_test,encoding='utf-8')
+ c=out/'classes';c.mkdir(exist_ok=True)
+ subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(J),'-d',str(c),*[str(S/(n+'.java')) for n in ['SceneOptions','ScenePolicy','SceneController','SceneTuning','FieldOverride']],*paths,str(t),str(S/'hooking/HookTransaction.java')],check=True)
+ r=subprocess.run(['java','-cp',str(c)+os.pathsep+str(J),'top.rongshangs.lumacurve.refactor.SceneAonTest'],capture_output=True,text=True,check=True);print(variant+': '+r.stdout.strip())

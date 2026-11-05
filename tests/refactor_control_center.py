@@ -3,6 +3,7 @@ from pathlib import Path
 import os,re,subprocess
 ROOT=Path(__file__).resolve().parents[1];SRC=ROOT/'experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor';OUT=ROOT/'build/control-center-tests';OUT.mkdir(exist_ok=True)
 files={
+'top/rongshangs/lumacurve/refactor/HbmAccess.java':'''package top.rongshangs.lumacurve.refactor;class HbmAccess{static boolean dataType(Class<?> type){String name=type.getName();return name.equals("com.android.server.display.config.HighBrightnessModeData")||name.equals("com.android.server.display.DisplayDeviceConfig$HighBrightnessModeData");}}''',
 'android/os/Process.java':'package android.os;public class Process{public static int myPid(){return 44;}}',
 'android/widget/Toast.java':'package android.widget;public class Toast{public static final int LENGTH_SHORT=0;public static int count;public static String text;public static Toast makeText(android.content.Context c,String s,int d){text=s;return new Toast();}public void show(){count++;}public void cancel(){}}',
 

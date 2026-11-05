@@ -26,7 +26,28 @@ final class SceneTuning {
         installGroup(loader,6,"AutomaticBrightnessController",new String[]{"updateNightWakeMode"},new Class<?>[][]{{boolean.class,boolean.class}},new Class<?>[]{void.class},new String[]{});
         installGroup(loader,7,"SunlightController",new String[]{"setSunLightModeActive","updateAmbientLux"},new Class<?>[][]{{boolean.class},{}},new Class<?>[]{void.class,void.class},new String[]{});
         installGroup(loader,8,"AutomaticBrightnessControllerImpl",new String[]{"dropDecreaseLuxIfNeeded"},new Class<?>[][]{{}},new Class<?>[]{boolean.class},new String[]{"mIsGameSceneEnable"});
+        installAon(loader);
     }
+    /** Newer scene detectors replaced isReflectiveScene with an AON lux window evaluated inside
+     *  updateAmbientLux. The reflection option maps to that verified window only; the stream
+     *  occlusion option needs the removed transient-proximity flag and is not fabricated. */
+    static void installAon(ClassLoader loader){List<XC_MethodHook.Unhook> added=new ArrayList<>();try{
+        Class<?> cls=Class.forName("com.android.server.display.SceneDetector",false,loader);Set<Integer> cap=capabilities.get(cls);if(cap!=null&&(cap.contains(5)||cap.contains(4)))return;
+        for(Class<?> type=cls;type!=null&&type!=Object.class;type=type.getSuperclass()){
+            for(Field f:type.getDeclaredFields())if(Arrays.asList("mTransientProximityEnabled","mNeedCheckProximitySensor","mNeedCheckAonFlare","mIsReflectiveScene").contains(f.getName()))throw new IllegalStateException("Incomplete legacy scene ABI");
+            for(Method m:type.getDeclaredMethods())if(Arrays.asList("isReflectiveScene","isNeedSkipBrightnessChange").contains(m.getName()))throw new IllegalStateException("Incomplete legacy scene ABI");
+        }
+        Method ambient=cls.getDeclaredMethod("updateAmbientLux",int.class,float.class,boolean.class);
+        if(ambient.getReturnType()!=void.class||Modifier.isStatic(ambient.getModifiers()))throw new IllegalStateException("ambient stream ABI");
+        for(String name:new String[]{"mUseAonFlareEnabled","mIsStepMode","mMinAonFlareEnableLux","mMaxAonFlareEnableLux"}){Field f=HookEntry.field(cls,name);if(f.getType()!=(name.endsWith("Lux")?float.class:boolean.class)||Modifier.isStatic(f.getModifiers()))throw new IllegalStateException("AON scene field ABI");}
+        Method flare=cls.getDeclaredMethod("checkAonFlareStatus",float.class);
+        if(flare.getReturnType()!=void.class||Modifier.isStatic(flare.getModifiers()))throw new IllegalStateException("AON status ABI");
+        added.add(XposedBridge.hookMethod(ambient,new XC_MethodHook(){
+            protected void beforeHookedMethod(MethodHookParam p){HookRuntime s=state(p.thisObject,"scene",false);if(s==null||s.probingScenes)return;SceneController c=s.scenes;if(!c.blocked(5))return;try{save(p,"mMinAonFlareEnableLux",Float.MAX_VALUE);save(p,"mMaxAonFlareEnableLux",-1f);}catch(Throwable failure){restore(p);c.stop();c.error="场景接口异常，已停止自定义场景";}}
+            protected void afterHookedMethod(MethodHookParam p){restore(p);}
+        }));
+        if(cap==null){cap=new HashSet<>();capabilities.put(cls,cap);}cap.add(5);
+    }catch(Throwable missing){HookTransaction.rollbackAll(added);XposedBridge.log("HyperLux AON scene option unavailable: "+missing);}}
     static void installGroup(ClassLoader loader,int group,String className,String[] names,Class<?>[][] args,Class<?>[] results,String[] fields){List<XC_MethodHook.Unhook> added=new ArrayList<>();try{
         Class<?> cls=Class.forName("com.android.server.display."+className,false,loader);Set<Integer> cap=capabilities.get(cls);if(cap!=null&&cap.contains(group))return;
         List<Method> methods=new ArrayList<>();for(int i=0;i<names.length;i++){Method m=cls.getDeclaredMethod(names[i],args[i]);if(m.getReturnType()!=results[i])throw new IllegalStateException("scene method ABI");methods.add(m);}for(String f:fields){Class<?> expected=f.equals("mMinAonFlareEnableLux")||f.equals("mMaxAonFlareEnableLux")?float.class:f.equals("mStepModeDarkenDebounceConfig")?long.class:boolean.class;if(HookEntry.field(cls,f).getType()!=expected)throw new IllegalStateException("scene field ABI");}

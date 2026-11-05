@@ -107,3 +107,67 @@ C=O/'classes';C.mkdir(exist_ok=True)
 sources=[*O.rglob('*.java'),S/'DimAodCompatibility.java',*[S/'hooking'/(n+'.java') for n in ['XC_MethodHook','HookTransaction','XposedBridge']]]
 subprocess.run(['javac','--release','8','-encoding','UTF-8','-cp',str(J),'-d',str(C),*[str(p) for p in sources]],check=True)
 subprocess.run(['java','-cp',str(C)+os.pathsep+str(J),'top.rongshangs.lumacurve.refactor.DimTest',str(C),str(J)],check=True)
+
+# Newer firmware: four-argument SDR entry, no dimming substage, mAppliedDimming carries the state.
+O2=R/'build/dim-aod-modern-tests';O2.mkdir(exist_ok=True)
+modern={name:text for name,text in files.items() if not name.endswith('DisplayPowerControllerImpl.java')}
+modern['com/android/server/display/ModernOwner.java']='''package com.android.server.display;
+import com.android.server.display.brightness.BrightnessReason;
+public class ModernOwner{
+ public int mDisplayId;public boolean mAutoBrightnessEnable=true,mAppliedDimming=true,hdr,throwOuter;
+ public DisplayPowerController mDisplayPowerController=new DisplayPowerController();
+ public float aod=.008160762f,cap=.5f,result=Float.NaN;
+ private boolean isHdrScene(){return hdr;}
+ public float adjustSdrBrightness(float b,boolean auto,BrightnessReason why,boolean appliedAuto){
+  if(throwOuter)throw new IllegalStateException("outer");
+  if(Float.isFinite(result))return result;
+  return Math.min(mAppliedDimming?aod:b,cap);
+ }
+}'''
+for name,text in modern.items():
+ p=O2/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_text(text,encoding='utf-8')
+p=O2/'top/rongshangs/lumacurve/refactor/DimModernTest.java'
+p.write_text(r'''package top.rongshangs.lumacurve.refactor;
+import java.lang.reflect.*;import java.util.*;import com.android.server.display.*;import com.android.server.display.brightness.*;
+import top.rongshangs.lumacurve.refactor.hooking.*;
+public class DimModernTest implements XposedBridge.Backend{
+ static int cases,attempts,failAt=-1;static final Map<Method,XC_MethodHook> hooks=new HashMap<>();
+ static void check(boolean yes){if(!yes)throw new AssertionError("case "+cases);cases++;}
+ public XC_MethodHook.Unhook hook(Method m,XC_MethodHook c){attempts++;if(attempts==failAt)throw new IllegalStateException("install failure");hooks.put(m,c);return new XC_MethodHook.Unhook(()->hooks.remove(m));}
+ public Object original(Method m,Object owner,Object[] args)throws Throwable{try{return m.invoke(owner,args);}catch(InvocationTargetException e){throw e.getCause();}}
+ public void log(String t){}
+ public static Object call(Object owner,float b,boolean auto,BrightnessReason why,boolean applied)throws Throwable{
+  Method m=owner.getClass().getDeclaredMethod("adjustSdrBrightness",float.class,boolean.class,BrightnessReason.class,boolean.class);m.setAccessible(true);
+  XC_MethodHook c=hooks.get(m);XC_MethodHook.MethodHookParam p=new XC_MethodHook.MethodHookParam();p.thisObject=owner;p.method=m;p.args=new Object[]{b,auto,why,applied};
+  if(c!=null)c.before(p);if(!p.returnEarly())try{p.outcome(m.invoke(owner,p.args),null);}catch(InvocationTargetException e){p.outcome(null,e.getCause());}
+  if(c!=null)c.after(p);if(p.hasThrowable())throw p.getThrowable();return p.getResult();
+ }
+ static float output(ModernOwner o)throws Throwable{return (Float)call(o,.00036625599f,true,new BrightnessReason(),true);}
+ static ModernOwner fresh(){ModernOwner o=new ModernOwner();HookEntry.states.put(o,new HookRuntime(o));return o;}
+ static void untouched(ModernOwner o)throws Throwable{long count=HookEntry.ownerState(o).dimAod.corrections;float result=output(o);check(result==Math.min(o.mAppliedDimming?o.aod:.00036625599f,o.cap));check(HookEntry.ownerState(o).dimAod.corrections==count);check(DimAodCompatibility.current.get()==null);}
+ static class NoOuter{public int mDisplayId;public boolean mAutoBrightnessEnable=true,mAppliedDimming=true;public DisplayPowerController mDisplayPowerController=new DisplayPowerController();}
+ static class WrongDimming{public int mDisplayId;public boolean mAutoBrightnessEnable=true;public int mAppliedDimming=1;public DisplayPowerController mDisplayPowerController=new DisplayPowerController();private boolean isHdrScene(){return false;}public float adjustSdrBrightness(float b,boolean a,BrightnessReason r,boolean p){return b;}}
+ static class BothShapes{public int mDisplayId;public boolean mAutoBrightnessEnable=true,mAppliedDimming=true;public DisplayPowerController mDisplayPowerController=new DisplayPowerController();private boolean isHdrScene(){return false;}private float adjustBrightnessWhenDimming(float b,boolean d){return b;}public float adjustSdrBrightness(float b,boolean a,BrightnessReason r,boolean p){return b;}}
+ public static void main(String[] args)throws Throwable{
+  XposedBridge.initialize(new DimModernTest());
+  check(!DimAodCompatibility.install(ModernOwner.class));
+  check(!DimAodCompatibility.install(ModernOwner.class));
+  check(hooks.isEmpty()&&XposedBridge.hookCount()==0);
+  ModernOwner o=fresh();HookRuntime s=HookEntry.ownerState(o);
+  check(!DimAodCompatibility.supported(o));check(!DimAodCompatibility.matched(o.getClass()));
+  check(DimAodCompatibility.status(s).getString("profile").isEmpty());
+  check(!DimAodCompatibility.status(s).getString("detail").isEmpty());
+  for(float input:new float[]{0f,.00036625599f,.1f,.5f,1f})for(float result:new float[]{0f,.0001f,.008f,.2f,1f}){
+   o.result=result;check((Float)call(o,input,true,new BrightnessReason(),true)==result);
+  }
+  o.result=Float.NaN;o.cap=.0001f;check(output(o)==.0001f);
+  check(s.dimAod.corrections==0&&s.logs==0&&DimAodCompatibility.current.get()==null);
+  check(!DimAodCompatibility.install(NoOuter.class)&&!DimAodCompatibility.install(WrongDimming.class)&&!DimAodCompatibility.install(BothShapes.class));
+  check(hooks.isEmpty()&&XposedBridge.hookCount()==0);
+  System.out.println("DIM AOD modern disabled: "+cases+" cases PASS; no hooks, native result preserved without verified AOD semantics");
+ }
+}''',encoding='utf-8')
+C2=O2/'classes';C2.mkdir(exist_ok=True)
+sources2=[*O2.rglob('*.java'),S/'DimAodCompatibility.java',*[S/'hooking'/(n+'.java') for n in ['XC_MethodHook','HookTransaction','XposedBridge']]]
+subprocess.run(['javac','--release','8','-encoding','UTF-8','-cp',str(J),'-d',str(C2),*[str(p) for p in sources2]],check=True)
+subprocess.run(['java','-cp',str(C2)+os.pathsep+str(J),'top.rongshangs.lumacurve.refactor.DimModernTest'],check=True)

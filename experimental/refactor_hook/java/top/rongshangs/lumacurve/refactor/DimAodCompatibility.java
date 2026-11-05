@@ -10,8 +10,8 @@ import top.rongshangs.lumacurve.refactor.hooking.*;
  * Only the native dimming substage is capped; subsequent OEM protections still run.
  */
 final class DimAodCompatibility {
-    static final String ROUTE="automatic_dim_aod_cap",FRAME="hyperlux.dim.frame",INPUT="hyperlux.dim.input";
-    static final Map<Class<?>,Profile> installed=new HashMap<>();
+    static final String ROUTE="automatic_dim_aod_cap",ROUTE_MODERN="automatic_dim_aod_cap_modern",FRAME="hyperlux.dim.frame",INPUT="hyperlux.dim.input";
+    static final Map<Class<?>,Object> installed=new HashMap<>();
     static final Map<Class<?>,String> errors=new HashMap<>();
     static final ThreadLocal<Frame> current=new ThreadLocal<>();
     static final class Counters {
@@ -20,7 +20,8 @@ final class DimAodCompatibility {
     }
     static final class Frame {
         final Frame previous;final Object owner,reason;final boolean automatic,dimming;
-        Frame(XC_MethodHook.MethodHookParam v){previous=current.get();owner=v.thisObject;reason=v.args[2];automatic=Boolean.TRUE.equals(v.args[1]);dimming=Boolean.TRUE.equals(v.args[4]);}
+        Frame(XC_MethodHook.MethodHookParam v){this(v,Boolean.TRUE.equals(v.args[4]));}
+        Frame(XC_MethodHook.MethodHookParam v,boolean modernDimming){previous=current.get();owner=v.thisObject;reason=v.args[2];automatic=Boolean.TRUE.equals(v.args[1]);dimming=modernDimming;}
     }
     static Field field(Class<?> c,String name,Class<?> type)throws Exception {
         Field f=HookEntry.field(c,name);
@@ -77,10 +78,61 @@ final class DimAodCompatibility {
                 &&Boolean.TRUE.equals(fullAod.invoke(owner))&&Boolean.TRUE.equals(strategyFullAod.invoke(doze))&&Boolean.FALSE.equals(hdr.invoke(owner));
         }
     }
+    /** four-argument SDR entry. Newer firmware dropped adjustBrightnessWhenDimming and the fifth
+     *  boolean; mAppliedDimming carries the applied-dim state. The module cannot re-derive the
+     *  full-AOD probe, so this variant only clamps a native raise back to the dim-stage input;
+     *  native lowering (thermal, battery, OPR) is kept. High risk: semantics inferred. */
+    static final class ModernProfile {
+        final Method outer,hdr,powerState,screenState,reason,modifier;
+        final Field display,automatic,appliedDimming,controller,controllerDisplay,request,policy;
+        final int dimPolicy,automaticReason,dimModifier;
+        ModernProfile(Class<?> owner)throws Exception {
+            ClassLoader loader=owner.getClassLoader();
+            Class<?> dpc=Class.forName("com.android.server.display.DisplayPowerController",false,loader);
+            Class<?> dps=Class.forName("com.android.server.display.DisplayPowerState",false,loader);
+            Class<?> req=Class.forName("android.hardware.display.DisplayManagerInternal$DisplayPowerRequest",false,loader);
+            Class<?> why=Class.forName("com.android.server.display.brightness.BrightnessReason",false,loader);
+            outer=method(owner,"adjustSdrBrightness",float.class,float.class,boolean.class,why,boolean.class);
+            try{owner.getDeclaredMethod("adjustBrightnessWhenDimming",float.class,boolean.class);throw new IllegalStateException("Ambiguous DIM inner");}catch(NoSuchMethodException absent){}
+            hdr=method(owner,"isHdrScene",boolean.class);
+            display=field(owner,"mDisplayId",int.class);automatic=field(owner,"mAutoBrightnessEnable",boolean.class);
+            appliedDimming=field(owner,"mAppliedDimming",boolean.class);
+            controller=field(owner,"mDisplayPowerController",dpc);
+            controllerDisplay=field(dpc,"mDisplayId",int.class);request=field(dpc,"mPowerRequest",req);policy=field(req,"policy",int.class);
+            powerState=method(dpc,"getDisplayPowerState",dps);screenState=method(dps,"getScreenState",int.class);
+            reason=method(why,"getReason",int.class);modifier=method(why,"getModifier",int.class);
+            dimPolicy=constant(req,"POLICY_DIM");automaticReason=constant(why,"REASON_AUTOMATIC");dimModifier=constant(why,"MODIFIER_DIMMED");
+            if(dimPolicy<0||automaticReason<=0||dimModifier<=0||(dimModifier&(dimModifier-1))!=0)throw new IllegalStateException("Invalid DIM constants");
+            for(String name:new String[]{"POLICY_OFF","POLICY_DOZE","POLICY_BRIGHT"})if(dimPolicy==constant(req,name))throw new IllegalStateException("Aliased DIM policy");
+        }
+        boolean ready(Object owner)throws Exception {
+            Object dpc=controller.get(owner);
+            return dpc!=null&&request.get(dpc)!=null&&powerState.invoke(dpc)!=null;
+        }
+        boolean allows(Frame f,HookRuntime s)throws Exception {
+            if(s==null||s.closed||s.changing||!s.onDisplayThread()||!s.phase.equals("active")||s.kernel.plan()==null||!s.appliesToUser())return false;
+            if(!f.automatic||!f.dimming||f.reason==null||!Boolean.TRUE.equals(s.kernel.get("mUseAutoBrightness")))return false;
+            Object owner=f.owner,dpc=controller.get(owner);
+            if(display.getInt(owner)!=0||!automatic.getBoolean(owner)||dpc==null||controllerDisplay.getInt(dpc)!=0)return false;
+            Object req=request.get(dpc),state=powerState.invoke(dpc);
+            return req!=null&&policy.getInt(req)==dimPolicy&&state!=null&&((Integer)screenState.invoke(state))==2
+                &&((Integer)reason.invoke(f.reason))==automaticReason&&(((Integer)modifier.invoke(f.reason))&dimModifier)!=0
+                &&Boolean.FALSE.equals(hdr.invoke(owner));
+        }
+    }
     static synchronized boolean install(Class<?> owner){
         if(installed.containsKey(owner))return true;
         if(errors.containsKey(owner))return false;
         try{
+            // The four-argument entry has no verified full-AOD substage. Until its native
+            // consumer semantics are established, never change its whole-pipeline result.
+            if(!hasLegacyInner(owner))throw new UnsupportedOperationException("四参 DIM/AOD 语义未验证，保留系统行为");
+            Object profile=installLegacy(owner);
+            installed.put(owner,profile);errors.remove(owner);return true;
+        }catch(Throwable unavailable){errors.put(owner,unavailable.toString());return false;}
+    }
+    static boolean hasLegacyInner(Class<?> owner){try{owner.getDeclaredMethod("adjustBrightnessWhenDimming",float.class,boolean.class);return true;}catch(NoSuchMethodException absent){return false;}}
+    static Profile installLegacy(Class<?> owner)throws Exception {
             final Profile p=new Profile(owner);
             try(HookTransaction tx=new HookTransaction()){
                 tx.add(XposedBridge.hookMethod(p.outer,new XC_MethodHook(){
@@ -99,22 +151,54 @@ final class DimAodCompatibility {
                         HookRuntime s=HookEntry.ownerState(frame.owner);
                         try{
                             if(!p.allows(frame,s))return;
-                            call.setResult(before);Counters c=s.dimAod;c.corrections++;c.lastElapsed=SystemClock.elapsedRealtime();c.input=before;c.nativeResult=after;c.error="";
-                            if(c.corrections==1)s.log("已协调熄屏前降亮，避免息屏目标重新抬高亮度");
-                            s.queuePublish();
+                            call.setResult(before);record(s,before,after);
                         }catch(Throwable unavailable){if(s!=null)s.dimAod.error=unavailable.getClass().getSimpleName();}
                     }
                 }));
                 tx.commit();
             }
-            installed.put(owner,p);errors.remove(owner);return true;
-        }catch(Throwable unavailable){errors.put(owner,unavailable.toString());return false;}
+            return p;
+    }
+    static ModernProfile installModern(Class<?> owner)throws Exception {
+            final ModernProfile p=new ModernProfile(owner);
+            try(HookTransaction tx=new HookTransaction()){
+                tx.add(XposedBridge.hookMethod(p.outer,new XC_MethodHook(){
+                    protected void beforeHookedMethod(MethodHookParam call){try{Frame frame=new Frame(call,p.appliedDimming.getBoolean(call.thisObject));call.setObjectExtra(FRAME,frame);current.set(frame);}catch(Throwable unavailable){call.setObjectExtra(FRAME,null);}}
+                    protected void afterHookedMethod(MethodHookParam call){
+                        Frame frame=(Frame)call.getObjectExtra(FRAME);if(frame!=null){if(frame.previous==null)current.remove();else current.set(frame.previous);}
+                        if(frame==null||frame.owner!=call.thisObject||call.hasThrowable())return;
+                        Object input=call.args[0],result=call.getResult();
+                        if(!(input instanceof Float)||!(result instanceof Float))return;
+                        float before=(Float)input,after=(Float)result;
+                        if(!Float.isFinite(before)||!Float.isFinite(after)||before<=0||before>1||after<=before||after>1)return;
+                        HookRuntime s=HookEntry.ownerState(frame.owner);
+                        try{
+                            if(!p.allows(frame,s))return;
+                            call.setResult(before);record(s,before,after);
+                        }catch(Throwable unavailable){if(s!=null)s.dimAod.error=unavailable.getClass().getSimpleName();}
+                    }
+                }));
+                tx.commit();
+            }
+            return p;
+    }
+    static void record(HookRuntime s,float before,float after){
+        Counters c=s.dimAod;c.corrections++;c.lastElapsed=SystemClock.elapsedRealtime();c.input=before;c.nativeResult=after;c.error="";
+        if(c.corrections==1)s.log("已协调熄屏前降亮，避免息屏目标重新抬高亮度");
+        s.queuePublish();
     }
     static synchronized boolean matched(Class<?> owner){return installed.containsKey(owner);}
-    static synchronized boolean supported(Object owner)throws Exception {Profile p=installed.get(owner.getClass());return p!=null&&p.ready(owner);}
+    static synchronized boolean supported(Object owner)throws Exception {
+        Object p=installed.get(owner.getClass());
+        return p instanceof Profile?((Profile)p).ready(owner):p instanceof ModernProfile&&((ModernProfile)p).ready(owner);
+    }
     static JSONObject status(HookRuntime s)throws JSONException {
         Class<?> cls=s.owner.getClass();String profile,error;
-        synchronized(DimAodCompatibility.class){profile=installed.containsKey(cls)?ROUTE:"";error=errors.containsKey(cls)?errors.get(cls):"";}
+        synchronized(DimAodCompatibility.class){
+            Object p=installed.get(cls);
+            profile=p instanceof ModernProfile?ROUTE_MODERN:p instanceof Profile?ROUTE:"";
+            error=errors.containsKey(cls)?errors.get(cls):"";
+        }
         Counters c=s.dimAod;
         JSONObject value=new JSONObject().put("profile",profile).put("detail",error).put("runtime_error",c.error).put("corrections",c.corrections).put("last_elapsed_ms",c.lastElapsed);
         if(Float.isFinite(c.input))value.put("last_dim_input",c.input).put("last_native_aod_result",c.nativeResult).put("last_output",c.input);

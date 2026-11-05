@@ -24,8 +24,10 @@ final class OutdoorOpr {
         List<XC_MethodHook.Unhook> hooks=new ArrayList<>();
         try{
             Class<?> reason=Class.forName("com.android.server.display.brightness.BrightnessReason",false,owner.getClassLoader());
-            Method sdr=HbmAccess.method(owner,"adjustSdrBrightness",float.class,float.class,boolean.class,reason,boolean.class,boolean.class);
-            Method opr=HbmAccess.method(owner,"adjustBrightnessByOpr",float.class,float.class,reason);
+            Method sdr=HbmAccess.sdrMethod(owner,reason);
+            Method opr=HbmAccess.oprMethod(owner,reason);
+            // Current OPR entry is (brightness, reason); the legacy ABI inserts another float.
+            final int reasonIndex=opr.getParameterTypes().length==2?1:2;
             OutdoorSdrScope scope=OutdoorSdrScope.resolve(owner);
             Method get=HbmAccess.method(reason,"getModifier",int.class),set=HbmAccess.method(reason,"setModifier",void.class,int.class);
             HbmAccess.typed(owner,"mAutoBrightnessEnable",boolean.class);
@@ -48,7 +50,7 @@ final class OutdoorOpr {
                 }
                 protected void beforeHookedMethod(MethodHookParam p){
                     try{HookRuntime s=HookEntry.ownerState(p.thisObject);
-                        if(eligible(p,s)&&reason.isInstance(p.args[1]))p.setObjectExtra("hyperlux.opr.attempt",new Attempt(p.args[1],(Integer)get.invoke(p.args[1])));
+                        if(eligible(p,s)&&reason.isInstance(p.args[reasonIndex]))p.setObjectExtra("hyperlux.opr.attempt",new Attempt(p.args[reasonIndex],(Integer)get.invoke(p.args[reasonIndex])));
                     }catch(Throwable unknown){/* An unknown interface retains the OEM limit. */}
                 }
                 protected void afterHookedMethod(MethodHookParam p){
