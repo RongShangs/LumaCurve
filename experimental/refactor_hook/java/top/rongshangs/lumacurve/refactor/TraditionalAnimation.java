@@ -29,19 +29,6 @@ final class TraditionalAnimation {
     static final class Binding {
         Object first,second,controller,record,display;Method reason;String firstName,secondName;int auto;
     }
-    /** Resolve the native automatic strategy name. Newer facades no longer expose the
-     *  last-selected getter; the surviving strategy slot only counts while it still points at
-     *  this exact controller, so a stale or manual-time object cannot open the route. */
-    static String automaticStrategy(Object dpc,Object abc){
-        try{Object selected=dpc.getClass().getMethod("getLastSelectedStrategy").invoke(dpc);
-            if(selected!=null){String name=selected.getClass().getSimpleName();if(name.startsWith("AutomaticBrightnessStrategy"))return name;}
-        }catch(Throwable absent){}
-        try{Object automatic=HookEntry.get(dpc,"mAutomaticBrightnessStrategy");if(automatic==null)return null;
-            if(HookEntry.get(automatic,"mAutomaticBrightnessController")!=abc)return null;
-            String name=automatic.getClass().getSimpleName();
-            return name.startsWith("AutomaticBrightnessStrategy")?name:null;
-        }catch(Throwable absent){return null;}
-    }
     static Binding read(HookRuntime s)throws Exception{
         Object owner=s.owner;
         if(((Number)HookEntry.get(owner,"mDisplayId")).intValue()!=0)throw new IllegalArgumentException("Not the primary display");

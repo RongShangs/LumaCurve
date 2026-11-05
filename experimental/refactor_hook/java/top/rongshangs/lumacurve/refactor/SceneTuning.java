@@ -33,10 +33,13 @@ final class SceneTuning {
      *  occlusion option needs the removed transient-proximity flag and is not fabricated. */
     static void installAon(ClassLoader loader){List<XC_MethodHook.Unhook> added=new ArrayList<>();try{
         Class<?> cls=Class.forName("com.android.server.display.SceneDetector",false,loader);Set<Integer> cap=capabilities.get(cls);if(cap!=null&&(cap.contains(5)||cap.contains(4)))return;
+        for(Class<?> type=cls;type!=null&&type!=Object.class;type=type.getSuperclass()){
+            for(Field f:type.getDeclaredFields())if(Arrays.asList("mTransientProximityEnabled","mNeedCheckProximitySensor","mNeedCheckAonFlare","mIsReflectiveScene").contains(f.getName()))throw new IllegalStateException("Incomplete legacy scene ABI");
+            for(Method m:type.getDeclaredMethods())if(Arrays.asList("isReflectiveScene","isNeedSkipBrightnessChange").contains(m.getName()))throw new IllegalStateException("Incomplete legacy scene ABI");
+        }
         Method ambient=cls.getDeclaredMethod("updateAmbientLux",int.class,float.class,boolean.class);
         if(ambient.getReturnType()!=void.class||Modifier.isStatic(ambient.getModifiers()))throw new IllegalStateException("ambient stream ABI");
-        for(String f:new String[]{"mUseAonFlareEnabled","mIsStepMode"})if(HookEntry.field(cls,f).getType()!=boolean.class)throw new IllegalStateException("AON scene flags ABI");
-        for(String f:new String[]{"mMinAonFlareEnableLux","mMaxAonFlareEnableLux"})if(HookEntry.field(cls,f).getType()!=float.class)throw new IllegalStateException("AON window ABI");
+        for(String name:new String[]{"mUseAonFlareEnabled","mIsStepMode","mMinAonFlareEnableLux","mMaxAonFlareEnableLux"}){Field f=HookEntry.field(cls,name);if(f.getType()!=(name.endsWith("Lux")?float.class:boolean.class)||Modifier.isStatic(f.getModifiers()))throw new IllegalStateException("AON scene field ABI");}
         Method flare=cls.getDeclaredMethod("checkAonFlareStatus",float.class);
         if(flare.getReturnType()!=void.class||Modifier.isStatic(flare.getModifiers()))throw new IllegalStateException("AON status ABI");
         added.add(XposedBridge.hookMethod(ambient,new XC_MethodHook(){

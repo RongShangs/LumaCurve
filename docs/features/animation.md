@@ -38,7 +38,7 @@
 | `oem_animation` · Refactor 原生时长过渡 | 调整已验证的原生过渡时长倍率，保持系统动画及主副屏隔离。 |
 | `traditional_ramp` · 传统自动亮度速率过渡 | 原生 Refactor 策略关闭且时长对象为空；匹配主屏双 RampAnimator、三参或四参目标入口及速率原因，只调整普通自动亮度速率，保留系统时长上限及特殊过渡。 |
 
-路线内部 ABI：`traditional_animation_entry`、`animation_strategy_selection`、`traditional_animation_reason`、`traditional_animation_target_signature`；完整条件仅维护在 [ABI索引](../architecture/compatibility-index.md#abi-内部变体)。
+路线内部 ABI：`traditional_animation_entry`、`traditional_animation_reason`、`traditional_animation_target_signature`；完整条件仅维护在 [ABI索引](../architecture/compatibility-index.md#abi-内部变体)。
 
 运行证据：`animation_override_supported`、`animation_compatibility_profile`。
 
@@ -53,5 +53,5 @@
 | 文件 | 当前源码 SHA-256 前16位 |
 | --- | --- |
 | [AdvancedTuning.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/AdvancedTuning.java) | `99787f6a9676e36d` |
-| [HookRuntime.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/HookRuntime.java) | `818d117cff24ad7d` |
-| [TraditionalAnimation.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/TraditionalAnimation.java) | `d58d63a8ada93c3e` |
+| [HookRuntime.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/HookRuntime.java) | `f1cdc6bfa6a1d706` |
+| [TraditionalAnimation.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/TraditionalAnimation.java) | `950c0af5416a3b49` |

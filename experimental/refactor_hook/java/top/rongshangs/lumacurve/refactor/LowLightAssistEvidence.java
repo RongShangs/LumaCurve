@@ -4,7 +4,7 @@ import java.lang.reflect.*;
 final class LowLightAssistEvidence {
  static boolean supported(HookRuntime s){try{Object impl=HookEntry.get(s.owner,"mAutomaticBrightnessControllerImpl"),dual=HookEntry.get(impl,"mDualSensorPolicy"),ring=HookEntry.get(dual,"mAssistLightSensorRingBuffer");
   for(String name:new String[]{"mAssistAmbientLuxValid","mAssistLightSensorEnable"})if(HookEntry.field(dual.getClass(),name).getType()!=boolean.class)return false;
-  try{if(HookEntry.field(dual.getClass(),"mIsPendingResetAssistValue").getType()!=boolean.class)return false;}catch(NoSuchFieldException optionalPending){}
+  try{Field pending=HookEntry.field(dual.getClass(),"mIsPendingResetAssistValue");if(pending.getType()!=boolean.class||Modifier.isStatic(pending.getModifiers()))return false;}catch(NoSuchFieldException optionalPending){}
   if(HookEntry.field(dual.getClass(),"mAssistLightSensorEnableTime").getType()!=long.class||HookEntry.field(dual.getClass(),"mAssistLightSensorWarmUpTime").getType()!=int.class)return false;
   return ring.getClass().getMethod("size").getReturnType()==int.class&&ring.getClass().getMethod("getTime",int.class).getReturnType()==long.class&&ring.getClass().getMethod("getLux",int.class).getReturnType()==float.class&&s.sensorName(0)!=null&&ResponseTuning.supported(s.owner);
  }catch(Throwable unavailable){return false;}}

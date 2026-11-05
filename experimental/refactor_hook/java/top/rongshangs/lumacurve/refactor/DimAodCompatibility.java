@@ -124,7 +124,10 @@ final class DimAodCompatibility {
         if(installed.containsKey(owner))return true;
         if(errors.containsKey(owner))return false;
         try{
-            Object profile=hasLegacyInner(owner)?installLegacy(owner):installModern(owner);
+            // The four-argument entry has no verified full-AOD substage. Until its native
+            // consumer semantics are established, never change its whole-pipeline result.
+            if(!hasLegacyInner(owner))throw new UnsupportedOperationException("四参 DIM/AOD 语义未验证，保留系统行为");
+            Object profile=installLegacy(owner);
             installed.put(owner,profile);errors.remove(owner);return true;
         }catch(Throwable unavailable){errors.put(owner,unavailable.toString());return false;}
     }

@@ -42,12 +42,15 @@ final class MemoryLifecycle {
         }catch(Throwable unavailable){}return false;
     }
     void installMode()throws Exception{
-        try{
-            Method method=TraditionalAdapter.method(state.owner.getClass(),"setAutoBrightnessState",boolean.class);
-            if(method.getReturnType()!=void.class||Modifier.isStatic(method.getModifiers())||TraditionalAdapter.find(state.owner.getClass(),"mUseAutoBrightness").getType()!=boolean.class)throw new NoSuchMethodException("mode lifecycle");
+        Method legacy=null;Field legacyMode=null;
+        try{legacy=TraditionalAdapter.method(state.owner.getClass(),"setAutoBrightnessState",boolean.class);}catch(NoSuchMethodException absent){}
+        try{legacyMode=TraditionalAdapter.find(state.owner.getClass(),"mUseAutoBrightness");}catch(NoSuchFieldException absent){}
+        if(legacy!=null||legacyMode!=null){
+            if(legacy==null||legacyMode==null||legacy.getReturnType()!=void.class||Modifier.isStatic(legacy.getModifiers())||legacyMode.getType()!=boolean.class||Modifier.isStatic(legacyMode.getModifiers()))throw new IllegalStateException("Incomplete mode lifecycle ABI");
+            Method method=legacy;
             hook(method,new XC_MethodHook(){protected void beforeHookedMethod(MethodHookParam p){MemoryLifecycle m=active(p.thisObject);if(m==null||!m.allowed())return;try{boolean was=(Boolean)TraditionalAdapter.read(p.thisObject,"mUseAutoBrightness"),now=(Boolean)p.args[0];if(was&&!now)m.state.persistentMemory.captureForHandover();}catch(Throwable unavailable){}}});
             return;
-        }catch(Throwable legacyAbsent){}
+        }
         // Newer builds keep the boolean on the controller and expose the mode switch on the
         // display-power facade. Only the owner's own facade is accepted; a stale or unrelated
         // controller link stays rejected rather than hooking a foreign display.
@@ -56,7 +59,8 @@ final class MemoryLifecycle {
         if(TraditionalAdapter.read(facade,"mDisplayPowerControllerImpl")!=state.owner)throw new IllegalStateException("mode facade owner");
         Method method=TraditionalAdapter.method(facade.getClass(),"setAutomaticScreenBrightnessMode",int.class);
         if(method.getReturnType()!=void.class||Modifier.isStatic(method.getModifiers()))throw new NoSuchMethodException("mode lifecycle");
-        if(TraditionalAdapter.find(state.owner.getClass(),"mAutoBrightnessEnable").getType()!=boolean.class)throw new NoSuchMethodException("mode lifecycle");
+        Field mode=TraditionalAdapter.find(state.owner.getClass(),"mAutoBrightnessEnable");
+        if(mode.getType()!=boolean.class||Modifier.isStatic(mode.getModifiers()))throw new NoSuchMethodException("mode lifecycle");
         links.put(facade,this);
         hook(method,new XC_MethodHook(){protected void beforeHookedMethod(MethodHookParam p){MemoryLifecycle m=active(p.thisObject);if(m==null||!m.allowed())return;try{boolean was=(Boolean)TraditionalAdapter.read(m.state.owner,"mAutoBrightnessEnable"),now=((Number)p.args[0]).intValue()!=0;if(was&&!now)m.state.persistentMemory.captureForHandover();}catch(Throwable unavailable){}}});
     }

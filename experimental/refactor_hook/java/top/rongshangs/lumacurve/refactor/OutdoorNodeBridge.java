@@ -27,14 +27,14 @@ final class OutdoorNodeBridge {
     }
     /** Same selector for the probe and the write decision: internal cap first, accessor as legacy ABI. */
     static float clampCap(Object clamp)throws Exception{
-        Object value;
-        try{value=HookEntry.get(clamp,"mBrightnessCap");}catch(NoSuchFieldException absent){value=null;}
-        if(value!=null){
-            if(!(value instanceof Float))throw new NoSuchFieldException("mBrightnessCap type");
-            return (Float)value;
+        java.lang.reflect.Field cap=null;
+        try{cap=HookEntry.field(clamp.getClass(),"mBrightnessCap");}catch(NoSuchFieldException absent){}
+        if(cap!=null){
+            if(cap.getType()!=float.class||java.lang.reflect.Modifier.isStatic(cap.getModifiers()))throw new IllegalStateException("mBrightnessCap ABI");
+            return cap.getFloat(clamp);
         }
         java.lang.reflect.Method legacy=clamp.getClass().getMethod("getMaxBrightness");
-        if(legacy.getReturnType()!=float.class)throw new NoSuchMethodException("getMaxBrightness return type");
+        if(legacy.getReturnType()!=float.class||java.lang.reflect.Modifier.isStatic(legacy.getModifiers()))throw new NoSuchMethodException("getMaxBrightness ABI");
         return ((Number)legacy.invoke(clamp)).floatValue();
     }
     void frame(float value){frame=value;changed();}

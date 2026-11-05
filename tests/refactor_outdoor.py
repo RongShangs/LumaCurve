@@ -238,7 +238,7 @@ public class OutdoorTest{static int count;static void check(boolean b){if(!b)thr
     s.strategy="AutomaticBrightnessStrategy";s.outdoor.tick();check(s.outdoor.policy.active);check(s.outdoor.target(.3f)>.3f);
    }
    if(round==1){s.strategy="TemporaryBrightnessStrategy";s.outdoor.tick();check(s.outdoor.policy.active);s.handler.advance(SystemClock.now+5);s.outdoor.tick();check(!s.outdoor.policy.active&&s.outdoor.policy.cooldownUntil>=SystemClock.now+59999);}
-   if(round==2){s.strategy="TemporaryBrightnessStrategy";s.outdoor.tick();s.handler.advance(SystemClock.now+50);s.outdoor.tick();check(!s.outdoor.policy.active&&s.outdoor.policy.cooldownUntil>=SystemClock.now+59999);}
+   if(round==2){s.strategy="TemporaryBrightnessStrategy";s.outdoor.tick();check(s.outdoor.deadline==SystemClock.now+50);s.handler.advance(SystemClock.now+50);check(!s.outdoor.policy.active&&s.outdoor.policy.cooldownUntil>=SystemClock.now+59999);}
    if(round==3){OutdoorOutputAccess.modifier=true;check(s.outdoor.block().equals("output_modifier"));s.outdoor.tick();check(!s.outdoor.policy.active);OutdoorOutputAccess.modifier=false;}
   }
   JSONObject debounceLog=s.outdoor.status();boolean sawFirst=false,sawAbort=false;

@@ -62,7 +62,7 @@ sources={
 'android/os/Process.java':'package android.os;public class Process{public static int myPid(){return 123;}}',
 'android/system/Os.java':'package android.system;public class Os{public static void chmod(String s,int m){}public static void rename(String a,String b){throw new AssertionError("Host must use test sink");}}',
 'top/rongshangs/lumacurve/refactor/hooking/XposedBridge.java':'package top.rongshangs.lumacurve.refactor.hooking;public class XposedBridge{public static void log(String s){}}',
-'top/rongshangs/lumacurve/refactor/HookEntry.java':'''package top.rongshangs.lumacurve.refactor;class HookEntry{static Object get(Object o,String n)throws Exception{for(Class<?> c=o.getClass();c!=null;c=c.getSuperclass())try{java.lang.reflect.Field f=c.getDeclaredField(n);f.setAccessible(true);return f.get(o);}catch(NoSuchFieldException absent){}throw new NoSuchFieldException(n);}}''',
+'top/rongshangs/lumacurve/refactor/HookEntry.java':'''package top.rongshangs.lumacurve.refactor;class HookEntry{static java.lang.reflect.Field field(Class<?> type,String n)throws Exception{for(Class<?> c=type;c!=null;c=c.getSuperclass())try{java.lang.reflect.Field f=c.getDeclaredField(n);f.setAccessible(true);return f;}catch(NoSuchFieldException absent){}throw new NoSuchFieldException(n);}static Object get(Object o,String n)throws Exception{return field(o.getClass(),n).get(o);}}''',
 'top/rongshangs/lumacurve/refactor/RawPanelOutputHooks.java':'package top.rongshangs.lumacurve.refactor;class RawPanelOutputHooks{static boolean ok=true;static boolean supports(Class<?> c){return ok;}}',
 'top/rongshangs/lumacurve/refactor/OutdoorSdrScope.java':'''package top.rongshangs.lumacurve.refactor;class OutdoorSdrScope{static OutdoorSdrScope instance=new OutdoorSdrScope();java.lang.reflect.Method privacy;boolean allow=true;static OutdoorSdrScope resolve(Class<?> c){return instance;}boolean allows(Object o){return allow;}}''',
 'top/rongshangs/lumacurve/refactor/HookRuntime.java':r'''package top.rongshangs.lumacurve.refactor;
@@ -78,6 +78,8 @@ class HookRuntime {
  public static class FieldClamp{private float mBrightnessCap=1;}
  public static class WrongFieldClamp{private Object mBrightnessCap="x";public float getMaxBrightness(){return 1;}}
  public static class NoCapClamp{}
+ public static class StaticCapClamp{private static float mBrightnessCap=1;public float getMaxBrightness(){return 1;}}
+ public static class StaticGetterClamp{public static float getMaxBrightness(){return 1;}}
  public static class Screen{public float value=1,sdr=1;public float getScreenBrightness(){return value;}public float getSdrScreenBrightness(){return sdr;}}
  public static class Control{String owner="none";boolean automatic=true,unlocked=true;boolean auto(){return automatic;}boolean unlocked(){return unlocked;}}
  public static class Outdoor{OutdoorOptions options=new OutdoorOptions();OutdoorPolicy policy=new OutdoorPolicy();Access access=new Access();String blocked;float lux=50000;Outdoor(){options.nodeBoost=true;options.flags[0]=options.flags[2]=options.flags[3]=true;options.values[5]=1;policy.active=true;policy.started=1000;}boolean rangeSupported(){return true;}String block(){return blocked;}float lux(){return lux;}}
@@ -103,9 +105,13 @@ public class NodeBridgeTest{
   check(OutdoorNodeBridge.interfaces(s,true));check(b.allowed());
   java.lang.reflect.Field cap=HookRuntime.FieldClamp.class.getDeclaredField("mBrightnessCap");cap.setAccessible(true);cap.set(s.owner.mDisplayPowerController.mBrightnessClamperController,.99f);check(!b.allowed());
   s.owner.mDisplayPowerController.mBrightnessClamperController=new HookRuntime.WrongFieldClamp();
-  try{OutdoorNodeBridge.interfaces(s,true);throw new AssertionError("wrong cap type accepted");}catch(NoSuchFieldException expected){cases++;}
+  try{OutdoorNodeBridge.interfaces(s,true);throw new AssertionError("wrong cap type accepted");}catch(IllegalStateException expected){cases++;}
   s.owner.mDisplayPowerController.mBrightnessClamperController=new HookRuntime.NoCapClamp();
   try{OutdoorNodeBridge.interfaces(s,true);throw new AssertionError("missing cap accepted");}catch(NoSuchMethodException expected){cases++;}
+  s.owner.mDisplayPowerController.mBrightnessClamperController=new HookRuntime.StaticCapClamp();
+  try{OutdoorNodeBridge.interfaces(s,true);throw new AssertionError("static cap accepted");}catch(IllegalStateException expected){cases++;}
+  s.owner.mDisplayPowerController.mBrightnessClamperController=new HookRuntime.StaticGetterClamp();
+  try{OutdoorNodeBridge.interfaces(s,true);throw new AssertionError("static cap accessor accepted");}catch(NoSuchMethodException expected){cases++;}
   s.owner.mDisplayPowerController.mBrightnessClamperController=new HookRuntime.Clamp();check(OutdoorNodeBridge.interfaces(s,true));
   List<Runnable> tasks=new ArrayList<>();writes.clear();b=new OutdoorNodeBridge(s,tasks::add,writes::add);b.send(true,1000);b.send(false,0);check(tasks.size()==1);tasks.remove(0).run();check(writes.size()==1&&writes.get(0).endsWith("0 0\n"));
   b=new OutdoorNodeBridge(s,Runnable::run,v->{throw new java.io.IOException("test");});b.frame=1;b.evaluate();check(b.failed);b.evaluate();check(!b.requested&&!s.handler.tasks.containsKey(b.check));

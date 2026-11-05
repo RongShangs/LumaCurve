@@ -168,8 +168,8 @@
 | 文件 | 当前源码 SHA-256 前16位 |
 | --- | --- |
 | [FieldOverride.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/FieldOverride.java) | `6b47448ffaf6ac29` |
-| [HookRuntime.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/HookRuntime.java) | `818d117cff24ad7d` |
+| [HookRuntime.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/HookRuntime.java) | `f1cdc6bfa6a1d706` |
 | [SceneCatalog.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/SceneCatalog.java) | `3f1dc5f8e950556e` |
 | [SceneController.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/SceneController.java) | `2f40296a53139af9` |
 | [SceneSettings.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/SceneSettings.java) | `cc5e5a66ffd6f854` |
-| [SceneTuning.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/SceneTuning.java) | `6d7bb5b7a90a2e37` |
+| [SceneTuning.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/SceneTuning.java) | `d83f9baf6b874ba5` |

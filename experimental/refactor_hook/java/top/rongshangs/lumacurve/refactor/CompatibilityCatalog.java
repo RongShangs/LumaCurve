@@ -26,7 +26,7 @@ final class CompatibilityCatalog {
     static Route[] catalogue(String id){
         if(Arrays.asList("curve","manual_memory","saved_curve","persistent_memory","memory_mode","memory_forever","memory_reset","memory_timeout").contains(id))return curveRoutes();
         switch(id){
-        case "dim_aod":return new Route[]{route("automatic_dim_aod_cap","自动降亮与息屏目标协调","主屏仍亮且处于自动DIM降亮时，阻止全屏AOD目标重新抬高已降低的亮度；真正息屏、背屏、手动及HDR沿用系统。"),route("automatic_dim_aod_cap_modern","自动降亮与息屏目标协调（新式SDR入口）","新式四参SDR入口删除息屏子阶段后，用 mAppliedDimming 作为降亮状态；只把原生结果中高于降亮输入的抬高夹回，原生降低保护仍执行。缺少全屏AOD探测，语义为推断，高风险。")};
+        case "dim_aod":return new Route[]{route("automatic_dim_aod_cap","自动降亮与息屏目标协调","主屏仍亮且处于自动DIM降亮时，阻止全屏AOD目标重新抬高已降低的亮度；真正息屏、背屏、手动及HDR沿用系统。"),route("automatic_dim_aod_cap_modern","自动降亮与息屏目标协调（新式SDR入口）","四参SDR入口缺少已验证的全屏AOD消费者语义；候选路线保留但不安装修正，所有亮度结果沿用系统。")};
         case "main_sensor":return new Route[]{route("oem_main","系统标准主光感","读取当前主屏 ABC 选用的 TYPE_LIGHT 光感，沿用原适配。"),route("oem_selected_secondary","系统选用的折叠光感","当前主屏 ABC 直接选用已验证的私有照度光感；拒绝原始、工厂、流式及其他屏幕候选。"),route("oem_selected_fov","系统 FOV 融合光感","沿用主屏原生光感选择器返回的 FOV 源和照度解析；不混用 ABC 保留的物理光感槽。")};
         case "assist_sensor":return new Route[]{
             route("native_auxiliary","系统原生辅助光感","原生辅助槽已有传感器时优先使用，继续沿用系统采样和融合。"),

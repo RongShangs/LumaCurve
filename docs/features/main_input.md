@@ -39,7 +39,7 @@
 | `oem_selected_secondary` · 系统选用的折叠光感 | 当前主屏 ABC 直接选用已验证的私有照度光感；拒绝原始、工厂、流式及其他屏幕候选。 |
 | `oem_selected_fov` · 系统 FOV 融合光感 | 沿用主屏原生光感选择器返回的 FOV 源和照度解析；不混用 ABC 保留的物理光感槽。 |
 
-路线内部 ABI：`dark_primary_only`、`main_light_identity`、`main_input_lux_scale`；完整条件仅维护在 [ABI索引](../architecture/compatibility-index.md#abi-内部变体)。
+路线内部 ABI：`animation_strategy_selection`、`dark_primary_only`、`main_light_identity`、`main_input_lux_scale`；完整条件仅维护在 [ABI索引](../architecture/compatibility-index.md#abi-内部变体)。
 
 运行证据：`sensor_status`、`sensor_sampling_enabled`、`ambient_lux_valid`、`main_fast_lux`、`main_input_compatibility`、`assist_source_present`、`main_reading_source`、`main_input_compatibility.lux_scale_route`。
 
@@ -59,6 +59,6 @@
 | --- | --- |
 | [BrightnessControl.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/BrightnessControl.java) | `8e91d605934d21fc` |
 | [BrightnessSensorAccess.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/BrightnessSensorAccess.java) | `fdfeca59df5414c8` |
-| [HookRuntime.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/HookRuntime.java) | `818d117cff24ad7d` |
+| [HookRuntime.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/HookRuntime.java) | `f1cdc6bfa6a1d706` |
 | [RuntimeFeatureChecks.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/RuntimeFeatureChecks.java) | `5cdff234d6de8d09` |
 | [SensorState.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/SensorState.java) | `793f6219eced1bd4` |

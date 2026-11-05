@@ -43,7 +43,7 @@ final class OutdoorController {
         }catch(Throwable unknown){oprEnvelopeError=unknown.toString();return limited;}
     }
     void oprApplied(float input,float limited,float delivered){oprRaises++;stage("outdoor_opr_native",input,limited);stage("outdoor_opr_relax",limited,delivered);}
-    void configure(OutdoorOptions next){liveLimits.clear();if(!options.same(next)){policy.reset();goal=Float.NaN;}nitLimit=null;nitLimitError="";options=next;failed=false;error="";tick();}
+    void configure(OutdoorOptions next){liveLimits.clear();if(!options.same(next)){policy.reset();goal=Float.NaN;exitFailures=0;exitFirst=exitLast=0;}nitLimit=null;nitLimitError="";options=next;failed=false;error="";tick();}
     float nitCeiling(double nit){
         try{HbmAccess h=binding();if(h==null||!OutdoorTuning.nitCaps.contains(s.owner.getClass()))return Float.NaN;
             if(nitLimit==null||nitLimit.owner!=s.owner)nitLimit=new NitBrightnessLimit(s.owner);
@@ -55,7 +55,7 @@ final class OutdoorController {
         if(options.values[OutdoorOptions.MAX_NIT]<=0||!policy.active||block()!=null||!OutdoorPolicy.valid(value)||!OutdoorTuning.nitScope(s.owner))return value;
         float cap=nitCeiling(options.values[OutdoorOptions.MAX_NIT]);return OutdoorPolicy.valid(cap)?Math.min(value,cap):value;
     }
-    void stop(){s.handler.removeCallbacks(wake);deadline=-1;goal=Float.NaN;liveLimits.clear();options=new OutdoorOptions();policy.step(options,Float.NaN,SystemClock.uptimeMillis(),null);failed=false;
+    void stop(){s.handler.removeCallbacks(wake);deadline=-1;exitFailures=0;exitFirst=exitLast=0;goal=Float.NaN;liveLimits.clear();options=new OutdoorOptions();policy.step(options,Float.NaN,SystemClock.uptimeMillis(),null);failed=false;
         if(access!=null)try{boolean changed=access.restore();if(changed)access.reevaluate(lux());}catch(Throwable failed){error=failed.toString();s.log("户外增强恢复异常："+error);}}
     float lux(){try{Object impl=HookEntry.get(s.owner,"mAutomaticBrightnessControllerImpl"),abc=HookEntry.get(impl,"mAutomaticBrightnessController");if(!Boolean.TRUE.equals(HookRuntime.optionalBoolean(abc,"mAmbientLuxValid")))return Float.NaN;return HookRuntime.optionalNumber(abc,"mAmbientLux");}catch(Throwable unknown){return Float.NaN;}}
     String block(){
@@ -197,7 +197,9 @@ final class OutdoorController {
         }catch(Throwable failure){failed=true;error=failure.toString();policy.reset();policy.reason="error";try{if(access!=null)access.restore();}catch(Throwable ignored){}s.handler.removeCallbacks(wake);deadline=-1;s.queuePublish();}
         finally{ticking=false;inTick=false;}
     }
-    void schedule(){long next=options.flags[0]?policy.next:-1;if(next==deadline)return;s.handler.removeCallbacks(wake);deadline=next;if(next>=0)s.handler.postDelayed(wake,Math.max(1,next-SystemClock.uptimeMillis()));}
+    void schedule(){long next=options.flags[0]?policy.next:-1;
+        if(options.flags[0]&&policy.active&&exitFailures>0){long checkAt=exitFirst+50;next=next<0?checkAt:Math.min(next,checkAt);}
+        if(next==deadline)return;s.handler.removeCallbacks(wake);deadline=next;if(next>=0)s.handler.postDelayed(wake,Math.max(1,next-SystemClock.uptimeMillis()));}
     boolean rangeAllowed(){
         if(!options.flags[0]||!options.flags[2]||!policy.active||access==null||access.rangeOnly()||block()!=null)return false;
         try{return !access.managed()||access.allowed();}catch(Throwable unknown){return false;}

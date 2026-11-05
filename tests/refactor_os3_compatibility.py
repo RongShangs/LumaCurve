@@ -38,17 +38,19 @@ def run(group,scenario,sources,production,main):
 
 total=0
 advanced=fixtures('refactor_advanced_hooks.py')
-for scenario in ['native_old','partial_driving','wrong_flag','unknown_detector','aon_only','aon_partial']:
+for scenario in ['native_old','partial_driving','wrong_flag','unknown_detector','aon_only','aon_partial','aon_legacy_marker','aon_static_window']:
     sources=dict(advanced)
     detector='package com.android.server.display;public class SceneDetector{public boolean mIsStepMode,mIsReflectiveScene,mNeedCheckProximitySensor,mNeedCheckAonFlare;}'
     sources['com/android/server/display/SceneDetector.java']=detector.replace('mNeedCheckAonFlare','unknown' if scenario=='unknown_detector' else 'mNeedCheckAonFlare')
     impl='public AutomaticBrightnessController mAutomaticBrightnessController;public HysteresisLevelsImpl mHysteresisLevelsImpl;public DualSensorPolicy mDualSensorPolicy=new DualSensorPolicy();public TouchCoverProtectionHelper mTouchAreaHelper=new TouchCoverProtectionHelper();public SceneDetector mSceneDetector=new SceneDetector();public boolean mUseAonFlareEnabled,mUseProximityEnabled,mTransientProximityEnabled;'
     if scenario=='partial_driving':impl+='public boolean mUseDrivingModeForBrt;'
     if scenario=='wrong_flag':impl=impl.replace('mTransientProximityEnabled;','spare;public int mTransientProximityEnabled;')
-    if scenario in ('aon_only','aon_partial'):
+    if scenario.startswith('aon_'):
         # HyperOS 3 layout: no legacy transient/reflection members; the AON flare window lives
         # inside SceneDetector.updateAmbientLux. aon_partial drops that entry point.
-        detector='package com.android.server.display;public class SceneDetector{public boolean mIsStepMode,mUseAonFlareEnabled;public float mMinAonFlareEnableLux,mMaxAonFlareEnableLux;public void updateAmbientLux(int e,float lux,boolean main){}'+('public void checkAonFlareStatus(float lux){}}' if scenario=='aon_only' else 'public void checkAonFlareStatus(int lux){}}')
+        detector='package com.android.server.display;public class SceneDetector{public boolean mIsStepMode,mUseAonFlareEnabled;public float mMinAonFlareEnableLux,mMaxAonFlareEnableLux;public void updateAmbientLux(int e,float lux,boolean main){}'+('public void checkAonFlareStatus(int lux){}}' if scenario=='aon_partial' else 'public void checkAonFlareStatus(float lux){}}')
+        if scenario=='aon_legacy_marker':detector=detector.replace('public class SceneDetector{','public class SceneDetector{public boolean mIsReflectiveScene;')
+        if scenario=='aon_static_window':detector=detector.replace('public float mMinAonFlareEnableLux','public static float mMinAonFlareEnableLux')
         sources['com/android/server/display/SceneDetector.java']=detector
         impl='public AutomaticBrightnessController mAutomaticBrightnessController;public HysteresisLevelsImpl mHysteresisLevelsImpl;public DualSensorPolicy mDualSensorPolicy=new DualSensorPolicy();public TouchCoverProtectionHelper mTouchAreaHelper=new TouchCoverProtectionHelper();public SceneDetector mSceneDetector=new SceneDetector();public boolean mUseProxAndTouchEnabled,mUseAonFlareEnabled,mUseProximityEnabled,mIsGameSceneEnable;'
     # This test uses actual eligibility methods, not a mocked "OS3 supported" flag.

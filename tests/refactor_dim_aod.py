@@ -149,36 +149,22 @@ public class DimModernTest implements XposedBridge.Backend{
  static class WrongDimming{public int mDisplayId;public boolean mAutoBrightnessEnable=true;public int mAppliedDimming=1;public DisplayPowerController mDisplayPowerController=new DisplayPowerController();private boolean isHdrScene(){return false;}public float adjustSdrBrightness(float b,boolean a,BrightnessReason r,boolean p){return b;}}
  static class BothShapes{public int mDisplayId;public boolean mAutoBrightnessEnable=true,mAppliedDimming=true;public DisplayPowerController mDisplayPowerController=new DisplayPowerController();private boolean isHdrScene(){return false;}private float adjustBrightnessWhenDimming(float b,boolean d){return b;}public float adjustSdrBrightness(float b,boolean a,BrightnessReason r,boolean p){return b;}}
  public static void main(String[] args)throws Throwable{
-  XposedBridge.initialize(new DimModernTest());check(DimAodCompatibility.install(ModernOwner.class));check(hooks.size()==1&&XposedBridge.hookCount()==1);check(DimAodCompatibility.install(ModernOwner.class)&&hooks.size()==1);
-  ModernOwner o=fresh();HookRuntime s=HookEntry.ownerState(o);check(DimAodCompatibility.supported(o));
-  check(output(o)==.00036625599f);check(s.dimAod.corrections==1&&s.dimAod.lastElapsed==1234&&s.logs==1);
-  check(DimAodCompatibility.status(s).getString("profile").equals(DimAodCompatibility.ROUTE_MODERN));check(DimAodCompatibility.status(s).getDouble("last_native_aod_result")>.008);check(DimAodCompatibility.status(s).getDouble("last_output")==.00036625599f);
-  for(float target:new float[]{.008160762f,.0079f,.00036625599f,.0082f,.0078f}){o.aod=target;check(output(o)==.00036625599f);}check(s.logs==1);
-  // Native lowering below the dim input is a real protection and must survive.
-  long base=s.dimAod.corrections;o.aod=.008f;o.cap=.0001f;check(output(o)==.0001f);check(s.dimAod.corrections==base);o.cap=.5f;
-  o.result=1.2f;check(output(o)==1.2f);o.result=-1f;check(output(o)==-1f);o.result=Float.NaN;
-  o.aod=.008f;for(float input:new float[]{0f,-1f,Float.NaN,1.1f,Float.POSITIVE_INFINITY})check((Float)call(o,input,true,new BrightnessReason(),true)==.008f);
-  o.mAppliedDimming=false;check(output(o)==.00036625599f);check(s.dimAod.corrections==base);o.mAppliedDimming=true;
-  for(int i=0;i<14;i++){o=fresh();s=HookEntry.ownerState(o);switch(i){
-   case 0:s.closed=true;break;case 1:s.changing=true;break;case 2:s.onThread=false;break;case 3:s.user=false;break;case 4:s.phase="attached";break;case 5:s.kernel.enabled=false;break;case 6:s.kernel.automatic=false;break;
-   case 7:o.mDisplayId=1;break;case 8:o.mDisplayPowerController.mDisplayId=1;break;case 9:o.mAutoBrightnessEnable=false;break;case 10:o.hdr=true;break;
-   case 11:o.mDisplayPowerController.mPowerRequest=null;break;case 12:o.mDisplayPowerController.state=null;break;case 13:o.mAppliedDimming=false;break;}
-   untouched(o);
+  XposedBridge.initialize(new DimModernTest());
+  check(!DimAodCompatibility.install(ModernOwner.class));
+  check(!DimAodCompatibility.install(ModernOwner.class));
+  check(hooks.isEmpty()&&XposedBridge.hookCount()==0);
+  ModernOwner o=fresh();HookRuntime s=HookEntry.ownerState(o);
+  check(!DimAodCompatibility.supported(o));check(!DimAodCompatibility.matched(o.getClass()));
+  check(DimAodCompatibility.status(s).getString("profile").isEmpty());
+  check(!DimAodCompatibility.status(s).getString("detail").isEmpty());
+  for(float input:new float[]{0f,.00036625599f,.1f,.5f,1f})for(float result:new float[]{0f,.0001f,.008f,.2f,1f}){
+   o.result=result;check((Float)call(o,input,true,new BrightnessReason(),true)==result);
   }
-  for(int policy:new int[]{0,1,3}){o=fresh();o.mDisplayPowerController.mPowerRequest.policy=policy;untouched(o);}
-  for(int state:new int[]{0,1,3,4,5,6}){o=fresh();o.mDisplayPowerController.state.screen=state;untouched(o);}
-  for(int reason:new int[]{0,1,2,3,5,6,7,8,9,10}){o=fresh();BrightnessReason why=new BrightnessReason();why.reason=reason;float expect=Math.min(o.aod,o.cap);check((Float)call(o,.00036625599f,true,why,true)==expect);}
-  o=fresh();check((Float)call(o,.00036625599f,false,new BrightnessReason(),true)==Math.min(o.aod,o.cap));
-  BrightnessReason why=new BrightnessReason();why.modifier=0;check((Float)call(o,.00036625599f,true,why,true)==Math.min(o.aod,o.cap));why.modifier=3;check((Float)call(o,.00036625599f,true,why,true)==.00036625599f);
-  check((Float)call(o,.00036625599f,true,null,true)==Math.min(o.aod,o.cap));
-  o=fresh();o.throwOuter=true;try{output(o);throw new AssertionError();}catch(IllegalStateException expected){check(expected.getMessage().equals("outer"));}check(DimAodCompatibility.current.get()==null);
-  o=fresh();HookEntry.states.remove(o);check(output(o)==Math.min(o.aod,o.cap));
-  check(!DimAodCompatibility.install(NoOuter.class)&&!DimAodCompatibility.install(WrongDimming.class)&&!DimAodCompatibility.install(BothShapes.class)&&hooks.size()==1);
-  android.hardware.display.DisplayManagerInternal.DisplayPowerRequest.POLICY_DIM=3;
-  try{new DimAodCompatibility.ModernProfile(ModernOwner.class);throw new AssertionError();}catch(IllegalStateException expected){check(true);}
-  android.hardware.display.DisplayManagerInternal.DisplayPowerRequest.POLICY_DIM=2;BrightnessReason.MODIFIER_DIMMED=0;
-  try{new DimAodCompatibility.ModernProfile(ModernOwner.class);throw new AssertionError();}catch(IllegalStateException expected){check(true);}BrightnessReason.MODIFIER_DIMMED=1;
-  check(DimAodCompatibility.current.get()==null);System.out.println("DIM AOD modern entry: "+cases+" cases PASS; inferred mapping with native lowering preserved");
+  o.result=Float.NaN;o.cap=.0001f;check(output(o)==.0001f);
+  check(s.dimAod.corrections==0&&s.logs==0&&DimAodCompatibility.current.get()==null);
+  check(!DimAodCompatibility.install(NoOuter.class)&&!DimAodCompatibility.install(WrongDimming.class)&&!DimAodCompatibility.install(BothShapes.class));
+  check(hooks.isEmpty()&&XposedBridge.hookCount()==0);
+  System.out.println("DIM AOD modern disabled: "+cases+" cases PASS; no hooks, native result preserved without verified AOD semantics");
  }
 }''',encoding='utf-8')
 C2=O2/'classes';C2.mkdir(exist_ok=True)

@@ -1141,7 +1141,7 @@
       "owners": [
         "DimAodCompatibility.java"
       ],
-      "selector": "实际完整SDR入口、主屏DPC/电源请求/原因及降亮状态同时匹配；旧版要求 DIM 子阶段与全屏AOD策略，新版四参入口以 mAppliedDimming 代替被删的第五参、且全库不存在 adjustBrightnessWhenDimming 时才走新路线；不按机型或版本放行。两路线都只在当前自动DIM调用及活动用户和显示线程内参与，缺接口或异常独立跳过，不回退改写其他阶段。",
+      "selector": "完整旧五参SDR、DIM子阶段与双全屏AOD探测、主屏/活动用户/显示线程均验证后才安装修正；四参候选语义待验证，保留代码但不安装、不更改原生结果，独立报告不支持。",
       "evidence": [
         "dim_aod_compatibility",
         "feature_self_check"
@@ -1308,7 +1308,7 @@
         "owner_setAutoBrightnessState_boolean",
         "display_power_facade_setAutomaticScreenBrightnessMode_int"
       ],
-      "rule": "旧路线优先：owner 的 setAutoBrightnessState(boolean) void 与 mUseAutoBrightness boolean 同时完整。两者任一缺失或类型不符时，才要求当前 owner 自己的 mDisplayPowerControllerImpl 归属一致、facade 的 setAutomaticScreenBrightnessMode(int) 非静态 void，且 owner 的 mAutoBrightnessEnable 为 boolean；跨屏/他人 facade、错误返回值或字段缺失一律拒绝，不按机型选择。",
+      "rule": "旧 setAutoBrightnessState(boolean) 非静态 void 与 mUseAutoBrightness 实例boolean完整时优先；只有两者整体缺失时才采用归属于当前owner的非静态facade setAutomaticScreenBrightnessMode(int) void及mAutoBrightnessEnable实例boolean。任一旧残片、类型错误、安装失败或归属不符立即拒绝，不运行失败降级。",
       "test": "tests/refactor_memory_lifecycle.py"
     },
     {
@@ -1324,13 +1324,13 @@
     },
     {
       "id": "animation_strategy_selection",
-      "owner": "TraditionalAnimation.java",
+      "owner": "HookRuntime.java",
       "alternatives": [
         "last_selected_strategy_getter",
         "owner_automatic_strategy_field"
       ],
-      "rule": "facade 的 getLastSelectedStrategy 返回 AutomaticBrightnessStrategy* 时采用；getter 缺失或抛错时，只接受 facade 的 mAutomaticBrightnessStrategy 槽指向本 ABC 的同名策略对象，其它对象/空槽返回 null，不按名称或机型放行。",
-      "test": "tests/refactor_traditional_animation.py"
+      "rule": "动画门禁复用OutdoorOutputAccess的统一输出契约。优先getter存在时必须是非静态引用返回类型，非自动/null、错误类型或调用失败均关闭；仅getter缺失时采用已验证AutomaticBrightnessStrategy2，核验主屏/ABC归属、enabled/use/applied及当前和临时reason、保护modifier。不以保留槽或名称前缀推断当前控制权。",
+      "test": "tests/refactor_outdoor_fold.py"
     },
     {
       "id": "inherited_mapper_members",
@@ -1540,7 +1540,7 @@
         "selected_strategy",
         "automatic_strategy2_reason"
       ],
-      "rule": "户外控制专用：优先 getLastSelectedStrategy，存在但错误或调用失败不降级；仅该方法缺失且独立 AutomaticBrightnessStrategy2 主屏归属、同一 ABC、启用/使用/已应用三个状态及已提交和当前计算的原生自动原因都完整时采用旧 ABI。仅允许已验证的 BCBC/OPR/PEAK 修饰，不绕开临时、手动、HDR、温控及其他修饰。能力检查不依赖当前是否已启用自动模式。",
+      "rule": "户外与动画共用输出归属契约：优先 getLastSelectedStrategy，存在但错误或调用失败不降级；仅该方法缺失且独立 AutomaticBrightnessStrategy2 主屏归属、同一 ABC、启用/使用/已应用三个状态及已提交和当前计算的原生自动原因都完整时采用旧 ABI。仅允许已验证的 BCBC/OPR/PEAK 修饰，不绕开临时、手动、HDR、温控及其他修饰。能力检查不依赖当前是否已启用自动模式。",
       "test": "tests/refactor_outdoor_fold.py"
     },
     {
@@ -1887,7 +1887,7 @@
         "internal_mBrightnessCap_float",
         "getMaxBrightness_float"
       ],
-      "rule": "节点写入上限优先读取 BrightnessClamperController.mBrightnessCap（clamp() 实际使用的 float）；该字段整体缺失时才用 getMaxBrightness() 旧访问器。字段存在但非 float、或旧访问器返回类型非 float 即拒绝安装，不以旧路线掩盖残缺。自检与写入判定共用同一选择器。",
+      "rule": "自检与写入共用clampCap；mBrightnessCap存在时必须为非静态float，残缺不回退；仅字段缺失时读非静态float getMaxBrightness()。字段、方法静态性、类型、空值及读取异常均严格拒绝，不以旧路线掩盖错误。",
       "test": "tests/refactor_outdoor_node.py"
     },
     {
@@ -1938,7 +1938,7 @@
         "legacy_five_param_with_inner",
         "modern_four_param_mAppliedDimming"
       ],
-      "rule": "旧路线要求五参 adjustSdrBrightness、adjustBrightnessWhenDimming(float,boolean)、全屏AOD探测与策略；新路线只在全库不存在 adjustBrightnessWhenDimming、四参 adjustSdrBrightness(float,boolean,BrightnessReason,boolean) 与 mAppliedDimming 布尔完整时安装，用 mAppliedDimming 替代被删第五参，并把原生结果中高于降亮输入的抬高夹回输入；原生降低保护保留，缺少全屏AOD探测属推断语义，高风险，需真机行为验证。残缺签名或类型错误一律拒绝；两套形状并存时优先旧路线，旧路线不完整则整项拒绝。",
+      "rule": "保留五参SDR及完整息屏子阶段、双全屏AOD探测的旧路线。四参mAppliedDimming路线缺少已验证AOD消费者语义，本次禁用：不安装Hook、不修改任何原生结果，独立报告unsupported；不增加设置或更改保存配置。候选实现仅保留供后续验证，不能由接口匹配自动启用。",
       "test": "tests/refactor_dim_aod.py"
     },
     {

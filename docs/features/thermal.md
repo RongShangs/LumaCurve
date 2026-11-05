@@ -37,7 +37,7 @@
 | --- | --- |
 | `display_thermal` · 显示层温控接口 | 仅调整显示亮度限制；严重温控、电池温度门槛及其他系统温控继续有效。 |
 
-路线内部 ABI：`module_loader_discovery`、`thermal_sdr_signature`；完整条件仅维护在 [ABI索引](../architecture/compatibility-index.md#abi-内部变体)。
+路线内部 ABI：`animation_strategy_selection`、`module_loader_discovery`、`thermal_sdr_signature`；完整条件仅维护在 [ABI索引](../architecture/compatibility-index.md#abi-内部变体)。
 
 运行证据：`thermal_supported`、`thermal_skipped`。
 
@@ -53,5 +53,5 @@
 | --- | --- |
 | [FieldOverride.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/FieldOverride.java) | `6b47448ffaf6ac29` |
 | [HookEntry.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/HookEntry.java) | `0d3b85e0fffd36a5` |
-| [HookRuntime.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/HookRuntime.java) | `818d117cff24ad7d` |
+| [HookRuntime.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/HookRuntime.java) | `f1cdc6bfa6a1d706` |
 | [ThermalPolicy.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ThermalPolicy.java) | `673d032fdaea9f5b` |

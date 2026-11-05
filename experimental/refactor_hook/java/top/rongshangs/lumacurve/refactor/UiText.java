@@ -185,7 +185,7 @@ public final class UiText {
         WORDS.put("自动降亮与息屏目标协调","Automatic dimming and AOD target coordination");
         WORDS.put("主屏仍亮且处于自动DIM降亮时，阻止全屏AOD目标重新抬高已降低的亮度；真正息屏、背屏、手动及HDR沿用系统。","While the primary screen is on and automatically dimming, prevent the full-screen AOD target from raising its dimmed input. Actual doze, rear displays, manual brightness and HDR keep system behavior。");
         WORDS.put("自动降亮与息屏目标协调（新式SDR入口）","Automatic dimming and AOD target coordination (new SDR entry)");
-        WORDS.put("新式四参SDR入口删除息屏子阶段后，用 mAppliedDimming 作为降亮状态；只把原生结果中高于降亮输入的抬高夹回，原生降低保护仍执行。缺少全屏AOD探测，语义为推断，高风险。","The newer four-argument SDR entry dropped the dimming substage; mAppliedDimming supplies the dimmed state. Only a native result above the dim input is clamped back while native lowering protections still run. Full-AOD probing is unavailable, so this mapping is inferred and high risk.");
+        WORDS.put("四参SDR入口缺少已验证的全屏AOD消费者语义；候选路线保留但不安装修正，所有亮度结果沿用系统。","The four-argument SDR entry lacks verified full-screen AOD consumer semantics. The candidate route is retained without installing a correction; all brightness results keep system behavior.");
         WORDS.put("未启用独立曲线时，深浅色模式共用此曲线；启用后，此处用于浅色模式。","Light and dark modes share this curve unless an independent dark curve is enabled. When enabled, this curve is used in light mode.");
         WORDS.put("当前基础曲线：","Current base curve: ");
         WORDS.put("使用本机亮度到背光的转换表；可可靠单调反解才启用。保留自动亮度、手动记忆与暗光锁定的原有控制权。","Use this device's brightness-to-backlight table only when it can be reliably inverted. Keep auto brightness, manual memory and low light lock ownership unchanged.");
@@ -1612,6 +1612,7 @@ public final class UiText {
         WORDS.put("强光下减少画面内容造成的限亮，提高可用亮度上限；需先开放高亮范围。","Relaxes content-based dimming in strong light to raise the available brightness ceiling. Requires the high-brightness range above.");
         WORDS.put("两项仍受温控、电量和 HBM 时间预算限制。","Both remain subject to thermal, battery and HBM time limits.");
         WORDS.put("代码贡献","Code contributions");
+        WORDS.put("贡献小米12S Pro亮度接口适配，以及场景、记忆和动画兼容改进。","Contributed Xiaomi 12S Pro brightness interface adaptation and scene, memory and animation compatibility improvements.");
         WORDS.put("贡献手动接管恢复、系统进程重启与断连兜底、节点校验顺序修复，以及图片解码优化。","Contributed manual takeover recovery, system process restart and disconnect recovery, node validation ordering, and image decoding improvements.");
         WORDS.put("实时状态","Live status");
         WORDS.put("连接后显示亮度状态与建议","Connect to view brightness status and suggestions");

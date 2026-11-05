@@ -68,15 +68,16 @@ final class ResponseTuning {
         Boolean found=aonProfiles.get(impl);if(found!=null)return found;
         boolean accepted=false;
         try{
-            for(String legacy:new String[]{"mTransientProximityEnabled","mNeedCheckProximitySensor","mNeedCheckAonFlare","mIsReflectiveScene"})
-                if(hasMember(impl,legacy))throw new IllegalStateException("legacy scene marker "+legacy);
-            for(String flag:new String[]{"mUseProxAndTouchEnabled","mUseAonFlareEnabled","mUseProximityEnabled","mIsGameSceneEnable"})
-                if(HookEntry.field(impl,flag).getType()!=boolean.class)throw new IllegalStateException("scene flag ABI");
             Class<?> detector=HookEntry.field(impl,"mSceneDetector").getType();
+            rejectDriving(impl);rejectDriving(detector);
+            for(String legacy:new String[]{"mTransientProximityEnabled","mNeedCheckProximitySensor","mNeedCheckAonFlare","mIsReflectiveScene","isReflectiveScene","isNeedSkipBrightnessChange"})
+                if(hasMember(impl,legacy)||hasMember(detector,legacy))throw new IllegalStateException("legacy scene marker "+legacy);
+            for(String flag:new String[]{"mUseProxAndTouchEnabled","mUseAonFlareEnabled","mUseProximityEnabled","mIsGameSceneEnable"})
+                instanceField(impl,flag,boolean.class);
             if(!detector.getName().equals("com.android.server.display.SceneDetector"))throw new IllegalStateException("scene owner ABI");
-            if(HookEntry.field(detector,"mIsStepMode").getType()!=boolean.class||HookEntry.field(detector,"mUseAonFlareEnabled").getType()!=boolean.class)throw new IllegalStateException("scene detector flags ABI");
+            instanceField(detector,"mIsStepMode",boolean.class);instanceField(detector,"mUseAonFlareEnabled",boolean.class);
             for(String field:new String[]{"mMinAonFlareEnableLux","mMaxAonFlareEnableLux"})
-                if(HookEntry.field(detector,field).getType()!=float.class)throw new IllegalStateException("AON window ABI");
+                instanceField(detector,field,float.class);
             Method ambient=detector.getDeclaredMethod("updateAmbientLux",int.class,float.class,boolean.class);
             if(ambient.getReturnType()!=void.class||Modifier.isStatic(ambient.getModifiers()))throw new IllegalStateException("ambient stream ABI");
             Method flare=detector.getDeclaredMethod("checkAonFlareStatus",float.class);
@@ -85,6 +86,7 @@ final class ResponseTuning {
         }catch(Throwable incomplete){accepted=false;}
         aonProfiles.put(impl,accepted);return accepted;
     }
+    static void instanceField(Class<?> type,String name,Class<?> expected)throws Exception{Field f=HookEntry.field(type,name);if(f.getType()!=expected||Modifier.isStatic(f.getModifiers()))throw new IllegalStateException(name+" ABI");}
     static boolean hasMember(Class<?> type,String name){for(Class<?> c=type;c!=null&&c!=Object.class;c=c.getSuperclass()){
         for(Field f:c.getDeclaredFields())if(f.getName().equals(name))return true;
         for(Method m:c.getDeclaredMethods())if(m.getName().equals(name))return true;

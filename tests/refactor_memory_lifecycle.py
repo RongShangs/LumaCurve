@@ -39,6 +39,8 @@ public class LifecycleHostTest {
  static class Owner {boolean mUseAutoBrightness=true;void setAutoBrightnessState(boolean auto){mUseAutoBrightness=auto;}Impl mAutomaticBrightnessControllerImpl=new Impl();Mapper mBrightnessMapper=mAutomaticBrightnessControllerImpl.mAutomaticBrightnessController.mCurrentBrightnessMapper;}
  static class Facade {boolean mAutoBrightnessEnable=true;Object mDisplayPowerControllerImpl;void setAutomaticScreenBrightnessMode(int mode){((OwnerNew)mDisplayPowerControllerImpl).mAutoBrightnessEnable=mode!=0;}}
  static class OwnerNew {boolean mAutoBrightnessEnable=true;Facade mDisplayPowerController=new Facade();Impl mAutomaticBrightnessControllerImpl=new Impl();Mapper mBrightnessMapper=mAutomaticBrightnessControllerImpl.mAutomaticBrightnessController.mCurrentBrightnessMapper;}
+ static class PartialOwner extends OwnerNew {boolean mUseAutoBrightness=true;}
+ static class MalformedOwner extends OwnerNew {boolean mUseAutoBrightness=true;int setAutoBrightnessState(boolean auto){return 1;}}
  static class FacadeWrong {Object mDisplayPowerControllerImpl;boolean setAutomaticScreenBrightnessMode(int mode){return true;}}
  static class OwnerWrong {boolean mAutoBrightnessEnable;FacadeWrong mDisplayPowerController=new FacadeWrong();Impl mAutomaticBrightnessControllerImpl=new Impl();Mapper mBrightnessMapper=mAutomaticBrightnessControllerImpl.mAutomaticBrightnessController.mCurrentBrightnessMapper;}
  static class Backend extends CurveBackend {String kind="model";boolean auto=true,restoreModel;JSONArray points=new JSONArray();CurvePlan p;Backend(){super(1,1000);factoryLux=new float[]{0,30,600,5000};factoryNit=new float[]{2,20,100,1000};p=new CurvePlan(factoryLux,factoryNit,min,max,new float[]{1,1,1,1});}
@@ -77,6 +79,7 @@ public class LifecycleHostTest {
   // A foreign or wrong-typed facade never opens the capability.
   OwnerNew stale=new OwnerNew();stale.mDisplayPowerController.mDisplayPowerControllerImpl=ownerNew;HookRuntime foreign=new HookRuntime(k,stale);foreign.memoryLifecycle.attach();check(!foreign.memoryLifecycle.modeSupported);
   OwnerWrong wrong=new OwnerWrong();HookRuntime typed=new HookRuntime(k,wrong);typed.memoryLifecycle.attach();check(!typed.memoryLifecycle.modeSupported);
+  for(OwnerNew incomplete:new OwnerNew[]{new PartialOwner(),new MalformedOwner()}){incomplete.mDisplayPowerController.mDisplayPowerControllerImpl=incomplete;HookRuntime partial=new HookRuntime(k,incomplete);partial.memoryLifecycle.attach();check(!partial.memoryLifecycle.modeSupported);partial.memoryLifecycle.close();}
   nl.close();newer.persistentMemory.pendingWrite=null;
   k.kind="model";s.onThread=false;check((Long)call(mapper,"getShortTermModelTimeout",new Class<?>[]{})==1800000);s.onThread=true;l.close();check(MemoryLifecycle.active(mapper)==null);check((Long)call(mapper,"getShortTermModelTimeout",new Class<?>[]{})==1800000);
   HookRuntime replacement=new HookRuntime(new Backend(),owner);replacement.memoryLifecycle.attach();replacement.persistentMemory.options=replacement.persistentMemory.options.with("memory_timeout_override",true).with("memory_timeout_minutes",10);check((Long)call(mapper,"getShortTermModelTimeout",new Class<?>[]{})==600000);replacement.closed=true;check((Long)call(mapper,"getShortTermModelTimeout",new Class<?>[]{})==1800000);

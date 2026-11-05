@@ -23,6 +23,8 @@ runtime=runtime[:start]+''' public static class Impl{public Object mAutomaticBri
  public static class BrokenPreferred extends Dpc{public int getLastSelectedStrategy(){return 1;}}
  public static class ThrowingPreferred extends Dpc{public Object getLastSelectedStrategy(){throw new IllegalStateException("OEM call failed");}}
 ''' +runtime[end:]
+
+runtime=runtime[:runtime.rfind('}')]+'long lastManualAdjustment=-1,memoryWindow=5000;boolean normalTuningAllowed(Object a,Object b){return true;}    boolean animationTuningAllowed(Object abc,Object impl){\n        if(!normalTuningAllowed(abc,impl)||(lastManualAdjustment>=0&&android.os.SystemClock.uptimeMillis()-lastManualAdjustment<=memoryWindow))return false;\n        // Share the verified current-output contract; a retained automatic-strategy slot alone\n        // does not prove that it currently owns brightness or animation.\n        return "AutomaticBrightnessStrategy".equals(OutdoorOutputAccess.name(this));\n    }\n'+runtime[runtime.rfind('}'):]
 sources[base+'HookRuntime.java']=runtime
 sources[base+'ActivePanelNode.java']='''package top.rongshangs.lumacurve.refactor;import org.json.*;class ActivePanelNode{static final String PROFILE="fold_default_display";static JSONObject selected;static JSONObject discover(){return new JSONObject(selected.toString());}}'''
 sources[base+'NativePanelRoot.java']='''package top.rongshangs.lumacurve.refactor;import java.io.*;import org.json.*;class NativePanelRoot{static final File BIN=new File("/unused/native");static int probes;static void probe(JSONObject node){probes++;}static void install(){throw new AssertionError("read-only tests must not install");}}'''
@@ -56,6 +58,19 @@ public class OutdoorFoldTest{
   ActivePanelNode.selected=node(outer,1);ActivePanelNode.selected.put("supported",false);check(!OutdoorNodeRoot.supported(state(outer)));
   for(JSONArray ids:new JSONArray[]{new JSONArray(),new JSONArray().put(inner),new JSONArray().put(inner).put(inner),new JSONArray().put(-1).put(outer)}){JSONObject n=node(outer,1).put("fold_physical_ids",ids);try{OutdoorNodeRoot.foldIds(n);throw new AssertionError();}catch(Exception expected){cases++;}}
   ActivePanelNode.selected=new JSONObject().put("supported",true).put("maximum",16383).put("path","/sys/class/backlight/panel0-backlight/brightness");check(OutdoorNodeRoot.supported(state(0)));check(OutdoorNodeRoot.command(ActivePanelNode.selected).size()==4);check(OutdoorNodeRoot.foldIds(ActivePanelNode.selected).isEmpty());
+  // A retained automatic slot cannot override a successfully selected nonautomatic output.
+  s=runtime();Object abc=dpc(s).mAutomaticBrightnessController;
+  HookRuntime.Preferred selected=new HookRuntime.Preferred();
+  selected.mAutomaticBrightnessController=abc;selected.mAutomaticBrightnessStrategy.mAutomaticBrightnessController=abc;
+  s.owner.mDisplayPowerController=selected;
+  check(s.animationTuningAllowed(abc,s.owner.mAutomaticBrightnessControllerImpl));
+  selected.selected=new HookRuntime.TemporaryBrightnessStrategy();check(!s.animationTuningAllowed(abc,s.owner.mAutomaticBrightnessControllerImpl));
+  selected.selected=null;check(!s.animationTuningAllowed(abc,s.owner.mAutomaticBrightnessControllerImpl));
+  s.owner.mDisplayPowerController=new HookRuntime.ThrowingPreferred();check(!s.animationTuningAllowed(abc,s.owner.mAutomaticBrightnessControllerImpl));
+  s.owner.mDisplayPowerController=new HookRuntime.BrokenPreferred();check(!s.animationTuningAllowed(abc,s.owner.mAutomaticBrightnessControllerImpl));
+  s=runtime();abc=dpc(s).mAutomaticBrightnessController;check(s.animationTuningAllowed(abc,s.owner.mAutomaticBrightnessControllerImpl));
+  dpc(s).mAutomaticBrightnessStrategy.applied=false;check(!s.animationTuningAllowed(abc,s.owner.mAutomaticBrightnessControllerImpl));
+  dpc(s).mAutomaticBrightnessStrategy.applied=true;dpc(s).mBrightnessReasonTemp.reason=43;check(!s.animationTuningAllowed(abc,s.owner.mAutomaticBrightnessControllerImpl));
   System.out.println("Outdoor provenance and root binding: "+cases+" cases PASS; production adapters, no device writes");
  }
 }'''

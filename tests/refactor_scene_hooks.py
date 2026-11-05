@@ -106,10 +106,15 @@ public class SceneAonTest{
   System.out.println("AON scene mapping: "+cases+" cases PASS; verified window only, stream occlusion stays unavailable");
  }
 }'''
-for variant,wrong in [('aon',False),('aon_partial',True)]:
+aon_test_base=aon_test
+for variant,wrong in [('aon',False),('aon_partial',True),('aon_legacy_marker',True),('aon_static_window',True)]:
+ aon_test=aon_test_base
  src=dict(aon)
  if wrong:
   src['com/android/server/display/SceneDetector.java']='''package com.android.server.display;public class SceneDetector{public boolean mIsStepMode=true,mUseAonFlareEnabled=true;public float mMinAonFlareEnableLux=17,mMaxAonFlareEnableLux=200;public void updateAmbientLux(int event,float lux,boolean dark){}public void checkAonFlareStatus(int lux){}}'''
+  if variant!='aon_partial':src['com/android/server/display/SceneDetector.java']=src['com/android/server/display/SceneDetector.java'].replace('checkAonFlareStatus(int lux)','checkAonFlareStatus(float lux)')
+  if variant=='aon_legacy_marker':src['com/android/server/display/SceneDetector.java']=src['com/android/server/display/SceneDetector.java'].replace('public class SceneDetector{','public class SceneDetector{public boolean mIsReflectiveScene;')
+  if variant=='aon_static_window':src['com/android/server/display/SceneDetector.java']=src['com/android/server/display/SceneDetector.java'].replace('public float mMinAonFlareEnableLux','public static float mMinAonFlareEnableLux')
   aon_test=aon_test.replace('check(SceneTuning.supported(s,5));check(SceneTuning.supported(s,3));','check(SceneTuning.supported(s,3));check(!SceneTuning.supported(s,5));')
   body='''  block(s,5);call(scene,"updateAmbientLux",new Class<?>[]{int.class,float.class,boolean.class},0,50f,true);
   check(!scene.sawAon);check(scene.mMinAonFlareEnableLux==17f&&scene.mMaxAonFlareEnableLux==200f);
