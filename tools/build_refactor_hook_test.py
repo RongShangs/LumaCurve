@@ -14,6 +14,19 @@ def validate_release_signing(key):
 def validate_output_paths(directory,names):
     existing=[directory/name for name in names if (directory/name).exists() or (directory/name).is_symlink()]
     if existing:raise FileExistsError('Existing deliverables are immutable; choose a new Beta/revision: '+', '.join(str(p) for p in existing))
+
+def sync_bundled_thanks(feed,asset):
+    raw=feed.read_bytes();data=json.loads(raw)
+    if not isinstance(data,dict) or data.get('schema')!=1 or not isinstance(data.get('entries'),list) or len(data['entries'])>200:
+        raise ValueError('Invalid thanks feed schema or entry count')
+    for entry in data['entries']:
+        if not isinstance(entry,dict):raise ValueError('Invalid thanks entry')
+        name=entry.get('name');message=entry.get('message')
+        if not isinstance(name,str) or not name.strip() or len(name)>80 or not isinstance(message,str) or len(message)>200:
+            raise ValueError('Invalid thanks name or message')
+        if any(c in name+message for c in '\r\n'):raise ValueError('Thanks entries must be single-line text')
+    if not asset.is_file() or asset.read_bytes()!=raw:asset.write_bytes(raw)
+    return data
 def class_archive(target,files,root):
     # Feed D8 a jar instead of thousands of Windows command-line characters.
     root=Path(root).resolve();target=Path(target)
@@ -51,9 +64,9 @@ if not args.verify_only:
 
 SDK=Path('D:/App/SDK'); BT=SDK/'build-tools/37.0.0'; ANDROID=SDK/'platforms/android-37.0/android.jar'
 OUT.mkdir(parents=True,exist_ok=True)
-# The web feed is updated independently; preserve the bundled offline fallback.
-# Keep the source archive's local-site fallback in sync before packaging it.
+# Daily feed edits remain independent; every packaged build takes the current feed.
 thanks=json.loads((ROOT/'website/thanks.json').read_text(encoding='utf-8'))
+if not args.verify_only:thanks=sync_bundled_thanks(ROOT/'website/thanks.json',SRC/'assets/thanks.json')
 (ROOT/'website/thanks.js').write_text('window.HyperLuxThanks='+json.dumps(thanks,ensure_ascii=False)+';\n',encoding='utf-8',newline='\n')
 DEP=OUT/'deps/api-82.jar';DEP.parent.mkdir(exist_ok=True)
 API_URL='https://api.xposed.info/de/robv/android/xposed/api/82/api-82.jar'
@@ -305,6 +318,7 @@ meta.update({'outdoor_fold_cases':outdoor_fold_cases,'outdoor_provenance_routes'
 (OUT/'verification.json').write_text(json.dumps(meta,ensure_ascii=False,indent=2),encoding='utf-8')
 with zipfile.ZipFile(APK) as z:
     assert z.testzip() is None
+    assert z.read('assets/thanks.json')==(ROOT/'website/thanks.json').read_bytes(),'Bundled thanks must match the latest release feed'
     assert z.read('assets/xposed_init').strip()==b'top.rongshangs.lumacurve.refactor.LegacyEntry'
     assert 'classes.dex' in z.namelist()
     assert not any(name.startswith('META-INF/xposed/') for name in z.namelist()),'unexpected modern entry metadata'

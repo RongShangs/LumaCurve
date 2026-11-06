@@ -1,4 +1,4 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="top.rongshangs.lumacurve" android:versionCode="44401" android:versionName="4.4.4-beta01">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="top.rongshangs.lumacurve" android:versionCode="44500" android:versionName="4.4.5">
     <uses-sdk android:minSdkVersion="34" android:targetSdkVersion="34"/>
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>

@@ -82,7 +82,7 @@
 | --- | --- |
 | [AboutHeroView.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/AboutHeroView.java) | `dd2a925b8c7b0f2d` |
 | [AboutMarquee.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/AboutMarquee.java) | `fc965fe937837380` |
-| [AboutPage.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/AboutPage.java) | `342ba7bcc234a96e` |
+| [AboutPage.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/AboutPage.java) | `20455e7425490514` |
 | [DiagnosticShareFiles.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/DiagnosticShareFiles.java) | `7bb6de497bb904bf` |
 | [DiagnosticShareProvider.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/DiagnosticShareProvider.java) | `94a085e0b46f3046` |
 | [DiagnosticSharing.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/DiagnosticSharing.java) | `f3671777989d4585` |

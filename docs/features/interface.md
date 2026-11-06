@@ -106,7 +106,7 @@
 | 项目 | 要求 |
 | --- | --- |
 | 触发 | 对应页面可见或用户明确触发。 |
-| 需求与行为 | 方形大图标容器内慢速错落弹幕，关于资料紧凑；动态感谢仅网站JSON，测试/代码贡献独立容器，昵称完整换行并保留来源链接；离页停止弹幕。 |
+| 需求与行为 | 方形大图标容器内慢速错落弹幕，关于资料紧凑；日常动态感谢以网站JSON为源，每次打包发布同步最新离线JSON，APK与源码核验一致；测试/代码贡献独立容器，昵称完整换行并保留来源链接；离页停止弹幕。 |
 | 退出 / 失败 | 离页或图标区域离开视口即暂停弹幕；名单获取失败沿用可用缓存，不启动后台服务。 |
 | 默认 | `on_request` · 只控制对应界面或用户明确操作，不自动调整屏幕亮度。 |
 | 配置键 | 无独立持久化亮度配置键 |
@@ -116,7 +116,7 @@
 
 | 文件 | 当前源码 SHA-256 前16位 |
 | --- | --- |
-| [AboutPage.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/AboutPage.java) | `342ba7bcc234a96e` |
+| [AboutPage.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/AboutPage.java) | `20455e7425490514` |
 | [AutomaticModeAccess.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/AutomaticModeAccess.java) | `89cb3474888f3cb7` |
 | [ConfigurationFile.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ConfigurationFile.java) | `a45f2429bd244e74` |
 | [FeatureCheckPage.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/FeatureCheckPage.java) | `c299b03f761fe6f0` |

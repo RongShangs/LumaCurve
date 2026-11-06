@@ -14,6 +14,26 @@ tree=ast.parse((ROOT/'tools/build_refactor_hook_test.py').read_text(encoding='ut
 guard=next(n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=='validate_release_signing')
 with scratch_directory(prefix='hyperlux-release-') as temporary:
     base=Path(temporary)
+    thanks_function=next(n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=='sync_bundled_thanks')
+    thanks_scope={'json':json}
+    exec(compile(ast.Module(body=[thanks_function],type_ignores=[]),'<production bundled thanks sync>','exec'),thanks_scope)
+    feed=base/'thanks.json';asset=base/'offline-thanks.json'
+    latest={'schema':1,'entries':[{'name':'*平','message':'感谢大佬免费制作模块，小小支持一下'}]}
+    raw=(json.dumps(latest,ensure_ascii=False,indent=2)+'\n').encode('utf-8');feed.write_bytes(raw);asset.write_bytes(b'old offline feed')
+    check(thanks_scope['sync_bundled_thanks'](feed,asset)==latest and asset.read_bytes()==raw)
+    for broken in [{'schema':2,'entries':[]},{'schema':1,'entries':[latest['entries'][0]]*201},
+                   {'schema':1,'entries':[{'name':'','message':'x'}]},
+                   {'schema':1,'entries':[{'name':'x','message':'line\nbreak'}]},
+                   {'schema':1,'entries':[{'name':'x','message':'x'*201}]},
+                   {'schema':1,'entries':[{'name':123,'message':'x'}]}]:
+        feed.write_text(json.dumps(broken),encoding='utf-8')
+        try:thanks_scope['sync_bundled_thanks'](feed,asset)
+        except ValueError:check(asset.read_bytes()==raw)
+        else:raise AssertionError('invalid feed replaced the bundled fallback')
+    feed.write_text('{invalid JSON',encoding='utf-8')
+    try:thanks_scope['sync_bundled_thanks'](feed,asset)
+    except ValueError:check(asset.read_bytes()==raw)
+    else:raise AssertionError('broken JSON replaced the bundled fallback')
     class_input=next(n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=='class_archive')
     archive_scope={'Path':Path,'zipfile':zipfile}
     exec(compile(ast.Module(body=[class_input],type_ignores=[]),'<production class input archive>','exec'),archive_scope)
