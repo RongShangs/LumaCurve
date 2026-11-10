@@ -20,7 +20,7 @@
     {
       "file": "ActivePanelNode.java",
       "layer": "adapters",
-      "purpose": "原生折叠布局、默认物理屏与背光节点绑定"
+      "purpose": "原生折叠布局、默认物理屏与背光节点绑定；已验证等范围配对屏的保存选择收束"
     },
     {
       "file": "AdvancedOptions.java",
@@ -40,7 +40,7 @@
     {
       "file": "AppBrightnessIsolation.java",
       "layer": "adapters",
-      "purpose": "同屏/同用户/真实窗口来源限定的应用偏好同步隔离，原子安装与原生无同步路径分离"
+      "purpose": "同屏/同用户/真实窗口来源限定同步隔离，系统原生隔离状态与保存选择分开；不执行旧版窗口共享"
     },
     {
       "file": "AppBuild.java",
@@ -60,7 +60,7 @@
     {
       "file": "ApplicationBrightnessSettings.java",
       "layer": "presentation",
-      "purpose": "界面与只读说明"
+      "purpose": "暂停、独立与最多三个分组的互斥名单入口，旧配置接续及保留期限草稿；分组编辑及删除按稳定ID解析当前草稿，防止周期刷新后捕获旧对象"
     },
     {
       "file": "AssistSensorCompat.java",
@@ -155,7 +155,7 @@
     {
       "file": "ControlCenterHooks.java",
       "layer": "adapters",
-      "purpose": "SystemUI原比例映射及独立v3整节点手势入口；真实节点回显、末端目标合并发送和代次隔离"
+      "purpose": "SystemUI原比例映射及独立v3整节点手势入口；真实节点回显、末端目标合并发送和代次隔离；SystemUI观察器后台有界注册和未就绪的原生回退"
     },
     {
       "file": "ControlCenterMapping.java",
@@ -410,7 +410,7 @@
     {
       "file": "MainActivity.java",
       "layer": "presentation",
-      "purpose": "界面与只读说明"
+      "purpose": "界面与只读说明；向应用名单页复用同一返回箭头绘制"
     },
     {
       "file": "ManualBrightnessPanel.java",
@@ -485,7 +485,7 @@
     {
       "file": "NativePanelRoot.java",
       "layer": "bridge",
-      "purpose": "Root 与原生程序桥"
+      "purpose": "Root 与原生程序桥；安装前后复核折叠物理身份，组合节点端口与控制中心进程绑定"
     },
     {
       "file": "NavigationPolicy.java",
@@ -911,6 +911,36 @@
       "file": "hooking/XposedBridge.java",
       "layer": "hook_backend",
       "purpose": "框架桥与安装事务"
+    },
+    {
+      "file": "AppIndependentPolicy.java",
+      "layer": "policy",
+      "purpose": "主屏比例坐标的逐应用/分组固定值、受保护输入排除、完整校验及记忆绑定"
+    },
+    {
+      "file": "AppIndependentAccess.java",
+      "layer": "adapters",
+      "purpose": "真实主屏、HBM普通范围、窗口覆盖及手动输入原生ABI，独立事务安装；接口只读探测与首次接管的Hook安装分离，避免闲置功能改变启动路径；原生设置消费后仅投递当前主屏的手动交接通知，不在原生锁栈执行服务读写"
+    },
+    {
+      "file": "AppIndependentControl.java",
+      "layer": "orchestration",
+      "purpose": "复用应用模式租约的独立值切换、明确输入记忆、恢复原模式与受管异步持久化；原生手动交接完成后按代次单次补交付目标，保护后来输入并在退出取消；快速交接与跨锁屏补存原租约待处理输入，存档提交拒绝的有界重试和未读存档保护"
+    },
+    {
+      "file": "ApplicationSelection.java",
+      "layer": "policy",
+      "purpose": "有界名单、分类选择、只读迁移计划与确认提交，取消/过期弹窗不改旧选择"
+    },
+    {
+      "file": "ApplicationCategories.java",
+      "layer": "adapters",
+      "purpose": "设备专用游戏分类与结构校验；混合影像名单不当作视频分类"
+    },
+    {
+      "file": "ApplicationListActivity.java",
+      "layer": "presentation",
+      "purpose": "带搜索、图标、开关和视频/游戏批选的统一二级名单页，草稿结果与离页任务清理；先创建窗口内容再读取系统栏控制器，避免未创建DecorView导致启动闪退；统一二级导航、固定搜索/滚动批选、连续大圆角名单与滚动尾部安全区域；与二级页一致的双向淡变及轻位移Activity过渡；固定不透明窗口中的内容过渡、离页复原及单次草稿返回，避免整窗动画露出任务背景"
     }
   ],
   "native_files": [

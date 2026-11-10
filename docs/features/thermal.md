@@ -52,6 +52,6 @@
 | 文件 | 当前源码 SHA-256 前16位 |
 | --- | --- |
 | [FieldOverride.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/FieldOverride.java) | `6b47448ffaf6ac29` |
-| [HookEntry.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/HookEntry.java) | `0d3b85e0fffd36a5` |
+| [HookEntry.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/HookEntry.java) | `0ccc8782697a7330` |
 | [HookRuntime.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/HookRuntime.java) | `f1cdc6bfa6a1d706` |
 | [ThermalPolicy.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ThermalPolicy.java) | `673d032fdaea9f5b` |

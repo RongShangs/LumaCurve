@@ -71,7 +71,7 @@ final class ForegroundApps {
     }
     static void attach(BrightnessControl target){
         // Power/service reads must not hold the monitor used by WM callbacks.
-        if(target.options.manualApps.isEmpty()||!target.enabled()||!target.mainDisplay()||!target.awake()){detach(target);return;}
+        if(target.options.applications().isEmpty()||!target.enabled()||!target.mainDisplay()||!target.awake()){detach(target);return;}
         if(!install(target.s.owner.getClass().getClassLoader()))return;
         boolean added;synchronized(ForegroundApps.class){added=targets.add(target);}
         if(added)refresh(target);

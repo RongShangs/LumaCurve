@@ -24,5 +24,16 @@ strategy=read(F,'com.android.server.display.brightness.strategy.OverrideBrightne
 old_o=read(OLD,'com.android.server.display.DisplayPowerControllerImpl');old_d=read(OLD,'com.android.server.display.DisplayPowerController')
 for name,src in [('requestBrightnessSync',old_o),('consumePendingBrightnessSync',old_o),('syncBrightnessToSettingAndUi',old_d)]:check('METHOD '+name+' ' not in src)
 check('DisplayBrightnessOverrideRequest;' in old_d)
+check('FIELD mUniqueDisplayId Ljava/lang/String;' in d)
+for name,kind in [('mNotQRcodeComponentSet','Ljava/util/Set;'),('mIsCameraOpen','Z'),('mHbmController','Lcom/android/server/display/HighBrightnessModeController;'),('mDisplayDeviceConfig','Lcom/android/server/display/DisplayDeviceConfig;')]:check('FIELD '+name+' '+kind in o)
+# Both sync call sites belong to the native positively classified non-QR branch.
+check('->mNotQRcodeComponentSet Ljava/util/Set;' in scoped)
+check(scoped.index('->mIsCameraOpen Z')<scoped.index('->requestBrightnessSync(F)V'))
+check(scoped.index('->isHdrScene()Z')<scoped.index('->requestBrightnessSync(F)V'))
+check(scoped.index('->contains(Ljava/lang/Object;)Z',scoped.index('->mNotQRcodeComponentSet '))<scoped.index('->requestBrightnessSync(F)V'))
+check(scoped.rindex('->requestBrightnessSync(F)V')<scoped.index('->getQRCodeBrightnessMax(F F)F'))
+check('->getNormalBrightnessMax()F' in body(o,'getNormalMaxBrightness'))
+check('->getCurrentBrightnessMax()F' in body(o,'getCurrentMaxBrightness'))
+check('->getGoodCurveMax(F Z)F' in body(o,'getQRCodeBrightnessMax'))
 print(f'Application isolation firmware: {count} checks PASS; private consumers only, no Android execution')
 

@@ -1,4 +1,4 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="top.rongshangs.lumacurve" android:versionCode="44500" android:versionName="4.4.5">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="top.rongshangs.lumacurve" android:versionCode="45000" android:versionName="4.5.0">
     <uses-sdk android:minSdkVersion="34" android:targetSdkVersion="34"/>
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
@@ -17,6 +17,7 @@
             <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="de.robv.android.xposed.category.MODULE_SETTINGS"/></intent-filter>
             <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.INFO"/></intent-filter>
         </activity>
+        <activity android:name="top.rongshangs.lumacurve.refactor.ApplicationListActivity" android:exported="false" android:windowSoftInputMode="adjustNothing"/>
         <activity-alias android:name="top.rongshangs.lumacurve.Launcher" android:targetActivity="top.rongshangs.lumacurve.refactor.MainActivity" android:enabled="true" android:exported="true">
             <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
         </activity-alias>

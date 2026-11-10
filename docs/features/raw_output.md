@@ -10,7 +10,7 @@
 | --- | --- |
 | 触发 | 用户点击磁贴或面板并拖动/输入目标，当前物理屏、权限与真实节点可验证。 |
 | 需求与行为 | 磁贴拖动关闭自动亮度并复用统一节点保持；读取真实上限，可设独立最高节点；临时常亮仅本次锁屏前 |
-| 退出 / 失败 | 打开自动亮度结束保持；锁屏暂停节点、解锁按租约恢复；临时常亮锁屏即清。 |
+| 退出 / 失败 | 恢复自动亮度先确认节点权限释放及系统模式写入；附加控制中心映射重绑失败单独提示，不能误报主操作失败。锁屏暂停节点，解锁检查同屏租约后恢复；临时常亮另行控制。 |
 | 默认 | `on_request` · 允许打开，本身不自动接管 |
 | 配置键 | `manual_panel_enabled`、`manual_panel_maximum` |
 | 依赖能力 | 由本项实际接口独立判断 |
@@ -40,7 +40,7 @@
 
 ### 清理及回滚
 
-熄屏先撤销控制权，租约失联自动归还，系统改写优先。
+熄屏先撤销控制权，租约失联自动归还，系统改写优先。 自动恢复后的可选映射重绑失败与节点权限恢复失败分别处理；fold+control-center监听参数独立校验、可组合，未知/重复/溢出参数拒绝。
 
 ## 已实现的兼容路线
 
@@ -64,7 +64,7 @@
 
 | 文件 | 当前源码 SHA-256 前16位 |
 | --- | --- |
-| [BrightnessControl.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/BrightnessControl.java) | `8e91d605934d21fc` |
+| [BrightnessControl.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/BrightnessControl.java) | `f957288314b2835a` |
 | [OutdoorNodeBridge.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/OutdoorNodeBridge.java) | `e798934e1a0f15df` |
 | [OutdoorOutputAccess.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/OutdoorOutputAccess.java) | `da1d5c4e82df9fcc` |
 | [RawPanelLease.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/RawPanelLease.java) | `5e6cd2ff95956c28` |

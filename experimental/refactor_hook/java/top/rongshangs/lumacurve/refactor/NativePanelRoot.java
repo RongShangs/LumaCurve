@@ -32,7 +32,11 @@ final class NativePanelRoot {
   try{StructStat opened=Os.fstat(fd);if(!OsConstants.S_ISREG(opened.st_mode)||expected.st_dev!=opened.st_dev||expected.st_ino!=opened.st_ino||!node.toPath().toRealPath().toString().equals(selected.getString("canonical_path")))throw new IOException("主屏节点在权限检查期间发生变化");}
   finally{Os.close(fd);}
  }
- static boolean matches(JSONObject node,JSONObject guard){return (!ActivePanelNode.PROFILE.equals(node.optString("discovery"))||node.optInt("fold_port",-2)==guard.optInt("fold_port",-3))&&guard.optBoolean("ok")&&("raw08-slider".equals(guard.optString("native_build"))||"raw09-slider".equals(guard.optString("native_build"))||"raw10-slider".equals(guard.optString("native_build"))||"raw11-slider".equals(guard.optString("native_build")))&&node.optString("path").equals(guard.optString("path"))&&node.optString("canonical_path").equals(guard.optString("canonical_path"))&&node.optInt("maximum",-1)==guard.optInt("maximum",-2);}
+ static boolean matches(JSONObject node,JSONObject guard){return (!ActivePanelNode.PROFILE.equals(node.optString("discovery"))||node.optInt("fold_port",-2)==guard.optInt("fold_port",-3))&&guard.optBoolean("ok")&&("raw08-slider".equals(guard.optString("native_build"))||"raw09-slider".equals(guard.optString("native_build"))||"raw10-slider".equals(guard.optString("native_build"))||"raw11-slider".equals(guard.optString("native_build"))||"raw12-slider".equals(guard.optString("native_build")))&&node.optString("path").equals(guard.optString("path"))&&node.optString("canonical_path").equals(guard.optString("canonical_path"))&&node.optInt("maximum",-1)==guard.optInt("maximum",-2);}
+ static boolean sameSelection(JSONObject selected,JSONObject current){
+  boolean fold=ActivePanelNode.PROFILE.equals(selected.optString("discovery"));
+  return current.optBoolean("supported")&&fold==ActivePanelNode.PROFILE.equals(current.optString("discovery"))&&selected.optString("path").equals(current.optString("path"))&&selected.optString("canonical_path").equals(current.optString("canonical_path"))&&selected.optInt("maximum",-1)==current.optInt("maximum",-2)&&(!fold||!selected.optString("physical_display_id").isEmpty()&&selected.optString("physical_display_id").equals(current.optString("physical_display_id"))&&selected.optInt("fold_port",-2)==current.optInt("fold_port",-3));
+ }
  static void install()throws Exception{
   RootWorkspace.requireNative();
   Os.chmod(RootControl.DATA.toString(),0700);
@@ -55,19 +59,18 @@ final class NativePanelRoot {
  }
  static void start(JSONObject selected)throws Exception{start(selected,false,0);}
  static void start(JSONObject selected,boolean follow,int enginePid)throws Exception{
-  if(follow&&ActivePanelNode.PROFILE.equals(selected.optString("discovery")))throw new IOException("折叠屏节点映射尚未启用");
+  if(follow&&enginePid<=1)throw new IOException("系统进程身份无效");
   JSONObject current=ActivePanelNode.discover();
-  if(!current.optBoolean("supported")||!selected.optString("path").equals(current.optString("path"))||!selected.optString("canonical_path").equals(current.optString("canonical_path"))||selected.optInt("maximum",-1)!=current.optInt("maximum",-2))throw new IOException("主屏节点已变化，请重新打开面板");
+  if(!sameSelection(selected,current))throw new IOException("主屏节点已变化，请重新打开面板");
    install();
    current=ActivePanelNode.discover();
-   if(!current.optBoolean("supported")||!selected.optString("path").equals(current.optString("path"))||!selected.optString("canonical_path").equals(current.optString("canonical_path"))||selected.optInt("maximum",-1)!=current.optInt("maximum",-2))throw new IOException("主屏节点已变化，请重新打开面板");
+   if(!sameSelection(selected,current))throw new IOException("主屏节点已变化，请重新打开面板");
   JSONObject existing=null;try{existing=NativePanelClient.call("STATUS");}catch(Exception ignored){}
   if(existing!=null){if(matches(current,existing)&&(!follow||existing.optBoolean("control_center_listener")&&existing.optInt("control_center_pid")==enginePid))return;if(matches(current,existing)){stop();existing=null;}else if(ActivePanelNode.PROFILE.equals(current.optString("discovery"))&&existing.optInt("fold_port",-1)>=0){stop();existing=null;}else throw new IOException("已有守护使用其他节点，请先恢复自动亮度");}
   File log=new File(RootControl.DATA,"main-panel.log");
   // Retain one bounded previous run before ProcessBuilder replaces the current log.
   if(log.isFile())try(RandomAccessFile old=new RandomAccessFile(log,"r")){int size=(int)Math.min(old.length(),65536);byte[] tail=new byte[size];old.seek(old.length()-size);old.readFully(tail);Files.write(new File(RootControl.DATA,"main-panel.previous.log").toPath(),tail);}catch(IOException unavailable){/* Optional evidence must not prevent startup. */}
-  java.util.List<String> command=new java.util.ArrayList<>(java.util.Arrays.asList(BIN.toString(),"--daemon","--node",current.getString("path")));if(ActivePanelNode.PROFILE.equals(current.optString("discovery")))command.add("--active-fold="+current.getInt("fold_port"));if(follow){if(enginePid<=1)throw new IOException("系统进程身份无效");command.add("--control-center="+enginePid);}
-  Process guard=new ProcessBuilder(command).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.to(log)).start();
+  Process guard=new ProcessBuilder(command(current,follow,enginePid)).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.to(log)).start();
   String lastProbe="未取得就绪响应";long deadline=System.nanoTime()+1500000000L;
   while(System.nanoTime()<deadline){
    try{JSONObject reply=NativePanelClient.call("STATUS");if(matches(current,reply)&&(!follow||reply.optBoolean("control_center_listener")&&reply.optInt("control_center_pid")==enginePid))return;lastProbe=reply.toString();}catch(Exception unavailable){lastProbe=unavailable.toString();}
@@ -75,6 +78,11 @@ final class NativePanelRoot {
    if(System.nanoTime()<deadline)Thread.sleep(50);
   }
   throw startFailure(log,"就绪检查超时；就绪查询："+lastProbe);
+ }
+ static java.util.List<String> command(JSONObject current,boolean follow,int enginePid)throws Exception{
+  java.util.List<String> command=new java.util.ArrayList<>(java.util.Arrays.asList(BIN.toString(),"--daemon","--node",current.getString("path")));
+  if(ActivePanelNode.PROFILE.equals(current.optString("discovery"))){int port=current.getInt("fold_port");if(port<0||port>7)throw new IOException("折叠屏节点端口无效");command.add("--active-fold="+port);}
+  if(follow){if(enginePid<=1)throw new IOException("系统进程身份无效");command.add("--control-center="+enginePid);}return command;
  }
  static IOException startFailure(File log,String status){
   String detail="";try{byte[] data=Files.readAllBytes(log.toPath());detail=new String(data,0,Math.min(data.length,8192),java.nio.charset.StandardCharsets.UTF_8).trim();}catch(Exception ignored){}

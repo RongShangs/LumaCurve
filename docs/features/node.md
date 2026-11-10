@@ -19,7 +19,7 @@
 
 ### 选择边界
 
-backlight 或明确标识显示的 leds；真实 sysfs 路径与上限配对且唯一主屏，不按机型写死上限。 新增手动面板折叠路线：实际原生布局至少两个不同默认物理屏；实时默认内部屏地址与布局、成对同控制器背光、唯一 DSI 亮屏端口一致，选当前端口，扫描后再确认物理屏未变化。无切换布局证据时原发现路径不变；有折叠证据但不完整则等待。 兼容实际 Physical / StablePhysical 地址对象，均直接调用原生 getPort；StablePhysical 的物理 ID 与端口独立，按内核成对 panelN 清单验证，不解码该 ID。 状态读数单独只读实际节点；可验证本机DisplayDeviceConfig背光标定时换算nit，不可换算时原生接管仅显示节点值，不复用框架旧亮度。 无nit但有已验证节点时，常规模式也展示真实节点；无节点时可显示DisplayPowerState实际输出比例，直接节点接管不复用该比例。
+backlight 或明确标识显示的 leds；真实 sysfs 路径与上限配对且唯一主屏，不按机型写死上限。 新增手动面板折叠路线：实际原生布局至少两个不同默认物理屏；实时默认内部屏地址与布局、成对同控制器背光、唯一 DSI 亮屏端口一致，选当前端口，扫描后再确认物理屏未变化。无切换布局证据时原发现路径不变；有折叠证据但不完整则等待。 兼容实际 Physical / StablePhysical 地址对象，均直接调用原生 getPort；StablePhysical 的物理 ID 与端口独立，按内核成对 panelN 清单验证，不解码该 ID。 状态读数单独只读实际节点；可验证本机DisplayDeviceConfig背光标定时换算nit，不可换算时原生接管仅显示节点值，不复用框架旧亮度。 无nit但有已验证节点时，常规模式也展示真实节点；无节点时可显示DisplayPowerState实际输出比例，直接节点接管不复用该比例。 保存选择的折叠配对复用由ActivePanelNode收束：当前节点须在实时验证的候选中，保存路径也在该集合且所有上限相同；普通单屏仍精确匹配。
 
 | 契约 | 内容 |
 | --- | --- |
@@ -29,7 +29,7 @@ backlight 或明确标识显示的 leds；真实 sysfs 路径与上限配对且�
 
 ### 清理及回滚
 
-发现与权限检查只读，不启动写入器；实际租约写入另由原生事务负责，拒绝副屏 / 指示灯 / 手电。 折叠专用原生选项与 v3 权限恢复记录仅允许绑定端口节点；v2 / 旧节点拒绝规则不变。关闭、熄屏、DRM 改变结束旧接管；租约和框架输出隔离绑定物理屏，晚到命令拒绝，不复用旧目标。户外新增显式折叠协作分支，使用独立物理租约和原生 DSI 核验；控制中心动态折叠监听仍须独立核验，不能复用户外通过结论。 读数不启动写入器、不修改节点或权限；物理屏或标定不一致时不显示旧nit。
+发现与权限检查只读，不启动写入器；实际租约写入另由原生事务负责，拒绝副屏 / 指示灯 / 手电。 折叠专用原生选项与 v3 权限恢复记录仅允许绑定端口节点；v2 / 旧节点拒绝规则不变。关闭、熄屏、DRM 改变结束旧接管；租约和框架输出隔离绑定物理屏，晚到命令拒绝，不复用旧目标。户外新增显式折叠协作分支，使用独立物理租约和原生 DSI 核验；控制中心动态折叠监听仍须独立核验，不能复用户外通过结论。 读数不启动写入器、不修改节点或权限；物理屏或标定不一致时不显示旧nit。 启动安装前后比较物理屏、折叠端口、路径及上限，任何改变均拒绝启动。
 
 ## 已实现的兼容路线
 
@@ -55,10 +55,10 @@ backlight 或明确标识显示的 leds；真实 sysfs 路径与上限配对且�
 
 | 文件 | 当前源码 SHA-256 前16位 |
 | --- | --- |
-| [ActivePanelNode.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ActivePanelNode.java) | `31e258daa4e6bded` |
-| [BrightnessControl.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/BrightnessControl.java) | `8e91d605934d21fc` |
-| [ControlCenterRoot.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ControlCenterRoot.java) | `5d398d8c5b193afb` |
-| [NativePanelRoot.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/NativePanelRoot.java) | `4d45c14397f7f48b` |
+| [ActivePanelNode.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ActivePanelNode.java) | `ea6abe78d6c2a152` |
+| [BrightnessControl.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/BrightnessControl.java) | `f957288314b2835a` |
+| [ControlCenterRoot.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ControlCenterRoot.java) | `49074e9977d153a4` |
+| [NativePanelRoot.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/NativePanelRoot.java) | `90df6884aec4f7ad` |
 | [PanelNodeDiscovery.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/PanelNodeDiscovery.java) | `85b38c1512206283` |
-| [RootControl.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/RootControl.java) | `77cafa1017ad8e5c` |
+| [RootControl.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/RootControl.java) | `6cf40b35ec4446c5` |
 | [ScreenBrightnessReading.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ScreenBrightnessReading.java) | `d907847857002944` |

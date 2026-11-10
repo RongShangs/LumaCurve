@@ -36,6 +36,7 @@ final class TraditionalHooks {
             added.add(XposedBridge.hookMethod(memory,new XC_MethodHook(){
                 protected void beforeHookedMethod(MethodHookParam p){
                     HookRuntime s=state(p.thisObject);if(s==null||s.changing||s.persistentMemory.replaying||!s.phase.equals("active")||!s.appliesToUser())return;
+                    if(s.brightnessControl.independent.blocksLearning()){p.setResult(null);return;}
                     try{CurveBackend a=s.kernel;
                         if(!Boolean.TRUE.equals(a.get("mUseAutoBrightness"))||!a.memoryContextActive())return;
                         float lux=(Float)p.args[0],desired=(Float)p.args[1];if(!Float.isFinite(lux)||lux<0||!Float.isFinite(desired)||desired<0||desired>1)return;

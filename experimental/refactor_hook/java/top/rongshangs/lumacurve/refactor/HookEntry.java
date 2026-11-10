@@ -91,6 +91,7 @@ public final class HookEntry {
                     protected void beforeHookedMethod(MethodHookParam p){
                         HookRuntime state=states.get(p.thisObject);
                         if(state==null||state.closed||state.changing||state.persistentMemory.replaying||!state.phase.equals("active")||!state.appliesToUser()||Looper.myLooper()!=state.handler.getLooper())return;
+                        if(state.brightnessControl.independent.blocksLearning()){p.setResult(null);return;}
                         try{
                             if(!((Boolean)state.kernel.get("mUseAutoBrightness")))return;
                             state.lastManualAdjustment=SystemClock.uptimeMillis();

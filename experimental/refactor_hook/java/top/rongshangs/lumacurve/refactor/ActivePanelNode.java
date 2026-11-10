@@ -12,6 +12,20 @@ import org.json.*;
 /** Explicit fold-layout route; ordinary primary/LED discovery remains unchanged. */
 final class ActivePanelNode {
     static final String PROFILE="fold_default_display";
+    /** Reuse a saved choice only within the resolver's verified, equal-range panel pair. */
+    static boolean matchesSavedBinding(JSONObject node,String canonical,int maximum)throws Exception {
+        if(!node.optBoolean("supported")||maximum<=10||node.optInt("maximum",-1)!=maximum||canonical.isEmpty())return false;
+        if(!PROFILE.equals(node.optString("discovery")))return canonical.equals(node.optString("canonical_path"));
+        JSONArray rows=node.optJSONArray("candidates");
+        if(rows==null||rows.length()<2||node.optString("physical_display_id").isEmpty())return false;
+        boolean saved=false,current=false;
+        for(int i=0;i<rows.length();i++){
+            JSONObject row=rows.getJSONObject(i);if(row.optInt("maximum",-1)!=maximum)return false;
+            saved|=canonical.equals(row.optString("canonical_path"));
+            current|=node.optString("canonical_path").equals(row.optString("canonical_path"))&&node.optInt("fold_port",-1)==row.optInt("port",-2);
+        }
+        return saved&&current;
+    }
     interface DisplaySource {JSONObject read()throws Exception;}
     static JSONObject address(Object info)throws Exception {
         if(info==null)throw new IOException("default_display_pending");

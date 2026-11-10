@@ -15,7 +15,7 @@
 | 小米13 | HyperOS 4.0.0.26.XPCCNXM、HyperOS 3.0 |
 | 小米14 | HyperOS 4.0.25.0.XEOCNXM（追梦官改，移植自小米18 Pro Max；已确认正常） |
 | 小米12S Pro | HyperOS 3.0.4.0.VLECNXM |
-| 小米18 Fold | HyperOS 4.0、HyperOS 4.0.21.0.XPNCNXM |
+| 小米18 Fold（用户确认，lhasa／2608BPX34C） | HyperOS 4.0、HyperOS 4.0.21.0.XPNCNXM、HyperOS 4.0.26.0.XPNCNXM（既有曲线已接入；4.0.26.0折叠完整/分区节点映射本地Beta适配，待新包设备验证） |
 | 小米 MIX Fold 3 | HyperOS 3.0.304.0.WMVCNXM |
 | 小米平板6 Pro | HyperOS 3.0.306.3.WMYCNXM |
 
@@ -42,3 +42,9 @@
 | 努比亚 Z80 Ultra | HyperOS 3.0.307.6.WPACNXM（骨灰移植版） |
 | 努比亚 Z70 Ultra | HyperOS 4.0（移植版） |
 | 红魔10 Pro | HyperOS 4.0.0.10.XPACNXM（移植版） |
+
+## 待回访记录
+
+| 设备标识 | 系统版本 | 当前边界 |
+| --- | --- | --- |
+| pandora／25098PN5AC（暂按分析包标识记录） | HyperOS 4.0.6.0.XBLCNXM | Beta06应用管理闪退已定位；Beta08本地修复窗口初始化、移除SystemUI启动线程同步注册等待，并延迟闲置独立亮度的Hook安装；Beta10回访确认接口、名单和组记忆可用，但原生手动交接覆盖首次目标，Beta11本地修复并调整迁移按钮布局；实际应用亮度、开机及节点恢复仍待新包回访；SystemUI多次启动超时的根因尚未确认。 |

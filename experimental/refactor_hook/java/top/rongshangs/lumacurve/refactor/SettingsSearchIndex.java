@@ -5,9 +5,9 @@ import java.util.*;
 
 /** Searchable UI destinations only. No hidden features, compatibility probes or option writes. */
 final class SettingsSearchIndex {
-    static final String[] GROUP_NAMES={"亮度曲线","手动记忆","户外高亮","环境变化与确认","亮度过渡","场景判定与控制","运行状态与界面","暗光稳定与锁定","主屏手动亮度","温控与显示保护","暂停自动亮度名单","应用亮度隔离"};
-    static final String[] GROUP_DESCRIPTIONS={"基础亮度、暗处下限与曲线预设","偏好强度、持久保存与锁屏交接","强光增强、HBM 与手动阳光屏","主辅光感阈值与确认时间","分别设置变亮和变暗时长","场景的进入条件、生效效果与退出条件","兼容状态与界面刷新","减少暗光波动，或定时保持亮度","磁贴面板、直接写值与自动退让","显示温控、温度门槛与冷却恢复","指定应用前台时暂停，退出后恢复","应用内临时调亮，退出后恢复系统调节"};
-    static final String[] GROUP_EN={"Brightness curve","Manual memory","Outdoor brightness","Ambient response","Brightness transitions","Scene controls","Runtime and interface","Low light stability and lock","Manual panel brightness","Thermal display protection","Pause auto brightness apps","Application brightness isolation"};
+    static final String[] GROUP_NAMES={"亮度曲线","手动记忆","户外高亮","环境变化与确认","亮度过渡","场景判定与控制","运行状态与界面","暗光稳定与锁定","主屏手动亮度","温控与显示保护","应用独立亮度","应用临时亮度隔离"};
+    static final String[] GROUP_DESCRIPTIONS={"基础亮度、暗处下限与曲线预设","偏好强度、持久保存与锁屏交接","强光增强、HBM 与手动阳光屏","主辅光感阈值与确认时间","分别设置变亮和变暗时长","场景的进入条件、生效效果与退出条件","兼容状态与界面刷新","减少暗光波动，或定时保持亮度","磁贴面板、直接写值与自动退让","显示温控、温度门槛与冷却恢复","暂停名单、逐应用及分组亮度记忆","阻止窗口临时亮度同步成系统偏好"};
+    static final String[] GROUP_EN={"Brightness curve","Manual memory","Outdoor brightness","Ambient response","Brightness transitions","Scene controls","Runtime and interface","Low light stability and lock","Manual panel brightness","Thermal display protection","Independent app brightness","Temporary app brightness isolation"};
     static final class Entry {
         final int group;final String title,description,enTitle,enDescription,target,words;
         Entry(int group,String title,String description,String enTitle,String enDescription,String target,String aliases){this.group=group;this.title=title;this.description=description;this.enTitle=enTitle;this.enDescription=enDescription;this.target=target;words=normalize(title+" "+description+" "+enTitle+" "+enDescription+" "+GROUP_NAMES[group]+" "+GROUP_DESCRIPTIONS[group]+" "+GROUP_EN[group]+" "+aliases);}
@@ -16,7 +16,8 @@ final class SettingsSearchIndex {
     }
     static Entry e(int g,String t,String d,String en,String ed,String target,String aliases){return new Entry(g,t,d,en,ed,target,aliases);}
     static final List<Entry> ENTRIES=Collections.unmodifiableList(Arrays.asList(
-        e(11,"应用亮度隔离","应用内临时调亮或调暗，退出后恢复系统调节","Application brightness isolation","Restore system brightness control after temporary in-app changes.","","视频 播放器 亮度解绑 隔离 临时 付款码 退出 恢复 video app override isolation restore"),
+        e(11,"应用临时亮度隔离","应用内临时调亮或调暗，退出后恢复系统调节","Application brightness isolation","Restore system brightness control after temporary in-app changes.","","视频 播放器 亮度解绑 隔离 临时 付款码 退出 恢复 video app override isolation restore"),
+        e(10,"应用独立亮度","独立应用或分组记住固定亮度；退出恢复系统调节","Independent app brightness","Per-app or grouped fixed brightness, restoring system control on leaving.","","独立 分组 视频 游戏 跨锁屏 跨重启 independent groups video game brightness"),
         e(0,"基础亮度曲线","调整不同光线下的亮度起点与曲线预设","Base brightness curve","Adjust brightness targets for different light levels.","curve","蓝色 基础 稍亮 柔和 默认 预设 spline curve"),
         e(0,"深色模式基础曲线","单独调整深色模式亮度；可清除、保持或分开记忆","Dark mode base curve","A separate dark base curve with clear, shared or independent learned preferences.","dark_curve","深色模式 独立曲线 黑暗 夜间 dark theme"),
         e(0,"暗处亮度下限","调整基础曲线在暗处的最低亮度","Minimum brightness","Set the base curve's minimum brightness in darkness.","curve","最低亮度 暗处下限 curve floor minimum nit"),

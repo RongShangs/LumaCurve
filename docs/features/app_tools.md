@@ -81,7 +81,7 @@
 | 文件 | 当前源码 SHA-256 前16位 |
 | --- | --- |
 | [AboutHeroView.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/AboutHeroView.java) | `dd2a925b8c7b0f2d` |
-| [AboutMarquee.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/AboutMarquee.java) | `fc965fe937837380` |
+| [AboutMarquee.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/AboutMarquee.java) | `cb63881e3ce87f14` |
 | [AboutPage.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/AboutPage.java) | `20455e7425490514` |
 | [DiagnosticShareFiles.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/DiagnosticShareFiles.java) | `7bb6de497bb904bf` |
 | [DiagnosticShareProvider.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/DiagnosticShareProvider.java) | `94a085e0b46f3046` |
@@ -92,9 +92,9 @@
 | [LauncherVisibility.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/LauncherVisibility.java) | `781a468b055306f9` |
 | [LogCompatibilityPanel.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/LogCompatibilityPanel.java) | `c3db0d25c6f3b8f2` |
 | [LogCompatibilityState.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/LogCompatibilityState.java) | `9943269d0f7fe58c` |
-| [MainActivity.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/MainActivity.java) | `2c493852ffa1550e` |
+| [MainActivity.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/MainActivity.java) | `277938475f735b22` |
 | [NavigationPolicy.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/NavigationPolicy.java) | `0c2ee299f2b23e4e` |
 | [ScrollElasticity.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ScrollElasticity.java) | `8beee69c1016aebb` |
 | [SettingsSearch.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/SettingsSearch.java) | `e6d35527a7fccfc5` |
-| [SettingsSearchIndex.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/SettingsSearchIndex.java) | `ba6610e487e74876` |
+| [SettingsSearchIndex.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/SettingsSearchIndex.java) | `82bb02068b966341` |
 | [UiPreferences.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/UiPreferences.java) | `58fbe72b1e8b46b0` |

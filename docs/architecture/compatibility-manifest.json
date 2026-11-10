@@ -123,7 +123,8 @@
         "tests/refactor_mapper_context_firmware.py",
         "tests/refactor_automatic_mode.py",
         "tests/refactor_automatic_mode_firmware.py",
-        "tests/refactor_legacy_input_firmware.py"
+        "tests/refactor_legacy_input_firmware.py",
+        "tests/refactor_memory_controls.py"
       ],
       "composition": "exclusive",
       "convergence": {
@@ -494,38 +495,68 @@
     },
     {
       "id": "applications",
-      "name": "暂停自动亮度名单",
+      "name": "应用独立亮度与暂停名单",
       "features": [
-        "apps"
+        "apps",
+        "app_independent"
       ],
       "routes": [
         "visible_tasks",
-        "focus_fallback"
+        "focus_fallback",
+        "focused_app_fixed_manual"
       ],
       "owners": [
         "ForegroundApps.java",
         "BrightnessControl.java",
-        "ApplicationBrightnessSettings.java"
+        "ApplicationBrightnessSettings.java",
+        "BrightnessControlOptions.java",
+        "AppIndependentPolicy.java",
+        "AppIndependentAccess.java",
+        "AppIndependentControl.java",
+        "ApplicationListActivity.java",
+        "ApplicationSelection.java",
+        "ApplicationCategories.java",
+        "DeferredStateWriter.java"
       ],
-      "selector": "完整可见任务接口优先；原生焦点事件为必要前提，不支持多窗口时明确焦点回退；禁止把运行进程当可见任务。",
+      "selector": "旧暂停名单继续使用manual_brightness_apps及可见任务优先/缺接口才焦点回退。独立应用仅匹配已核验的同用户默认屏焦点，逐应用或稳定组ID选择一个固定值；最多3组、名单互斥。普通范围、窗口覆盖读数及原生setTemporaryBrightness接口完整才安装独立输入观察；不从窗口或实际输出学习，不按机型版本判断。视频分类取ApplicationInfo.category并按精确包名补充常用国内视频应用，游戏另可取本机专用分类文件；混合影像名单不整份当作视频。 迁移先生成只读草稿，弹窗确认后记录原处关闭；取消不得修改任何旧选择。批选迁移一次确认，返回时名单和已确认移除记录原子提交。 手动输入按真实原生入口及调用帧识别；窗口处于显示状态不等于该输入来自窗口，用户普通控制中心输入可记忆，窗口自身调用帧排除。 独立亮度接口探测与观察安装分离：启动/自检只读，首次实际接管才安装输入观察；恢复旧租约不因此安装新观察。 独立接口还核验ABC原生用户学习入口及DBC设置消费/临时值清理入口，按物理对象和显示线程隔离独立会话学习。 独立手动交接观察复用已核验DBC设置消费者，只在当前物理主屏/显示线程发出有界单次任务；实际模式与亮度的读取、写入均延后到原生锁栈退出。",
       "evidence": [
-        "brightness_control.app_multiwindow_supported"
+        "brightness_control.app_multiwindow_supported",
+        "app_independent_supported",
+        "brightness_control.app_independent.profile",
+        "brightness_control.app_independent.active",
+        "brightness_control.app_independent.key",
+        "brightness_control.app_independent.remembered",
+        "brightness_control.foreground_visibility_pending",
+        "brightness_control.app_independent.native_mode_pending",
+        "brightness_control.app_independent.native_reapply_queued",
+        "brightness_control.app_independent.memory_loaded",
+        "brightness_control.app_independent.memory_load_attempts",
+        "brightness_control.app_independent.memory_load_retry_queued"
       ],
-      "cleanup": "按代次丢弃过期查询；停用 / 熄屏解除订阅，惰性线程空闲退出，名单设置保留。",
+      "cleanup": "复用BrightnessControl应用租约，模式改动前持久记录恢复意图；退出恢复原模式及仍拥有的基线，用户主动开启自动亮度优先。暂停名单可见性规则保持；独立名单按焦点退出。屏幕事件立即撤销手动输入许可，清理延迟任务；默认锁屏清空，可显式保留锁屏/重启记忆。用户/物理屏/范围标定绑定变化拒绝旧值，异步读取按代次丢弃，写入合并为有界快照。列表页离开停止读取图标及分类，无新服务或持续轮询。 名单页先创建窗口内容再取系统栏控制器，控制器为空保留默认外观，不阻止打开页面。 退出仍拥有的独立值先恢复基线，原生消费待处理设置并清除临时值/用户更新标记后才恢复自动模式；不动外部后来写入的亮度。 等待原生模式确认的补交付按租约代次取消；先到的用户拖动与外部后来写入优先，不后台重试或轮询。 名单页只固定顶栏与搜索，批选/计数/名单共用列表滚动；连续圆角背景只画数据区域，行保持透明与回收。底部安全距离放滚动尾部，不缩短整个页面视口；导航栏透明，键盘出现时按实际遮挡预留。 分组页面缓存只缓存表现，删除/重命名回调按稳定ID解析当前草稿；确认前再次解析，已删除ID不复活或命中同名新组。名单Activity保持主题不透明窗口与静止背景，关闭双向系统整窗动画，仅内容淡变/轻位移，禁用系统动画时直接呈现。快速返回/离页取消旧内容动画并复原属性，退出被后台打断仍返回一次原草稿，不留旧完成回调。 快速交接先按原租约补存未合并的明确输入；跨锁屏候选在原生锁栈外处理，默认清空仍保留。存档提交被执行器拒绝不视为已加载，同一绑定最多3次、250/1000毫秒有界重试；锁屏/配置/停用撤销重试，过期回执拒绝，未读存档不被快照覆盖。",
       "tests": [
         "tests/refactor_brightness_control.py",
-        "tests/refactor_foreground_firmware.py"
+        "tests/refactor_foreground_firmware.py",
+        "tests/refactor_app_independent.py",
+        "tests/refactor_app_share.py",
+        "tests/refactor_app_helper.py",
+        "tests/refactor_application_lifecycle.py",
+        "tests/refactor_app_groups.py"
       ],
-      "composition": "exclusive",
+      "composition": "per_feature",
       "convergence": {
         "boundary": [
-          "ForegroundApps.java"
+          "ForegroundApps.java",
+          "AppIndependentAccess.java",
+          "ApplicationCategories.java"
         ],
-        "contract": "可见名单应用/焦点回退的统一匹配结果与能力证据",
-        "coordinates": "同用户/同屏可见性；小窗不等同焦点",
+        "contract": "可见暂停名单与焦点独立名单分别收束，唯一应用/组记忆键和模式租约统一管理",
+        "coordinates": "默认主屏同用户；固定值为框架亮度比例，不伪造nit，不把窗口/HDR输出当用户偏好",
         "consumers": [
           "BrightnessControl.java",
-          "ApplicationBrightnessSettings.java"
+          "ApplicationBrightnessSettings.java",
+          "AppIndependentControl.java",
+          "ApplicationListActivity.java"
         ]
       }
     },
@@ -768,7 +799,7 @@
         "outdoor_output_profile",
         "outdoor_node_physical_id"
       ],
-      "cleanup": "熄屏先撤销控制权，租约失联自动归还，系统改写优先。",
+      "cleanup": "熄屏先撤销控制权，租约失联自动归还，系统改写优先。 自动恢复后的可选映射重绑失败与节点权限恢复失败分别处理；fold+control-center监听参数独立校验、可组合，未知/重复/溢出参数拒绝。",
       "tests": [
         "tests/refactor_raw_output.py",
         "tests/refactor_raw_panel_transaction.py",
@@ -806,7 +837,7 @@
         "ActivePanelNode.java",
         "ScreenBrightnessReading.java"
       ],
-      "selector": "backlight 或明确标识显示的 leds；真实 sysfs 路径与上限配对且唯一主屏，不按机型写死上限。 新增手动面板折叠路线：实际原生布局至少两个不同默认物理屏；实时默认内部屏地址与布局、成对同控制器背光、唯一 DSI 亮屏端口一致，选当前端口，扫描后再确认物理屏未变化。无切换布局证据时原发现路径不变；有折叠证据但不完整则等待。 兼容实际 Physical / StablePhysical 地址对象，均直接调用原生 getPort；StablePhysical 的物理 ID 与端口独立，按内核成对 panelN 清单验证，不解码该 ID。 状态读数单独只读实际节点；可验证本机DisplayDeviceConfig背光标定时换算nit，不可换算时原生接管仅显示节点值，不复用框架旧亮度。 无nit但有已验证节点时，常规模式也展示真实节点；无节点时可显示DisplayPowerState实际输出比例，直接节点接管不复用该比例。",
+      "selector": "backlight 或明确标识显示的 leds；真实 sysfs 路径与上限配对且唯一主屏，不按机型写死上限。 新增手动面板折叠路线：实际原生布局至少两个不同默认物理屏；实时默认内部屏地址与布局、成对同控制器背光、唯一 DSI 亮屏端口一致，选当前端口，扫描后再确认物理屏未变化。无切换布局证据时原发现路径不变；有折叠证据但不完整则等待。 兼容实际 Physical / StablePhysical 地址对象，均直接调用原生 getPort；StablePhysical 的物理 ID 与端口独立，按内核成对 panelN 清单验证，不解码该 ID。 状态读数单独只读实际节点；可验证本机DisplayDeviceConfig背光标定时换算nit，不可换算时原生接管仅显示节点值，不复用框架旧亮度。 无nit但有已验证节点时，常规模式也展示真实节点；无节点时可显示DisplayPowerState实际输出比例，直接节点接管不复用该比例。 保存选择的折叠配对复用由ActivePanelNode收束：当前节点须在实时验证的候选中，保存路径也在该集合且所有上限相同；普通单屏仍精确匹配。",
       "evidence": [
         "main_panel_node.node_class",
         "main_panel_node.node_path",
@@ -826,7 +857,7 @@
         "NATIVE_START_FAIL.private_stage",
         "NATIVE_START_FAIL.uid/euid"
       ],
-      "cleanup": "发现与权限检查只读，不启动写入器；实际租约写入另由原生事务负责，拒绝副屏 / 指示灯 / 手电。 折叠专用原生选项与 v3 权限恢复记录仅允许绑定端口节点；v2 / 旧节点拒绝规则不变。关闭、熄屏、DRM 改变结束旧接管；租约和框架输出隔离绑定物理屏，晚到命令拒绝，不复用旧目标。户外新增显式折叠协作分支，使用独立物理租约和原生 DSI 核验；控制中心动态折叠监听仍须独立核验，不能复用户外通过结论。 读数不启动写入器、不修改节点或权限；物理屏或标定不一致时不显示旧nit。",
+      "cleanup": "发现与权限检查只读，不启动写入器；实际租约写入另由原生事务负责，拒绝副屏 / 指示灯 / 手电。 折叠专用原生选项与 v3 权限恢复记录仅允许绑定端口节点；v2 / 旧节点拒绝规则不变。关闭、熄屏、DRM 改变结束旧接管；租约和框架输出隔离绑定物理屏，晚到命令拒绝，不复用旧目标。户外新增显式折叠协作分支，使用独立物理租约和原生 DSI 核验；控制中心动态折叠监听仍须独立核验，不能复用户外通过结论。 读数不启动写入器、不修改节点或权限；物理屏或标定不一致时不显示旧nit。 启动安装前后比较物理屏、折叠端口、路径及上限，任何改变均拒绝启动。",
       "tests": [
         "tests/refactor_panel_nodes.py",
         "tests/refactor_panel_access.py",
@@ -1032,7 +1063,7 @@
         "MappingRecoveryState.java",
         "ControlCenterScreen.java"
       ],
-      "selector": "旧mode=0/1/2保留坐标语义：严格单调全域优先；端点平台只有原始数组、双向样条与裁剪证据完整才采用有效域，逻辑101点表独立核验。\n完整节点mode=3复用已验证坐标回显，并独立核验主屏隔离、物理ID、Root可写节点与监听进程；动态折叠监听未知时不套用。\n分区mode=4额外读取设备普通HBM边界并经真实标定换算；没有可靠边界或额外区间则只拒绝分区。\n分区普通段占75%、增强段占25%；普通V1使用原生逻辑输入全域，gamma使用物理普通边界；增强段及回显按实际节点标定。用户上界不修改自动HBM范围。\n普通V1的延迟回显先将真实物理读数反解为本机逻辑进度，再映射到75%，动画比较使用同一逆变换。作用域、手势和控制权为独立检查。 分区普通边界接受 config.* 与 DisplayDeviceConfig 内嵌两种已验证 HBM 数据身份；系统界面 HyperOSBrightnessPolicyV1 的新 ABI 仍为独立待适配项，不在本次边界修复内。",
+      "selector": "旧mode=0/1/2保留坐标语义：严格单调全域优先；端点平台只有原始数组、双向样条与裁剪证据完整才采用有效域，逻辑101点表独立核验。\n完整节点mode=3复用已验证坐标回显，并独立核验主屏隔离、物理ID、Root可写节点与监听进程；动态折叠监听未知时不套用。\n分区mode=4额外读取设备普通HBM边界并经真实标定换算；没有可靠边界或额外区间则只拒绝分区。\n分区普通段占75%、增强段占25%；普通V1使用原生逻辑输入全域，gamma使用物理普通边界；增强段及回显按实际节点标定。用户上界不修改自动HBM范围。\n普通V1的延迟回显先将真实物理读数反解为本机逻辑进度，再映射到75%，动画比较使用同一逆变换。作用域、手势和控制权为独立检查。 分区普通边界接受 config.* 与 DisplayDeviceConfig 内嵌两种已验证 HBM 数据身份；系统界面 HyperOSBrightnessPolicyV1 的新 ABI 仍为独立待适配项，不在本次边界修复内。 已验证fold_default_display可与完整/分区节点监听组合，当前物理屏须等于本次TABLES标定；不再将已验证折叠节点一概禁用。 SystemUI观察器通过原有有界IO线程注册；Application.onCreate/addToggleSlider只发布上下文并排队，不同步访问Provider/注册广播。未完成初始化不采用映射。",
       "evidence": [
         "control_center_slider.kind",
         "control_center_slider.error",
@@ -1056,9 +1087,14 @@
         "control_center_setup.scope_state",
         "control_center_setup.injection_state",
         "hyperlux_control_center_ui_v1.pid",
-        "hyperlux_control_center_ui_v1.process_start"
+        "hyperlux_control_center_ui_v1.process_start",
+        "main_panel_node.node_physical_display_id",
+        "mapping_warning",
+        "main-panel.log.NATIVE_READY",
+        "control_center_system_ui.observers_ready",
+        "control_center_system_ui.observer_attempts"
       ],
-      "cleanup": "停用或用户、配置、进程、对象变化时撤回旧profile。Root暂缺保留原配置和其他设置；同节点且无关设置变动不解除已有保持。\n节点拖动复用raw_panel、原生程序及健康检查，关闭自动亮度并放开暗光锁定；重开自动亮度撤销租约及旧手势。锁屏输入/回显退回原生，解锁仅恢复当前代次。\n分区普通段调用原生回调，保留开启中的自动亮度与学习；增强段不学习。首次在75%封顶，松手后三秒内再次上滑越界才接管；返回普通段按用户选择恢复自动或继续手动。\n首次封顶同步源滑块并保护外部变化；系统自动反馈不进入手势门禁。自动高亮已在增强段时，需新手势且框架实际值/标定再次确认。超时、换代或未越界结束均撤销确认。\n独立onStart/onStop通知为可选子组，失败不撤销既有进度路径。已确认的手动保持不因HDR退出，但保留图像处理、首笔HDR拒绝、严重温控与真实故障退让。\n作用域只在相关配置确实改变时按实际证据提示；手动重启仅针对核验后的SystemUI主进程。动画离页停止，监听与日志有界，协议细节见ABI及原生变体。",
+      "cleanup": "停用或用户、配置、进程、对象变化时撤回旧profile。Root暂缺保留原配置和其他设置；同节点且无关设置变动不解除已有保持。\n节点拖动复用raw_panel、原生程序及健康检查，关闭自动亮度并放开暗光锁定；重开自动亮度撤销租约及旧手势。锁屏输入/回显退回原生，解锁仅恢复当前代次。\n分区普通段调用原生回调，保留开启中的自动亮度与学习；增强段不学习。首次在75%封顶，松手后三秒内再次上滑越界才接管；返回普通段按用户选择恢复自动或继续手动。\n首次封顶同步源滑块并保护外部变化；系统自动反馈不进入手势门禁。自动高亮已在增强段时，需新手势且框架实际值/标定再次确认。超时、换代或未越界结束均撤销确认。\n独立onStart/onStop通知为可选子组，失败不撤销既有进度路径。已确认的手动保持不因HDR退出，但保留图像处理、首笔HDR拒绝、严重温控与真实故障退让。\n作用域只在相关配置确实改变时按实际证据提示；手动重启仅针对核验后的SystemUI主进程。动画离页停止，监听与日志有界，协议细节见ABI及原生变体。 折叠监听灭屏释放写权限、拒绝新接管并等待；实际换屏撤旧租约且不继承旧目标。恢复自动亮度成功后的可选映射失败单独提示；释放和系统模式失败仍为硬失败。 观察器注册失败撤销部分ContentObserver，最多3次异步尝试，不在SystemUI主线程等待；不禁用或越过系统锁屏。",
       "tests": [
         "tests/refactor_control_center.py",
         "tests/refactor_control_center_root.py",
@@ -1069,7 +1105,11 @@
         "tests/refactor_control_center_partition.py",
         "tests/refactor_control_center_settings.py",
         "tests/refactor_control_center_demo.py",
-        "tests/refactor_system_ui_setup.py"
+        "tests/refactor_system_ui_setup.py",
+        "tests/refactor_recovery_paths.py",
+        "tests/refactor_raw_panel_transaction.py",
+        "tests/refactor_native_panel.py",
+        "tests/refactor_fold_panel.py"
       ],
       "composition": "per_feature",
       "convergence": {
@@ -1175,32 +1215,36 @@
       "owners": [
         "AppBrightnessIsolation.java",
         "AppIsolationSettings.java",
-        "BrightnessControlOptions.java"
+        "BrightnessControlOptions.java",
+        "BrightnessControl.java"
       ],
-      "selector": "独立默认关闭。按实际Class/加载器核验窗口消费者、请求来源、亮度原因与同步消费者；完整新ABI才安装5个必要Hook。三个同步入口全部缺失且窗口接口完整时采用原生无同步路径、0个Hook；残缺新结构拒绝，不按OS/机型回退。仅匹配当前主屏DPC、当前用户、已接受且正在生效的同标签窗口覆盖、同一次调用及相同亮度参数；控制中心真实调节优先至窗口释放/来源变更。",
+      "selector": "按实际类型、方法与来源选路；完整同步ABI时仅在同一主屏/用户/窗口调用帧内拦截偏好同步；三个同步入口全缺且窗口消费者完整时沿用原生隔离，不按OS版本推断。原生已隔离显示开启且不可伪关闭，不改保存的模块选择。旧版窗口共享已停用，历史路线与保存字段留档。独立亮度持有应用租约时同样阻止窗口写入全局偏好。",
       "evidence": [
         "app_brightness_isolation.profile",
-        "app_brightness_isolation.detail",
-        "app_brightness_isolation.window_active",
-        "app_brightness_isolation.user_adjustment_priority",
+        "app_brightness_isolation.native_isolated",
+        "app_brightness_isolation.enabled",
+        "app_brightness_isolation.module_requested",
         "app_brightness_isolation.blocked_syncs",
-        "app_brightness_isolation.state",
-        "app_brightness_isolation_supported"
+        "app_brightness_isolation.window_active",
+        "app_brightness_isolation.share_enabled",
+        "app_brightness_isolation.share_detail"
       ],
-      "cleanup": "HookTransaction全组回滚；ThreadLocal调用栈在返回/异常时恢复；弱引用同屏状态不持有控制器。停用/切用户/非活动/非亮屏/其他控制者/HDR时沿用系统，不写缓存亮度、不改自动模式、不全局拦截Settings。接口暂缺只裁剪运行副本，原保存开关保留。无新增服务/传感器/轮询；不承诺拦截应用直接写系统设置。",
+      "cleanup": "5个必要Hook事务回滚；ThreadLocal按栈恢复；用户主动调节、HDR、非主屏/用户、无匹配来源或不完整ABI沿用系统。仅阻止同步，不记忆或重放窗口值。页面不再提供共享和名单；不借原生状态重写用户保存配置。",
       "tests": [
         "tests/refactor_app_isolation.py",
         "tests/refactor_feature_self_check.py",
         "tests/refactor_feature_compatibility.py",
         "tests/refactor_ui_navigation.py",
-        "tests/refactor_app_isolation_firmware.py"
+        "tests/refactor_app_isolation_firmware.py",
+        "tests/refactor_app_share.py",
+        "tests/refactor_brightness_control.py"
       ],
-      "composition": "exclusive",
+      "composition": "per_feature",
       "convergence": {
         "boundary": [
           "AppBrightnessIsolation.java"
         ],
-        "contract": "同屏同用户窗口来源限定的同步隔离/原生无同步能力",
+        "contract": "来源限定同步隔离或原生隔离的有效状态；保存的模块选择单独保留",
         "coordinates": "应用覆盖与控制中心主动输入分开",
         "consumers": [
           "HookRuntime.java",
@@ -1228,7 +1272,7 @@
         "MappingRecoveryState.java",
         "MappingRecoverySignal.java"
       ],
-      "selector": "仅已保存开启的主用户映射，在开机解锁或覆盖安装后通过系统JobScheduler恢复；Root重新核验本机原配置、当前系统进程/启动代次、标定和节点。可读Settings仅作调度提示，读取失败不覆盖本地记录。 APP广播可能受后台策略延后；已保存开启且Root目录可读写时，补充受管service.d脚本入口，按真实目录权限选择，文件可执行与开机实际执行分别记录，不宣称所有Root实现均支持。 系统界面实际读到本次有效TABLES且缺少绑定时，以平台签名权限保护的明确广播触发同一Android任务；首次请求即时任务，配额/框架拒绝保留原延迟任务。成功要求当前存活SystemUI反馈同一引擎代次，不仅是PROFILE写入。",
+      "selector": "仅已保存开启的主用户映射，在开机解锁或覆盖安装后通过系统JobScheduler恢复；Root重新核验本机原配置、当前系统进程/启动代次、标定和节点。可读Settings仅作调度提示，读取失败不覆盖本地记录。 APP广播可能受后台策略延后；已保存开启且Root目录可读写时，补充受管service.d脚本入口，按真实目录权限选择，文件可执行与开机实际执行分别记录，不宣称所有Root实现均支持。 系统界面实际读到本次有效TABLES且缺少绑定时，以平台签名权限保护的明确广播触发同一Android任务；首次请求即时任务，配额/框架拒绝保留原延迟任务。成功要求当前存活SystemUI反馈同一引擎代次，不仅是PROFILE写入。 折叠屏暂未点亮或同屏标定滞后保持pending，沿用既有有界任务和就绪事件；损坏布局仍unavailable，不按待就绪降级。",
       "composition": "per_feature",
       "evidence": [
         "startup.state",

@@ -20,7 +20,7 @@
 | 项目 | 要求 |
 | --- | --- |
 | 触发 | 自动亮度及可学习普通区间内，用户主动调节控制中心亮度；完整节点与增强段不学习。 |
-| 需求与行为 | 普通自动亮度区间主动调整后学习附近照度偏好，绿色只画真实实时曲线；学习容量和存档回放能力分别判断 |
+| 需求与行为 | 普通自动亮度区间主动调整后学习附近照度偏好，绿色只画真实实时曲线；学习容量和存档回放能力分别判断；记住手动偏好卡片不再提供完整记忆/渐进记忆/不记忆预设；保留原开关、强度和保存值。红字提醒仅在本次进入页面后用户调整过记忆开关，或详细参数展开时显示，初始折叠且未操作时隐藏 |
 | 退出 / 失败 | 按原生模型生命周期及用户保持选择重建；清除按钮只清当前主题记忆，不清基础曲线。 |
 | 默认 | `native` · 强度100%，保留原生学习 |
 | 配置键 | `memory_strength`、`memory_window`、`memory_lux_range` |
@@ -164,6 +164,7 @@
 - [refactor_automatic_mode.py](../../tests/refactor_automatic_mode.py)
 - [refactor_automatic_mode_firmware.py](../../tests/refactor_automatic_mode_firmware.py)
 - [refactor_legacy_input_firmware.py](../../tests/refactor_legacy_input_firmware.py)
+- [refactor_memory_controls.py](../../tests/refactor_memory_controls.py)
 
 ## 实现追溯
 
@@ -179,7 +180,7 @@
 | [CurveEditor.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/CurveEditor.java) | `66423535b50b13ee` |
 | [CurvePlan.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/CurvePlan.java) | `6064003310ae7433` |
 | [HookRuntime.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/HookRuntime.java) | `f1cdc6bfa6a1d706` |
-| [MainActivity.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/MainActivity.java) | `2c493852ffa1550e` |
+| [MainActivity.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/MainActivity.java) | `277938475f735b22` |
 | [MapperContextAccess.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/MapperContextAccess.java) | `778e604c1ff57198` |
 | [MemoryLifecycle.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/MemoryLifecycle.java) | `ee4d215c8a92a43b` |
 | [MemoryPersistence.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/MemoryPersistence.java) | `09c7bd896953ad71` |
@@ -195,4 +196,4 @@
 | [ThemeMemoryStore.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ThemeMemoryStore.java) | `d6db61812d73f5d5` |
 | [TraditionalAdapter.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/TraditionalAdapter.java) | `5537819db1b1ee6d` |
 | [TraditionalCurve.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/TraditionalCurve.java) | `6d6dae27db1b9bf7` |
-| [TraditionalHooks.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/TraditionalHooks.java) | `ce1e61e19bdab0d6` |
+| [TraditionalHooks.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/TraditionalHooks.java) | `3a2cc7708155c83d` |

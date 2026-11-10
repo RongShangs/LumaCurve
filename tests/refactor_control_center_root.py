@@ -2,12 +2,14 @@
 from pathlib import Path
 import subprocess,re
 ROOT=Path(__file__).resolve().parents[1];SRC=ROOT/'experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor';OUT=ROOT/'build/control-center-root-tests';OUT.mkdir(exist_ok=True);J=ROOT/'build/refactor-diagnostics/json-20240303.jar'
+active=(SRC/'ActivePanelNode.java').read_text(encoding='utf-8');predicate=active[active.index('    static boolean matchesSavedBinding('):active.index('    interface DisplaySource')]
 p=OUT/'CoordinateRootTest.java';p.write_text(r'''package top.rongshangs.lumacurve.refactor;
 import org.json.*;import java.util.*;
 class RootSettings{final Map<String,String> values=new HashMap<>();String get(String k){return values.get(k);}boolean put(String k,String v){if(v==null)values.remove(k);else values.put(k,v);return true;}}
 class BrightnessControlOptions{static boolean mappingRecoveryWanted(JSONObject c){return c!=null&&c.optBoolean("enabled")&&c.optInt("user_serial",-1)==0&&c.optInt("control_center_node_mode",0)>0&&c.optInt("control_center_node_mode",0)<=4;}static String capability(int mode){return mode==4?"control_center_partition_supported":mode==3?"control_center_raw_supported":"control_center_slider_supported";}int nodeSliderMode,partitionMaximum;static BrightnessControlOptions parseStored(JSONObject c){BrightnessControlOptions o=new BrightnessControlOptions();o.nodeSliderMode=c.optInt("control_center_node_mode");return o;}}
 class ControlCenterEngine{static final String TABLES="tables",UI="ui";}
 class SystemUiAccess{static boolean alive=true;static JSONObject injection(JSONObject probe,String raw,java.io.File proc)throws Exception{return probe.put("injection_state",alive?"current":"unconfirmed");}}
+class ActivePanelNode{static final String PROFILE="fold_default_display";'''+predicate+r'''}
 class NativePanelClient{static JSONObject guard=new JSONObject();static JSONObject call(String s){return guard;}}
 class NativePanelRoot{static JSONObject node;static int stops;static JSONObject status(){return node;}static int starts;static void start(JSONObject node,boolean follow,int pid){starts++;}static void stop(){stops++;}}
 public class CoordinateRootTest{
@@ -38,6 +40,14 @@ public class CoordinateRootTest{
  // A new system-server/boot generation rebinds the original saved choice, not the previous PROFILE.
  s.put("boot_count","2");runtime.put("pid",456).put("process_start","789");table.put("pid",456).put("process_start","789").put("boot_count","2");s.put("tables",table.toString());check(ControlCenterRoot.recover(s,runtime,original,200).getString("state").equals("pending"));ack.put("bound_profile",MappingRecoveryState.identity(new JSONObject(s.get(ControlCenterRoot.PROFILE))));s.put("ui",ack.toString());check(ControlCenterRoot.recover(s,runtime,original,200).getString("state").equals("restored"));SystemUiAccess.alive=false;check(ControlCenterRoot.recover(s,runtime,original,201).getString("state").equals("pending"));SystemUiAccess.alive=true;profile=new JSONObject(s.get(ControlCenterRoot.PROFILE));check(profile.getInt("pid")==456&&profile.getString("boot_count").equals("2"));check(new JSONObject(s.get(ControlCenterRoot.RECOVERY)).getLong("checked_elapsed_ms")==201);
  NativePanelClient.guard.put("armed",true).put("control_center_listener",false);started=NativePanelRoot.starts;check(ControlCenterRoot.recover(s,runtime,original,300).getString("state").equals("unavailable"));check(NativePanelRoot.starts==started);NativePanelClient.guard=new JSONObject();NativePanelRoot.node.put("canonical_path","other");check(ControlCenterRoot.recover(s,runtime,original,300).getString("state").equals("unavailable"));check(NativePanelRoot.starts==started&&config.toString().equals(original));
+ // Equal-range paired panels reuse the saved choice without rewriting preferences.
+ NativePanelRoot.node=new JSONObject().put("supported",true).put("maximum",16383).put("canonical_path","secondary").put("discovery",ActivePanelNode.PROFILE).put("fold_port",1).put("physical_display_id","panel-b").put("candidates",new JSONArray().put(new JSONObject().put("canonical_path","primary").put("maximum",16383).put("port",0)).put(new JSONObject().put("canonical_path","secondary").put("maximum",16383).put("port",1)));
+ table.put("physical","panel-b");s.put("tables",table.toString());started=NativePanelRoot.starts;
+ for(int mode:new int[]{3,4}){JSONObject choice=new JSONObject(original).put("control_center_node_mode",mode);runtime.put(BrightnessControlOptions.capability(mode),true);table.put("partition",new JSONObject());s.put("tables",table.toString());ControlCenterRoot.reconcile(s,runtime,choice.toString());check(new JSONObject(s.get(ControlCenterRoot.PROFILE)).getString("physical").equals("panel-b"));}
+ check(NativePanelRoot.starts==started+2&&config.toString().equals(original));
+ table.put("physical","panel-a");s.put("tables",table.toString());started=NativePanelRoot.starts;check(ControlCenterRoot.recover(s,runtime,original,400).getString("state").equals("pending"));check(s.get(ControlCenterRoot.PROFILE)==null&&NativePanelRoot.starts==started);
+ NativePanelRoot.node.put("supported",false).put("reason","fold_binding_pending");check(ControlCenterRoot.recover(s,runtime,original,401).getString("state").equals("pending"));check(NativePanelRoot.starts==started);
+ NativePanelRoot.node.put("reason","fold_layout_invalid");check(ControlCenterRoot.recover(s,runtime,original,402).getString("state").equals("unavailable"));check(NativePanelRoot.starts==started&&config.toString().equals(original));
  System.out.println("Coordinate Root: "+cases+" cases PASS; no native writer start API in service double");
  }
 }''',encoding='utf-8')

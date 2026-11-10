@@ -24,7 +24,8 @@ final class ControlCenterRoot {
                 boolean consumed=current&&alive&&MappingRecoveryState.acknowledged(profile,ui);
                 result.put("binding_ready",current).put("system_ui_confirmed",consumed);
                 state=consumed?"restored":"pending";message=consumed?"系统界面已确认映射绑定，等待手动操作":current?"映射已准备，等待系统界面确认":"等待本次开机的映射标定";
-            }catch(Exception unavailable){state="unavailable";message=unavailable.toString();}
+            }catch(java.util.concurrent.TimeoutException pending){state="pending";message=pending.getMessage();}
+            catch(Exception unavailable){state="unavailable";message=unavailable.toString();}
         }
         result.put("boot_count",settings.get("boot_count")).put("pid",runtime==null?-1:runtime.optInt("pid",-1));
         result.put("state",state).put("message",message.substring(0,Math.min(300,message.length())));
@@ -53,13 +54,15 @@ final class ControlCenterRoot {
             return;
         }
         JSONObject node=NativePanelRoot.status();
-        if(!node.optBoolean("supported")||node.optInt("maximum")!=config.optInt("control_center_node_maximum")||!node.optString("canonical_path").equals(config.optString("control_center_node_path"))){settings.put(PROFILE,null);throw new IllegalStateException("控制中心主屏节点身份已变化，请重新保存");}
+        if(!node.optBoolean("supported")&&ActivePanelNode.PROFILE.equals(node.optString("discovery"))&&"fold_binding_pending".equals(node.optString("reason"))){settings.put(PROFILE,null);throw new java.util.concurrent.TimeoutException("等待确认当前折叠主屏");}
+        if(!ActivePanelNode.matchesSavedBinding(node,config.optString("control_center_node_path"),config.optInt("control_center_node_maximum"))){settings.put(PROFILE,null);throw new IllegalStateException("控制中心主屏节点身份已变化，请重新保存");}
         String tableRaw=settings.get(ControlCenterEngine.TABLES),boot=settings.get("boot_count");
         if(tableRaw==null||tableRaw.length()>260000){settings.put(PROFILE,null);return;}
         JSONObject tables=new JSONObject(tableRaw);
         if(!tables.optBoolean("enabled")||!config.optString("revision").equals(tables.optString("revision"))||tables.optInt("user_serial",-1)!=config.optInt("user_serial",-2)||!runtime.getJSONObject("control_center_slider").optBoolean("coordinate_ready")||!AppBuild.BUILD.equals(tables.optString("build"))||tables.optInt("pid")!=runtime.getInt("pid")||!runtime.getString("process_start").equals(tables.optString("process_start"))||boot==null||!boot.equals(tables.optString("boot_count"))){settings.put(PROFILE,null);return;}
         if(options.nodeSliderMode>=3){
             if(tables.optString("physical").isEmpty()||!runtime.getJSONObject("control_center_slider").optBoolean("raw_ready"))throw new IllegalStateException("主屏节点控制接口尚未就绪");
+            if(ActivePanelNode.PROFILE.equals(node.optString("discovery"))&&!node.optString("physical_display_id").equals(tables.optString("physical"))){settings.put(PROFILE,null);throw new java.util.concurrent.TimeoutException("等待当前折叠主屏的亮度标定");}
             JSONObject guard=null;try{guard=NativePanelClient.call("STATUS");}catch(Exception absent){}
             if(guard!=null&&guard.optBoolean("armed")&&!guard.optBoolean("control_center_listener"))throw new IllegalStateException("请先结束主屏手动面板保持，再保存完整节点控制");
             // A listener sleeps without a lease. Only an explicit fresh UI gesture can arm it.

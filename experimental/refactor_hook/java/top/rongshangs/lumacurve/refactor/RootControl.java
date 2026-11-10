@@ -340,10 +340,17 @@ public final class RootControl implements AutoCloseable {
         if(action.equals("restore")){
             step="停止守护并释放节点";NativePanelRoot.stop();
             if(((Number)Class.forName("android.app.ActivityManager").getMethod("getCurrentUser").invoke(null)).intValue()!=0)throw new IOException("请切回主用户");
+            step="恢复自动亮度模式";
             request.put("action","raw_restore");try{brightness(Base64.getEncoder().encodeToString(request.toString().getBytes(StandardCharsets.UTF_8)));}catch(Exception unavailable){}
             if(!settings.putSystem("screen_brightness_mode","1"))throw new IOException("系统未确认自动亮度模式");
-            ControlCenterRoot.reconcile(settings,refreshedLive(),settings.get(CONFIG));
-            return new JSONObject().put("ok",true).put("node",NativePanelRoot.status()).put("runtime",refreshedLive());
+            JSONObject result=new JSONObject().put("ok",true);
+            step="重新绑定控制中心映射";
+            try{ControlCenterRoot.reconcile(settings,refreshedLive(),settings.get(CONFIG));}
+            catch(Exception mappingFailure){
+                try{settings.put(ControlCenterRoot.PROFILE,null);}catch(Exception ignored){}
+                ControlCenterRoot.retireIdleWriter();result.put("mapping_warning",mappingFailure.toString());
+            }
+            return result.put("node",NativePanelRoot.status()).put("runtime",refreshedLive());
         }
         int value=request.getInt("value");if(request.getDouble("value")!=value)throw new IOException("请输入整数节点值");
         JSONObject node=NativePanelRoot.status();if(!node.optBoolean("supported"))throw new IOException("主屏节点尚不可用："+node.optString("reason","unknown"));int ceiling=BrightnessControlOptions.manualCeiling(BrightnessControlOptions.parseStored(new JSONObject(java.util.Objects.toString(settings.get(CONFIG),"{}"))).manualMaximum,node.getInt("maximum"));if(value<10||value>ceiling)throw new IOException("主屏节点值超出磁贴设置范围");

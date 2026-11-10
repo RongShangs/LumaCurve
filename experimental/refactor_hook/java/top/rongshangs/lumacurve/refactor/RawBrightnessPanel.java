@@ -81,6 +81,7 @@ final class RawBrightnessPanel {
   inputAction.setEnabled(slider.ready);maxAction.setEnabled(slider.ready);inputAction.setAlpha(slider.ready?1:.4f);maxAction.setAlpha(slider.ready?1:.4f);
   if(!dragging&&pending==null)slider.value=Math.max(10,Math.min(maximum,goal>=10?goal:actual));slider.invalidate();
   if(!slider.ready)state.setText(tr(owner!=null&&!owner.optBoolean("manual_panel_supported")?"主屏输出接口尚未兼容":"先启用引擎；刚更新应用需重启"));
+  if(!answer.optString("mapping_warning").isEmpty())state.setText(en?"Automatic brightness restored; control center mapping is waiting for recovery":"已恢复自动亮度；控制中心映射待恢复");
  }
  void begin(int value){if(closed||!slider.ready)return;clearFault();generation++;claimed=false;pending=null;session=UUID.randomUUID().toString();gesture=SystemClock.elapsedRealtime();submit(command("begin",value),true);}
  JSONObject command(String action,int n){JSONObject j=new JSONObjectRequest(action);try{j.put("session",session).put("panel_display_id",panelDisplayId).put("value",n).put("gesture_elapsed",gesture);}catch(Exception impossible){}return j;}

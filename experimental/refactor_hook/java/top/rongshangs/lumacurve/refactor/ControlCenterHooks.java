@@ -16,7 +16,7 @@ import top.rongshangs.lumacurve.refactor.hooking.*;
 final class ControlCenterHooks {
     static final String UI_PROCESS_START=uiProcessStart();
     static String uiProcessStart(){try(java.io.BufferedReader reader=new java.io.BufferedReader(new java.io.FileReader("/proc/self/stat"))){String text=reader.readLine();return text.substring(text.lastIndexOf(')')+2).split(" +")[19];}catch(Exception unavailable){return "";}}
-    static boolean installed;static Context context;static Handler main;static volatile Profile profile;static String profileIdentity="";
+    static boolean installed;static volatile boolean observersReady;static boolean observerQueued;static int observerAttempts;static Context context;static Handler main;static volatile Profile profile;static String profileIdentity="";
     static final MappingRecoveryState.Gate recoveryGate=new MappingRecoveryState.Gate();static volatile String recoverySignal="not_requested";
     static volatile String error="",route="waiting_controller",gestureEvidence="";static volatile boolean abiReady,trackingLifecycle;
     static final Map<Object,Binding> bindings=Collections.synchronizedMap(new WeakHashMap<>());
@@ -68,7 +68,7 @@ final class ControlCenterHooks {
         }
         boolean v1()throws Exception{return (Boolean)abi.support.invoke(abi.policy.get(owner.get()));}
         void v1Range()throws Exception{if((Integer)abi.logicalProgress.invoke(null,0f)!=minimum||(Integer)abi.logicalProgress.invoke(null,1f)!=maximum)throw new IllegalArgumentException("逻辑亮度与控件坐标不一致");}
-        Profile active()throws Exception{Object o=owner.get();Profile p=profile;if(p!=null&&p.raw&&!ControlCenterScreen.allowsNodes(context)){partition.reset();rawThumbUntil=0;feedbackNode=Double.NaN;animationPhysical=false;return null;}if(o==null||!valid||p==null||abi.display.getInt(o)!=0||p.mode==1&&abi.automatic.getBoolean(o)||(!p.raw||p.mode==4)&&v1()&&p.v1==null)return null;return p;}
+        Profile active()throws Exception{if(!observersReady)return null;Object o=owner.get();Profile p=profile;if(p!=null&&p.raw&&!ControlCenterScreen.allowsNodes(context)){partition.reset();rawThumbUntil=0;feedbackNode=Double.NaN;animationPhysical=false;return null;}if(o==null||!valid||p==null||abi.display.getInt(o)!=0||p.mode==1&&abi.automatic.getBoolean(o)||(!p.raw||p.mode==4)&&v1()&&p.v1==null)return null;return p;}
         float low()throws Exception{return abi.min.getFloat(owner.get());}float high()throws Exception{return abi.max.getFloat(owner.get());}
         void range()throws Exception{if(!Float.isFinite(low())||!Float.isFinite(high())||low()<0||high()>1||high()<=low())throw new IllegalArgumentException("系统亮度范围无效");}
         int input(Profile p,int position)throws Exception{
@@ -148,8 +148,28 @@ final class ControlCenterHooks {
     }
     static void failed(Throwable failure){String next=failure.toString();if(!next.equals(error)){error=next;XposedBridge.log("HyperLux slider coordinates unavailable: "+next);publish();}}
     static void bind(Context c){
-        if(c==null||context!=null||!"com.android.systemui".equals(c.getPackageName()))return;context=c;main=new Handler(Looper.getMainLooper());try{ControlCenterScreen.observe(c,ControlCenterHooks::screenChanged);}catch(RuntimeException unavailable){failed(unavailable);}ContentObserver changed=new ContentObserver(main){public void onChange(boolean self){refresh();}};
-        c.getContentResolver().registerContentObserver(Settings.Global.getUriFor(ControlCenterRoot.PROFILE),false,changed);c.getContentResolver().registerContentObserver(Settings.Global.getUriFor(ControlCenterEngine.TABLES),false,changed);c.getContentResolver().registerContentObserver(Settings.Global.getUriFor("boot_count"),false,changed);c.getContentResolver().registerContentObserver(Settings.System.getUriFor(Settings.System.SCREEN_BRIGHTNESS_MODE),false,changed);refresh();
+        if(c==null||!"com.android.systemui".equals(c.getPackageName()))return;
+        synchronized(ControlCenterHooks.class){if(context!=null)return;context=c;main=new Handler(Looper.getMainLooper());}
+        queueObservers();
+    }
+    static void queueObservers(){
+        synchronized(ControlCenterHooks.class){if(observersReady||observerQueued||observerAttempts>=3)return;observerQueued=true;observerAttempts++;}
+        try{io.execute(ControlCenterHooks::registerObservers);}catch(RejectedExecutionException rejected){synchronized(ControlCenterHooks.class){observerQueued=false;}failed(rejected);}
+    }
+    static void registerObservers(){
+        // SettingsProvider and broadcast registration may wait for services at boot.
+        // Never hold Application.onCreate, addToggleSlider or the UI thread here.
+        Context c=context;ContentObserver changed=new ContentObserver(main){public void onChange(boolean self){refresh();}};boolean retry=false;
+        try{
+            c.getContentResolver().registerContentObserver(Settings.Global.getUriFor(ControlCenterRoot.PROFILE),false,changed);
+            c.getContentResolver().registerContentObserver(Settings.Global.getUriFor(ControlCenterEngine.TABLES),false,changed);
+            c.getContentResolver().registerContentObserver(Settings.Global.getUriFor("boot_count"),false,changed);
+            c.getContentResolver().registerContentObserver(Settings.System.getUriFor(Settings.System.SCREEN_BRIGHTNESS_MODE),false,changed);
+            ControlCenterScreen.observe(c,ControlCenterHooks::screenChanged);observersReady=true;refreshNow();
+        }catch(RuntimeException|LinkageError unavailable){
+            observersReady=false;try{c.getContentResolver().unregisterContentObserver(changed);}catch(RuntimeException ignored){}failed(unavailable);retry=true;
+        }finally{synchronized(ControlCenterHooks.class){observerQueued=false;}}
+        if(retry&&observerAttempts<3)main.postDelayed(ControlCenterHooks::queueObservers,observerAttempts*1000L);
     }
     static void screenChanged(){
         if(main==null)return;
@@ -165,12 +185,14 @@ final class ControlCenterHooks {
             publish();
         });
     }
-    static void refresh(){try{io.execute(()->{try{
+    static void refresh(){if(!observersReady)return;try{io.execute(ControlCenterHooks::refreshNow);}catch(RejectedExecutionException ignored){}}
+    static void refreshNow(){if(!observersReady)return;try{
+
         String raw=Settings.Global.getString(context.getContentResolver(),ControlCenterRoot.PROFILE),tables=Settings.Global.getString(context.getContentResolver(),ControlCenterEngine.TABLES),boot=Settings.Global.getString(context.getContentResolver(),"boot_count");Profile parsed=null;
         if(raw!=null&&tables!=null&&raw.length()<260000&&tables.length()<260000){JSONObject p=new JSONObject(raw),t=new JSONObject(tables);if(t.optBoolean("enabled")&&p.optInt("user_serial",-1)==0&&p.getInt("user_serial")==t.optInt("user_serial",-1)&&!p.optString("revision").isEmpty()&&p.getString("revision").equals(t.optString("revision"))&&AppBuild.BUILD.equals(t.optString("build"))&&p.getInt("pid")==t.getInt("pid")&&p.getString("process_start").equals(t.getString("process_start"))&&boot!=null&&boot.equals(p.getString("boot_count"))&&boot.equals(t.getString("boot_count"))&&p.getJSONObject("calibration").toString().equals(t.getJSONObject("calibration").toString())&&(!("raw_node_v3".equals(p.optString("kind"))||"partition_node_v4".equals(p.optString("kind")))||p.optInt("maximum")==t.optInt("maximum")&&p.optString("physical").equals(t.optString("physical")))){parsed=new Profile(p);if(parsed.mode==4&&(!p.getJSONObject("partition").toString().equals(t.getJSONObject("partition").toString())||p.optInt("partition_maximum",0)!=t.optInt("partition_maximum",0)))throw new IllegalStateException("普通亮度区间已改变");parsed.automatic=Settings.System.getInt(context.getContentResolver(),Settings.System.SCREEN_BRIGHTNESS_MODE,1)!=0;JSONObject held=t.optJSONObject("raw_control");if(held!=null)parsed.autoEpoch=held.optLong("auto_epoch",0);if(parsed.raw&&held!=null&&held.optBoolean("active")&&held.optBoolean("confirmed")&&Settings.System.getInt(context.getContentResolver(),Settings.System.SCREEN_BRIGHTNESS_MODE,1)==0){parsed.holdSession=held.optString("session");parsed.held=held.optInt("target",-1);parsed.holding=parsed.held>=10&&parsed.held<=parsed.maximum;}}}
         if(parsed==null&&abiReady&&tables!=null)try{String key=MappingRecoveryState.generation(new JSONObject(tables),boot);if(recoveryGate.claim(key,SystemClock.elapsedRealtime())){MappingRecoverySignal.send(context,key);recoverySignal="requested";}}catch(Exception unavailable){recoverySignal=unavailable.getClass().getSimpleName();}
         String key=parsed==null?"":raw+(parsed.mode==1||parsed.raw?":"+Settings.System.getInt(context.getContentResolver(),Settings.System.SCREEN_BRIGHTNESS_MODE,0):"");applyProfile(parsed,key);
-    }catch(Exception failure){applyProfile(null,"");failed(failure);}});}catch(RejectedExecutionException ignored){}}
+    }catch(Exception failure){applyProfile(null,"");failed(failure);}}
     static boolean sameGeneration(Profile a,Profile b){if(a==null||b==null)return false;for(String key:new String[]{"build","pid","process_start","boot_count","revision","user_serial","maximum","physical","mode"})if(!String.valueOf(a.generation.opt(key)).equals(String.valueOf(b.generation.opt(key))))return false;return true;}
     static void applyProfile(Profile next,String identity){main.post(()->{
         boolean resetPartition=!sameGeneration(profile,next)||profile!=null&&next!=null&&(profile.autoEpoch!=next.autoEpoch||!profile.automatic&&next.automatic);
@@ -212,5 +234,5 @@ final class ControlCenterHooks {
     }
     static void publish(){if(context!=null)try{io.execute(ControlCenterHooks::publishNow);}catch(RejectedExecutionException ignored){}}
     static void recordGesture(Binding b,String event,int position,int action){try{ControlCenterPartition.Gate g=b.partition;gestureEvidence=new JSONObject().put("event",event).put("elapsed",SystemClock.elapsedRealtime()).put("position",position).put("minimum",b.minimum).put("maximum",b.maximum).put("boundary",ControlCenterMapping.progress(ControlCenterPartition.ORDINARY_SPAN,b.minimum,b.maximum)).put("action",action).put("since",g.since).put("confirmed",g.confirmed).put("released",g.released).put("stroke",g.stroke).put("raw",g.raw).toString();publish();}catch(Exception ignored){}}
-    static void publishNow(){try{Profile bound=profile;String evidence=gestureEvidence;Settings.Global.putString(context.getContentResolver(),ControlCenterEngine.UI,new JSONObject().put("build",AppBuild.BUILD).put("pid",android.os.Process.myPid()).put("process_start",UI_PROCESS_START).put("input",bound!=null&&bound.mode==4?"partition_node_v4":bound!=null&&bound.raw?"raw_node_v3":"coordinate_v2").put("coordinate_abi",abiReady).put("route",route).put("tracking_lifecycle",trackingLifecycle?"controller_start_stop":"on_changed_stop").put("gesture",evidence.isEmpty()?JSONObject.NULL:new JSONObject(evidence)).put("lockscreen_native",!ControlCenterScreen.allowsNodes(context)).put("profile_ready",bound!=null).put("bound_profile",bound==null?JSONObject.NULL:MappingRecoveryState.identity(bound.generation)).put("recovery_signal",recoverySignal).put("detail",error).toString());}catch(Exception ignored){}}
+    static void publishNow(){try{Profile bound=profile;String evidence=gestureEvidence;Settings.Global.putString(context.getContentResolver(),ControlCenterEngine.UI,new JSONObject().put("build",AppBuild.BUILD).put("pid",android.os.Process.myPid()).put("process_start",UI_PROCESS_START).put("input",bound!=null&&bound.mode==4?"partition_node_v4":bound!=null&&bound.raw?"raw_node_v3":"coordinate_v2").put("observers_ready",observersReady).put("observer_attempts",observerAttempts).put("coordinate_abi",abiReady).put("route",route).put("tracking_lifecycle",trackingLifecycle?"controller_start_stop":"on_changed_stop").put("gesture",evidence.isEmpty()?JSONObject.NULL:new JSONObject(evidence)).put("lockscreen_native",!ControlCenterScreen.allowsNodes(context)).put("profile_ready",bound!=null).put("bound_profile",bound==null?JSONObject.NULL:MappingRecoveryState.identity(bound.generation)).put("recovery_signal",recoverySignal).put("detail",error).toString());}catch(Exception ignored){}}
 }

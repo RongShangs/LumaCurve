@@ -10,10 +10,10 @@ files={
 'android/app/ActivityManager.java':'package android.app;public class ActivityManager{public static int getCurrentUser(){return 0;}}',
 'top/rongshangs/lumacurve/refactor/RootControl.java':r'''package top.rongshangs.lumacurve.refactor;
 import org.json.*;import java.util.*;import java.io.*;import java.nio.file.*;import java.nio.charset.StandardCharsets;
-class ControlCenterRoot{static void reconcile(Object settings,JSONObject runtime,String raw){}}
+class ControlCenterRoot{static final String PROFILE="profile";static boolean fail;static int retired;static void reconcile(Object settings,JSONObject runtime,String raw)throws Exception{if(fail)throw new IOException("mapping pending");}static void retireIdleWriter(){retired++;}}
 class RootControl{static final String CONFIG="config";
 static final File DATA=new File("build/raw-panel-transaction-tests");Settings settings=new Settings();boolean reject,failMode,failHook,loseBeginAck;String session="";int hookCalls,aborts;List<String> calls=new ArrayList<>();
-class Settings{String config;String get(String key){return config;}String mode="1";String getSystem(String key){return mode;}boolean putSystem(String key,String value){mode=value;return true;}}
+class Settings{String config;String get(String key){return config;}boolean put(String key,String value){return true;}String mode="1";String getSystem(String key){return mode;}boolean putSystem(String key,String value){if(failMode)return false;mode=value;return true;}}
 JSONObject live()throws Exception{return new JSONObject().put("pid",123).put("phase","active");}
 JSONObject refreshedLive()throws Exception{return live();}
 JSONObject brightness(String encoded)throws Exception{hookCalls++;JSONObject request=new JSONObject(new String(Base64.getDecoder().decode(encoded),StandardCharsets.UTF_8));String action=request.getString("action");calls.add(action);
@@ -25,7 +25,7 @@ JSONObject brightness(String encoded)throws Exception{hookCalls++;JSONObject req
  return new JSONObject().put("ok",true).put("state",new JSONObject().put("auto",settings.mode.equals("1")).put("owner",session.isEmpty()?"none":"raw_panel").put("session",session));}
 '''+method+'}',
 'top/rongshangs/lumacurve/refactor/NativePanelRoot.java':r'''package top.rongshangs.lumacurve.refactor;import org.json.*;import java.io.*;
-class NativePanelRoot{static boolean failStart;static int starts,stops;static void reset(){failStart=false;starts=stops=0;NativePanelClient.reset();}static JSONObject status()throws Exception{return new JSONObject().put("supported",true).put("maximum",16383).put("actual",NativePanelClient.actual);}static void start(JSONObject selected)throws Exception{if(selected.getInt("maximum")!=16383)throw new AssertionError("selection lost");starts++;if(failStart)throw new IOException("exit=6 escape_app_freezer");}static void stop(){stops++;}}
+class NativePanelRoot{static boolean failStart,failStop;static int starts,stops;static void reset(){failStart=failStop=false;ControlCenterRoot.fail=false;ControlCenterRoot.retired=0;starts=stops=0;NativePanelClient.reset();}static JSONObject status()throws Exception{return new JSONObject().put("supported",true).put("maximum",16383).put("actual",NativePanelClient.actual);}static void start(JSONObject selected)throws Exception{if(selected.getInt("maximum")!=16383)throw new AssertionError("selection lost");starts++;if(failStart)throw new IOException("exit=6 escape_app_freezer");}static void stop()throws Exception{stops++;if(failStop)throw new IOException("permissions not restored");}}
 ''',
 'top/rongshangs/lumacurve/refactor/NativePanelClient.java':r'''package top.rongshangs.lumacurve.refactor;import org.json.*;import java.io.*;import java.util.*;
 class NativePanelClient{static int actual=700;static boolean failArm,failSet;static List<String> calls=new ArrayList<>();static void reset(){actual=700;failArm=failSet=false;calls.clear();}static void require(String request)throws Exception{calls.add(request);if(request.startsWith("ARM")&&failArm)throw new IOException("lease rejected");}static JSONObject call(String request)throws Exception{calls.add(request);if(failSet)return new JSONObject().put("ok",false).put("reason","write_or_readback_failed").put("errno",13);actual=Integer.parseInt(request.split(" ")[2]);return new JSONObject().put("ok",true);}}
@@ -54,6 +54,9 @@ c=ctl();c.failHook=true;check(c.rawPanel(req("restore",0,"a")).getBoolean("ok"))
 c=ctl();c.loseBeginAck=true;check(failed(c,"begin",4000,"acklost").contains("ack lost"));check(c.settings.mode.equals("1")&&c.session.isEmpty()&&c.aborts==1);check(NativePanelClient.calls.equals(Arrays.asList("STOP acklost"))&&NativePanelClient.actual==700);
 c=ctl();c.settings.config=new JSONObject().put("manual_panel_maximum",9000).toString();check(failed(c,"begin",9001,"limit").contains("磁贴设置范围"));check(c.settings.mode.equals("1")&&NativePanelRoot.starts==0&&c.hookCalls==0);check(c.rawPanel(req("begin",9000,"limit_ok")).getBoolean("ok")&&NativePanelClient.actual==9000);check(failed(c,"set",10000,"limit_ok").contains("磁贴设置范围")&&NativePanelClient.actual==9000);
 c=ctl();c.settings.config=new JSONObject().put("manual_panel_maximum",65535).toString();check(failed(c,"begin",20000,"device_limit").contains("磁贴设置范围")&&NativePanelRoot.starts==0);
+c=ctl();ControlCenterRoot.fail=true;JSONObject restored=c.rawPanel(req("restore",0,"a"));check(restored.getBoolean("ok")&&restored.getString("mapping_warning").contains("mapping pending"));check(c.settings.mode.equals("1")&&NativePanelRoot.stops==1&&ControlCenterRoot.retired==1);
+c=ctl();NativePanelRoot.failStop=true;check(failed(c,"restore",0,"a").contains("停止守护并释放节点"));check(c.hookCalls==0&&ControlCenterRoot.retired==0);
+c=ctl();c.failHook=true;c.failMode=true;check(failed(c,"restore",0,"a").contains("系统未确认自动亮度模式"));check(ControlCenterRoot.retired==0);
 System.out.println("Raw panel root transaction: "+cases+" cases PASS; production orchestration with service doubles, Android not tested");
 }}
 '''}

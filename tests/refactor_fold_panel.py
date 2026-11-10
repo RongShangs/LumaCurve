@@ -36,6 +36,10 @@ public class FoldPanelTest{
  public static void main(String[] args)throws Exception{
   sys=new File(args[0]);layout=new File(sys,"layout.xml");layouts(true);
   for(int port:new int[]{1,0,1,0}){on(port);JSONObject node=resolve(port);check(node.getBoolean("supported"));check(node.getInt("fold_port")==port&&node.getInt("maximum")==16383&&node.getInt("actual")==912);check(node.getString("physical_display_id").equals("local:"+(256+port)));check(node.getString("canonical_path").contains("panel"+port+"-backlight"));}
+  on(0);JSONObject first=resolve(0);String saved=first.getString("canonical_path");check(ActivePanelNode.matchesSavedBinding(first,saved,16383));
+  on(1);JSONObject second=resolve(1);check(ActivePanelNode.matchesSavedBinding(second,saved,16383));check(!ActivePanelNode.matchesSavedBinding(second,"/unrelated/brightness",16383));check(!ActivePanelNode.matchesSavedBinding(second,saved,4095));
+  second.getJSONArray("candidates").getJSONObject(0).put("maximum",4095);check(!ActivePanelNode.matchesSavedBinding(second,saved,16383));
+  JSONObject ordinary=new JSONObject().put("supported",true).put("maximum",16383).put("canonical_path",saved);check(ActivePanelNode.matchesSavedBinding(ordinary,saved,16383));check(!ActivePanelNode.matchesSavedBinding(ordinary,"other",16383));
   on(1);check(!resolve(0).getBoolean("supported"));write("class/drm/card0-DSI-1/enabled","enabled");write("class/drm/card0-DSI-1/dpms","On");check(!resolve(1).getBoolean("supported"));
   on(1);write("class/backlight/panel1-backlight/brightness","0");check(!resolve(1).getBoolean("supported"));on(1);
   int[] reads={0};check(!ActivePanelNode.discover(sys,layout,()->display(reads[0]++==0?1:0)).getBoolean("supported"));

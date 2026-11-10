@@ -5,8 +5,8 @@ import java.util.*;
 import org.json.*;
 import top.rongshangs.lumacurve.refactor.hooking.*;
 
-/** Isolate only proven window-override sync calls. No brightness writes, cached
- * restore, mode changes, animation overrides, package lists or background work. */
+/** Proven window-sync isolation and optional sharing at the same native boundary.
+ * No settings/sysfs writes, mode changes, animation overrides or background work. */
 final class AppBrightnessIsolation {
     static final String SCOPED="app_override_scoped_sync",NATIVE="native_window_no_sync";
     static final Map<Class<?>,Profile> profiles=new java.util.concurrent.ConcurrentHashMap<>();
@@ -81,11 +81,12 @@ final class AppBrightnessIsolation {
                     Frame before=current.get();HookRuntime s=HookEntry.ownerState(m.thisObject);Session session=null;boolean allowed=false;
                     try{if(s!=null&&s.owner.getClass()==p.owner){Object d=p.dpc(s.owner);session=sessions.get(d);Object why=m.args[2];
                         synchronized(session==null?p:session){Object source=why==null?null:p.tag.invoke(why);
-                            allowed=eligible(p,s)&&session!=null&&session.active&&!session.userAdjusted&&session.user==s.kernel.integer("mUserSerial")&&source!=null&&session.tag.contentEquals((CharSequence)source)
+                            allowed=eligible(p,s)&&session!=null&&session.active&&(!session.userAdjusted||s.brightnessControl.independentActive())&&session.user==s.kernel.integer("mUserSerial")&&source!=null&&session.tag.contentEquals((CharSequence)source)
                                 &&((Integer)p.reason.invoke(why))==p.overrideReason&&Boolean.TRUE.equals(p.applied.invoke(p.brightnessController.get(d)))&&valid((Float)m.args[1]);}
                     }}catch(Throwable ignored){allowed=false;}
-                    Frame frame=new Frame(before,s,p,session,(Float)m.args[1],allowed);m.setObjectExtra("hyperlux.app.isolation.frame",frame);current.set(frame);
-                }protected void afterHookedMethod(MethodHookParam m){Object value=m.getObjectExtra("hyperlux.app.isolation.frame");if(value instanceof Frame){Frame previous=((Frame)value).previous;if(previous==null)current.remove();else current.set(previous);}}}));
+                    Frame frame=new Frame(before,s,p,session,(Float)m.args[1],allowed);
+                    m.setObjectExtra("hyperlux.app.isolation.frame",frame);current.set(frame);
+                }protected void afterHookedMethod(MethodHookParam m){Object value=m.getObjectExtra("hyperlux.app.isolation.frame");if(value instanceof Frame){Frame f=(Frame)value;try{}finally{if(f.previous==null)current.remove();else current.set(f.previous);}}}}));
                 tx.add(XposedBridge.hookMethod(p.drag,new XC_MethodHook(){protected void beforeHookedMethod(MethodHookParam m){if(Boolean.TRUE.equals(m.args[0])&&blocked(p,m.thisObject,(Float)m.args[1],false))m.setResult(null);}}));
                 tx.add(XposedBridge.hookMethod(p.sync,new XC_MethodHook(){protected void beforeHookedMethod(MethodHookParam m){if(blocked(p,m.thisObject,(Float)m.args[0],true))m.setResult(null);}}));
                 profiles.put(owner,p);errors.remove(owner);tx.commit();
@@ -97,21 +98,27 @@ final class AppBrightnessIsolation {
     static HookRuntime resolve(Profile p,Object value,boolean controller){synchronized(HookEntry.states){for(HookRuntime s:HookEntry.states.values())try{if(!s.closed&&s.owner.getClass()==p.owner){Object d=p.dpc(s.owner);if((controller?d:p.brightnessController.get(d))==value)return s;}}catch(Throwable ignored){}}return null;}
     static void invalidate(Profile p,HookRuntime s){try{Session value=sessions.get(p.dpc(s.owner));if(value!=null)synchronized(value){value.accept("",false,-1);}}catch(Throwable ignored){}}
     static boolean eligible(Profile p,HookRuntime s)throws Exception{
-        if(s==null||s.closed||s.changing||!s.phase.equals("active")||!s.appliesToUser()||!s.onDisplayThread()||!s.brightnessControl.options.appIsolation)return false;
+        if(s==null||s.closed||s.changing||!s.phase.equals("active")||!s.appliesToUser()||!s.onDisplayThread()||!(s.brightnessControl.options.appIsolation||s.brightnessControl.independentActive()))return false;
         // Existing owners, HDR, DIM and screen-off retain all native decisions.
-        if(!s.brightnessControl.owner.equals("none")||Boolean.TRUE.equals(p.hdr.invoke(s.owner)))return false;
+        if(!s.brightnessControl.owner.equals("none")&&!s.brightnessControl.independentActive()||Boolean.TRUE.equals(p.hdr.invoke(s.owner)))return false;
         Object d=p.dpc(s.owner),request=p.powerRequest.get(d),power=p.power.invoke(d);
         return request!=null&&power!=null&&p.policy.getInt(request)==p.brightPolicy&&((Integer)p.screen.invoke(power))==2;
     }
     static boolean blocked(Profile p,Object owner,float value,boolean count){
         Frame f=current.get();if(f==null||!f.eligible||f.profile!=p||f.state==null||f.state.owner!=owner||!valid(value)||Float.compare(value,f.value)!=0)return false;
-        try{synchronized(f.session){if(f.session.generation!=f.generation||!f.session.active||f.session.userAdjusted||!eligible(p,f.state))return false;
+        try{synchronized(f.session){if(f.session.generation!=f.generation||!f.session.active||f.session.userAdjusted&&!f.state.brightnessControl.independentActive()||!eligible(p,f.state))return false;
             if(count){f.session.blocked++;f.session.last="isolated";}return true;}}
         catch(Throwable unavailable){return false;}
     }
     static boolean supported(HookRuntime s)throws Exception{Profile p=profiles.get(s.owner.getClass());if(p==null)throw new NoSuchMethodException(errors.getOrDefault(s.owner.getClass(),"应用亮度接口尚未匹配"));return p.brightnessController.get(p.dpc(s.owner))!=null;}
+    // Retired Beta03 flag stays readable in configuration; no window sharing runs.
+    static boolean shareSupported(HookRuntime s){return false;}
+    static void clear(HookRuntime s,String reason){}
+    static void configure(HookRuntime s,BrightnessControlOptions before,BrightnessControlOptions next){}
     static JSONObject status(HookRuntime s)throws JSONException{
-        Profile p=profiles.get(s.owner.getClass());JSONObject out=new JSONObject().put("profile",p==null?"":p.route).put("enabled",s.brightnessControl.options.appIsolation).put("detail",errors.getOrDefault(s.owner.getClass(),""));
+        Profile p=profiles.get(s.owner.getClass());boolean nativeIsolation=p!=null&&NATIVE.equals(p.route);
+        JSONObject out=new JSONObject().put("profile",p==null?"":p.route).put("enabled",nativeIsolation||s.brightnessControl.options.appIsolation).put("native_isolated",nativeIsolation).put("module_requested",s.brightnessControl.options.appIsolation).put("detail",errors.getOrDefault(s.owner.getClass(),""));
+        out.put("share_enabled",false).put("share_profile","").put("share_detail","旧版临时亮度共享已停用，保存选择保留");
         try{Object d=p==null?null:p.dpc(s.owner);Session session=d==null?null:sessions.get(d);if(session!=null)synchronized(session){out.put("window_active",session.active).put("user_adjustment_priority",session.userAdjusted).put("blocked_syncs",session.blocked).put("state",session.last);}}
         catch(Throwable pending){out.put("detail",pending.toString());}return out;
     }
