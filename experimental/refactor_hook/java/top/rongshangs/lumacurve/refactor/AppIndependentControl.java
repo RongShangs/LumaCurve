@@ -29,7 +29,7 @@ final class AppIndependentControl {
     boolean blocksLearning(){return active;}
     AppIndependentAccess access()throws Exception{AppIndependentAccess.install(s.owner.getClass());AppIndependentAccess p=AppIndependentAccess.profiles.get(s.owner.getClass());if(p==null)throw new IllegalStateException(AppIndependentAccess.errors.getOrDefault(s.owner.getClass(),"独立亮度接口尚未就绪"));return p;}
     boolean bound(AppIndependentAccess p)throws Exception{return physical.equals(p.identity(s))&&range==p.hbm.get(s.owner)&&configuration==p.configuration.get(s.owner);}
-    String focused(){ForegroundApps.Snapshot f=c.foreground;return !c.foregroundPending&&!c.foregroundQuerying&&f.user==0&&f.display==0?f.pkg:"";}
+    String focused(){ForegroundApps.Snapshot f=c.foreground;return !c.foregroundPending&&!c.foregroundQuerying&&f.user==0&&f.display==0&&f.independentAllowed?f.pkg:"";}
     void configure(BrightnessControlOptions before,BrightnessControlOptions next){
         String nextSignature=next.independentSignature();if(!signature.equals(nextSignature)){generation++;resetLoad();input=lockInput=null;signature=nextSignature;policy.retain(next);}
         if((before.independentKeepReboot||!next.independentApps.isEmpty()||!next.independentGroups.isEmpty())&&(!next.independentKeepReboot||!next.independentKeepLock))persist(false);

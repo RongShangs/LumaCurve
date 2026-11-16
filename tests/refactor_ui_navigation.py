@@ -24,10 +24,11 @@ class View{static final int VISIBLE=0,GONE=8;int top,focuses,visibility;boolean 
 class ScrollView extends View{ViewTreeObserver tree=new ViewTreeObserver();int moves,y;int getScrollY(){return y;}void post(Runnable r){r.run();}void invalidate(){}ViewTreeObserver getViewTreeObserver(){return tree;}void offsetDescendantRectToMyCoords(View v,Rect r){r.top+=v.top;}void smoothScrollTo(int x,int y){moves++;this.y=y;}void scrollTo(int x,int y){moves++;this.y=y;}}
 class Window{final View decor=new View();View getDecorView(){return decor;}}
 class AlertDialog{Window window=new Window();boolean showing=true;Window getWindow(){return window;}boolean isShowing(){return showing;}}
+class OutdoorDetailsPage{boolean visible;View root=new View();ScrollView scroll=new ScrollView();}
 class SceneSettings {View target;void commit(){}View find(String key){return target;}}
 class RootControl {static float[] numbers(JSONArray a)throws JSONException{return CurveComparison.numbers(a);}}
 class MainActivity {
- ThemeCurveOptions themeCurve=new ThemeCurveOptions();JSONObject runtime;
+ OutdoorDetailsPage outdoorDetailsPage=new OutdoorDetailsPage();OutdoorSettings outdoorSettings;OutdoorOprCurveSettings oprCurveSettings;void openOutdoorDetails(){outdoorDetailsPage.visible=true;displayedPage=outdoorDetailsPage.root;}ThemeCurveOptions themeCurve=new ThemeCurveOptions();JSONObject runtime;
  View darkCurveCard=new View(),themeCurveSwitch=new View(),controlCenterChoice=new View();
  SavedCurve savedBase;
  final Map<String,Runnable> detailOpeners=new HashMap<>();final ScrollView[] settingsScrollers=new ScrollView[12];final View[] settingScreens=new View[12];
@@ -35,14 +36,15 @@ class MainActivity {
  float[] factoryLux={0,30,600,100000},factoryNit={2,100,300,1060},factors={1,1,1,1};float minimum=1,maximum=1060,curveFloor=0,thermalCeiling=43,memoryStrength=1,memoryLuxRange=.3f,thermalCooling=1,lowLightLimit=50;
  boolean thermalRelax,memoryEnabled=true,responseOverride,smallBrightenOverride,lowLightStability;long memoryWindow=1500,brightenDelay=1500,darkenDelay=5000,smallBrightenDelay=5000,lowLightBrighten=3000,lowLightDarken=4000;
  SceneSettings sceneSettings;SceneOptions sceneOptions=new SceneOptions();AdvancedOptions advanced=new AdvancedOptions();OutdoorOptions outdoorOptions=new OutdoorOptions();BrightnessControlOptions controls=new BrightnessControlOptions();LowLightThresholds lowThresholds=new LowLightThresholds();LowLightAssistGate assistGateOptions=new LowLightAssistGate();MemoryOptions memoryOptions=new MemoryOptions(true,30);
- MainActivity(){try{runtime=new JSONObject().put("curve_backend","refactor").put("factory_logical_nit",new JSONArray(factoryNit));}catch(JSONException e){throw new RuntimeException(e);}for(int i=0;i<12;i++){settingsScrollers[i]=new ScrollView();settingScreens[i]=new View();}}
- int dp(float x){return Math.round(x);}void select(int p){page=p;}void showSettingsGroup(int g){group=g;displayedPage=settingScreens[g];}
+ MainActivity(){try{runtime=new JSONObject().put("curve_backend","refactor").put("factory_logical_nit",new JSONArray(factoryNit));}catch(JSONException e){throw new RuntimeException(e);}for(int i=0;i<12;i++){settingsScrollers[i]=new ScrollView();settingScreens[i]=new View();}detailOpeners.put("outdoor",this::openOutdoorDetails);}
+ int dp(float x){return Math.round(x);}void select(int p){page=p;outdoorDetailsPage.visible=false;}void showSettingsGroup(int g){outdoorDetailsPage.visible=false;group=g;displayedPage=settingScreens[g];}
 ''' +navigation+configuration+r'''}
 class HomeScroll extends ScrollView{void requestFocus(){super.requestFocus();y=0;}}
 class Container{View home;View getChildAt(int at){return home;}}
+class OutdoorOprCurveSettings{View body=new View();}class OutdoorSettings{View ceilingBody=new View(),nodeBody=new View(),testCard=new View(),admission=new View();void leave(){}}
 class ControlCenterSetup{static final int SETTINGS_GROUP=8;}
 class SettingsNavigation{
- static class Setup{int calls;boolean prompt;void check(boolean prompt){calls++;this.prompt=prompt;}}static class Mapping{Setup setup=new Setup();}Mapping controlCenterSettings;BrightnessControlOptions controls=new BrightnessControlOptions();
+ static class Setup{int calls;boolean prompt;void check(boolean prompt){calls++;this.prompt=prompt;}}static class Mapping{Setup setup=new Setup();}Mapping controlCenterSettings;OutdoorDetailsPage outdoorDetailsPage;OutdoorSettings outdoorSettings;BrightnessControlOptions controls=new BrightnessControlOptions();
  ScrollView settingsHomeScroll=new HomeScroll();int settingsHomeY,page=1,settingsGroup=-1;long settingsScrollRestore;boolean settingsHomeRestoring,destroyed;
  View displayedPage=settingsHomeScroll,header=new View(),bottomNav=new View();View[] settingScreens=new View[12];Container content=new Container();
  SettingsNavigation(){content.home=settingsHomeScroll;for(int i=0;i<12;i++)settingScreens[i]=new View();}
@@ -69,26 +71,27 @@ public class NavigationTest {
   scene.positionScene(dialog,null);check(actual.tree.listeners.isEmpty());dialog.window.decor.tagged=new View();scene.positionScene(dialog,active);check(actual.tree.listeners.isEmpty());dialog.window=null;scene.positionScene(dialog,active);check(actual.tree.listeners.isEmpty());
   String[] targets={"range","opr","thermal","dark_lock","low_light","curve","memory"};int[] groups={2,2,9,7,7,0,1};
   for(int i=0;i<targets.length;i++){
-   MainActivity a=new MainActivity();String before=a.configuration().toString();int[] expanded={0};a.detailOpeners.put("outdoor",()->expanded[0]++);a.detailOpeners.put("low",()->expanded[0]++);
-   View target=i==0?a.rangeSwitch:i==1?a.oprSwitch:i==2?a.thermalSwitch:i==3?a.darkLockSwitch:i==4?a.lowLightSwitch:i==5?a.settingsGraph:a.memorySwitch;ScrollView scroll=a.settingsScrollers[groups[i]];
+   MainActivity a=new MainActivity();String before=a.configuration().toString();int[] expanded={0};a.detailOpeners.put("outdoor",()->{expanded[0]++;a.openOutdoorDetails();});a.detailOpeners.put("low",()->expanded[0]++);
+   View target=i==0?a.rangeSwitch:i==1?a.oprSwitch:i==2?a.thermalSwitch:i==3?a.darkLockSwitch:i==4?a.lowLightSwitch:i==5?a.settingsGraph:a.memorySwitch;ScrollView scroll=i<2?a.outdoorDetailsPage.scroll:a.settingsScrollers[groups[i]];
    a.openAdvice(new StatusAdvice.Action("link",groups[i],targets[i]));check(a.page==1&&a.group==groups[i]);check(scroll.moves==0&&target.focuses==0);check(expanded[0]==(i<2||i==4?1:0));
    // The target acquires its real offset only in the next layout traversal.
    target.top=700;scroll.tree.draw();check(scroll.moves==1&&scroll.y==684&&target.focuses==1);check(scroll.tree.listeners.isEmpty());scroll.tree.draw();check(scroll.moves==1);check(a.dirty&&before.equals(a.configuration().toString()));
   }
   for(int mode=0;mode<3;mode++){MainActivity linked=new MainActivity();linked.themeCurve.enabled=mode==1;View target=mode==0?linked.themeCurveSwitch:mode==1?linked.darkCurveCard:linked.controlCenterChoice;int group=mode<2?0:8;String key=mode<2?"dark_curve":"node_mapping";String before=linked.configuration().toString();linked.openAdvice(new StatusAdvice.Action("link",group,key));target.top=500;linked.settingsScrollers[group].tree.draw();check(linked.settingsScrollers[group].y==484&&target.focuses==1);check(before.equals(linked.configuration().toString())&&linked.dirty);}
-  for(int mode=0;mode<3;mode++){MainActivity a=new MainActivity();a.openAdvice(new StatusAdvice.Action("link",2,"range"));if(mode==0)a.displayedPage=new View();if(mode==1)a.destroyed=true;if(mode==2)a.rangeSwitch.shown=false;a.settingsScrollers[2].tree.draw();check(a.settingsScrollers[2].moves==0&&a.rangeSwitch.focuses==0);check(a.settingsScrollers[2].tree.listeners.isEmpty());}
+  for(int mode=0;mode<3;mode++){MainActivity a=new MainActivity();a.openAdvice(new StatusAdvice.Action("link",2,"range"));if(mode==0)a.displayedPage=new View();if(mode==1)a.destroyed=true;if(mode==2)a.rangeSwitch.shown=false;a.outdoorDetailsPage.scroll.tree.draw();check(a.outdoorDetailsPage.scroll.moves==0&&a.rangeSwitch.focuses==0);check(a.outdoorDetailsPage.scroll.tree.listeners.isEmpty());}
   MainActivity a=new MainActivity();a.openAdvice(new StatusAdvice.Action("conditions",2,""));check(a.settingsScrollers[2].tree.listeners.isEmpty());check(a.dirty);
+  MainActivity high=new MainActivity();high.outdoorSettings=new OutdoorSettings();String retained=high.configuration().toString();high.openAdvice(new StatusAdvice.Action("curve",2,"outdoor"));check(high.outdoorDetailsPage.visible&&high.displayedPage==high.outdoorDetailsPage.root);high.outdoorSettings.admission.top=450;high.outdoorDetailsPage.scroll.tree.draw();check(high.outdoorDetailsPage.scroll.y==434&&retained.equals(high.configuration().toString()));high.openAdvice(new StatusAdvice.Action("test",2,"outdoor_test"));check(!high.outdoorDetailsPage.visible&&high.displayedPage==high.settingScreens[2]);high.outdoorSettings.testCard.top=100;high.settingsScrollers[2].tree.draw();check(high.settingsScrollers[2].y==84);
   for(boolean extreme:new boolean[]{false,true}){
    a=new MainActivity();if(extreme){a.advanced.values[5]=2000;a.outdoorOptions.values[1]=100000;a.factors=new float[]{1.234567f,1.234567f,1.234567f,1};a.curveFloor=1.234567f;a.thermalCeiling=50;a.memoryWindow=3000;a.memoryLuxRange=.1234567f;a.controls.exitLux=500;a.controls.exitSeconds=30;a.controls.minutes=30;a.controls.appIsolation=true;}
    String options=a.configuration().toString(),payload=Base64.getEncoder().encodeToString(options.getBytes(StandardCharsets.UTF_8));String request=new JSONObject().put("command","apply").put("payload",payload).toString();
    check(payload.length()<=16384);check(request.length()<=16384);System.out.println("Apply request frame: "+request.length()+" chars");
   }
 
-  for(int id=0;id<9;id++){MainActivity sceneNav=new MainActivity();sceneNav.sceneSettings=new SceneSettings();View target=new View();sceneNav.sceneSettings.target=target;String key="scene_"+SceneOptions.IDS[id];int group=id==7?2:5;int[] expanded={0};sceneNav.detailOpeners.put(key,()->expanded[0]++);sceneNav.openAdvice(new StatusAdvice.Action("scene",group,key));check(expanded[0]==1&&sceneNav.group==group);target.top=900;sceneNav.settingsScrollers[group].tree.draw();check(sceneNav.settingsScrollers[group].y==884&&target.focuses==0);}
+  for(int id=0;id<9;id++){MainActivity sceneNav=new MainActivity();sceneNav.sceneSettings=new SceneSettings();View target=new View();sceneNav.sceneSettings.target=target;String key="scene_"+SceneOptions.IDS[id];int group=id==7?2:5;int[] expanded={0};sceneNav.detailOpeners.put(key,()->expanded[0]++);sceneNav.openAdvice(new StatusAdvice.Action("scene",group,key));check(expanded[0]==1&&sceneNav.group==group);check(!sceneNav.outdoorDetailsPage.visible);target.top=900;ScrollView owner=sceneNav.settingsScrollers[group];owner.tree.draw();check(owner.y==884&&target.focuses==0);}
   System.out.println("Advice navigation: "+cases+" cases PASS; actual navigation/configuration with deferred layout doubles; Android not tested");
  }
 }''',encoding='utf-8')
 classes=O/'classes';classes.mkdir(exist_ok=True)
-names=['SceneOptions', 'CurvePlan', 'CurveComparison', 'SavedCurve', 'CurveCompatibility', 'TraditionalCurve', 'ThemeCurveOptions', 'ThermalPolicy', 'MemoryPolicy', 'MemoryOptions', 'AdvancedOptions', 'AdvancedPolicy', 'OutdoorNodeTarget', 'OutdoorOptions', 'BrightnessControlOptions', 'LowLightThresholds', 'LowLightAssistGate', 'StatusAdvice', 'LiveLimitEvidence']
+names=['SceneOptions', 'CurvePlan', 'CurveComparison', 'SavedCurve', 'CurveCompatibility', 'TraditionalCurve', 'ThemeCurveOptions', 'ThermalPolicy', 'MemoryPolicy', 'MemoryOptions', 'AdvancedOptions', 'AdvancedPolicy', 'OutdoorNodeTarget', 'OutdoorTargetCurve','OutdoorOptions', 'BrightnessControlOptions', 'LowLightThresholds', 'LowLightAssistGate', 'StatusAdvice', 'LiveLimitEvidence']
 subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(J),'-d',str(classes),*[str(S/(n+'.java')) for n in names],str(test)],check=True)
 subprocess.run(['java','-cp',str(classes)+os.pathsep+str(J),'top.rongshangs.lumacurve.refactor.NavigationTest'],check=True)

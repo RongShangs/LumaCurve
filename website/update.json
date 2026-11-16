@@ -1,17 +1,17 @@
 {
   "name": "HyperLux",
-  "version": "4.5.0",
-  "versionCode": 45000,
+  "version": "4.6.0",
+  "versionCode": 46000,
   "distribution": "apk",
   "requires": [
     "Root",
     "LSPosed",
     "HyperOS"
   ],
-  "apkUrl": "https://lc.rongshangs.top/downloads/HyperLux-4.5.0.apk",
-  "sourceUrl": "https://lc.rongshangs.top/downloads/LumaCurve-4.5.0-source.zip",
-  "bundleUrl": "https://lc.rongshangs.top/downloads/LumaCurve-4.5.0.zip",
-  "releaseUrl": "https://github.com/RongShangs/LumaCurve/releases/tag/v4.5.0",
-  "sha256": "4cca77c4fdc38bb1f0a1e8d0970f13c17e028b06100a8d1126e67f9792fe9539",
-  "changelog": "# HyperLux 4.5.0 正式版\n\n1. 新增应用独立亮度：支持逐应用独立、分组独立，可选跨锁屏、跨重启保存；保留旧暂停自动亮度名单。\n2. 重做应用选择页：支持搜索、视频/游戏批选，补充国内视频应用识别；跨名单移动确认后自动取消原处选择。\n3. 完善折叠屏节点映射及恢复，优化开机初始化。\n4. 简化手动记忆设置，移除强度预设，调整提醒显示时机。\n5. 新增部分机型适配。"
+  "apkUrl": "https://lc.rongshangs.top/downloads/HyperLux-4.6.0.apk",
+  "sourceUrl": "https://lc.rongshangs.top/downloads/LumaCurve-4.6.0-source.zip",
+  "bundleUrl": "https://lc.rongshangs.top/downloads/LumaCurve-4.6.0.zip",
+  "releaseUrl": "https://github.com/RongShangs/LumaCurve/releases/tag/v4.6.0",
+  "sha256": "72c40c1897f95107ac006f7e579895cd89c56f6af071c8a1ca8de08640e15687",
+  "changelog": "# HyperLux 4.6.0 正式版\n\n1. 重做高亮增强设置，支持四点拖动目标曲线、恢复默认及最高亮度限制。\n2. 新增短时激发测试，显示剩余时间、当前亮度和测试最高亮度。\n3. 完善应用临时亮度隔离：正常小窗保留临时亮度，最小浮窗或贴边挂起后交回系统。\n4. 修复应用从小窗最大化后未恢复独立亮度的问题。\n5. 精简多个设置页面的冗余说明，优化布局、状态展示及深色模式。"
 }

@@ -48,9 +48,24 @@
       "purpose": "入口与代次"
     },
     {
+      "file": "AppIndependentAccess.java",
+      "layer": "adapters",
+      "purpose": "真实主屏、HBM普通范围、窗口覆盖及手动输入原生ABI，独立事务安装；接口只读探测与首次接管的Hook安装分离，避免闲置功能改变启动路径；原生设置消费后仅投递当前主屏的手动交接通知，不在原生锁栈执行服务读写"
+    },
+    {
+      "file": "AppIndependentControl.java",
+      "layer": "orchestration",
+      "purpose": "复用应用模式租约的独立值切换、明确输入记忆、恢复原模式与受管异步持久化；原生手动交接完成后按代次单次补交付目标，保护后来输入并在退出取消；快速交接与跨锁屏补存原租约待处理输入，存档提交拒绝的有界重试和未读存档保护"
+    },
+    {
+      "file": "AppIndependentPolicy.java",
+      "layer": "policy",
+      "purpose": "主屏比例坐标的逐应用/分组固定值、受保护输入排除、完整校验及记忆绑定"
+    },
+    {
       "file": "AppIsolationSettings.java",
       "layer": "presentation",
-      "purpose": "独立默认关闭的应用亮度隔离设置页与只读兼容状态"
+      "purpose": "单一隔离开关和四种窗口状态说明；显示原生/模块及部分能力状态，旧两项选择按OR继承"
     },
     {
       "file": "AppRootDiagnostics.java",
@@ -58,9 +73,29 @@
       "purpose": "Root导出不可用时APP侧Downloads权限分析包"
     },
     {
+      "file": "AppWindowBrightness.java",
+      "layer": "orchestration",
+      "purpose": "统一应用隔离开关下的最小/挂起窗口资格过滤、独立事务Hook与有界重评估；不改窗口属性/系统设置"
+    },
+    {
       "file": "ApplicationBrightnessSettings.java",
       "layer": "presentation",
       "purpose": "暂停、独立与最多三个分组的互斥名单入口，旧配置接续及保留期限草稿；分组编辑及删除按稳定ID解析当前草稿，防止周期刷新后捕获旧对象"
+    },
+    {
+      "file": "ApplicationCategories.java",
+      "layer": "adapters",
+      "purpose": "设备专用游戏分类与结构校验；混合影像名单不当作视频分类"
+    },
+    {
+      "file": "ApplicationListActivity.java",
+      "layer": "presentation",
+      "purpose": "带搜索、图标、开关和视频/游戏批选的统一二级名单页，草稿结果与离页任务清理；先创建窗口内容再读取系统栏控制器，避免未创建DecorView导致启动闪退；统一二级导航、固定搜索/滚动批选、连续大圆角名单与滚动尾部安全区域；与二级页一致的双向淡变及轻位移Activity过渡；固定不透明窗口中的内容过渡、离页复原及单次草稿返回，避免整窗动画露出任务背景"
+    },
+    {
+      "file": "ApplicationSelection.java",
+      "layer": "policy",
+      "purpose": "有界名单、分类选择、只读迁移计划与确认提交，取消/过期弹窗不改旧选择"
     },
     {
       "file": "AssistSensorCompat.java",
@@ -495,12 +530,32 @@
     {
       "file": "NitBrightnessLimit.java",
       "layer": "policy",
-      "purpose": "策略与算子"
+      "purpose": "策略与算子；缓存只读单调框架比例/物理nit预览表，核验端点与普通边界，不改变输出反解"
     },
     {
       "file": "OutdoorController.java",
       "layer": "orchestration",
       "purpose": "显示运行协调；在真实输出判定点采集有界诊断环（128 条、去重）与关键事件锁存（32 条）；写门保持严格，仅输出归属退出对单帧 temp 失败做有界去抖（2 帧或 50ms），上游 block 与受保护 modifier 立即退出"
+    },
+    {
+      "file": "OutdoorCurvePreview.java",
+      "layer": "policy",
+      "purpose": "严格读取原生框架比例到物理nit的单调预览表，按既有增强策略计算目标参考并反解拖动力度，不线性相乘nit或外推"
+    },
+    {
+      "file": "OutdoorDetailsPage.java",
+      "layer": "presentation",
+      "purpose": "高亮详细设置二级页的标准顶栏/保存入口/安全滚动容器；复用主页面同一草稿，不在导航时提交配置"
+    },
+    {
+      "file": "OutdoorLightTest.java",
+      "layer": "orchestration",
+      "purpose": "用户确认的20秒强光输入模拟租约、临时事务Hook、学习保护、事件退出、真实读数记录与有界撤销"
+    },
+    {
+      "file": "OutdoorLightTestAccess.java",
+      "layer": "adapters",
+      "purpose": "主屏ABC最终照度/重算/恢复/模型与手动接口的严格探测、线程和物理归属及仅恢复自持值"
     },
     {
       "file": "OutdoorNodeBridge.java",
@@ -525,7 +580,12 @@
     {
       "file": "OutdoorOpr.java",
       "layer": "adapters",
-      "purpose": "设备接口与所有权；OPR 两参优先、旧三参回退"
+      "purpose": "设备接口与所有权；OPR 两参优先、旧三参回退；仅实际OPR帧在原生SDR结束后接续可选曲线限制，校验配置与HBM对象归属并清理帧"
+    },
+    {
+      "file": "OutdoorOprCurveSettings.java",
+      "layer": "presentation",
+      "purpose": "四方式共用完整物理nit坐标的独立四点曲线；灰区只表模式未开放范围，不跟随原生瞬时状态；保留图例/恢复/旧多点显式简化"
     },
     {
       "file": "OutdoorOprEnvelope.java",
@@ -535,7 +595,7 @@
     {
       "file": "OutdoorOptions.java",
       "layer": "configuration",
-      "purpose": "配置、保持与迁移"
+      "purpose": "配置、保持与迁移；放宽后高亮包络的不可变节点、严格配置与线性插值"
     },
     {
       "file": "OutdoorOutputAccess.java",
@@ -551,6 +611,16 @@
       "file": "OutdoorSdrScope.java",
       "layer": "adapters",
       "purpose": "设备接口与所有权"
+    },
+    {
+      "file": "OutdoorSettings.java",
+      "layer": "presentation",
+      "purpose": "高亮增强主页预设、带底色的运行快照状态及详细入口；四排方式与曲线/触发门槛共用二级草稿，固定四格测试、可靠读数与整块点击。"
+    },
+    {
+      "file": "OutdoorTargetCurve.java",
+      "layer": "configuration",
+      "purpose": "显式启用的独立物理nit高亮目标曲线、严格解析与工作范围裁剪；不改普通基线或原生记忆"
     },
     {
       "file": "OutdoorTuning.java",
@@ -898,6 +968,11 @@
       "purpose": "界面与只读说明"
     },
     {
+      "file": "WindowBrightnessAccess.java",
+      "layer": "adapters",
+      "purpose": "窗口亮度门禁、小窗最小/贴边谓词、主用户/主屏/窗口类型及窗口线程重评估的完整ABI收束；无焦点/尺寸推断或亮度写入"
+    },
+    {
       "file": "hooking/HookTransaction.java",
       "layer": "hook_backend",
       "purpose": "框架桥与安装事务"
@@ -911,36 +986,6 @@
       "file": "hooking/XposedBridge.java",
       "layer": "hook_backend",
       "purpose": "框架桥与安装事务"
-    },
-    {
-      "file": "AppIndependentPolicy.java",
-      "layer": "policy",
-      "purpose": "主屏比例坐标的逐应用/分组固定值、受保护输入排除、完整校验及记忆绑定"
-    },
-    {
-      "file": "AppIndependentAccess.java",
-      "layer": "adapters",
-      "purpose": "真实主屏、HBM普通范围、窗口覆盖及手动输入原生ABI，独立事务安装；接口只读探测与首次接管的Hook安装分离，避免闲置功能改变启动路径；原生设置消费后仅投递当前主屏的手动交接通知，不在原生锁栈执行服务读写"
-    },
-    {
-      "file": "AppIndependentControl.java",
-      "layer": "orchestration",
-      "purpose": "复用应用模式租约的独立值切换、明确输入记忆、恢复原模式与受管异步持久化；原生手动交接完成后按代次单次补交付目标，保护后来输入并在退出取消；快速交接与跨锁屏补存原租约待处理输入，存档提交拒绝的有界重试和未读存档保护"
-    },
-    {
-      "file": "ApplicationSelection.java",
-      "layer": "policy",
-      "purpose": "有界名单、分类选择、只读迁移计划与确认提交，取消/过期弹窗不改旧选择"
-    },
-    {
-      "file": "ApplicationCategories.java",
-      "layer": "adapters",
-      "purpose": "设备专用游戏分类与结构校验；混合影像名单不当作视频分类"
-    },
-    {
-      "file": "ApplicationListActivity.java",
-      "layer": "presentation",
-      "purpose": "带搜索、图标、开关和视频/游戏批选的统一二级名单页，草稿结果与离页任务清理；先创建窗口内容再读取系统栏控制器，避免未创建DecorView导致启动闪退；统一二级导航、固定搜索/滚动批选、连续大圆角名单与滚动尾部安全区域；与二级页一致的双向淡变及轻位移Activity过渡；固定不透明窗口中的内容过渡、离页复原及单次草稿返回，避免整窗动画露出任务背景"
     }
   ],
   "native_files": [

@@ -9,7 +9,7 @@
 | 项目 | 要求 |
 | --- | --- |
 | 触发 | 暗光锁定及日落选项已启用，系统Twilight给出有效夜间状态。 |
-| 需求与行为 | 采用本机Twilight日出日落状态，作为暗光锁定准入，不凭固定时间推断；资料未知不能冒充夜间 |
+| 需求与行为 | 采用本机Twilight日出日落状态，作为暗光锁定准入，不凭固定时间推断；资料未知不能冒充夜间 页面删除系统日出日落原理长说明及全天模式重复提示，夜间选择下仍展示实际日出日落或信息缺失状态。 |
 | 退出 / 失败 | 日出释放本模块取得的锁定；停用/熄屏/切用户注销本次监听与边界任务，用户手动关闭不擅自恢复。 |
 | 默认 | `off` · 新配置关闭 |
 | 配置键 | `dark_lock_sunset_only` |
@@ -51,5 +51,5 @@
 
 | 文件 | 当前源码 SHA-256 前16位 |
 | --- | --- |
-| [BrightnessControl.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/BrightnessControl.java) | `f957288314b2835a` |
+| [BrightnessControl.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/BrightnessControl.java) | `7f6e8cc411da5e30` |
 | [DarkLockSchedule.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/DarkLockSchedule.java) | `5eb5ea9490286917` |

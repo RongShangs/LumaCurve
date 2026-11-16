@@ -78,7 +78,7 @@ paths=[]
 for name,code in sources.items():
  p=O/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_text(code,encoding='utf-8');paths.append(p)
 C=O/'classes';C.mkdir(exist_ok=True)
-production=['OutdoorOutputAccess','OutdoorNodeBridge','OutdoorNodeRoot','OutdoorNodeProfile','OutdoorNodeTarget','OutdoorOptions','OutdoorPolicy','AdvancedPolicy']
+production=['OutdoorOutputAccess','OutdoorNodeBridge','OutdoorNodeRoot','OutdoorNodeProfile','OutdoorNodeTarget','OutdoorTargetCurve','OutdoorOptions','OutdoorPolicy','AdvancedPolicy']
 subprocess.run(['javac','--release','8','-encoding','UTF-8','-cp',str(J),'-d',str(C),*map(str,paths),*[str(S/(n+'.java')) for n in production]],check=True)
 result=subprocess.check_output(['java','-cp',str(C)+os.pathsep+str(J),'top.rongshangs.lumacurve.refactor.OutdoorFoldTest'],text=True,encoding='utf-8');print(result,end='');total=int(re.search(r'(\d+) cases PASS',result).group(1))
 for mode in ['wrong_reason_return','static_enabled','wrong_display_type','aliased_modifier','missing_applied']:

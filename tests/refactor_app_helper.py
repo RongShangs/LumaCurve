@@ -4,6 +4,8 @@ import os,subprocess,sys,zipfile
 R=Path(__file__).resolve().parents[1];archive=Path(sys.argv[1]);O=R/'build/app-helper-config-tests';O.mkdir(exist_ok=True)
 J=R/'build/refactor-diagnostics/json-20240303.jar'
 with zipfile.ZipFile(archive) as z:
+ assert 'top/rongshangs/lumacurve/refactor/OutdoorTargetCurve.class' in z.namelist(), 'Root helper must include the physical target curve configuration'
+ assert 'top/rongshangs/lumacurve/refactor/OutdoorOptions$OprCurve.class' in z.namelist(), 'Root helper must include the high brightness curve type'
  assert 'top/rongshangs/lumacurve/refactor/BrightnessControlOptions$AppGroup.class' in z.namelist(), 'Root helper must include grouped configuration type'
 p=O/'AppHelperTest.java';p.write_text('''package top.rongshangs.lumacurve.refactor;
 import java.util.*;import org.json.*;
@@ -14,6 +16,14 @@ public class AppHelperTest{
   BrightnessControlOptions options=BrightnessControlOptions.parseStored(source);check(options.manualApps.contains("com.old.pause"));check(options.independentKey("com.demo.a").equals("group:videos"));check(options.independentKey("com.demo.single").equals("app:com.demo.single"));check(options.independentKeepLock&&options.independentKeepReboot);
   JSONObject saved=new JSONObject();options.put(saved);BrightnessControlOptions round=BrightnessControlOptions.parseStored(saved);check(round.applications().size()==4&&round.independentGroups.size()==1);check(round.manualApps.equals(options.manualApps));
   round.selectApplications("videos",Arrays.asList("com.old.pause"),Arrays.asList("com.old.pause"));check(round.manualApps.isEmpty()&&round.independentGroups.get(0).apps.contains("com.old.pause"));
+  JSONObject curve=new JSONObject().put("outdoor_enabled",true).put("outdoor_range_unlock",true).put("outdoor_opr_relax",true).put(OutdoorOptions.OPR_CURVE_ENABLED,true).put(OutdoorOptions.OPR_CURVE,new JSONArray().put(new JSONObject().put("lux",10000).put("nit",1000)).put(new JSONObject().put("lux",60000).put("nit",2000)));
+  OutdoorOptions high=OutdoorOptions.parse(curve);check(high.oprCurveEnabled&&high.oprCurve.at(60000)==2000);JSONObject kept=new JSONObject();high.put(kept);check(OutdoorOptions.parse(kept).oprCurve.same(high.oprCurve));
+  JSONArray paused=new JSONArray();JSONObject missing=new JSONObject().put("outdoor_opr_curve_supported",false);JSONObject runtime=ConfigurationCompatibility.fit(kept,missing,paused);check(!runtime.optBoolean(OutdoorOptions.OPR_CURVE_ENABLED)&&kept.optBoolean(OutdoorOptions.OPR_CURVE_ENABLED)&&kept.getJSONArray(OutdoorOptions.OPR_CURVE).length()==2);check(paused.toString().contains("放宽后高亮曲线"));
+  missing.put("outdoor_opr_curve_supported",true);check(ConfigurationCompatibility.fit(kept,missing,new JSONArray()).optBoolean(OutdoorOptions.OPR_CURVE_ENABLED));
+  JSONObject target=new JSONObject(curve.toString()).put(OutdoorOptions.OPR_CURVE_ENABLED,false).put(OutdoorTargetCurve.ENABLED,true).put(OutdoorTargetCurve.POINTS,curve.getJSONArray(OutdoorOptions.OPR_CURVE));
+  OutdoorOptions requested=OutdoorOptions.parse(target);check(requested.targetCurve.enabled&&requested.targetCurve.target(60000,600,3500)==2000);JSONObject storedTarget=new JSONObject();requested.put(storedTarget);check(OutdoorOptions.parse(storedTarget).same(requested));
+  JSONObject absent=new JSONObject().put("outdoor_target_curve_supported",false);JSONObject dormant=ConfigurationCompatibility.fit(storedTarget,absent,new JSONArray());check(!dormant.getBoolean(OutdoorTargetCurve.ENABLED)&&storedTarget.getBoolean(OutdoorTargetCurve.ENABLED));check(OutdoorTargetCurve.parse(dormant).points.same(requested.targetCurve.points));
+  absent.put("outdoor_target_curve_supported",true);check(ConfigurationCompatibility.fit(storedTarget,absent,new JSONArray()).getBoolean(OutdoorTargetCurve.ENABLED));
   System.out.println("App helper configuration: "+cases+" cases PASS; only packaged helper classes, no full-app classpath");
  }
 }''','utf-8')

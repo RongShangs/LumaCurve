@@ -27,9 +27,12 @@ public final class FeatureCompatibility {
         case "assist_sensor":JSONObject binding=object(runtime,"assist_compatibility");String mode=text(binding,"state"),kind=text(binding,"binding_kind");choice=kind.equals("native_auxiliary")||kind.equals("ported_auxiliary")?kind:mode.equals("native")?"native_auxiliary":mode.equals("bound")?"ported_auxiliary":"";break;
         case "hbm":choice=text(object(runtime,"outdoor"),"hbm_tuning_profile");String controller=text(object(runtime,"outdoor"),"hbm_controller_profile");if(controller.equals("enabled_field")||controller.equals("native_support_method"))result.add(controller);break;
         case "response":case "small_response":case "low_light":case "low_threshold":case "threshold_override":case "assist_gate":case "assist_override":choice=text(runtime,"response_scene_profile");break;
+        case "outdoor_curve":choice=runtime!=null&&runtime.optBoolean("outdoor_target_curve_supported")?"physical_outdoor_target":"";break;
+        case "outdoor_test":choice=text(object(runtime,"outdoor_light_test"),"profile");break;
         case "outdoor":choice=text(object(runtime,"outdoor"),"range_profile").equals("native_range_only")?"native_range_only":text(object(runtime,"outdoor"),"target_compatibility_profile");break;
         case "opr":case "nit_limit":choice=text(object(runtime,"outdoor"),"sdr_compatibility_profile");break;
         case "mapping_boot":case "mapping_startup":choice=text(object(entry,"startup"),"route");break;
+        case "suspended_window_brightness":choice=text(object(runtime,"suspended_window_brightness"),"profile");break;
         case "app_brightness_isolation":choice=text(object(runtime,"app_brightness_isolation"),"profile");break;
         case "app_brightness_share":choice="";break;
         case "app_independent":choice=text(object(object(runtime,"brightness_control"),"app_independent"),"profile");break;
@@ -60,6 +63,7 @@ public final class FeatureCompatibility {
         case "opr":case "nit_limit":return "SDR 适配："+(text(out,"sdr_compatibility_profile").isEmpty()?"未报告":text(out,"sdr_compatibility_profile"))+(text(out,"sdr_compatibility_detail").isEmpty()?"":"\n"+text(out,"sdr_compatibility_detail"))+(id.equals("opr")&&!text(out,"opr_envelope_profile").isEmpty()?"\nOPR 放宽范围："+text(out,"opr_envelope_profile")+(out.has("opr_envelope_max_nit")?" · "+out.optDouble("opr_envelope_max_nit")+" nit":"")+(text(out,"opr_envelope_detail").isEmpty()?"":"\n"+text(out,"opr_envelope_detail")):"");
         case "mapping_boot":JSONObject boot=object(entry,"startup");return text(boot,"path")+"\n"+text(entry,"detail")+"\n"+(boot.optBoolean("current_boot")?"本次开机：":"历史启动记录：")+text(object(boot,"last_result"),"state")+" · "+text(object(boot,"last_result"),"message");
         case "mapping_startup":JSONObject startup=object(entry,"startup");return "开机恢复："+text(startup,"state")+"\n"+text(startup,"detail")+"\n启动来源："+text(startup,"trigger")+" · "+text(startup,"dispatch")+"\n尝试次数："+(startup.optLong("elapsed_ms",0)>0?startup.optInt("attempt")+1:0)+"/"+startup.optInt("maximum_attempts",4);
+        case "suspended_window_brightness":JSONObject window=object(runtime,"suspended_window_brightness");return "小窗亮度："+text(window,"profile")+"\n"+text(window,"detail")+"\n已忽略请求："+window.optLong("blocked_requests");
         case "app_brightness_isolation":JSONObject isolation=object(runtime,"app_brightness_isolation");return "应用隔离："+text(isolation,"profile")+"\n"+text(isolation,"detail")+"\n已拦截同步："+isolation.optLong("blocked_syncs")+"\n窗口状态："+text(isolation,"state");
         case "app_independent":JSONObject independent=object(object(runtime,"brightness_control"),"app_independent");return "独立亮度："+text(independent,"profile")+"\n当前应用："+text(independent,"package")+"\n记忆归属："+text(independent,"key");
         case "apps":JSONObject c=object(runtime,"brightness_control");return c.has("app_multiwindow_supported")?c.optBoolean("app_multiwindow_supported")?"本机可见任务接口完整；已接入多窗口判断。":"本机仅提供已验证的焦点回退；不能保证小窗失焦时继续暂停。":"多窗口接口信息尚未报告。";

@@ -4,7 +4,7 @@ import org.json.*;
 
 /** Optional mode ownership, independent of curve learning and ordinary low-light tuning. */
 final class BrightnessControlOptions {
-    boolean appIsolation,appIsolationShare,darkLock,sunsetOnly,manualPanel=true,manualExit,partitionRestoreAuto=true;int nodeSliderMode,partitionMaximum,manualMaximum;
+    boolean appIsolation,appIsolationShare,appWindowBrightness,darkLock,sunsetOnly,manualPanel=true,manualExit,partitionRestoreAuto=true;int nodeSliderMode,partitionMaximum,manualMaximum;
     float enterLux=10,exitLux=50;
     int minutes=1,exitSeconds=1;
     final java.util.Set<String> manualApps=new java.util.LinkedHashSet<>();
@@ -41,7 +41,7 @@ final class BrightnessControlOptions {
     void putIndependent(JSONObject j)throws JSONException{JSONArray groups=new JSONArray();for(AppGroup g:independentGroups)groups.put(new JSONObject().put("id",g.id).put("name",g.name).put("apps",new JSONArray(g.apps)));j.put("independent_brightness_apps",new JSONArray(independentApps)).put("independent_brightness_groups",groups).put("independent_brightness_keep_lock",independentKeepLock).put("independent_brightness_keep_reboot",independentKeepReboot);}
     static BrightnessControlOptions parse(JSONObject j)throws JSONException {
         BrightnessControlOptions o=new BrightnessControlOptions();o.appIsolation=bool(j,"app_brightness_isolation",false);
-        o.appIsolationShare=bool(j,"app_brightness_isolation_share",false);
+        o.appIsolationShare=bool(j,"app_brightness_isolation_share",false);o.appWindowBrightness=bool(j,"suspended_window_brightness",false);
         o.nodeSliderMode=integer(j,"control_center_node_mode",0,0,4);o.partitionRestoreAuto=bool(j,"control_center_partition_restore_auto",true);o.partitionMaximum=integer(j,"control_center_partition_maximum",0,0,65535);
         o.darkLock=bool(j,"dark_lock_enabled",o.darkLock);o.sunsetOnly=bool(j,"dark_lock_sunset_only",false);o.manualPanel=bool(j,"manual_panel_enabled",true);
         o.manualMaximum=integer(j,"manual_panel_maximum",0,0,65535);if(o.manualMaximum>0&&o.manualMaximum<10)throw new IllegalArgumentException("主屏手动节点上限至少为 10");
@@ -66,16 +66,19 @@ final class BrightnessControlOptions {
     }
     void holdInDarkness(){BrightnessControlOptions o=new BrightnessControlOptions();darkLock=true;sunsetOnly=false;manualExit=o.manualExit;enterLux=o.enterLux;exitLux=o.exitLux;minutes=o.minutes;exitSeconds=o.exitSeconds;}
     void afterSunset(){holdInDarkness();sunsetOnly=true;}
+    boolean isolationRequested(){return appIsolation||appWindowBrightness;}
+    void setIsolation(boolean on){appIsolation=on;appWindowBrightness=on;}
+    static boolean isolationRequested(JSONObject stored)throws JSONException{boolean sync=bool(stored,"app_brightness_isolation",false),window=bool(stored,"suspended_window_brightness",false);return sync||window;}
     static boolean bool(JSONObject j,String key,boolean def){if(!j.has(key))return def;Object v=j.opt(key);if(!(v instanceof Boolean))throw new IllegalArgumentException("开关无效："+key);return (Boolean)v;}
     static float number(JSONObject j,String key,float def,float min,float max){if(!j.has(key))return def;Object v=j.opt(key);if(!(v instanceof Number))throw new IllegalArgumentException("参数无效："+key);float n=((Number)v).floatValue();if(!Float.isFinite(n)||n<min||n>max)throw new IllegalArgumentException("参数超出范围："+key);return n;}
     static int integer(JSONObject j,String key,int def,int min,int max){float n=number(j,key,def,min,max);if(n!=Math.rint(n))throw new IllegalArgumentException("参数必须为整数："+key);return (int)n;}
     static boolean validPackage(String p){return p!=null&&p.length()<=160&&p.matches("[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z][A-Za-z0-9_]*)+");}
-    void put(JSONObject j)throws JSONException{putIndependent(j);j.put("app_brightness_isolation",appIsolation).put("app_brightness_isolation_share",appIsolationShare);j.put("manual_panel_maximum",manualMaximum);j.remove("dark_lock_manual_hold");j.put("control_center_node_mode",nodeSliderMode).put("control_center_partition_restore_auto",partitionRestoreAuto).put("control_center_partition_maximum",partitionMaximum);j.put("dark_lock_enabled",darkLock).put("dark_lock_sunset_only",sunsetOnly).put("manual_panel_enabled",manualPanel).put("dark_lock_manual_exit",manualExit).put("manual_brightness_apps",new JSONArray(manualApps)).put("dark_lock_enter_lux",enterLux).put("dark_lock_exit_lux",exitLux).put("dark_lock_minutes",minutes).put("dark_lock_exit_seconds",exitSeconds);}
+    void put(JSONObject j)throws JSONException{putIndependent(j);j.put("suspended_window_brightness",appWindowBrightness);j.put("app_brightness_isolation",appIsolation).put("app_brightness_isolation_share",appIsolationShare);j.put("manual_panel_maximum",manualMaximum);j.remove("dark_lock_manual_hold");j.put("control_center_node_mode",nodeSliderMode).put("control_center_partition_restore_auto",partitionRestoreAuto).put("control_center_partition_maximum",partitionMaximum);j.put("dark_lock_enabled",darkLock).put("dark_lock_sunset_only",sunsetOnly).put("manual_panel_enabled",manualPanel).put("dark_lock_manual_exit",manualExit).put("manual_brightness_apps",new JSONArray(manualApps)).put("dark_lock_enter_lux",enterLux).put("dark_lock_exit_lux",exitLux).put("dark_lock_minutes",minutes).put("dark_lock_exit_seconds",exitSeconds);}
     static boolean mappingRecoveryWanted(JSONObject config){return config!=null&&config.optBoolean("enabled")&&config.optInt("user_serial",-1)==0&&config.optInt("control_center_node_mode",0)>0&&config.optInt("control_center_node_mode",0)<=4;}
     static String capability(int mode){return mode==4?"control_center_partition_supported":mode==3?"control_center_raw_supported":"control_center_slider_supported";}
     void verify(JSONObject state){if(nodeSliderMode>0&&!state.optBoolean(capability(nodeSliderMode)))throw new IllegalArgumentException("本机控制中心节点输出接口尚未兼容");if(darkLock&&!state.optBoolean("dark_lock_supported"))throw new IllegalArgumentException("本机暗光锁定所需的主屏与光感接口尚未就绪");if(!manualApps.isEmpty()&&!state.optBoolean("app_auto_supported"))throw new IllegalArgumentException("本机前台应用事件接口尚未兼容");}
     static int manualCeiling(int configured,int device){return configured==0?device:Math.min(configured,device);}
-    boolean same(BrightnessControlOptions o){return appIsolation==o.appIsolation&&nodeSliderMode==o.nodeSliderMode&&partitionRestoreAuto==o.partitionRestoreAuto&&partitionMaximum==o.partitionMaximum&&manualMaximum==o.manualMaximum&&sameOwnership(o);}
+    boolean same(BrightnessControlOptions o){return appIsolation==o.appIsolation&&appWindowBrightness==o.appWindowBrightness&&nodeSliderMode==o.nodeSliderMode&&partitionRestoreAuto==o.partitionRestoreAuto&&partitionMaximum==o.partitionMaximum&&manualMaximum==o.manualMaximum&&sameOwnership(o);}
     // Coordinate presentation does not own automatic mode or a held dark-lock target.
     boolean sameOwnership(BrightnessControlOptions o){return darkLock==o.darkLock&&sunsetOnly==o.sunsetOnly&&manualPanel==o.manualPanel&&manualExit==o.manualExit&&manualApps.equals(o.manualApps)&&independentSignature().equals(o.independentSignature())&&enterLux==o.enterLux&&exitLux==o.exitLux&&minutes==o.minutes&&exitSeconds==o.exitSeconds;}
 }

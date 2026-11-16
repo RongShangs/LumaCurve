@@ -19,7 +19,7 @@
 | [HBM 控制器与计时](hbm.md) | HBM触发与预算 |
 | [户外增强目标](outdoor.md) | 户外增强目标 |
 | [高亮范围](range.md) | 开放高亮范围 |
-| [灰阶放宽与物理 nit 限制](sdr.md) | 强光下放宽画面限亮、户外nit上限 |
+| [灰阶放宽与物理 nit 限制](sdr.md) | 强光下放宽画面限亮、户外nit上限、放宽后高亮曲线 |
 | [显示层温控](thermal.md) | 显示层温控调整 |
 | [主屏输出隔离](raw_output.md) | 主屏手动节点面板、户外节点高亮入口 |
 | [真实主屏节点](node.md) | 主屏节点发现及读数 |
@@ -30,6 +30,9 @@
 | [熄屏前降亮与息屏显示协调](dim_aod.md) | 熄屏前降亮协调 |
 | [应用临时亮度隔离](app_brightness_isolation.md) | 应用临时亮度隔离 |
 | [控制中心开机恢复](mapping_startup.md) | Android开机恢复、Root开机恢复 |
+| [短时强光输入模拟](outdoor_test.md) | 主动强光激发测试 |
+| [独立高亮目标曲线](outdoor_curve.md) | 独立高亮目标曲线 |
+| [挂起小窗亮度隔离](suspended_window_brightness.md) | 挂起小窗亮度隔离 |
 | [界面与使用工具](interface.md) | 欢迎与五页教程、快速设置、设置搜索、状态页、悬浮导航与滚动、深浅色界面、检查更新与下载、配置工具与恢复默认、运行与兼容及诊断、关于、感谢和贡献、统一应用名单管理、旧版窗口亮度共享（已停用） |
 
 版本变化单独见 [releases](../releases/)，当前任务单独见 [work-status](../work-status.md)。

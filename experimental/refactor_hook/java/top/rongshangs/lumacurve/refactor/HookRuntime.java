@@ -19,6 +19,7 @@ final class HookRuntime {
     final DeferredStateWriter stateWriter;
     final ThermalPolicy thermalGate=new ThermalPolicy();
     final OutdoorController outdoor=new OutdoorController(this);
+    final OutdoorLightTest outdoorTest=new OutdoorLightTest(this);
     final SceneController scenes=new SceneController(this);
     final BrightnessControl brightnessControl;
     final OutdoorNodeBridge outdoorNode=new OutdoorNodeBridge(this);
@@ -63,7 +64,7 @@ final class HookRuntime {
         thermalListener=level->{if(closed)return;thermalSeverity=level;environmentChanged();};
         batteryListener=new BroadcastReceiver(){public void onReceive(Context c,Intent intent){if(closed)return;
             if(Intent.ACTION_CONFIGURATION_CHANGED.equals(intent.getAction())){themeChanged();return;}
-            if(Intent.ACTION_SCREEN_OFF.equals(intent.getAction())){outdoorNode.release();persistentMemory.screenOff();assistGate.reset();brightnessControl.screenOff();return;}
+            if(Intent.ACTION_SCREEN_OFF.equals(intent.getAction())){outdoorTest.stop("screen_off");outdoorNode.release();persistentMemory.screenOff();assistGate.reset();brightnessControl.screenOff();return;}
             if(Intent.ACTION_SCREEN_ON.equals(intent.getAction())){persistentMemory.screenOn();handler.post(brightnessControl::screenOn);return;}
             if(Intent.ACTION_TIME_CHANGED.equals(intent.getAction())||Intent.ACTION_TIMEZONE_CHANGED.equals(intent.getAction())){brightnessControl.schedule.refresh();brightnessControl.tick();return;}
             if(Intent.ACTION_USER_PRESENT.equals(intent.getAction())){handler.post(brightnessControl::screenOn);return;}
@@ -94,7 +95,7 @@ final class HookRuntime {
     }
     void close(){
         if(closed)return;
-        stateWriter.close();controlCenter.close();
+        outdoorTest.stop("engine_closed");stateWriter.close();controlCenter.close();
         outdoorNode.close();persistentMemory.close();brightnessControl.close();
         closed=true;memoryLifecycle.close();
         try{context.getContentResolver().unregisterContentObserver(observer);}catch(Throwable ignored){}
@@ -108,6 +109,7 @@ final class HookRuntime {
     }
     void environmentChanged(){
         if(closed)return;
+        outdoorTest.check();
         outdoor.tick();
         outdoorNode.changed();
         boolean before=thermalAllowed;boolean now=relaxThermal();thermalAllowed=now;
@@ -175,7 +177,7 @@ final class HookRuntime {
             refreshUserIdentity();
             String text=Settings.Global.getString(context.getContentResolver(),CONFIG);
             if(configProcessed&&Objects.equals(text,processedConfig)){publishAcknowledgement();return;}
-            processedConfig=text;configProcessed=true;featureChecks.run(selfCheckRequest);selfCheckRequest="configuration-start";
+            outdoorTest.stop("configuration_changed");processedConfig=text;configProcessed=true;featureChecks.run(selfCheckRequest);selfCheckRequest="configuration-start";
             lowLightEnabled=false;
             if(text==null||text.equals("null")){
                 if(kernel.plan()!=null)kernel.configure(null);disableOverrides();memoryStrength=1;phase="attached";revision="";message="已连接 · 官方曲线";
@@ -201,7 +203,7 @@ final class HookRuntime {
                     // A temporarily unavailable display/sensor at boot must not disable the curve.
                     // RootControl validates capabilities before applying; this feature retries readiness itself.
                     BrightnessControlOptions controls=BrightnessControlOptions.parseStored(config);
-                    OutdoorOptions outdoorOptions=OutdoorOptions.parse(config);JSONObject outdoorCaps=outdoor.status();outdoorOptions.verify(new JSONObject().put("outdoor_supported",outdoorCaps.optBoolean("supported")).put("outdoor_hbm_supported",outdoorCaps.optBoolean("hbm_tuning_supported")).put("outdoor_range_supported",outdoorCaps.optBoolean("range_supported")).put("outdoor_opr_supported",outdoorCaps.optBoolean("opr_supported")).put("outdoor_nit_limit_supported",outdoorCaps.optBoolean("nit_limit_supported")).put("outdoor_node_supported",OutdoorNodeProfile.matches(kernel.name(),kernel.max,65535,RawPanelOutputHooks.supports(owner.getClass()),outdoor.rangeSupported())));outdoor.validateNitLimit(outdoorOptions);
+                    OutdoorOptions outdoorOptions=OutdoorOptions.parse(config);JSONObject outdoorCaps=outdoor.status();outdoorOptions.verify(new JSONObject().put("outdoor_supported",outdoorCaps.optBoolean("supported")).put("outdoor_hbm_supported",outdoorCaps.optBoolean("hbm_tuning_supported")).put("outdoor_range_supported",outdoorCaps.optBoolean("range_supported")).put("outdoor_opr_supported",outdoorCaps.optBoolean("opr_supported")).put("outdoor_nit_limit_supported",outdoorCaps.optBoolean("nit_limit_supported")).put("outdoor_target_curve_supported",outdoorCaps.optBoolean("target_curve_supported")).put("outdoor_node_supported",OutdoorNodeProfile.matches(kernel.name(),kernel.max,65535,RawPanelOutputHooks.supports(owner.getClass()),outdoor.rangeSupported())));outdoor.validateNitLimit(outdoorOptions);
                     SceneOptions proposedScenes=SceneOptions.parse(config);JSONObject sceneCaps=new JSONObject();scenes.put(sceneCaps);proposedScenes.verify(sceneCaps);
                     AdvancedOptions proposed=AdvancedOptions.parse(config);JSONObject capabilities=new JSONObject();AdvancedTuning.capabilities((key,value)->capabilities.put(key,value),this);proposed.verify(capabilities);
                     float lowLimit=(float)config.optDouble("low_light_limit",50);long lowBright=config.optLong("low_light_brighten",3000),lowDark=config.optLong("low_light_darken",4000);LowLightPolicy.validate(lowLimit,lowBright,lowDark);
@@ -311,7 +313,7 @@ final class HookRuntime {
     }
     void refreshUserIdentity(){if(kernel.usesRuntimeUserIdentity())HookEntry.refreshCurrentUser(context);}
     boolean appliesToUser(){try{return ForegroundUser.matches(boundUser,kernel.integer("mUserSerial"));}catch(Throwable error){return false;}}
-    void userChanged(){disableOverrides();try{kernel.configure(null);phase="error";message="用户已切换，恢复官方策略";log(message);publish();}catch(Throwable error){fault(error);}}
+    void userChanged(){outdoorTest.stop("user_changed");disableOverrides();try{kernel.configure(null);phase="error";message="用户已切换，恢复官方策略";log(message);publish();}catch(Throwable error){fault(error);}}
     void sample(float lux,float nit){
         if(!onDisplayThread()||!Float.isFinite(lux)||!Float.isFinite(nit)||lux<0||nit<0)return;
         lastLux=lux;lastNit=nit;lastBrightness=Float.NaN;if(kernel.plan()!=null)consumed++;
@@ -337,7 +339,7 @@ final class HookRuntime {
                 .put("factory_lux",array(kernel.factoryLux)).put("factory_logical_nit",array(kernel.factoryNit)).put("min_logical_nit",kernel.min).put("max_logical_nit",kernel.max)
                 .put("thermal_supported",HookEntry.thermalSupported.contains(owner.getClass())).put("thermal_relax",thermalEnabled)
                 .put("thermal_permitted",relaxThermal()).put("thermal_ceiling",thermalCeiling).put("thermal_severity",thermalSeverity)
-                .put("thermal_skipped",thermalSkipped).put("logs",new JSONArray(logs)).put("feature_self_check",featureChecks.report).put("dim_aod_compatibility",DimAodCompatibility.status(this)).put("app_brightness_isolation",AppBrightnessIsolation.status(this)).put("main_input_compatibility",BrightnessSensorAccess.evidence(owner)).put("compatibility_paused",compatibilityPaused)
+                .put("thermal_skipped",thermalSkipped).put("logs",new JSONArray(logs)).put("feature_self_check",featureChecks.report).put("dim_aod_compatibility",DimAodCompatibility.status(this)).put("app_brightness_isolation",AppBrightnessIsolation.status(this)).put("suspended_window_brightness",AppWindowBrightness.status(this)).put("main_input_compatibility",BrightnessSensorAccess.evidence(owner)).put("compatibility_paused",compatibilityPaused)
                 .put("response_scene_profile",ResponseTuning.sceneProfile(owner));
             AutomaticModeAccess.put(status,kernel);
             AdvancedTuning.capabilities((key,value)->status.put(key,value),this);JSONObject settings=new JSONObject();advanced.put(settings);status.put("advanced_options",settings)
@@ -377,7 +379,7 @@ final class HookRuntime {
             if(Float.isFinite(lastLux))status.put("last_lux",lastLux);
             if(Float.isFinite(lastNit))status.put("calculated_physical_nit",lastNit);
             if(Float.isFinite(lastBrightness))status.put("calculated_brightness",lastBrightness);
-            ScreenBrightnessReading.capture(owner,status);
+            outdoorTest.check();ScreenBrightnessReading.capture(owner,status);outdoorTest.observe(status);status.put("outdoor_light_test",outdoorTest.status());
             if(controlCenter.curveDisplayRange!=null)status.put("curve_display_range",controlCenter.curveDisplayRange);
             if(controlCenter.screenNitCalibration!=null)status.put("screen_nit_calibration",controlCenter.screenNitCalibration).put("screen_nit_physical",controlCenter.screenNitPhysical);
             CurvePlan plan=kernel.plan();if(plan!=null){float[] handles=new float[4];for(int i=0;i<4;i++)handles[i]=plan.at(kernel.factoryLux[i]);status.put("active_logical_nit",array(handles)).put("applied_base_lux",array(kernel.baselineLux())).put("applied_base_nit",array(kernel.baselineNit()));}

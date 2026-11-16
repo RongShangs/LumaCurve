@@ -19,11 +19,15 @@ public class FirmwareTest{
   check(ConfigurationCompatibility.canReuse(c,actual,c.getString("fingerprint")));
   for(String key:new String[]{"baseline_id","curve_backend","user_serial"}){JSONObject changed=new JSONObject(actual.toString());changed.put(key,key.equals("user_serial")?1:"changed");check(!ConfigurationCompatibility.canReuse(c,changed,ota));}
   check(!ConfigurationCompatibility.canReuse(null,actual,ota));check(!ConfigurationCompatibility.canReuse(c,null,ota));
+  JSONObject targetStored=new JSONObject(c.toString()).put(OutdoorTargetCurve.ENABLED,true).put(OutdoorTargetCurve.POINTS,new JSONArray().put(new JSONObject().put("lux",10000).put("nit",1200)).put(new JSONObject().put("lux",40000).put("nit",2000)));
+  actual.put("outdoor_target_curve_supported",false);JSONObject proposal=new JSONObject(targetStored.toString());JSONObject checked=ConfigurationCompatibility.submissionValidation(proposal,actual,targetStored,ota);check(!checked.getBoolean(OutdoorTargetCurve.ENABLED)&&proposal.getBoolean(OutdoorTargetCurve.ENABLED)&&targetStored.getBoolean(OutdoorTargetCurve.ENABLED));check(OutdoorTargetCurve.parse(checked).points.same(OutdoorTargetCurve.parse(targetStored).points));
+  proposal.getJSONArray(OutdoorTargetCurve.POINTS).getJSONObject(1).put("nit",2100);check(ConfigurationCompatibility.submissionValidation(proposal,actual,targetStored,ota).getBoolean(OutdoorTargetCurve.ENABLED));
+  actual.put("outdoor_target_curve_supported",true);check(ConfigurationCompatibility.submissionValidation(targetStored,actual,targetStored,ota).getBoolean(OutdoorTargetCurve.ENABLED));
   c.remove("baseline_id");reject(c,"Vendor/product/device:17/new/build:user/keys","physical_mapping","baseline");
   System.out.println("Firmware revalidation: "+cases+" cases PASS; actual policy, Android not tested");
  }
 }''',encoding='utf-8')
-c=O/'classes';c.mkdir(exist_ok=True);subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(J),'-d',str(c),str(p),str(S/'BrightnessControlOptions.java'),str(S/'ConfigurationCompatibility.java'),str(S/'OutdoorOptions.java'),str(S/'OutdoorNodeTarget.java'),str(S/'AdvancedPolicy.java'),str(S/'MemoryOptions.java')],check=True)
+c=O/'classes';c.mkdir(exist_ok=True);subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(J),'-d',str(c),str(p),str(S/'BrightnessControlOptions.java'),str(S/'ConfigurationCompatibility.java'),str(S/'OutdoorTargetCurve.java'),str(S/'OutdoorOptions.java'),str(S/'OutdoorNodeTarget.java'),str(S/'AdvancedPolicy.java'),str(S/'MemoryOptions.java')],check=True)
 subprocess.run(['java','-cp',str(c)+';'+str(J),'top.rongshangs.lumacurve.refactor.FirmwareTest'],check=True)
 fixture=R/'build/analysis-20261015-131612-99130d/state.json'
 if fixture.exists():

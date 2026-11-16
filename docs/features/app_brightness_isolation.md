@@ -8,18 +8,18 @@
 
 | 项目 | 要求 |
 | --- | --- |
-| 触发 | 隔离已启用，原生窗口覆盖同步来源、用户及屏幕可证明，且无更高优先级控制者。 |
-| 需求与行为 | 允许原生窗口临时调亮/调暗，只阻止其同步成为系统亮度偏好。页面和入口统一命名应用临时亮度隔离，仅保留一个隔离开关及说明；原生已隔离时显示开启和系统说明，不提供伪关闭，不修改已保存模块选择。独立亮度接管期间同样保护全局偏好。 简介以阻止同步到系统亮度偏好为主语，不写允许应用调亮；保留非控制中心操作、视频播放与付款码例子，以及控制中心主动调整不受影响的说明。 |
-| 退出 / 失败 | 窗口撤销或退出后交回系统，不延续窗口值；主动调节、失配、HDR或其他控制权优先。原生已隔离状态只读显示。 |
-| 默认 | `off` · 新配置关闭 |
-| 配置键 | `app_brightness_isolation` |
+| 触发 | 用户打开统一隔离开关并保存；Beta19旧两项设置中任一已开即继承开启。运行副本先合并意图，再分别按同步与小窗能力裁剪。 |
+| 需求与行为 | 页面只保留“隔离应用临时亮度”一个开关，统一阻止窗口临时亮度同步成为系统亮度偏好，并按窗口状态处理请求：正常视频小窗保留临时亮度；最小浮窗或贴边挂起时忽略该窗口请求，交回系统或其他有效窗口；关闭或完全后台由原生撤销；控制中心主动调整优先。保留非控制中心操作、视频播放和付款码说明，不记忆、延续或重放临时亮度。保存的统一意图与系统原生状态分开：原生已隔离时明确说明原生功能仍在，开关控制模块补充处理，不假称可以关闭系统原生隔离。两项能力独立检查、独立失败；缺一项保留另一项并显示部分能力未就绪，不用统一开关代替兼容检测。独立亮度租约仍保护系统偏好。 四种状态以窗口状态/处理方式两列表格展示，不写成长段文字；表格共用一个14dp圆角背景并裁剪外部四角，内部只用细分隔线，正文可换行且两列按宽度分配，统一浅深色语义底色与文字；保留简短视频/付款码说明。 页面保留简短视频/付款码示例与圆角规则表格；不显示重复的“不记忆或延续”和正常启用确认。原生隔离未关闭及能力未就绪提示保留，隐藏行不占高度。 |
+| 退出 / 失败 | 关闭统一开关同时撤销模块同步隔离与最小/挂起请求过滤；原生自带隔离继续保留。缺接口不改保存原文；所有旧路线、主动调节、HDR及其他控制权规则保留。 |
+| 默认 | `off` · 模块统一开关默认关闭；已有任一显式隔离选择继承开启，原生行为不变 |
+| 配置键 | `app_brightness_isolation`、`suspended_window_brightness` |
 | 依赖能力 | 由本项实际接口独立判断 |
 
 ## 分叉与收束
 
 ### 选择边界
 
-按实际类型、方法与来源选路；完整同步ABI时仅在同一主屏/用户/窗口调用帧内拦截偏好同步；三个同步入口全缺且窗口消费者完整时沿用原生隔离，不按OS版本推断。原生已隔离显示开启且不可伪关闭，不改保存的模块选择。旧版窗口共享已停用，历史路线与保存字段留档。独立亮度持有应用租约时同样阻止窗口写入全局偏好。
+按实际类型、方法与来源选路；完整同步ABI时仅在同一主屏/用户/窗口调用帧内拦截偏好同步；三个同步入口全缺且窗口消费者完整时沿用原生隔离，不按OS版本推断。原生隔离作为实际状态说明保留；页面唯一开关控制模块同步隔离与最小/挂起处理，不假称能关闭原生行为。旧版窗口共享已停用，历史路线与保存字段留档。独立亮度持有应用租约时同样阻止窗口写入全局偏好。
 
 | 契约 | 内容 |
 | --- | --- |
@@ -29,7 +29,7 @@
 
 ### 清理及回滚
 
-5个必要Hook事务回滚；ThreadLocal按栈恢复；用户主动调节、HDR、非主屏/用户、无匹配来源或不完整ABI沿用系统。仅阻止同步，不记忆或重放窗口值。页面不再提供共享和名单；不借原生状态重写用户保存配置。
+5个必要Hook事务回滚；ThreadLocal按栈恢复；用户主动调节、HDR、非主屏/用户、无匹配来源或不完整ABI沿用系统。仅阻止同步，不记忆或重放窗口值。页面只提供一个统一隔离开关；Beta19任一旧选择已开即继承。原生状态不重写用户保存配置。
 
 ## 已实现的兼容路线
 
@@ -57,7 +57,7 @@
 | 文件 | 当前源码 SHA-256 前16位 |
 | --- | --- |
 | [AppBrightnessIsolation.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/AppBrightnessIsolation.java) | `593b568b51dc57fe` |
-| [AppIsolationSettings.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/AppIsolationSettings.java) | `41b486e1f20ececf` |
-| [BrightnessControl.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/BrightnessControl.java) | `f957288314b2835a` |
-| [BrightnessControlOptions.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/BrightnessControlOptions.java) | `88d3df8b4bbe475f` |
-| [HookRuntime.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/HookRuntime.java) | `f1cdc6bfa6a1d706` |
+| [AppIsolationSettings.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/AppIsolationSettings.java) | `390011a16a79bd1b` |
+| [BrightnessControl.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/BrightnessControl.java) | `7f6e8cc411da5e30` |
+| [BrightnessControlOptions.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/BrightnessControlOptions.java) | `e5078bc085530fa2` |
+| [HookRuntime.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/HookRuntime.java) | `3363c0fe90e8ef02` |

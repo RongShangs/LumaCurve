@@ -122,7 +122,7 @@ for scenario in ['modern','modern_dual','legacy','unknown_privacy','unknown_layo
     for name,text in sources.items():
         dest=out/name;dest.parent.mkdir(parents=True,exist_ok=True);dest.write_text(text,encoding='utf-8')
     classes=out/'classes';classes.mkdir(exist_ok=True)
-    production=[SRC/'hooking/HookTransaction.java']+[SRC/(n+'.java') for n in ['OutdoorNodeTarget','OutdoorOptions','OutdoorPolicy','HbmAccess','OutdoorController','OutdoorTuning','OutdoorOpr','OutdoorOprEnvelope','OutdoorSdrScope','ThermalPolicy','AdvancedPolicy','LiveLimitEvidence','NitBrightnessLimit']]
+    production=[SRC/'hooking/HookTransaction.java']+[SRC/(n+'.java') for n in ['OutdoorNodeTarget','OutdoorTargetCurve','OutdoorOptions','OutdoorPolicy','HbmAccess','OutdoorController','OutdoorTuning','OutdoorOpr','OutdoorOprEnvelope','OutdoorSdrScope','ThermalPolicy','AdvancedPolicy','LiveLimitEvidence','NitBrightnessLimit']]
     subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(JSON),'-d',str(classes),*map(str,production),*[str(out/n) for n in sources]],check=True)
     result=subprocess.run(['java','-cp',str(classes)+';'+str(JSON),'top.rongshangs.lumacurve.refactor.OutdoorCompatibilityTest',scenario],check=True,capture_output=True,text=True)
     print(result.stdout,end='');total+=int(re.search(r'(\d+) cases PASS',result.stdout).group(1))

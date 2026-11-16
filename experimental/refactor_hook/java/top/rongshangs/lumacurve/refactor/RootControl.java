@@ -325,6 +325,13 @@ public final class RootControl implements AutoCloseable {
         for(int i=0;i<120;i++){String raw=settings.get("hyperlux_brightness_ack_v1");if(raw!=null){JSONObject ack=new JSONObject(raw);if(id.equals(ack.optString("id")))return ack;}Thread.sleep(25);}
         throw new IOException("系统尚未确认亮度请求，请重新打开面板");
     }
+    JSONObject outdoorTest(String payload)throws Exception{
+        if(payload==null||payload.length()>512)throw new IOException("强光测试请求无效");
+        JSONObject request=new JSONObject(new String(Base64.getDecoder().decode(payload),StandardCharsets.UTF_8));String action=request.getString("action");
+        if(!action.equals("start")&&!action.equals("stop"))throw new IOException("强光测试操作无效");
+        request.put("action","outdoor_test_"+action);JSONObject ack=brightness(Base64.getEncoder().encodeToString(request.toString().getBytes(StandardCharsets.UTF_8)));
+        if(!ack.optBoolean("ok"))throw new IOException(ack.optString("message","强光测试未确认"));return inspect().put("outdoor_test_result",ack);
+    }
     JSONObject rawPanel(String payload)throws Exception{
         String step="读取主屏状态";
         try{
@@ -397,6 +404,7 @@ public final class RootControl implements AutoCloseable {
         if(command.equals("restart-system-ui"))return SystemUiAccess.restart(settings);
         if(command.equals("inspect"))return inspect();
         if(command.equals("self-check")){selfCheckNext=true;selfCheckReason="app-start".equals(payload)?"app-start":"manual";try{return inspect();}finally{selfCheckNext=false;selfCheckReason="manual";}}
+        if(command.equals("outdoor-test"))return outdoorTest(payload);
         if(command.equals("raw-panel")&&payload!=null)return rawPanel(payload);
         if(command.equals("brightness")&&payload!=null)return brightness(payload);
         if(command.equals("export-config")&&payload!=null){byte[] raw=Base64.getDecoder().decode(payload);if(raw.length>ConfigurationFile.LIMIT)throw new IOException("配置文件过大");JSONObject document=new JSONObject(new String(raw,StandardCharsets.UTF_8));if(!ConfigurationFile.FORMAT.equals(document.optString("format"))||document.getInt("schema")!=2||!document.has("options"))throw new IOException("不是兼容的 HyperLux 配置文件");byte[] bytes=document.toString(2).getBytes(StandardCharsets.UTF_8);if(bytes.length>ConfigurationFile.LIMIT)throw new IOException("配置文件过大");File file=new File("/sdcard","HyperLux-config-"+new SimpleDateFormat("yyyyMMdd-HHmmss",Locale.ROOT).format(new Date())+"-"+UUID.randomUUID().toString().substring(0,8)+".json");Files.createFile(file.toPath());try(FileOutputStream output=new FileOutputStream(file)){output.write(bytes);output.getFD().sync();}catch(Exception failure){file.delete();throw failure;}return new JSONObject().put("ok",true).put("path",file.getAbsolutePath());}

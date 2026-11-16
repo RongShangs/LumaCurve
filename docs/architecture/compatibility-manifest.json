@@ -518,7 +518,7 @@
         "ApplicationCategories.java",
         "DeferredStateWriter.java"
       ],
-      "selector": "旧暂停名单继续使用manual_brightness_apps及可见任务优先/缺接口才焦点回退。独立应用仅匹配已核验的同用户默认屏焦点，逐应用或稳定组ID选择一个固定值；最多3组、名单互斥。普通范围、窗口覆盖读数及原生setTemporaryBrightness接口完整才安装独立输入观察；不从窗口或实际输出学习，不按机型版本判断。视频分类取ApplicationInfo.category并按精确包名补充常用国内视频应用，游戏另可取本机专用分类文件；混合影像名单不整份当作视频。 迁移先生成只读草稿，弹窗确认后记录原处关闭；取消不得修改任何旧选择。批选迁移一次确认，返回时名单和已确认移除记录原子提交。 手动输入按真实原生入口及调用帧识别；窗口处于显示状态不等于该输入来自窗口，用户普通控制中心输入可记忆，窗口自身调用帧排除。 独立亮度接口探测与观察安装分离：启动/自检只读，首次实际接管才安装输入观察；恢复旧租约不因此安装新观察。 独立接口还核验ABC原生用户学习入口及DBC设置消费/临时值清理入口，按物理对象和显示线程隔离独立会话学习。 独立手动交接观察复用已核验DBC设置消费者，只在当前物理主屏/显示线程发出有界单次任务；实际模式与亮度的读取、写入均延后到原生锁栈退出。",
+      "selector": "旧暂停名单继续使用manual_brightness_apps及可见任务优先/缺接口才焦点回退。独立应用仅匹配已核验的同用户默认屏焦点，逐应用或稳定组ID选择一个固定值；最多3组、名单互斥。普通范围、窗口覆盖读数及原生setTemporaryBrightness接口完整才安装独立输入观察；不从窗口或实际输出学习，不按机型版本判断。视频分类取ApplicationInfo.category并按精确包名补充常用国内视频应用，游戏另可取本机专用分类文件；混合影像名单不整份当作视频。 迁移先生成只读草稿，弹窗确认后记录原处关闭；取消不得修改任何旧选择。批选迁移一次确认，返回时名单和已确认移除记录原子提交。 手动输入按真实原生入口及调用帧识别；窗口处于显示状态不等于该输入来自窗口，用户普通控制中心输入可记忆，窗口自身调用帧排除。 独立亮度接口探测与观察安装分离：启动/自检只读，首次实际接管才安装输入观察；恢复旧租约不因此安装新观察。 独立接口还核验ABC原生用户学习入口及DBC设置消费/临时值清理入口，按物理对象和显示线程隔离独立会话学习。 独立手动交接观察复用已核验DBC设置消费者，只在当前物理主屏/显示线程发出有界单次任务；实际模式与亮度的读取、写入均延后到原生锁栈退出。 完整任务窗口模式接口可用时仅全屏焦点进入独立亮度；配置变化触发一次既有前台查询，小窗还原全屏无需重新启动。接口缺失保留既有焦点路线；已存在接口读取损坏不冒充全屏。",
       "evidence": [
         "brightness_control.app_multiwindow_supported",
         "app_independent_supported",
@@ -533,7 +533,7 @@
         "brightness_control.app_independent.memory_load_attempts",
         "brightness_control.app_independent.memory_load_retry_queued"
       ],
-      "cleanup": "复用BrightnessControl应用租约，模式改动前持久记录恢复意图；退出恢复原模式及仍拥有的基线，用户主动开启自动亮度优先。暂停名单可见性规则保持；独立名单按焦点退出。屏幕事件立即撤销手动输入许可，清理延迟任务；默认锁屏清空，可显式保留锁屏/重启记忆。用户/物理屏/范围标定绑定变化拒绝旧值，异步读取按代次丢弃，写入合并为有界快照。列表页离开停止读取图标及分类，无新服务或持续轮询。 名单页先创建窗口内容再取系统栏控制器，控制器为空保留默认外观，不阻止打开页面。 退出仍拥有的独立值先恢复基线，原生消费待处理设置并清除临时值/用户更新标记后才恢复自动模式；不动外部后来写入的亮度。 等待原生模式确认的补交付按租约代次取消；先到的用户拖动与外部后来写入优先，不后台重试或轮询。 名单页只固定顶栏与搜索，批选/计数/名单共用列表滚动；连续圆角背景只画数据区域，行保持透明与回收。底部安全距离放滚动尾部，不缩短整个页面视口；导航栏透明，键盘出现时按实际遮挡预留。 分组页面缓存只缓存表现，删除/重命名回调按稳定ID解析当前草稿；确认前再次解析，已删除ID不复活或命中同名新组。名单Activity保持主题不透明窗口与静止背景，关闭双向系统整窗动画，仅内容淡变/轻位移，禁用系统动画时直接呈现。快速返回/离页取消旧内容动画并复原属性，退出被后台打断仍返回一次原草稿，不留旧完成回调。 快速交接先按原租约补存未合并的明确输入；跨锁屏候选在原生锁栈外处理，默认清空仍保留。存档提交被执行器拒绝不视为已加载，同一绑定最多3次、250/1000毫秒有界重试；锁屏/配置/停用撤销重试，过期回执拒绝，未读存档不被快照覆盖。",
+      "cleanup": "复用BrightnessControl应用租约，模式改动前持久记录恢复意图；退出恢复原模式及仍拥有的基线，用户主动开启自动亮度优先。暂停名单可见性规则保持；独立名单按焦点退出。屏幕事件立即撤销手动输入许可，清理延迟任务；默认锁屏清空，可显式保留锁屏/重启记忆。用户/物理屏/范围标定绑定变化拒绝旧值，异步读取按代次丢弃，写入合并为有界快照。列表页离开停止读取图标及分类，无新服务或持续轮询。 名单页先创建窗口内容再取系统栏控制器，控制器为空保留默认外观，不阻止打开页面。 退出仍拥有的独立值先恢复基线，原生消费待处理设置并清除临时值/用户更新标记后才恢复自动模式；不动外部后来写入的亮度。 等待原生模式确认的补交付按租约代次取消；先到的用户拖动与外部后来写入优先，不后台重试或轮询。 名单页只固定顶栏与搜索，批选/计数/名单共用列表滚动；连续圆角背景只画数据区域，行保持透明与回收。底部安全距离放滚动尾部，不缩短整个页面视口；导航栏透明，键盘出现时按实际遮挡预留。 分组页面缓存只缓存表现，删除/重命名回调按稳定ID解析当前草稿；确认前再次解析，已删除ID不复活或命中同名新组。名单Activity保持主题不透明窗口与静止背景，关闭双向系统整窗动画，仅内容淡变/轻位移，禁用系统动画时直接呈现。快速返回/离页取消旧内容动画并复原属性，退出被后台打断仍返回一次原草稿，不留旧完成回调。 快速交接先按原租约补存未合并的明确输入；跨锁屏候选在原生锁栈外处理，默认清空仍保留。存档提交被执行器拒绝不视为已加载，同一绑定最多3次、250/1000毫秒有界重试；锁屏/配置/停用撤销重试，过期回执拒绝，未读存档不被快照覆盖。 模块自身模式写入通知按有界待确认队列消费，不将延迟恢复自动亮度误当用户豁免；真正外部模式变化和已有控制中心指令仍优先。",
       "tests": [
         "tests/refactor_brightness_control.py",
         "tests/refactor_foreground_firmware.py",
@@ -623,7 +623,8 @@
         "OutdoorTuning.java",
         "OutdoorController.java",
         "HbmAccess.java",
-        "OutdoorPolicy.java"
+        "OutdoorPolicy.java",
+        "OutdoorSettings.java"
       ],
       "selector": "覆盖目标入口优先；明确缺入口且旧调用所有权完整时走传统自定义目标，残缺覆盖接口不回退。 原生HBM数据确实为null且deviceSupportsHbm为false，普通范围和当前上限均有效时采用native_range_only；目标沿用同一自动SDR入口，限制到实时原生上限，不制造HBM配置或绕开原生下游保护。存在但残缺的数据仍拒绝。 HBM 数据身份按 HbmAccess 变体选择；两种身份之外的结构整体拒绝。",
       "evidence": [
@@ -635,7 +636,8 @@
       "tests": [
         "tests/refactor_outdoor.py",
         "tests/refactor_os3_compatibility.py",
-        "tests/refactor_hook_transactions.py"
+        "tests/refactor_hook_transactions.py",
+        "tests/refactor_opr_curve_ui.py"
       ],
       "composition": "exclusive",
       "convergence": {
@@ -692,7 +694,8 @@
       "name": "灰阶放宽与物理 nit 限制",
       "features": [
         "opr",
-        "nit_limit"
+        "nit_limit",
+        "opr_curve"
       ],
       "routes": [
         "privacy_aware",
@@ -702,23 +705,35 @@
         "OutdoorSdrScope.java",
         "OutdoorOpr.java",
         "NitBrightnessLimit.java",
-        "OutdoorOprEnvelope.java"
+        "OutdoorOprEnvelope.java",
+        "OutdoorOprCurveSettings.java",
+        "OutdoorCurvePreview.java"
       ],
-      "selector": "完整隐私判断优先；完全没有隐私 / UHBM 残片且旧 OPR 完整才用传统路径。实际物理换算用于 nit 上限。调用失败不降级。 OPR额外放宽独立读取完整原生灰阶/nit包络，最多到该表最高档；不存在整组字段时保留旧映射路线，部分缺失/坏表/换算失败保留原生限亮。 OPR 入口优先 (brightness, reason)，仅完整两参缺失才用旧三参；SDR 入口四参优先、五参回退。",
+      "selector": "完整隐私判断优先；完全没有隐私 / UHBM 残片且旧 OPR 完整才用传统路径。实际物理换算用于 nit 上限。调用失败不降级。 OPR额外放宽独立读取完整原生灰阶/nit包络，最多到该表最高档；不存在整组字段时保留旧映射路线，部分缺失/坏表/换算失败保留原生限亮。 OPR 入口优先 (brightness, reason)，仅完整两参缺失才用旧三参；SDR 入口四参优先、五参回退。 高亮曲线单独要求实际OPR自动SDR帧及可靠物理nit转换，复用已核验两/三参OPR和四/五参SDR接口，不增加机型白名单。",
       "evidence": [
         "outdoor.sdr_compatibility_profile",
         "outdoor.sdr_compatibility_detail",
         "outdoor.opr_envelope_profile",
         "outdoor.opr_envelope_max_nit",
         "outdoor.opr_envelope_max_brightness",
-        "outdoor.opr_envelope_detail"
+        "outdoor.opr_envelope_detail",
+        "outdoor.opr_curve_enabled",
+        "outdoor.opr_curve_nodes",
+        "outdoor.opr_curve_limits",
+        "outdoor.opr_curve_error",
+        "outdoor.opr_curve_requested_nit",
+        "outdoor.opr_curve_delivered",
+        "outdoor.mapping_normal_nit",
+        "outdoor.preview_mapping",
+        "outdoor.preview_detail"
       ],
-      "cleanup": "ThreadLocal 帧按调用恢复；只移除本次引入的 OPR 原因位；温控、电量、HDR 与系统接管继续优先。",
+      "cleanup": "ThreadLocal 帧按调用恢复；只移除本次引入的 OPR 原因位；温控、电量、HDR 与系统接管继续优先。 放宽后曲线在完整SDR原生调用返回后只缩小高亮输出，保持普通上限和原生较低安全结果；无OPR消费者、旧配置帧、HDR/隐私/手动/换用户不应用。默认关闭，能力消失只裁剪运行开关，导入与预设保留节点；Root工具须带OutdoorOptions内嵌曲线类型。",
       "tests": [
         "tests/refactor_outdoor_compatibility.py",
         "tests/refactor_outdoor_compatibility_firmware.py",
         "tests/refactor_opr_envelope.py",
-        "tests/refactor_opr_envelope_firmware.py"
+        "tests/refactor_opr_envelope_firmware.py",
+        "tests/refactor_opr_curve_ui.py"
       ],
       "composition": "exclusive",
       "convergence": {
@@ -1218,7 +1233,7 @@
         "BrightnessControlOptions.java",
         "BrightnessControl.java"
       ],
-      "selector": "按实际类型、方法与来源选路；完整同步ABI时仅在同一主屏/用户/窗口调用帧内拦截偏好同步；三个同步入口全缺且窗口消费者完整时沿用原生隔离，不按OS版本推断。原生已隔离显示开启且不可伪关闭，不改保存的模块选择。旧版窗口共享已停用，历史路线与保存字段留档。独立亮度持有应用租约时同样阻止窗口写入全局偏好。",
+      "selector": "按实际类型、方法与来源选路；完整同步ABI时仅在同一主屏/用户/窗口调用帧内拦截偏好同步；三个同步入口全缺且窗口消费者完整时沿用原生隔离，不按OS版本推断。原生隔离作为实际状态说明保留；页面唯一开关控制模块同步隔离与最小/挂起处理，不假称能关闭原生行为。旧版窗口共享已停用，历史路线与保存字段留档。独立亮度持有应用租约时同样阻止窗口写入全局偏好。",
       "evidence": [
         "app_brightness_isolation.profile",
         "app_brightness_isolation.native_isolated",
@@ -1229,7 +1244,7 @@
         "app_brightness_isolation.share_enabled",
         "app_brightness_isolation.share_detail"
       ],
-      "cleanup": "5个必要Hook事务回滚；ThreadLocal按栈恢复；用户主动调节、HDR、非主屏/用户、无匹配来源或不完整ABI沿用系统。仅阻止同步，不记忆或重放窗口值。页面不再提供共享和名单；不借原生状态重写用户保存配置。",
+      "cleanup": "5个必要Hook事务回滚；ThreadLocal按栈恢复；用户主动调节、HDR、非主屏/用户、无匹配来源或不完整ABI沿用系统。仅阻止同步，不记忆或重放窗口值。页面只提供一个统一隔离开关；Beta19任一旧选择已开即继承。原生状态不重写用户保存配置。",
       "tests": [
         "tests/refactor_app_isolation.py",
         "tests/refactor_feature_self_check.py",
@@ -1309,6 +1324,145 @@
         "consumers": [
           "RootControl.java",
           "FeatureCompatibility.java"
+        ]
+      }
+    },
+    {
+      "id": "outdoor_test",
+      "name": "短时强光输入模拟",
+      "features": [
+        "outdoor_test"
+      ],
+      "routes": [
+        "abc_native_lux_lease"
+      ],
+      "owners": [
+        "OutdoorLightTestAccess.java",
+        "OutdoorLightTest.java"
+      ],
+      "selector": "核验当前ABC实例、物理主屏和同显示Handler；mAmbientLux/mRawScreenAutoBrightness为非静态可写float，原生计算、真实照度通知、双源入口及手动退出接口类型完整。缺失只停用测试，不影响旧户外功能；不按型号或系统版本开启。",
+      "evidence": [
+        "outdoor_light_test.profile",
+        "outdoor_light_test.active",
+        "outdoor_light_test.reason",
+        "outdoor_light_test.recorded_peak_nit",
+        "outdoor_light_test.error"
+      ],
+      "cleanup": "默认无Hook；显式开始事务安装临时Hook，照度仅在计算作用域内修改并按仍持有值恢复。真实setAmbientLux/阈值/样本/学习保持原生，避免内联重置风险。20秒或保护接管结束时通知当前真实照度并重算，不覆盖后写值，不重置HBM预算；残留句柄有界重试。",
+      "tests": [
+        "tests/refactor_outdoor_light_test.py",
+        "tests/refactor_outdoor_light_test_firmware.py",
+        "tests/refactor_opr_curve_ui.py",
+        "tests/refactor_brightness_control.py"
+      ],
+      "composition": "exclusive",
+      "convergence": {
+        "boundary": [
+          "OutdoorLightTestAccess.java"
+        ],
+        "contract": "原生计算作用域照度租约、真实输入与输出路径证据",
+        "coordinates": "计算内临时lux，计算外真实lux；结果只来自实际显示比例和本机物理nit换算，不当仪器实测",
+        "consumers": [
+          "OutdoorLightTest.java"
+        ]
+      }
+    },
+    {
+      "id": "outdoor_curve",
+      "name": "独立高亮目标曲线",
+      "features": [
+        "outdoor_curve"
+      ],
+      "routes": [
+        "physical_outdoor_target"
+      ],
+      "owners": [
+        "OutdoorTargetCurve.java",
+        "OutdoorController.java",
+        "NitBrightnessLimit.java",
+        "OutdoorCurvePreview.java",
+        "OutdoorSettings.java",
+        "OutdoorOprCurveSettings.java",
+        "OutdoorDetailsPage.java"
+      ],
+      "selector": "同主屏自动输出目标入口及本机物理nit双向映射完整；新曲线只在明确选择增强方式或编辑后启用，既有增强、OPR上限和节点路线继续保留。接口缺失只停用新目标，不伪装nit，不按型号放行。",
+      "evidence": [
+        "outdoor.target_curve_supported",
+        "outdoor.options.outdoor_target_curve_enabled",
+        "outdoor.options.outdoor_target_curve",
+        "outdoor.preview_mapping",
+        "outdoor.target_adjustments",
+        "outdoor.limit_trace"
+      ],
+      "cleanup": "强光会话准入、退出、单次时长、冷却、控制权和原生保护仍由已有控制器负责；目标在原生目标后、后续保护前接入，可调亮或压低高亮目标，不改普通曲线与学习。旧OPR/节点改用曲线需确认且保留数值；不因查看、缺能力或读取失败清保存设置。手势绑定映射、revision、物理屏、模式及草稿所有权；取消只恢复仍拥有的数据。",
+      "tests": [
+        "tests/refactor_outdoor_target.py",
+        "tests/refactor_outdoor.py",
+        "tests/refactor_opr_curve_ui.py",
+        "tests/refactor_configuration.py",
+        "tests/refactor_outdoor_light_test.py",
+        "tests/refactor_outdoor_details.py"
+      ],
+      "composition": "per_feature",
+      "convergence": {
+        "boundary": [
+          "NitBrightnessLimit.java",
+          "OutdoorCurvePreview.java"
+        ],
+        "contract": "原生框架目标在本机标定边界转为物理nit，目标曲线计算后反向映射并经过当前允许范围及全部后续保护。",
+        "coordinates": "lux与设备标定物理nit，区别于普通逻辑nit、窗口比例及原始节点；图上目标不冒充实测输出。",
+        "consumers": [
+          "OutdoorController.java",
+          "OutdoorOprCurveSettings.java",
+          "OutdoorSettings.java"
+        ]
+      }
+    },
+    {
+      "id": "suspended_window_brightness",
+      "name": "挂起小窗亮度隔离",
+      "features": [
+        "suspended_window_brightness"
+      ],
+      "routes": [
+        "wm_mini_pin_gate"
+      ],
+      "owners": [
+        "WindowBrightnessAccess.java",
+        "AppWindowBrightness.java",
+        "AppIsolationSettings.java",
+        "BrightnessControlOptions.java",
+        "BrightnessControl.java",
+        "ConfigurationCompatibility.java"
+      ],
+      "selector": "完整WindowManagerServiceImpl窗口亮度门禁、Task根身份、主屏/主用户、原生最小小窗与贴边谓词和模式事件均已验证时独立安装；只筛除原生已允许的应用窗口请求，不按OS、型号、焦点或窗口面积猜测。 用户界面与同步隔离合并为一个开关；保存原文不改，运行副本先合并两旧键的OR意图，再独立按能力裁剪，禁止裁剪后再次OR而绕过缺失能力。",
+      "evidence": [
+        "suspended_window_brightness.profile",
+        "suspended_window_brightness.enabled",
+        "suspended_window_brightness.blocked_requests",
+        "suspended_window_brightness.reevaluation_queued",
+        "suspended_window_brightness.detail"
+      ],
+      "tests": [
+        "tests/refactor_window_brightness.py",
+        "tests/refactor_window_brightness_firmware.py",
+        "tests/refactor_brightness_control.py",
+        "tests/refactor_configuration.py",
+        "tests/refactor_feature_self_check.py",
+        "tests/refactor_window_brightness_ui.py"
+      ],
+      "composition": "exclusive",
+      "cleanup": "两个必要Hook事务安装，残缺ABI拒绝。异常保留原生判定，不走不完整备用路线。配置关闭/停用/对象结束移除所属运行规则，并在WM handler合并为一次重评估；不保存窗口值、不改LayoutParams、不写亮度、模式或用户记录，不安装轮询。",
+      "convergence": {
+        "boundary": [
+          "WindowBrightnessAccess.java"
+        ],
+        "contract": "输出窗口是否为已证实的主用户主屏最小/挂起应用窗口及事件重评估操作；共同过滤器只将原生true收束为false，不放宽原生false。",
+        "coordinates": "窗口资格布尔、Task根身份、主用户ID0和主显示ID0；无照度/nit/节点转换。缺字段或调用异常均为未知，保留原生。",
+        "consumers": [
+          "AppWindowBrightness.java",
+          "AppIsolationSettings.java",
+          "BrightnessControl.java"
         ]
       }
     }
@@ -1994,6 +2148,16 @@
       ],
       "rule": "辅助暗光闸门只把 pending 复位字段当作可选证据：字段存在时必须为非静态 boolean，值为 true 时不确认；字段整体缺失（本机 DualSensorPolicy 没有该状态）视为没有待复位，继续用辅助使能、预热时间和环形缓冲确认，不伪造复位状态。",
       "test": "tests/refactor_advanced_hooks.py"
+    },
+    {
+      "id": "outdoor_test_notification_visibility",
+      "owner": "OutdoorLightTestAccess.java",
+      "alternatives": [
+        "public_declared_notification",
+        "nonpublic_or_inherited_notification"
+      ],
+      "rule": "按实际声明类型逐层查找同签名非静态void照度通知方法；非public不等于缺失，错误返回类型/静态签名直接拒绝，不降级绕过。只对已绑定主屏范围/策略对象使用。",
+      "test": "tests/refactor_outdoor_light_test.py"
     }
   ],
   "native_variants": [

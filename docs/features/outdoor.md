@@ -9,7 +9,7 @@
 | 项目 | 要求 |
 | --- | --- |
 | 触发 | 明确启用，持续强光完成确认，普通自动亮度、用户/屏幕和保护条件允许；驾驶能力确认缺失时按未驾驶判定，残缺或歧义仍保持关闭。 |
-| 需求与行为 | 持续强光且普通自动亮度保护允许时提高目标；无HBM数据仅用原生普通范围；保留确认、强度、会话与冷却；HBM 数据身份按已验证变体选择。输出归属失败的写门保持严格（任一判定帧不通过即不写），仅退出对单帧 mBrightnessReasonTemp 失败容忍：连续 2 次或持续 50ms 才中止并冷却；受保护 modifier 与上游 block 立即退出 |
+| 需求与行为 | 持续强光且普通自动亮度保护允许时提高目标；无HBM数据仅用原生普通范围；保留确认、强度、会话与冷却；HBM 数据身份按已验证变体选择。输出归属失败的写门保持严格（任一判定帧不通过即不写），仅退出对单帧 mBrightnessReasonTemp 失败容忍：连续 2 次或持续 50ms 才中止并冷却；受保护 modifier 与上游 block 立即退出；页面名为高亮增强；预设置顶，增强方式使用紧凑单选卡片，所有标题可见且仅选中项展开。以独立高亮目标曲线调节，不与普通曲线合并；HBM归入准入，确认和时长用紧凑行，缺标定保留旧增强参数。原接口、存储和节点/OPR兼容路线保留。 |
 | 退出 / 失败 | 离开强光、手动、熄屏、过热、会话超时或停用退出，并遵守冷却；输出归属瞬态单帧不计入退出，正常帧恢复写入。 |
 | 默认 | `off` · 新配置关闭 |
 | 配置键 | `outdoor_enabled`、`outdoor_enter_lux`、`outdoor_full_lux`、`outdoor_enter_ms`、`outdoor_exit_ms`、`outdoor_exit_ratio`、`outdoor_strength`、`outdoor_session_ms`、`outdoor_cooldown_ms` |
@@ -48,12 +48,14 @@
 - [refactor_outdoor.py](../../tests/refactor_outdoor.py)
 - [refactor_os3_compatibility.py](../../tests/refactor_os3_compatibility.py)
 - [refactor_hook_transactions.py](../../tests/refactor_hook_transactions.py)
+- [refactor_opr_curve_ui.py](../../tests/refactor_opr_curve_ui.py)
 
 ## 实现追溯
 
 | 文件 | 当前源码 SHA-256 前16位 |
 | --- | --- |
 | [HbmAccess.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/HbmAccess.java) | `1b60fcde7b4ab2b7` |
-| [OutdoorController.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/OutdoorController.java) | `7c041c22158401f2` |
+| [OutdoorController.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/OutdoorController.java) | `04002b346d81ba8d` |
 | [OutdoorPolicy.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/OutdoorPolicy.java) | `4439f553657f8494` |
+| [OutdoorSettings.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/OutdoorSettings.java) | `8d26ce76f27d7383` |
 | [OutdoorTuning.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/OutdoorTuning.java) | `84ee79e3de745ecc` |

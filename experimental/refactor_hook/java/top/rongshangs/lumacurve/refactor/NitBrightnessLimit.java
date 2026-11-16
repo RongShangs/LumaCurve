@@ -1,6 +1,7 @@
 package top.rongshangs.lumacurve.refactor;
 
 import java.lang.reflect.Method;
+import org.json.*;
 
 /** Inverts the primary display's physical-nit conversion, never the editable lux curve.
  * Cache the inversion; ordinary output calls verify its endpoints and capped value.
@@ -10,6 +11,7 @@ final class NitBrightnessLimit {
     final Method converter;
     double requested=Double.NaN;
     float minimum=Float.NaN,maximum=Float.NaN,minimumNit=Float.NaN,maximumNit=Float.NaN,brightness=Float.NaN;
+    JSONObject preview;float previewMin,previewMax,previewLow,previewHigh,previewNormal,previewNormalNit,previewNative;
     NitBrightnessLimit(Object owner)throws Exception{
         this.owner=owner;converter=owner.getClass().getMethod("convertBrightnessToNit",float.class);
         if(converter.getReturnType()!=float.class)throw new IllegalStateException("Physical nit conversion unavailable");
@@ -18,6 +20,16 @@ final class NitBrightnessLimit {
         float nit=((Number)converter.invoke(owner,value)).floatValue();
         if(!Float.isFinite(nit)||nit<0)throw new IllegalStateException("Invalid physical nit mapping");
         return nit;
+    }
+    JSONObject preview(float normal,float nativeMax)throws Exception{
+        if(!OutdoorPolicy.valid(normal)||normal<minimum||normal>maximum||!OutdoorPolicy.valid(nativeMax))throw new IllegalStateException("Physical preview unavailable");
+        nativeMax=Math.max(normal,Math.min(maximum,nativeMax));float normalNit=read(normal);
+        if(preview!=null&&previewMin==minimum&&previewMax==maximum&&previewLow==minimumNit&&previewHigh==maximumNit&&previewNormal==normal&&previewNormalNit==normalNit&&previewNative==nativeMax)return preview;
+        java.util.TreeMap<Float,Float> table=new java.util.TreeMap<>();for(int i=0;i<=64;i++){float x=minimum+(maximum-minimum)*i/64f;table.put(x,read(x));}table.put(normal,normalNit);table.put(nativeMax,read(nativeMax));
+        JSONArray x=new JSONArray(),y=new JSONArray();float previous=-1;for(java.util.Map.Entry<Float,Float> e:table.entrySet()){if(e.getValue()<previous)throw new IllegalStateException("Physical preview is not monotonic");previous=e.getValue();x.put(e.getKey());y.put(e.getValue());}
+        if(read(minimum)!=minimumNit||read(maximum)!=maximumNit||read(normal)!=normalNit)throw new IllegalStateException("Physical preview changed");
+        JSONObject next=new JSONObject().put("brightness",x).put("nit",y).put("normal",normal).put("native_max",nativeMax);
+        previewMin=minimum;previewMax=maximum;previewLow=minimumNit;previewHigh=maximumNit;previewNormal=normal;previewNormalNit=normalNit;previewNative=nativeMax;preview=next;return next;
     }
     float resolve(double nit,float min,float max)throws Exception{
         if(!Double.isFinite(nit)||nit<0||!OutdoorPolicy.valid(min)||!OutdoorPolicy.valid(max)||max<=min)throw new IllegalArgumentException("Invalid outdoor nit limit");

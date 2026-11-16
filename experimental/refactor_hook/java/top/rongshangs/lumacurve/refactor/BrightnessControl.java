@@ -148,7 +148,7 @@ final class BrightnessControl implements SensorEventListener {
             brightnessSnapshot=brightnessValues();
         }catch(Throwable failure){fail(failure);}
         };retry=()->{if(s.closed)return;if(!registered){start();if(!registered)return;}failed=false;tick();};
-        modeObserver=new ContentObserver(s.handler){public void onChange(boolean self){try{if(s.closed)return;boolean automatic=auto();s.memorySettingChanged(automatic);if(busy)return;if(automatic){lastAutoEnabledAt=SystemClock.elapsedRealtime();suppressApplication();if(!owner.equals("none"))relinquish("user_auto",false);else tick();}else tick();}catch(Throwable failure){fail(failure);}}};
+        modeObserver=new ContentObserver(s.handler){public void onChange(boolean self){try{if(s.closed)return;boolean automatic=auto(),ours=ownModeNotification(automatic);s.memorySettingChanged(automatic);if(busy)return;if(ours){tick();return;}if(automatic){lastAutoEnabledAt=SystemClock.elapsedRealtime();suppressApplication();if(!owner.equals("none"))relinquish("user_auto",false);else tick();}else tick();}catch(Throwable failure){fail(failure);}}};
         brightnessObserver=new ContentObserver(s.handler){public void onChange(boolean self){try{if(!s.closed&&!busy){if(owner.equals("raw_panel")&&session.startsWith("cc_")&&(rawPaused||!unlocked())&&!brightnessSnapshot.equals(brightnessValues()))relinquish("lockscreen_brightness",false);else if(owner.equals("dark")&&SystemClock.uptimeMillis()>ignoreBrightnessUntil&&!brightnessSnapshot.equals(brightnessValues()))manualBrightnessChanged();}}catch(Throwable failure){fail(failure);}}};
         commandObserver=new ContentObserver(s.handler){public void onChange(boolean self){command();}};
     }
@@ -206,10 +206,18 @@ final class BrightnessControl implements SensorEventListener {
         if(owner.equals("raw_panel")&&!session.startsWith("cc_")&&next.manualMaximum>0&&rawTarget>next.manualMaximum)relinquish("manual_limit_changed",false);
         if(next.applications().isEmpty()){appExemptions.clear();appSuppressionPending=false;syncApplicationSuppression();}
         independent.configure(options,next);
-        options=next;failed=false;error="";if(!registered)start();try{s.memoryModeKnown(auto());}catch(Throwable unavailable){s.log("记忆保持等待模式状态就绪");}tick();
+        options=next;AppWindowBrightness.configure(s,next.appWindowBrightness);failed=false;error="";if(!registered)start();try{s.memoryModeKnown(auto());}catch(Throwable unavailable){s.log("记忆保持等待模式状态就绪");}tick();
         if(options.applications().isEmpty())ForegroundApps.detach(this);else ForegroundApps.attach(this);
     }
-    void mode(boolean on)throws Exception{if(!Settings.System.putInt(s.context.getContentResolver(),Settings.System.SCREEN_BRIGHTNESS_MODE,on?1:0)||auto()!=on)throw new IllegalStateException("系统未确认自动亮度模式");}
+    static final class ModeWrite{final boolean on;ModeWrite(boolean on){this.on=on;}}
+    final ArrayDeque<ModeWrite> ownModeWrites=new ArrayDeque<>();
+    boolean ownModeNotification(boolean on){if(ownModeWrites.isEmpty())return false;if(ownModeWrites.peekLast().on!=on){ownModeWrites.clear();return false;}ownModeWrites.removeFirst();return true;}
+    void mode(boolean on)throws Exception{
+        // Provider notifications may arrive after busy is released. Consume our
+        // queued writes once; a different final mode remains an external change.
+        if(ownModeWrites.size()>=16)ownModeWrites.clear();ModeWrite write=new ModeWrite(on);ownModeWrites.addLast(write);boolean confirmed=false;
+        try{if(!Settings.System.putInt(s.context.getContentResolver(),Settings.System.SCREEN_BRIGHTNESS_MODE,on?1:0)||auto()!=on)throw new IllegalStateException("系统未确认自动亮度模式");confirmed=true;}finally{if(!confirmed)ownModeWrites.remove(write);}
+    }
     void setAuto(boolean on)throws Exception{boolean previous=busy;busy=true;try{mode(on);}finally{busy=previous;}}
     void mark(String value)throws Exception{if(!Settings.Global.putString(s.context.getContentResolver(),OWNER,value))throw new IllegalStateException("亮度控制状态保存失败");}
     void claim(String kind,String token,float value)throws Exception{
@@ -229,7 +237,7 @@ final class BrightnessControl implements SensorEventListener {
         if(!previous.equals("none")){s.log(previous.equals("dark")?"暗光锁定退出："+why:previous.equals("app")?"应用亮度接管结束："+why:"主屏手动面板已退让："+why);s.queueControlPublish();}
     }
     void screenOff(){AppBrightnessIsolation.clear(s,"screen_off");independent.screenOff();schedule.stop();TemporaryScreenOn.clear();ForegroundApps.detach(this);s.handler.removeCallbacks(screenCleanup);screenCleanupQueued=false;if(owner.equals("raw_panel")){rawScreenOff=true;pauseRaw();}else relinquish("screen_off",true);unlisten();s.handler.removeCallbacks(timer);s.handler.removeCallbacks(retry);failed=false;}
-    void stop(){AppBrightnessIsolation.clear(s,"disabled");independent.stop();schedule.stop();TemporaryScreenOn.clear();ForegroundApps.detach(this);appExemptions.clear();appSuppressionPending=false;syncApplicationSuppression();s.handler.removeCallbacks(screenCleanup);screenCleanupQueued=false;relinquish("disabled",true);unlisten();s.handler.removeCallbacks(timer);s.handler.removeCallbacks(retry);options=new BrightnessControlOptions();}
+    void stop(){AppWindowBrightness.configure(s,false);AppBrightnessIsolation.clear(s,"disabled");independent.stop();schedule.stop();TemporaryScreenOn.clear();ForegroundApps.detach(this);appExemptions.clear();appSuppressionPending=false;syncApplicationSuppression();s.handler.removeCallbacks(screenCleanup);screenCleanupQueued=false;relinquish("disabled",true);unlisten();s.handler.removeCallbacks(timer);s.handler.removeCallbacks(retry);options=new BrightnessControlOptions();}
     void close(){stop();unregisterObservers();}
     void unregisterObservers(){
         try{if(displayEvents!=null)displayEvents.unregisterDisplayListener(displayListener);}catch(Throwable failure){error=failure.toString();}
@@ -299,7 +307,7 @@ final class BrightnessControl implements SensorEventListener {
         j.put("app_independent",independent.status());
         j.put("app_auto_supported",ForegroundApps.supported()).put("foreground_package",foreground.pkg).put("foreground_auto_suppressed",!appSuppressed.isEmpty());
         j.put("app_multiwindow_supported",ForegroundApps.multiWindowSupported).put("foreground_visibility_known",foreground.visibilityKnown).put("foreground_visible_packages",new JSONArray(foreground.visible)).put("foreground_matched_package",foreground.selected(options.manualApps)).put("foreground_visibility_pending",foregroundPending);
-        j.put("foreground_auto_exemptions",new JSONArray(appExemptions)).put("foreground_auto_override_pending",appSuppressionPending);
+        j.put("app_window_mode_supported",ForegroundApps.windowModeSupported).put("app_window_mode_detail",ForegroundApps.windowModeError).put("foreground_independent_allowed",foreground.independentAllowed);j.put("foreground_auto_exemptions",new JSONArray(appExemptions)).put("foreground_auto_override_pending",appSuppressionPending);
         if(!ForegroundApps.error.isEmpty())j.put("app_auto_detail",ForegroundApps.error);
         if(DarkLockPolicy.valid(mainLux))j.put("watch_main_lux",mainLux);if(DarkLockPolicy.valid(assistLux))j.put("watch_assist_lux",assistLux);
         j.put("watch_main_samples",mainSamples).put("watch_assist_samples",assistSamples).put("watch_unmatched_samples",unmatchedSamples).put("watch_evaluations",sensorEvaluations).put("watch_requested_period_us",1000000).put("watch_main_age_ms",mainAt<0?-1:SystemClock.uptimeMillis()-mainAt).put("watch_assist_age_ms",assistAt<0?-1:SystemClock.uptimeMillis()-assistAt);
@@ -363,6 +371,12 @@ final class BrightnessControl implements SensorEventListener {
             JSONObject request=new JSONObject(raw);id=request.getString("id");if(id.equals(lastRequest))return;lastRequest=id;
             if(!id.matches("[A-Za-z0-9_-]{1,80}")||!request.getString("build").equals(HookRuntime.BUILD)||!request.getString("process_start").equals(HookRuntime.processStart())||Math.abs(SystemClock.elapsedRealtime()-request.getLong("elapsed"))>15000)throw new IllegalArgumentException("亮度请求已过期，请重新打开面板");
             String action=request.getString("action"),token=request.getString("session");
+            if(action.equals("outdoor_test_start")||action.equals("outdoor_test_stop")){
+                if(!token.matches("[A-Za-z0-9_-]{1,80}"))throw new IllegalArgumentException("测试会话无效");
+                if(action.equals("outdoor_test_start"))s.outdoorTest.start(token);else s.outdoorTest.stopFor(token);
+                JSONObject ack=new JSONObject().put("id",id).put("ok",true).put("state",s.outdoorTest.status());Settings.Global.putString(s.context.getContentResolver(),ACK,ack.toString());s.queueControlPublish();return;
+            }
+            s.outdoorTest.stop("control_changed");
             if(!enabled()||!awake()||!mainDisplay())throw new IllegalStateException("请先启用引擎并保持主屏亮起");
             // Raw control only needs main-display ownership and mode acknowledgement.
             // HBM's float range and temporarily missing BrightnessInfo are irrelevant to sysfs.

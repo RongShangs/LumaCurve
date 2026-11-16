@@ -10,8 +10,6 @@ final class ApplicationBrightnessSettings {
     final MainActivity h;final TextView status;final Switch lock,reboot;final Button pause,individual,add;final LinearLayout groups;boolean updating;String groupSignature="";
     ApplicationBrightnessSettings(MainActivity host,LinearLayout parent){
         h=host;LinearLayout intro=h.card(parent);intro.addView(h.text("应用独立亮度",18,h.INK));
-        intro.addView(h.text("暂停名单沿用进入时的亮度；独立名单每个应用分别记忆；同一分组共用记忆。独立应用在前台时使用固定亮度，离开后恢复此前系统调节。每个应用只能属于一个名单或分组。",13,h.MUTED));
-        intro.addView(h.text("通过控制中心的普通亮度调节更新独立值；应用窗口、付款码和 HDR 的临时提亮不进入记忆。尚未记忆时沿用系统亮度，用户主动开启自动亮度后尊重本次选择。保存并应用后生效。",12,h.MUTED));
         lock=new Switch(h);lock.setText(h.tr("跨锁屏保留独立亮度"));lock.setTextSize(15);lock.setMinimumHeight(h.dp(48));intro.addView(lock,new LinearLayout.LayoutParams(-1,-2));
         reboot=new Switch(h);reboot.setText(h.tr("跨重启保留独立亮度"));reboot.setTextSize(15);reboot.setMinimumHeight(h.dp(48));intro.addView(reboot,new LinearLayout.LayoutParams(-1,-2));
         intro.addView(h.text("默认锁屏清除。跨重启保留同时需要跨锁屏保留；记忆只在对应应用进入前台时使用，锁屏与桌面不接管。",12,h.MUTED));

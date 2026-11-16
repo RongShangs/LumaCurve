@@ -133,7 +133,7 @@ paths=[]
 for name,text in sources.items():p=O/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_text(text,encoding='utf-8');paths.append(p)
 classes=O/'classes';classes.mkdir(exist_ok=True)
 J=R/'build/refactor-diagnostics/json-20240303.jar'
-subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(J),'-d',str(classes),*[str(p) for p in paths],*[str(S/(n+'.java')) for n in ['OutdoorNodeBridge','OutdoorNodeProfile','OutdoorNodeTarget','OutdoorOptions','OutdoorPolicy','AdvancedPolicy']]],check=True)
+subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(J),'-d',str(classes),*[str(p) for p in paths],*[str(S/(n+'.java')) for n in ['OutdoorNodeBridge','OutdoorNodeProfile','OutdoorNodeTarget','OutdoorTargetCurve','OutdoorOptions','OutdoorPolicy','AdvancedPolicy']]],check=True)
 java_output=subprocess.check_output(['java','-cp',str(classes)+';'+str(J),'top.rongshangs.lumacurve.refactor.NodeBridgeTest'],text=True,encoding='utf-8');print(java_output,end='')
 
 total=sum(int(re.search(r'(\d+) cases PASS',out).group(1)) for out in [native_output,java_output]);print(f'Outdoor node compatibility: {total} cases PASS; native policy and Java bridge, device not tested')

@@ -23,12 +23,15 @@ final class OutdoorController {
     final LiveLimitEvidence liveLimits=new LiveLimitEvidence();
     NitBrightnessLimit nitLimit;
     OutdoorOprEnvelope oprEnvelope;
+    NitBrightnessLimit oprCurveMapping;String oprCurveError="";long oprCurveLimits;
+    double oprCurveRequestedNit=Double.NaN;float oprCurveDelivered=Float.NaN;long oprCurveAt=-1;
     String oprEnvelopeError="";
     String nitLimitError="";
     final Runnable wake;
     OutdoorController(HookRuntime s){this.s=s;wake=()->{deadline=-1;if(s.closed)return;tick();s.requestRecalculation();s.queuePublish();};}
     HbmAccess binding(){try{Object hbm=HookEntry.get(s.owner,"mHbmController");if(access==null||access.controller!=hbm){if(access!=null)access.restore();access=new HbmAccess(hbm);}access.observeReplacement();return access;}catch(Throwable unavailable){error=unavailable.toString();return null;}}
     boolean supported(){return OutdoorTuning.owners.contains(s.owner.getClass())&&binding()!=null;}
+    boolean targetCurveSupported(){try{HbmAccess h=binding();if(!supported()||h==null||!OutdoorTuning.nitCaps.contains(s.owner.getClass()))return false;NitBrightnessLimit mapping=new NitBrightnessLimit(s.owner);double low=mapping.read(HookRuntime.optionalNumber(h.controller,"mBrightnessMin")),normal=mapping.read(h.normal()),high=mapping.read(h.max());return Double.isFinite(low)&&Double.isFinite(normal)&&Double.isFinite(high)&&low>=0&&normal>=low&&high>low&&normal<=high;}catch(Throwable unavailable){return false;}}
     boolean rangeSupported(){return supported()&&!access.rangeOnly()&&OutdoorTuning.ranges.contains(access.controller.getClass())&&OutdoorTuning.peaks.contains(s.owner.getClass());}
     boolean oprSupported(){return rangeSupported()&&OutdoorOpr.owners.contains(s.owner.getClass());}
     boolean oprAllowed(){return options.flags[3]&&rangeAllowed()&&Float.isFinite(lux())&&lux()>=options.values[0]*options.values[4];}
@@ -43,7 +46,19 @@ final class OutdoorController {
         }catch(Throwable unknown){oprEnvelopeError=unknown.toString();return limited;}
     }
     void oprApplied(float input,float limited,float delivered){oprRaises++;stage("outdoor_opr_native",input,limited);stage("outdoor_opr_relax",limited,delivered);}
-    void configure(OutdoorOptions next){liveLimits.clear();if(!options.same(next)){policy.reset();goal=Float.NaN;exitFailures=0;exitFirst=exitLast=0;}nitLimit=null;nitLimitError="";options=next;failed=false;error="";tick();}
+    float oprCurve(float result){
+        if(!options.oprCurveEnabled||options.nodeBoost||!oprAllowed()||!OutdoorPolicy.valid(result))return result;
+        try{float normal=access.normal();if(!OutdoorPolicy.valid(normal)||normal<=0||result<=normal)return result;
+            double target=options.oprCurve.at(lux());if(!Double.isFinite(target))return result;
+            if(oprCurveMapping==null)oprCurveMapping=new NitBrightnessLimit(s.owner);
+            float min=HookRuntime.optionalNumber(access.controller,"mBrightnessMin"),max=access.max();
+            // Keep ordinary output intact and retain every native cap already applied.
+            target=Math.max(target,oprCurveMapping.read(normal));float cap=oprCurveMapping.resolve(target,min,max);
+            float next=Math.min(result,Math.max(normal,cap));oprCurveError="";oprCurveRequestedNit=target;oprCurveDelivered=next;oprCurveAt=SystemClock.uptimeMillis();
+            if(next<result){oprCurveLimits++;stage("outdoor_opr_curve",result,next);}return next;
+        }catch(Throwable unavailable){oprCurveError=unavailable.toString();oprCurveRequestedNit=Double.NaN;oprCurveDelivered=Float.NaN;return result;}
+    }
+    void configure(OutdoorOptions next){liveLimits.clear();if(!options.same(next)){policy.reset();goal=Float.NaN;exitFailures=0;exitFirst=exitLast=0;}nitLimit=null;nitLimitError="";oprCurveMapping=null;oprCurveError="";oprCurveRequestedNit=Double.NaN;oprCurveDelivered=Float.NaN;oprCurveAt=-1;options=next;failed=false;error="";tick();}
     float nitCeiling(double nit){
         try{HbmAccess h=binding();if(h==null||!OutdoorTuning.nitCaps.contains(s.owner.getClass()))return Float.NaN;
             if(nitLimit==null||nitLimit.owner!=s.owner)nitLimit=new NitBrightnessLimit(s.owner);
@@ -55,13 +70,15 @@ final class OutdoorController {
         if(options.values[OutdoorOptions.MAX_NIT]<=0||!policy.active||block()!=null||!OutdoorPolicy.valid(value)||!OutdoorTuning.nitScope(s.owner))return value;
         float cap=nitCeiling(options.values[OutdoorOptions.MAX_NIT]);return OutdoorPolicy.valid(cap)?Math.min(value,cap):value;
     }
-    void stop(){s.handler.removeCallbacks(wake);deadline=-1;exitFailures=0;exitFirst=exitLast=0;goal=Float.NaN;liveLimits.clear();options=new OutdoorOptions();policy.step(options,Float.NaN,SystemClock.uptimeMillis(),null);failed=false;
+    void stop(){oprCurveMapping=null;oprCurveError="";oprCurveRequestedNit=Double.NaN;oprCurveDelivered=Float.NaN;oprCurveAt=-1;s.handler.removeCallbacks(wake);deadline=-1;exitFailures=0;exitFirst=exitLast=0;goal=Float.NaN;liveLimits.clear();options=new OutdoorOptions();policy.step(options,Float.NaN,SystemClock.uptimeMillis(),null);failed=false;
         if(access!=null)try{boolean changed=access.restore();if(changed)access.reevaluate(lux());}catch(Throwable failed){error=failed.toString();s.log("户外增强恢复异常："+error);}}
-    float lux(){try{Object impl=HookEntry.get(s.owner,"mAutomaticBrightnessControllerImpl"),abc=HookEntry.get(impl,"mAutomaticBrightnessController");if(!Boolean.TRUE.equals(HookRuntime.optionalBoolean(abc,"mAmbientLuxValid")))return Float.NaN;return HookRuntime.optionalNumber(abc,"mAmbientLux");}catch(Throwable unknown){return Float.NaN;}}
-    String block(){
+    float lux(){if(s.outdoorTest.active)return OutdoorLightTest.TEST_LUX;try{Object impl=HookEntry.get(s.owner,"mAutomaticBrightnessControllerImpl"),abc=HookEntry.get(impl,"mAutomaticBrightnessController");if(!Boolean.TRUE.equals(HookRuntime.optionalBoolean(abc,"mAmbientLuxValid")))return Float.NaN;return HookRuntime.optionalNumber(abc,"mAmbientLux");}catch(Throwable unknown){return Float.NaN;}}
+    String block(){return block(true);}
+    String testBlock(){return block(false);}
+    private String block(boolean requireEnabled){
         String result;OutdoorOutputAccess.Decision decision=null;
         try{
-            if(!options.flags[0])result="disabled";
+            if(requireEnabled&&!options.flags[0])result="disabled";
             else if(s.closed||!s.phase.equals("active")||!s.appliesToUser())result="inactive";
             else if(!s.screenOn()||Boolean.TRUE.equals(HookRuntime.optionalBoolean(access.controller,"mIsAutoBrightnessOffByState")))result="screen_off";
             else if(!Boolean.TRUE.equals(s.kernel.get("mUseAutoBrightness")))result="manual_mode";
@@ -209,9 +226,11 @@ final class OutdoorController {
         deliveredRange=result;if(result>original&&!probing)rangeRaises++;return result;
     }
     float target(float base){
-        if(!options.flags[0])return base;
+        if(!options.flags[0]||!OutdoorPolicy.valid(base))return base;
         tick();if(!policy.active||access==null||block()!=null)return base;
-        try{float max=access.allowedMax(),normal=access.normal();goal=limit(access.rangeOnly()?OutdoorPolicy.withinRangeTarget(options,lux(),base,max):OutdoorPolicy.target(options,lux(),base,Math.min(normal,max),max));if(OutdoorPolicy.valid(goal))goalAt=SystemClock.uptimeMillis();if(goal>base)boosts++;return goal;}
+        try{float max=access.allowedMax(),normal=access.normal();
+            if(options.targetCurve.enabled){NitBrightnessLimit mapping=new NitBrightnessLimit(s.owner);float low=options.flags[2]?Math.min(normal,max):HookRuntime.optionalNumber(access.controller,"mBrightnessMin");double wanted=options.targetCurve.target(lux(),mapping.read(low),mapping.read(access.max()));if(!Double.isFinite(wanted))return base;goal=limit(Math.min(max,mapping.resolve(wanted,HookRuntime.optionalNumber(access.controller,"mBrightnessMin"),access.max())));}
+            else goal=limit(access.rangeOnly()?OutdoorPolicy.withinRangeTarget(options,lux(),base,max):OutdoorPolicy.target(options,lux(),base,Math.min(normal,max),max));if(OutdoorPolicy.valid(goal))goalAt=SystemClock.uptimeMillis();if(goal>base||options.targetCurve.enabled&&goal<base)boosts++;return goal;}
         catch(Throwable failed){error=failed.toString();return base;}
     }
     float dynamicRange(float original){nativeDynamic=original;float result=original;
@@ -230,6 +249,8 @@ final class OutdoorController {
         HbmAccess h=binding();j.put("supported",supported()).put("hbm_tuning_supported",h!=null&&h.tunable()).put("range_supported",rangeSupported()).put("opr_supported",oprSupported());
         j.put("hbm_budget_supported",h!=null&&h.budgetTunable()).put("hbm_tuning_profile",h==null?"unsupported":h.tuningProfile());
         j.put("hbm_controller_profile",h==null?"unsupported":h.controllerProfile).put("target_compatibility_profile",OutdoorTuning.targetProfile(s.owner.getClass()));
+        j.put("opr_curve_last_uptime_ms",oprCurveAt).put("opr_curve_enabled",options.oprCurveEnabled).put("opr_curve_nodes",options.oprCurve.json()).put("opr_curve_limits",oprCurveLimits).put("opr_curve_error",oprCurveError);
+        if(Double.isFinite(oprCurveRequestedNit))j.put("opr_curve_requested_nit",oprCurveRequestedNit);if(Float.isFinite(oprCurveDelivered))j.put("opr_curve_delivered",oprCurveDelivered);
         j.put("range_only",h!=null&&h.rangeOnly()).put("range_profile",h==null?"unconfirmed":h.rangeOnly()?"native_range_only":"configured_hbm");
         j.put("sdr_compatibility_profile",OutdoorSdrScope.profile(s.owner.getClass()));
         j.put("opr_envelope_profile",oprEnvelope==null?(oprEnvelopeError.isEmpty()?"unconfirmed":"native_limit_retained"):oprEnvelope.profile);
@@ -237,8 +258,9 @@ final class OutdoorController {
         String envelopeError=oprEnvelope==null?oprEnvelopeError:oprEnvelope.error;
         if(!envelopeError.isEmpty())j.put("opr_envelope_detail",envelopeError);
         String scopeDetail=OutdoorSdrScope.detail(s.owner.getClass());if(!scopeDetail.isEmpty())j.put("sdr_compatibility_detail",scopeDetail);
-        float cap=nitCeiling(options.values[OutdoorOptions.MAX_NIT]);j.put("nit_limit_supported",OutdoorPolicy.valid(cap));
+        float cap=nitCeiling(options.values[OutdoorOptions.MAX_NIT]);j.put("nit_limit_supported",OutdoorPolicy.valid(cap)).put("target_curve_supported",targetCurveSupported());
         if(nitLimit!=null&&Float.isFinite(nitLimit.maximumNit))j.put("mapping_max_nit",nitLimit.maximumNit).put("mapping_min_nit",nitLimit.minimumNit);
+        if(nitLimit!=null&&h!=null)try{float normalNit=nitLimit.read(h.normal());if(Float.isFinite(normalNit)&&normalNit>0&&normalNit<nitLimit.maximumNit)j.put("mapping_normal_nit",normalNit);}catch(Exception unavailable){/* Retain other diagnostics. */}
         if(options.values[OutdoorOptions.MAX_NIT]>0){j.put("maximum_nit",options.values[OutdoorOptions.MAX_NIT]);if(OutdoorPolicy.valid(cap))j.put("nit_limit_brightness",cap);else j.put("nit_limit_detail",nitLimitError);}
         j.put("enabled",options.flags[0]).put("active",policy.active).put("reason",policy.reason).put("text",description(policy.reason)).put("target_adjustments",boosts).put("range_adjustments",rangeRaises).put("dynamic_range_adjustments",dynamicRaises).put("opr_adjustments",oprRaises).put("opr_enabled",options.flags[3]);
         JSONObject config=new JSONObject();options.put(config);j.put("options",config).put("limit_trace",new JSONArray(history)).put("output_diagnostics",new JSONArray(outputDiagnostics)).put("output_diagnostics_critical",new JSONArray(outputCritical)).put("current_limits",liveLimits.snapshot(SystemClock.uptimeMillis()));
@@ -248,6 +270,7 @@ final class OutdoorController {
         if(!error.isEmpty())j.put("interface_detail",error);
         if(h!=null){probing=true;try{h.allowedMax();}finally{probing=false;}if(OutdoorPolicy.valid(nativeRange))j.put("native_range_max",nativeRange);if(OutdoorPolicy.valid(deliveredRange))j.put("effective_range_max",deliveredRange);
             j.put("controller_managed",h.managed()).put("hbm_allowed",h.allowed()).put("device_mapping_max",h.max()).put("normal_max",h.normal());
+            if(nitLimit!=null&&OutdoorPolicy.valid(cap))try{j.put("preview_mapping",nitLimit.preview(h.normal(),OutdoorPolicy.valid(nativeRange)?nativeRange:h.normal()));}catch(Exception unavailable){j.put("preview_detail","physical_mapping_unavailable");}
             if(!h.rangeOnly()){
             j.put("original_minimum_lux",h.originalLux()).put("original_time_window_ms",h.originalLong("timeWindowMillis")).put("original_time_max_ms",h.originalLong("timeMaxMillis")).put("original_time_min_ms",h.originalLong("timeMinMillis"));
             Object data=h.dataField.get(h.controller);j.put("data_overridden",data==h.applied);for(String name:new String[]{"minimumLux","timeWindowMillis","timeMaxMillis","timeMinMillis"})j.put("effective_"+name,HookEntry.get(data,name));

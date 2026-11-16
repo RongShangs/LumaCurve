@@ -18,7 +18,7 @@ final class SettingsPresets {
     if(mode==3){require(caps,"outdoor_range_supported",true);o.flags[2]=true;o.flags[3]=caps.optBoolean("outdoor_opr_supported");
      // Only lower the trigger on a verified, timed HBM controller. Keep its original budget.
      o.flags[1]=caps.optBoolean("outdoor_hbm_supported");if(o.flags[1])o.values[8]=.5;}
-    o.put(p);p.remove("outdoor_max_nit");return p;
+    o.put(p);p.remove("outdoor_max_nit");p.remove(OutdoorOptions.OPR_CURVE);p.remove(OutdoorOptions.OPR_CURVE_ENABLED);p.remove(OutdoorTargetCurve.POINTS);return p;
    case "response":
     require(caps,"response_supported",enabled);p.put("response_override",enabled).put("small_brighten_override",enabled&&caps.optBoolean("small_response_supported"));
     if(enabled)p.put("brighten_delay",mode==1?1500:3000).put("darken_delay",mode==1?2000:5000).put("small_brighten_delay",mode==1?1500:5000);return p;
@@ -37,5 +37,5 @@ final class SettingsPresets {
   }
  }
  static void require(JSONObject caps,String key,boolean needed){if(needed&&!caps.optBoolean(key))throw new IllegalArgumentException("此系统接口暂未兼容");}
- static JSONObject merge(JSONObject draft,JSONObject patch)throws JSONException {JSONObject next=new JSONObject(draft.toString());java.util.Iterator<String> keys=patch.keys();while(keys.hasNext()){String key=keys.next();next.put(key,patch.get(key));}return next;}
+ static JSONObject merge(JSONObject draft,JSONObject patch)throws JSONException {JSONObject next=new JSONObject(draft.toString());java.util.Iterator<String> keys=patch.keys();while(keys.hasNext()){String key=keys.next();next.put(key,patch.get(key));}if(next.optBoolean(OutdoorOptions.OPR_CURVE_ENABLED)&&(!next.optBoolean("outdoor_enabled")||!next.optBoolean("outdoor_range_unlock")||!next.optBoolean("outdoor_opr_relax")||next.optBoolean("outdoor_node_boost")))next.put(OutdoorOptions.OPR_CURVE_ENABLED,false);return next;}
 }

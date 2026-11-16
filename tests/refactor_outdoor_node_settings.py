@@ -46,5 +46,5 @@ public class NodeSettingsTest {
  }
 }'''.replace('DRAW',method('MainActivity.java','void drawNodeTarget(')).replace('ANNOTATE',method('OutdoorNodeRoot.java','static void annotate('))
 p=O/'NodeSettingsTest.java';p.write_text(source,encoding='utf-8');C=O/'classes';C.mkdir(exist_ok=True)
-subprocess.run(['javac','--release','8','-encoding','UTF-8','-cp',str(J),'-d',str(C),str(p),*[str(S/(n+'.java')) for n in ['OutdoorNodeTarget','OutdoorOptions','AdvancedPolicy']]],check=True)
+subprocess.run(['javac','--release','8','-encoding','UTF-8','-cp',str(J),'-d',str(C),str(p),*[str(S/(n+'.java')) for n in ['OutdoorNodeTarget','OutdoorTargetCurve','OutdoorOptions','AdvancedPolicy']]],check=True)
 subprocess.run(['java','-cp',str(C)+';'+str(J),'top.rongshangs.lumacurve.refactor.NodeSettingsTest'],check=True)

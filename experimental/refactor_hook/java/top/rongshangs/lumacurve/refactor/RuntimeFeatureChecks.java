@@ -50,6 +50,7 @@ final class RuntimeFeatureChecks {
         if(!s.controlCenter.nodes.error.isEmpty())f.explain("control_center_raw",s.controlCenter.nodes.error);
         if(!s.controlCenter.error.isEmpty())f.explain("control_center_slider",s.controlCenter.error);
         f.check("app_brightness_isolation","应用临时亮度隔离","app_brightness_isolation_supported",true,()->AppBrightnessIsolation.supported(s));
+        f.check("suspended_window_brightness","挂起小窗亮度隔离","suspended_window_brightness_supported",true,()->AppWindowBrightness.supported(s));
         f.check("app_independent","应用独立亮度","app_independent_supported",true,()->ForegroundApps.supported()&&AppIndependentAccess.supported(s));
         f.check("apps","暂停自动亮度名单","app_auto_supported",true,()->s.receiverRegistered&&ForegroundApps.supported());
         f.check("thermal","温控调整","thermal_supported",true,()->s.receiverRegistered&&s.thermalRegistered&&HookEntry.thermalSupported.contains(s.owner.getClass()));
@@ -74,6 +75,9 @@ final class RuntimeFeatureChecks {
         f.check("outdoor_range","高亮范围","outdoor_range_supported",false,()->range());
         f.check("opr","画面限亮放宽","outdoor_opr_supported",false,()->range()&&OutdoorOpr.owners.contains(s.owner.getClass()));
         f.check("nit_limit","户外 nit 上限","outdoor_nit_limit_supported",true,()->OutdoorTuning.nitCaps.contains(s.owner.getClass())&&OutdoorPolicy.valid(new NitBrightnessLimit(s.owner).resolve(0,HookRuntime.optionalNumber(hbm().controller,"mBrightnessMin"),hbm().max())));
+        f.check("opr_curve","放宽后高亮曲线","outdoor_opr_curve_supported",true,()->range()&&hbm().normal()>0&&hbm().normal()<hbm().max()&&OutdoorOpr.owners.contains(s.owner.getClass())&&OutdoorTuning.nitCaps.contains(s.owner.getClass())&&OutdoorPolicy.valid(new NitBrightnessLimit(s.owner).resolve(0,HookRuntime.optionalNumber(hbm().controller,"mBrightnessMin"),hbm().max())));
+        f.check("outdoor_curve","高亮目标曲线","outdoor_target_curve_supported",true,()->outdoor()&&s.outdoor.targetCurveSupported());
+        f.check("outdoor_test","主动强光激发测试","outdoor_test_supported",true,()->s.receiverRegistered&&OutdoorLightTestAccess.checked(s));
         f.check("node_output","节点高亮框架接口","outdoor_node_supported",true,()->OutdoorNodeBridge.interfaces(s,range()));
         try{caps=f.capabilities();try{caps.put("outdoor_output_profile",OutdoorOutputAccess.profile(s));}catch(Exception unavailable){}report=f.report(SystemClock.elapsedRealtime(),request);runs++;report.put("runs",runs);}catch(JSONException impossible){s.log("功能自检结果生成失败");}
     }

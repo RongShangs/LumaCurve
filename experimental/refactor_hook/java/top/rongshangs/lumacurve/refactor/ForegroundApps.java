@@ -8,7 +8,8 @@ import top.rongshangs.lumacurve.refactor.hooking.*;
 /** Event source only. Never calls Settings/providers/services while WM holds its lock. */
 final class ForegroundApps {
     static final Set<BrightnessControl> targets=Collections.newSetFromMap(new IdentityHashMap<BrightnessControl,Boolean>());
-    static boolean installed,attempted,multiWindowSupported;
+    static boolean installed,attempted,multiWindowSupported,windowModeSupported;
+    static Method focusedWindowMode;static int fullScreenMode;static String windowModeError="";
     static String error="";
     // No WM service query on the display handler. One lazy, bounded worker;
     // it exits after ten idle seconds and never polls or changes brightness.
@@ -23,9 +24,10 @@ final class ForegroundApps {
         });
     }
     static final class Snapshot {
-        final String pkg;final int user,display;final Set<String> visible;final boolean visibilityKnown;
+        final String pkg;final int user,display;final boolean independentAllowed;final Set<String> visible;final boolean visibilityKnown;
         Snapshot(String p,int u,int d){this(p,u,d,null);}
-        Snapshot(String p,int u,int d,Set<String> packages){pkg=p==null?"":p;user=u;display=d;visibilityKnown=packages!=null;visible=packages==null?Collections.emptySet():Collections.unmodifiableSet(new LinkedHashSet<>(packages));}
+        Snapshot(String p,int u,int d,Set<String> packages){this(p,u,d,packages,true);}
+        Snapshot(String p,int u,int d,Set<String> packages,boolean allowed){independentAllowed=allowed;pkg=p==null?"":p;user=u;display=d;visibilityKnown=packages!=null;visible=packages==null?Collections.emptySet():Collections.unmodifiableSet(new LinkedHashSet<>(packages));}
         boolean contains(String p){return visibilityKnown?visible.contains(p):user==0&&display==0&&pkg.equals(p);}
         String selected(Set<String> apps){if(contains(pkg)&&apps.contains(pkg))return pkg;for(String p:visible)if(apps.contains(p))return p;return "";}
         static Snapshot unknown(){return new Snapshot("",-1,-1);}
@@ -67,8 +69,18 @@ final class ForegroundApps {
                 }});multiWindowSupported=true;
             }catch(Throwable unavailable){error="多窗口可见性接口不可用，沿用焦点判断："+unavailable;}
         }catch(Throwable unavailable){error=unavailable.toString();XposedBridge.log("HyperLux foreground events unavailable: "+unavailable);}
+        if(installed)try{
+            Class<?> task=Class.forName("com.android.server.wm.Task",false,loader),configuration=Class.forName("android.content.res.Configuration",false,loader),info=Class.forName("android.app.TaskInfo",false,loader),window=Class.forName("android.app.WindowConfiguration",false,loader);
+            Method changed=task.getDeclaredMethod("onConfigurationChanged",configuration),mode=task.getMethod("getWindowingMode"),readMode=info.getDeclaredMethod("getWindowingMode");Field fullscreen=window.getDeclaredField("WINDOWING_MODE_FULLSCREEN"),user=HookEntry.field(task,"mUserId");
+            if(changed.getReturnType()!=void.class||mode.getReturnType()!=int.class||readMode.getReturnType()!=int.class||fullscreen.getType()!=int.class||!Modifier.isStatic(fullscreen.getModifiers())||user.getType()!=int.class||Modifier.isStatic(changed.getModifiers())||Modifier.isStatic(mode.getModifiers())||Modifier.isStatic(readMode.getModifiers())||Modifier.isStatic(user.getModifiers()))throw new IllegalStateException("Unknown task window-mode interface");
+            changed.setAccessible(true);mode.setAccessible(true);readMode.setAccessible(true);fullscreen.setAccessible(true);int full=fullscreen.getInt(null);if(full<=0)throw new IllegalStateException("Unknown fullscreen constant");
+            XposedBridge.hookMethod(changed,new XC_MethodHook(){protected void beforeHookedMethod(MethodHookParam p){synchronized(ForegroundApps.class){if(targets.isEmpty())return;}try{p.setObjectExtra("hyperlux.foreground.previous_mode",mode.invoke(p.thisObject));}catch(Throwable ignored){}}
+                protected void afterHookedMethod(MethodHookParam p){if(p.hasThrowable())return;try{Object before=p.getObjectExtra("hyperlux.foreground.previous_mode");if(user.getInt(p.thisObject)==0&&before instanceof Integer&&!before.equals(mode.invoke(p.thisObject)))windowsChanged();}catch(Throwable ignored){}}
+            });focusedWindowMode=readMode;fullScreenMode=full;windowModeSupported=true;
+        }catch(Throwable unavailable){windowModeError="窗口模式事件不可用，沿用已有焦点判断："+unavailable;}
         return installed;
     }
+    static void windowsChanged(){synchronized(ForegroundApps.class){for(BrightnessControl c:targets)c.invalidateForeground();}}
     static void attach(BrightnessControl target){
         // Power/service reads must not hold the monitor used by WM callbacks.
         if(target.options.applications().isEmpty()||!target.enabled()||!target.mainDisplay()||!target.awake()){detach(target);return;}
@@ -98,7 +110,8 @@ final class ForegroundApps {
         }
         if(component==null)return new Snapshot("",-1,-1,visible);
         Method name=component.getClass().getMethod("getPackageName");
-        return new Snapshot((String)name.invoke(component),HookEntry.field(info.getClass(),"userId").getInt(info),HookEntry.field(info.getClass(),"displayId").getInt(info),visible);
+        boolean allowed=true;if(windowModeSupported)try{allowed=((Integer)focusedWindowMode.invoke(info))==fullScreenMode;windowModeError="";}catch(Throwable unavailable){allowed=false;windowModeError="窗口模式读取失败："+unavailable;}
+        return new Snapshot((String)name.invoke(component),HookEntry.field(info.getClass(),"userId").getInt(info),HookEntry.field(info.getClass(),"displayId").getInt(info),visible,allowed);
     }
     static Field visibilityField(Class<?> info)throws Exception{try{return HookEntry.field(info,"isVisibleRequested");}catch(NoSuchFieldException old){return HookEntry.field(info,"isVisible");}}
 }

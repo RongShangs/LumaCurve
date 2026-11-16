@@ -9,7 +9,7 @@
 | 项目 | 要求 |
 | --- | --- |
 | 触发 | 用户明确启用，亮屏自动模式进入所设暗光范围且持续满足进入确认。 |
-| 需求与行为 | 达到暗光确认后取得可恢复的自动亮度控制权；可选手动后继续锁定新值或退出；光线达到退出阈值后自动恢复 |
+| 需求与行为 | 达到暗光确认后取得可恢复的自动亮度控制权；可选手动后继续锁定新值或退出；光线达到退出阈值后自动恢复 页面删除双光感监听机制和手动调整后当前方案的长说明，不显示等待持续暗光的常态提示；计时、已锁定与异常仍可见，隐藏行不占高度。 |
 | 退出 / 失败 | 达到退出照度并确认后恢复本模块取得的自动状态；手动调整按所选方案；停用/切用户及时释放。 |
 | 默认 | `off` · 新配置关闭，手动后退出默认关闭 |
 | 配置键 | `dark_lock_enabled`、`dark_lock_manual_exit`、`dark_lock_enter_lux`、`dark_lock_exit_lux`、`dark_lock_minutes`、`dark_lock_exit_seconds` |
@@ -50,7 +50,7 @@
 
 | 文件 | 当前源码 SHA-256 前16位 |
 | --- | --- |
-| [BrightnessControl.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/BrightnessControl.java) | `f957288314b2835a` |
+| [BrightnessControl.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/BrightnessControl.java) | `7f6e8cc411da5e30` |
 | [BrightnessSensorAccess.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/BrightnessSensorAccess.java) | `fdfeca59df5414c8` |
 | [DarkLockPolicy.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/DarkLockPolicy.java) | `c5f8a32a3c033eb6` |
-| [HookRuntime.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/HookRuntime.java) | `f1cdc6bfa6a1d706` |
+| [HookRuntime.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/HookRuntime.java) | `3363c0fe90e8ef02` |

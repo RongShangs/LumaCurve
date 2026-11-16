@@ -5,6 +5,7 @@ import java.util.*;
 import top.rongshangs.lumacurve.refactor.hooking.*;
 
 /** Optional SDR-only relaxation of the content/grayscale cap, before thermal and animation.
+ * The optional user ceiling runs after native SDR caps, before animation.
  * No OEM fields, curves, mode settings or panel nodes are written here.
  */
 final class OutdoorOpr {
@@ -12,7 +13,7 @@ final class OutdoorOpr {
     static final Set<Class<?>> owners=new HashSet<>();
     static final ThreadLocal<Frame> current=new ThreadLocal<>();
     static final class Frame {
-        final Object owner;final boolean auto;final Frame previous;
+        final Object owner;final boolean auto;final Frame previous;boolean visited;OutdoorOptions options;Object hbm;
         Frame(Object owner,boolean auto){this.owner=owner;this.auto=auto;previous=current.get();}
     }
     static final class Attempt {
@@ -38,7 +39,12 @@ final class OutdoorOpr {
                 }
                 protected void afterHookedMethod(MethodHookParam p){
                     Object saved=p.getObjectExtra("hyperlux.opr.frame");
-                    if(saved instanceof Frame){Frame frame=(Frame)saved;if(frame.previous==null)current.remove();else current.set(frame.previous);}
+                    if(saved instanceof Frame){Frame frame=(Frame)saved;try{
+                        // The native SDR body has finished BCBC, sunlight merging and all
+                        // thermal/power caps. A decreasing envelope here cannot raise them.
+                        HookRuntime s=HookEntry.ownerState(p.thisObject);
+                        if(!p.hasThrowable()&&frame.visited&&frame.owner==p.thisObject&&frame.auto&&s!=null&&s.outdoor.options.oprCurveEnabled&&frame.options==s.outdoor.options&&s.onDisplayThread()&&scope.allows(p.thisObject)&&s.outdoor.oprAllowed()&&s.outdoor.access!=null&&frame.hbm==s.outdoor.access.controller)p.setResult(s.outdoor.oprCurve((Float)p.getResult()));
+                    }catch(Throwable unknown){/* Retain the native result. */}finally{if(frame.previous==null)current.remove();else current.set(frame.previous);}}
                 }
             }));
             hooks.add(XposedBridge.hookMethod(opr,new XC_MethodHook(){
@@ -59,6 +65,7 @@ final class OutdoorOpr {
                     try{HookRuntime s=HookEntry.ownerState(p.thisObject);if(!eligible(p,s))return;
                         Attempt attempt=(Attempt)saved;
                         float before=(Float)p.args[0],limited=(Float)p.getResult(),next=s.outdoor.opr(before,limited);
+                        Frame frame=current.get();if(frame!=null&&OutdoorPolicy.valid(before)&&OutdoorPolicy.valid(limited)){frame.visited=true;frame.options=s.outdoor.options;frame.hbm=s.outdoor.access==null?null:s.outdoor.access.controller;}
                         if(next<=limited)return;
                         // Remove only the OPR bit introduced by this invocation. Retain existing
                         // modifiers, including an OPR bit that was already present upstream.

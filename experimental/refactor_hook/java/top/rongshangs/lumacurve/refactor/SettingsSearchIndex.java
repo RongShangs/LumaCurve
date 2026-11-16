@@ -5,9 +5,9 @@ import java.util.*;
 
 /** Searchable UI destinations only. No hidden features, compatibility probes or option writes. */
 final class SettingsSearchIndex {
-    static final String[] GROUP_NAMES={"亮度曲线","手动记忆","户外高亮","环境变化与确认","亮度过渡","场景判定与控制","运行状态与界面","暗光稳定与锁定","主屏手动亮度","温控与显示保护","应用独立亮度","应用临时亮度隔离"};
+    static final String[] GROUP_NAMES={"亮度曲线","手动记忆","高亮增强","环境变化与确认","亮度过渡","场景判定与控制","运行状态与界面","暗光稳定与锁定","主屏手动亮度","温控与显示保护","应用独立亮度","应用临时亮度隔离"};
     static final String[] GROUP_DESCRIPTIONS={"基础亮度、暗处下限与曲线预设","偏好强度、持久保存与锁屏交接","强光增强、HBM 与手动阳光屏","主辅光感阈值与确认时间","分别设置变亮和变暗时长","场景的进入条件、生效效果与退出条件","兼容状态与界面刷新","减少暗光波动，或定时保持亮度","磁贴面板、直接写值与自动退让","显示温控、温度门槛与冷却恢复","暂停名单、逐应用及分组亮度记忆","阻止窗口临时亮度同步成系统偏好"};
-    static final String[] GROUP_EN={"Brightness curve","Manual memory","Outdoor brightness","Ambient response","Brightness transitions","Scene controls","Runtime and interface","Low light stability and lock","Manual panel brightness","Thermal display protection","Independent app brightness","Temporary app brightness isolation"};
+    static final String[] GROUP_EN={"Brightness curve","Manual memory","High brightness enhancement","Ambient response","Brightness transitions","Scene controls","Runtime and interface","Low light stability and lock","Manual panel brightness","Thermal display protection","Independent app brightness","Temporary app brightness isolation"};
     static final class Entry {
         final int group;final String title,description,enTitle,enDescription,target,words;
         Entry(int group,String title,String description,String enTitle,String enDescription,String target,String aliases){this.group=group;this.title=title;this.description=description;this.enTitle=enTitle;this.enDescription=enDescription;this.target=target;words=normalize(title+" "+description+" "+enTitle+" "+enDescription+" "+GROUP_NAMES[group]+" "+GROUP_DESCRIPTIONS[group]+" "+GROUP_EN[group]+" "+aliases);}
@@ -16,7 +16,7 @@ final class SettingsSearchIndex {
     }
     static Entry e(int g,String t,String d,String en,String ed,String target,String aliases){return new Entry(g,t,d,en,ed,target,aliases);}
     static final List<Entry> ENTRIES=Collections.unmodifiableList(Arrays.asList(
-        e(11,"应用临时亮度隔离","应用内临时调亮或调暗，退出后恢复系统调节","Application brightness isolation","Restore system brightness control after temporary in-app changes.","","视频 播放器 亮度解绑 隔离 临时 付款码 退出 恢复 video app override isolation restore"),
+        e(11,"应用临时亮度隔离","阻止临时亮度同步成系统偏好，最小浮窗或挂起后交回系统","Application brightness isolation","Isolate brightness preference sync and ignore minimized or suspended window requests.","suspended_window_brightness","挂起小窗亮度隔离 最小 小窗 浮窗 贴边 挂起 视频 播放器 亮度解绑 隔离 临时 付款码 退出 恢复 video app override isolation restore mini freeform pinned window"),
         e(10,"应用独立亮度","独立应用或分组记住固定亮度；退出恢复系统调节","Independent app brightness","Per-app or grouped fixed brightness, restoring system control on leaving.","","独立 分组 视频 游戏 跨锁屏 跨重启 independent groups video game brightness"),
         e(0,"基础亮度曲线","调整不同光线下的亮度起点与曲线预设","Base brightness curve","Adjust brightness targets for different light levels.","curve","蓝色 基础 稍亮 柔和 默认 预设 spline curve"),
         e(0,"深色模式基础曲线","单独调整深色模式亮度；可清除、保持或分开记忆","Dark mode base curve","A separate dark base curve with clear, shared or independent learned preferences.","dark_curve","深色模式 独立曲线 黑暗 夜间 dark theme"),
@@ -25,13 +25,16 @@ final class SettingsSearchIndex {
         e(1,"永久保持记忆","跨自动亮度开关、锁屏和重启保持偏好","Keep memory permanently","Keep preferences across auto mode, screen off and reboot.","memory","保持记忆 永久保持 跨开关 跨锁屏 跨重启 持久化 permanent persistence"),
         e(1,"保持记忆范围","分别选择跨开关、锁屏或重启保持","Memory retention","Choose when brightness preferences should be retained.","memory","记忆 保存 长期 恢复 retention reboot unlock"),
         e(1,"将绿色曲线保存为基础曲线","把当前学习结果保存为新的蓝色基础曲线","Save learned curve as base","Use the current learned curve as your new base curve.","memory","转存 绿色转蓝色 保存曲线 learned save base"),
-        e(2,"户外高亮","选择强光下的增强强度与持续时间","Outdoor brightness","Choose the strength and duration of outdoor enhancement.","outdoor","阳光屏 强光 最大增强 outdoor sunlight strength"),
+        e(2,"高亮目标曲线","拖动照度与nit节点设置强光目标，可调亮或调暗","High brightness target curve","Drag lux/nit nodes to raise or lower the strong-light target.","outdoor_curve","放宽后高亮曲线 激发 画面限亮 上限 拖动 nit lux opr curve drag"),
+        e(2,"高亮增强","直接选择增强方式，在nit曲线中调整照度、目标与上限","High brightness enhancement","Choose an enhancement mode and edit lux, targets and ceilings on one nit graph.","","户外高亮 阳光屏 强光 最大增强 outdoor sunlight strength"),
+        e(2,"高亮增强详细设置","增强方式、曲线、触发门槛与保护","High brightness detailed settings","Enhancement modes, curve, trigger thresholds and protection settings.","outdoor","详细 高亮 准入 保护 曲线 details outdoor"),
+        e(2,"主动激发测试","短时模拟强光输入，记录设备实际亮度；20秒后恢复","Active strong-light test","Simulate strong-light input briefly and record device output, restoring real input after 20 seconds.","outdoor_test","激发 测试 100000 20秒 模拟 HBM test simulate"),
         e(2,"开放系统映射内的高亮范围","提高强光下可用的软件亮度上限","Unlock mapped brightness range","Allow more of the device's supported brightness range.","range","解锁高亮 高光范围 亮度上限 range unlock"),
         e(2,"强光下放宽画面限亮","减少画面内容造成的亮度限制","Relax content brightness limit","Reduce content-dependent dimming in strong light.","opr","画面限量 限亮 灰阶 OPR 内容 apl"),
-        e(2,"强制达到节点上限","设置节点增强目标，仍保留系统保护","Node brightness target","Choose a node enhancement target with system protection retained.","outdoor","最高节点 真实节点 节点滑动杆 node maximum target"),
-        e(2,"户外亮度上限","按 nit 设置户外增强的最高目标","Outdoor brightness ceiling","Set an outdoor brightness ceiling in nit.","outdoor","最高亮度 nit 2000 亮度封顶 ceiling cap"),
-        e(2,"HBM 触发与预算","调整高亮触发照度及支持的时间预算","HBM trigger and budget","Adjust high brightness thresholds and supported time budgets.","outdoor","HBM 高亮模式 时间预算 budget trigger"),
-        e(2,"手动阳光屏","设置手动亮度下阳光模式的确认条件","Manual sunlight mode","Adjust sunlight mode confirmation in manual brightness.","outdoor","手动阳光屏 sunlight manual"),
+        e(2,"旧版节点增强设置","保留已启用的节点控制和参数，可确认改用目标曲线","Node brightness target","Choose a node enhancement target with system protection retained.","outdoor_node","强制达到节点上限 最高节点 真实节点 节点滑动杆 node maximum target"),
+        e(2,"最高亮度限制","按 nit 限制增强后的最高亮度","Maximum brightness limit","Limit the maximum enhanced brightness in nit.","outdoor_ceiling","户外亮度上限 最终亮度上限 最高亮度 nit 2000 亮度封顶 ceiling cap"),
+        e(2,"触发门槛与预算","调整高亮触发照度及支持的时间预算","HBM trigger and budget","Adjust high brightness thresholds and supported time budgets.","outdoor_admission","高亮准入 HBM 高亮模式 时间预算 budget trigger"),
+        e(2,"手动阳光屏","设置手动亮度下阳光模式的确认条件","Manual sunlight mode","Adjust sunlight mode confirmation in manual brightness.","scene_manual_sunlight","手动阳光屏 sunlight manual"),
         e(3,"光感阈值与确认时间","调整环境变化多久才影响屏幕亮度","Ambient thresholds and confirmation","Choose how much and how long light must change.","","变亮 变暗 灵敏 温和 防抖 响应 阈值 delay hysteresis"),
         e(3,"辅助光感确认","调整辅助输入的变亮、变暗确认","Auxiliary light confirmation","Tune brightening and darkening confirmation for auxiliary input.","","双光感 辅助光线传感器 assist secondary sensor"),
         e(4,"亮度过渡速度","分别调整变亮、变暗的过渡倍率","Brightness transition speed","Adjust brightening and darkening transition speeds separately.","","平滑 动画 变亮倍率 变暗倍率 animation ramp transition"),

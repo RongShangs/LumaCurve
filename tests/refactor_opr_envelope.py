@@ -1,10 +1,11 @@
 """Production OPR envelope and nonlinear nit inversion; host tests, no colorimeter."""
 from pathlib import Path
-import subprocess
+import subprocess,os
 
 R=Path(__file__).resolve().parents[1]
 S=R/'experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor'
 O=R/'build/refactor-opr-envelope-tests'; O.mkdir(exist_ok=True)
+J=R/'build/refactor-diagnostics/json-20240303.jar'
 stubs={
 'HookEntry.java':'''package top.rongshangs.lumacurve.refactor;import java.lang.reflect.*;class HookEntry{static Field field(Class<?> c,String n)throws Exception{for(;c!=null;c=c.getSuperclass())try{Field f=c.getDeclaredField(n);f.setAccessible(true);return f;}catch(NoSuchFieldException absent){}throw new NoSuchFieldException(n);}}''',
 'OutdoorSdrScope.java':'''package top.rongshangs.lumacurve.refactor;import java.lang.reflect.*;class OutdoorSdrScope{static Field typed(Class<?> c,String n,Class<?> t)throws Exception{Field f=HookEntry.field(c,n);if(f.getType()!=t||Modifier.isStatic(f.getModifiers()))throw new IllegalStateException(n);return f;}}''',
@@ -65,8 +66,8 @@ public class EnvelopeTest{
 }'''
 }
 for name,body in stubs.items():(O/name).write_text(body,encoding='utf-8')
-subprocess.run(['javac','-encoding','UTF-8','--release','8','-d',str(O),*[str(O/n) for n in stubs],str(S/'OutdoorOprEnvelope.java'),str(S/'NitBrightnessLimit.java')],check=True)
-subprocess.run(['java','-cp',str(O),'top.rongshangs.lumacurve.refactor.EnvelopeTest'],check=True)
+subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(J),'-d',str(O),*[str(O/n) for n in stubs],str(S/'OutdoorOprEnvelope.java'),str(S/'NitBrightnessLimit.java')],check=True)
+subprocess.run(['java','-cp',os.pathsep.join([str(O),str(J)]),'top.rongshangs.lumacurve.refactor.EnvelopeTest'],check=True)
 c=(S/'OutdoorController.java').read_text(encoding='utf-8')
 assert 'oprEnvelope.bound(proposed,limited' in c
 assert 'new OutdoorOprEnvelope(s.owner)' in c
