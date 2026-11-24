@@ -20,7 +20,7 @@ class PanelNodeDiscovery {static int maximum;static boolean available=true;stati
 class RootControl {static File DATA=new File("not-used");}
 class OutdoorNodeRoot {
  static JSONObject discover(){return PanelNodeDiscovery.discover(new java.io.File("/sys"));}static boolean accepts(JSONObject state,JSONObject node){return node.optBoolean("supported");}static String foldIds(JSONObject node){return "";}
- static boolean supported(JSONObject state){return PanelNodeDiscovery.available&&state.optBoolean("outdoor_node_supported");}static JSONObject health(){return new JSONObject();}static int running(){return -1;}
+ static boolean supported(JSONObject state){return PanelNodeDiscovery.available&&state.optBoolean("outdoor_node_supported");}static JSONObject health(){return new JSONObject();}static int running(){return -1;}static int anyRunning(){return -1;}
  ANNOTATE
 }
 public class NodeSettingsTest {

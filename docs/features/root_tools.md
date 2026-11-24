@@ -9,8 +9,8 @@
 | 项目 | 要求 |
 | --- | --- |
 | 触发 | Root桥需要读写配置事务文件或生成诊断，在实际身份下校验受管目录。 |
-| 需求与行为 | 私有受管目录优先，拒绝时可用受管临时目录；验证所有权、真实路径和权限，不把目录可写当成节点可写 原生锁只规范可信Root自有目录和同inode文件的私有权限，不删除或强抢锁；导出可只读记录元数据。 |
-| 退出 / 失败 | 候选目录校验失败只拒绝对应工具；未知文件和链接保留，不移动原生节点。 |
+| 需求与行为 | 私有受管目录优先；父目录身份/所有权/权限、真实路径、目录身份和可读写全部通过才使用，首选不可用时按同一规则核验备用目录。原生节点程序、锁、权限恢复记录和日志跟随同一个已核验目录，不降低任何检查，也不迁移用户设置；旧版原生程序残留按旧固定目录安全恢复。 |
+| 退出 / 失败 | 任一候选目录校验失败只拒绝对应路径，不删除既有数据、不改用户设置；全部候选失败时明确报告两个目录，主屏直写保持关闭，已有曲线和自动亮度不受影响。 |
 | 默认 | `on_request` · 按实际权限选择 |
 | 配置键 | 无独立持久化亮度配置键 |
 | 依赖能力 | 由本项实际接口独立判断 |
@@ -31,7 +31,7 @@
 | 项目 | 要求 |
 | --- | --- |
 | 触发 | 节点增强已请求，原生框架支持且当前内部主屏及节点唯一绑定。 |
-| 需求与行为 | 普通单主屏与折叠当前端口分别校验，复用同一租约；换屏释放旧目标，保留偏好 |
+| 需求与行为 | 普通单主屏与折叠当前端口分别校验，复用同一租约；换屏释放旧目标，保留偏好。只从通过同一私有目录校验的候选读取有界状态记录并结合进程身份确认守护；复用当前守护前检查其他候选，清理已验证的残留进程。 |
 | 退出 / 失败 | 物理屏变化、熄屏或租约失效时结束旧屏协作，不跨屏复用目标。 |
 | 默认 | `off` · 显式节点增强时使用 |
 | 配置键 | `outdoor_node_boost`、`outdoor_node_target` |
@@ -85,7 +85,7 @@
 
 ### 选择边界
 
-逐项检查私有存储、原始配置、当前 APK 资产和组合接口；不试写亮度，不擅自启动服务。 Root设置三入口互斥，原外部Provider优先；只读探测拒绝时尝试权限等价的cmd settings/settings CLI，不绕过系统权限。写入失败不重放，UID0不等于全权限。私有目录严格身份检查后才回退，原生节点不换目录。 原生程序使用同一Root私有锁检查，不按Root工具名称放行；候选载荷先完成原生恢复才原子替换。
+逐项检查私有存储、原始配置、当前 APK 资产和组合接口；不试写亮度，不擅自启动服务。 Root设置三入口互斥，原外部Provider优先；只读探测拒绝时尝试权限等价的cmd settings/settings CLI，不绕过系统权限。写入失败不重放，UID0不等于全权限。私有目录严格身份检查后才回退，原生程序、锁、恢复记录与日志跟随同一已核验目录，旧版残留按旧目录恢复。户外守护从已核验目录读取有界状态记录，复用前检查两处候选。原生程序使用同一Root私有锁检查，不按Root工具名称放行；候选载荷先完成原生恢复才原子替换。
 
 | 契约 | 内容 |
 | --- | --- |
@@ -106,7 +106,7 @@
 | `primary_node_profile` · 实际主屏节点与框架输出组合 | 按实际节点上限、曲线映射和输出能力核验，不按机型名单放行。 |
 | `apk_native_asset` · APK 内原生程序校验 | 核对当前 APK 的主屏程序资产完整性，不启动守护、不试写亮度。 |
 | `fold_bound_outdoor` · 折叠主屏节点协作绑定 | 当前物理主屏、原生布局和背光配对完整；用独立物理租约核验切屏，不跨屏继承目标。 |
-| `root_temporary_storage` · Root 独立操作目录 | 原目录受限时使用受验证的私有目录；不迁移原生输出程序或用户设置。 |
+| `root_temporary_storage` · Root 独立操作目录 | 原目录受限时按同一身份规则使用备用私有目录；原生程序、锁、权限记录和日志跟随同一目录，不迁移用户设置。 |
 | `root_actual_identity` · 实际进程权限信息 | 记录实际UID、Capabilities及SELinux上下文，不以Root管理器名称判定权限。 |
 | `external_provider` · 原生设置接口 | 优先使用原有设置服务；写入仍需系统授权与读回确认。 |
 | `cmd_settings` · 系统设置命令服务 | 原入口不可读时核验cmd设置服务；不重放失败的写入。 |
@@ -133,11 +133,11 @@
 | --- | --- |
 | [AppRootDiagnostics.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/AppRootDiagnostics.java) | `4739b5d2f6cc3a9e` |
 | [NativePanelAsset.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/NativePanelAsset.java) | `57da7aa4e8f0cfed` |
-| [OutdoorNodeRoot.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/OutdoorNodeRoot.java) | `9def729b0d7dc0bf` |
+| [OutdoorNodeRoot.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/OutdoorNodeRoot.java) | `2413ee92ef0abead` |
 | [RootAccess.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/RootAccess.java) | `eb2e765208fa31b1` |
 | [RootCommand.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/RootCommand.java) | `22091c80df72806c` |
-| [RootControl.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/RootControl.java) | `3eee4317ba467ae6` |
+| [RootControl.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/RootControl.java) | `9710b9c86220f344` |
 | [RootFeatureChecks.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/RootFeatureChecks.java) | `f801660ebbb8a387` |
 | [RootLaunch.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/RootLaunch.java) | `a681d9b5f44fe950` |
 | [RootSettings.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/RootSettings.java) | `3b21095ef09b28e0` |
-| [RootWorkspace.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/RootWorkspace.java) | `a7620b43655d8bb4` |
+| [RootWorkspace.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/RootWorkspace.java) | `e6004fc941010e8a` |

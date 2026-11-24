@@ -18,6 +18,8 @@ public class FeatureCompatibilityTest{
  public static void main(String[] args)throws Exception{
   JSONObject r=new JSONObject().put("curve_backend","refactor");
   for(String route:new String[]{"app_override_scoped_sync","native_window_no_sync"}){r.put("app_brightness_isolation",new JSONObject().put("profile",route).put("blocked_syncs",7));picked("app_brightness_isolation",r,route);check(enrich("app_brightness_isolation","available",r).getString("evidence").contains("7"));check(selected(enrich("app_brightness_isolation","unsupported",r)).isEmpty());}
+  r.put("app_brightness_isolation",new JSONObject().put("profile","app_override_native_handoff").put("blocked_handoffs",12));
+  picked("app_brightness_isolation",r,"app_override_native_handoff");check(enrich("app_brightness_isolation","available",r).getString("evidence").contains("已拦截亮度交接：12"));
   r.put("app_brightness_isolation",new JSONObject().put("share_profile","app_override_screen_shared"));check(selected(enrich("app_brightness_share","available",r)).isEmpty());check(selected(enrich("app_brightness_share","unsupported",r)).isEmpty());
   r.put("brightness_control",new JSONObject().put("app_independent",new JSONObject().put("profile","focused_app_fixed_manual").put("key","group:videos")));picked("app_independent",r,"focused_app_fixed_manual");check(enrich("app_independent","available",r).getString("evidence").contains("group:videos"));check(selected(enrich("app_independent","unsupported",r)).isEmpty());
   String[] memory={"curve","manual_memory","saved_curve","persistent_memory","memory_mode","memory_forever","memory_reset","memory_timeout"};

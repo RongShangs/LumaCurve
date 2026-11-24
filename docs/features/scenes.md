@@ -61,7 +61,7 @@
 | 项目 | 要求 |
 | --- | --- |
 | 触发 | 系统事实成立、原生策略可用，且用户选择跟随或所设准入条件允许。 |
-| 需求与行为 | 对已有的流式距离遮挡场景选择跟随、阻止或自定义准入；要求瞬时遮挡标记与跳过亮度变化入口完整，新版场景接口只保留 updateAmbientLux(int,float,boolean) 而缺少这些入口时本项保持不可用，不伪造准入或传感器行为，进入、效果和退出按实际能力展开。 |
+| 需求与行为 | 对已有的流式距离遮挡场景选择跟随、阻止或自定义准入；要求瞬时遮挡标记与跳过亮度变化入口完整，新版场景接口只保留 updateAmbientLux(int,float,boolean) 而缺少这些入口时本项保持不可用，不伪造准入或传感器行为，进入、效果和退出按实际能力展开。 已核验旧式消费者中，仅在主屏/当前用户/模块配置生效且自动光感有效时，原生流式Sensor字段为null、状态为7且SensorManager确认33171005不存在，调用范围内关闭不可完成的距离确认准入；等待判断只移除缺失输入的距离项，保留AON及未知原生结果。不替换中兴等厂商类型，不持久改原生标志或用户配置；缺字段、类型错、查询失败、待初始化及已注册状态沿用原生。 |
 | 退出 / 失败 | 按照对应原生退出事实及已保存的确认条件退让，换对象只恢复自己的字段。 |
 | 原生默认条件 | 系统游戏策略允许流式距离检测，发生待确认的变暗事件后读取流式传感器。系统按原始通道与两级阈值判定遮挡；无遮挡才继续降亮。位置以本机传感器为准。新版场景接口只保留 updateAmbientLux 而缺少瞬时遮挡与跳过亮度变化入口时，本项保持不可用。 |
 | 原生效果 | 变暗前确认是否被遮挡，确认期间暂缓降亮。 |
@@ -100,7 +100,7 @@
 | 项目 | 要求 |
 | --- | --- |
 | 触发 | 系统事实成立、原生策略可用，且用户选择跟随或所设准入条件允许。 |
-| 需求与行为 | 对已有的手动模式阳光屏场景选择跟随、阻止或自定义准入；进入、效果和退出按实际能力展开，不创建新命名场景。 |
+| 需求与行为 | 对已有的手动模式阳光屏场景选择跟随、阻止或自定义准入；折叠时显示标题和详细设置入口，进入、效果和退出按实际能力展开，不创建新命名场景。 |
 | 退出 / 失败 | 按照对应原生退出事实及已保存的确认条件退让，换对象只恢复自己的字段。 |
 | 原生默认条件 | 系统自动亮度关闭、阳光屏开关开启、屏幕亮起、未被用户临时停用且未挂起；照度持续超过系统门槛后进入。与自动亮度 HBM 是两条不同链路。 |
 | 原生效果 | 手动亮度下临时增亮，提高阳光可读性。 |
@@ -125,12 +125,12 @@
 
 ### 选择边界
 
-各场景独立实际消费者；普通 / 流式距离分别检测。新版 SceneDetector 缺少瞬时遮挡与跳过亮度变化入口时流式距离保持不可用（不伪造）；反射确认在旧 isReflectiveScene 缺失时映射到已核验的 AON 照度窗口。OEM 未启用普通距离时报告 inactive，不强开传感器；只能约束现有场景。
+各场景独立实际消费者；普通 / 流式距离分别检测。新版 SceneDetector 缺少瞬时遮挡与跳过亮度变化入口时流式距离保持不可用（不伪造）；反射确认在旧 isReflectiveScene 缺失时映射到已核验的 AON 照度窗口。OEM 未启用普通距离时报告 inactive，不强开传感器；只能约束现有场景。 已核验旧式流式消费者遇到原生输入明确缺失时采用独立缺输入门禁：仅处理33171005确实不存在，未知和损坏不回退；不采用厂商替代传感器。
 
 | 契约 | 内容 |
 | --- | --- |
 | 组合方式 | `per_feature` |
-| 统一输出 | SceneCatalog状态、独立进入/效果/退出配置及应用计数 |
+| 统一输出 | SceneCatalog状态、独立进入/效果/退出配置及应用计数；缺输入修正只暴露准入/等待计数，不改变原有场景配置与有效输入的保护 |
 | 坐标与身份 | 照度lux、时间毫秒；未知与未生效分开 |
 
 ### 清理及回滚
@@ -151,9 +151,9 @@
 | `oem_manual_sunlight` · 系统手动阳光屏策略 | 使用 SunlightController 原生状态与条件。 |
 | `oem_game` · 系统游戏防误降亮策略 | 匹配本机该场景的原生消费者，仅限制参与条件，不强制进入场景。 |
 
-路线内部 ABI：`scene_reflection_mapping`、`scene_stream_proximity_absent`；完整条件仅维护在 [ABI索引](../architecture/compatibility-index.md#abi-内部变体)。
+路线内部 ABI：`scene_reflection_mapping`、`scene_stream_proximity_absent`、`scene_stream_sensor_missing`；完整条件仅维护在 [ABI索引](../architecture/compatibility-index.md#abi-内部变体)。
 
-运行证据：`system_scene`、`scene_options`、`feature_self_check`。
+运行证据：`system_scene`、`scene_options`、`feature_self_check`、`scene_control.stream_sensor_compatibility`。
 
 验证入口：
 
@@ -170,6 +170,6 @@
 | [FieldOverride.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/FieldOverride.java) | `6b47448ffaf6ac29` |
 | [HookRuntime.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/HookRuntime.java) | `3363c0fe90e8ef02` |
 | [SceneCatalog.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/SceneCatalog.java) | `3f1dc5f8e950556e` |
-| [SceneController.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/SceneController.java) | `2f40296a53139af9` |
-| [SceneSettings.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/SceneSettings.java) | `309bb8db000e13a6` |
-| [SceneTuning.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/SceneTuning.java) | `d83f9baf6b874ba5` |
+| [SceneController.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/SceneController.java) | `aaf08e0e3ebf5c6b` |
+| [SceneSettings.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/SceneSettings.java) | `55c8133840086961` |
+| [SceneTuning.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/SceneTuning.java) | `611a70c1bf7a50d6` |

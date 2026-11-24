@@ -424,11 +424,12 @@
         "SceneCatalog.java",
         "FieldOverride.java"
       ],
-      "selector": "各场景独立实际消费者；普通 / 流式距离分别检测。新版 SceneDetector 缺少瞬时遮挡与跳过亮度变化入口时流式距离保持不可用（不伪造）；反射确认在旧 isReflectiveScene 缺失时映射到已核验的 AON 照度窗口。OEM 未启用普通距离时报告 inactive，不强开传感器；只能约束现有场景。",
+      "selector": "各场景独立实际消费者；普通 / 流式距离分别检测。新版 SceneDetector 缺少瞬时遮挡与跳过亮度变化入口时流式距离保持不可用（不伪造）；反射确认在旧 isReflectiveScene 缺失时映射到已核验的 AON 照度窗口。OEM 未启用普通距离时报告 inactive，不强开传感器；只能约束现有场景。 已核验旧式流式消费者遇到原生输入明确缺失时采用独立缺输入门禁：仅处理33171005确实不存在，未知和损坏不回退；不采用厂商替代传感器。",
       "evidence": [
         "system_scene",
         "scene_options",
-        "feature_self_check"
+        "feature_self_check",
+        "scene_control.stream_sensor_compatibility"
       ],
       "cleanup": "调用结束或异常时由FieldOverride逆序恢复临时字段；停止时取消本次确认并恢复仍持有的步行/夜间设置，系统后来更新优先。",
       "tests": [
@@ -444,7 +445,7 @@
           "SceneTuning.java",
           "SceneController.java"
         ],
-        "contract": "SceneCatalog状态、独立进入/效果/退出配置及应用计数",
+        "contract": "SceneCatalog状态、独立进入/效果/退出配置及应用计数；缺输入修正只暴露准入/等待计数，不改变原有场景配置与有效输入的保护",
         "coordinates": "照度lux、时间毫秒；未知与未生效分开",
         "consumers": [
           "HookRuntime.java",
@@ -934,7 +935,7 @@
         "RootAccess.java",
         "AppRootDiagnostics.java"
       ],
-      "selector": "逐项检查私有存储、原始配置、当前 APK 资产和组合接口；不试写亮度，不擅自启动服务。 Root设置三入口互斥，原外部Provider优先；只读探测拒绝时尝试权限等价的cmd settings/settings CLI，不绕过系统权限。写入失败不重放，UID0不等于全权限。私有目录严格身份检查后才回退，原生节点不换目录。 原生程序使用同一Root私有锁检查，不按Root工具名称放行；候选载荷先完成原生恢复才原子替换。",
+      "selector": "逐项检查私有存储、原始配置、当前 APK 资产和组合接口；不试写亮度，不擅自启动服务。 Root设置三入口互斥，原外部Provider优先；只读探测拒绝时尝试权限等价的cmd settings/settings CLI，不绕过系统权限。写入失败不重放，UID0不等于全权限。私有目录严格身份检查后才回退，原生程序、锁、恢复记录与日志跟随同一已核验目录，旧版残留按旧目录恢复。户外守护从已核验目录读取有界状态记录，复用前检查两处候选。原生程序使用同一Root私有锁检查，不按Root工具名称放行；候选载荷先完成原生恢复才原子替换。",
       "evidence": [
         "feature_self_check",
         "root_feature_self_check",
@@ -1225,6 +1226,7 @@
       ],
       "routes": [
         "app_override_scoped_sync",
+        "app_override_native_handoff",
         "native_window_no_sync"
       ],
       "owners": [
@@ -1233,7 +1235,7 @@
         "BrightnessControlOptions.java",
         "BrightnessControl.java"
       ],
-      "selector": "按实际类型、方法与来源选路；完整同步ABI时仅在同一主屏/用户/窗口调用帧内拦截偏好同步；三个同步入口全缺且窗口消费者完整时沿用原生隔离，不按OS版本推断。原生隔离作为实际状态说明保留；页面唯一开关控制模块同步隔离与最小/挂起处理，不假称能关闭原生行为。旧版窗口共享已停用，历史路线与保存字段留档。独立亮度持有应用租约时同样阻止窗口写入全局偏好。",
+      "selector": "按实际类型、方法与来源选路；完整同步ABI时仅在同一主屏/用户/窗口调用帧内拦截偏好同步；三个同步入口全缺时确认原生保持交接链路，完整则阻止应用亮度写入保持策略，保持交接标记也缺失时沿用原生隔离，残缺或类型错误不回退，不按OS版本推断。原生隔离作为实际状态说明保留；页面唯一开关控制模块同步隔离与最小/挂起处理，不假称能关闭原生行为。旧版窗口共享已停用，历史路线与保存字段留档。独立亮度持有应用租约时同样阻止窗口写入全局偏好。",
       "evidence": [
         "app_brightness_isolation.profile",
         "app_brightness_isolation.native_isolated",
@@ -1242,9 +1244,10 @@
         "app_brightness_isolation.blocked_syncs",
         "app_brightness_isolation.window_active",
         "app_brightness_isolation.share_enabled",
-        "app_brightness_isolation.share_detail"
+        "app_brightness_isolation.share_detail",
+        "app_brightness_isolation.blocked_handoffs"
       ],
-      "cleanup": "5个必要Hook事务回滚；ThreadLocal按栈恢复；用户主动调节、HDR、非主屏/用户、无匹配来源或不完整ABI沿用系统。仅阻止同步，不记忆或重放窗口值。页面只提供一个统一隔离开关；Beta19任一旧选择已开即继承。原生状态不重写用户保存配置。",
+      "cleanup": "同步5个、保持交接4个必要Hook事务回滚；ThreadLocal按栈恢复；用户主动调节、HDR、非主屏/用户、无匹配来源或不完整ABI沿用系统。仅阻止同步，不记忆或重放窗口值。页面只提供一个统一隔离开关；Beta19任一旧选择已开即继承。原生状态不重写用户保存配置。",
       "tests": [
         "tests/refactor_app_isolation.py",
         "tests/refactor_feature_self_check.py",
@@ -1259,7 +1262,7 @@
         "boundary": [
           "AppBrightnessIsolation.java"
         ],
-        "contract": "来源限定同步隔离或原生隔离的有效状态；保存的模块选择单独保留",
+        "contract": "来源限定同步隔离、保持交接隔离或原生隔离的有效状态；保存的模块选择单独保留",
         "coordinates": "应用覆盖与控制中心主动输入分开",
         "consumers": [
           "HookRuntime.java",
@@ -2158,6 +2161,27 @@
       ],
       "rule": "按实际声明类型逐层查找同签名非静态void照度通知方法；非public不等于缺失，错误返回类型/静态签名直接拒绝，不降级绕过。只对已绑定主屏范围/策略对象使用。",
       "test": "tests/refactor_outdoor_light_test.py"
+    },
+    {
+      "id": "scene_stream_sensor_missing",
+      "owner": "SceneTuning.java",
+      "alternatives": [
+        "native_sensor_available_or_unconfirmed",
+        "verified_missing_native_stream_input"
+      ],
+      "rule": "保留完整旧式共享Hook组及新版无流式接口路线。额外检查非static mDisplayId/mProxState int、mTransientProximityEnabled及两等待位boolean、mStreamProximitySensor Sensor、mSensorManager SensorManager，注册void(boolean)与准入boolean()签名。模块active、同用户显示线程、亮屏有效自动输入、display0/state7、输入null且getDefaultSensor(33171005)==null才抑制不可完成的距离项。原生结果不等于两等待位OR时不自动改写；AON保留。调用结束/异常恢复临时标志；不清持久等待位、不注册传感器、不代用33181011、不按机型放行；类型错、未知/查询失败/有效输入/初始化中沿用原生。",
+      "test": "tests/refactor_scene_hooks.py"
+    },
+    {
+      "id": "app_override_native_handoff_abi",
+      "owner": "AppBrightnessIsolation.java",
+      "alternatives": [
+        "app_override_scoped_sync",
+        "app_override_native_handoff",
+        "native_window_no_sync"
+      ],
+      "rule": "完整旧同步路径优先；三同步入口全缺时，以DPC updateOverrideBrightnessSetting字段或updateOverrideDragMode方法识别保持交接。核验DPC与ABC双接收者、自动亮度标记、持久化消费者与物理屏标识。只拦截limitQRCodeBrightnessMax调用栈中同一已接受窗口、同内置主屏/用户/配置且精确匹配当前亮度的保持开启调用。保留原生输出、退出调用、手动调节和HDR。疑似残缺保持结构不报原生隔离。",
+      "test": "tests/refactor_app_isolation.py"
     }
   ],
   "native_variants": [

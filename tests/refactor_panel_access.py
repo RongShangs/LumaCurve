@@ -13,7 +13,7 @@ S = R / 'experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor'
 O = R / 'build/panel-access-tests'
 J = R / 'build/refactor-diagnostics/json-20240303.jar'
 files = {
- 'top/rongshangs/lumacurve/refactor/RootWorkspace.java':'package top.rongshangs.lumacurve.refactor;final class RootWorkspace{static void requireNative(){}}',
+ 'top/rongshangs/lumacurve/refactor/RootWorkspace.java':'package top.rongshangs.lumacurve.refactor;final class RootWorkspace{static java.io.File requireNative(){return new java.io.File("build/panel-access-tests");}static void secure(java.io.File f,boolean create){}static java.io.File directory(){return new java.io.File("build/panel-access-tests");}static java.io.File[] candidates(){return new java.io.File[]{directory()};}}',
 
     'top/rongshangs/lumacurve/refactor/ActivePanelNode.java': 'package top.rongshangs.lumacurve.refactor;class ActivePanelNode{static final String PROFILE="fold_default_display";static org.json.JSONObject discover()throws Exception{return PanelNodeDiscovery.discover(new java.io.File("/sys"));}}',
     'android/system/ErrnoException.java': '''package android.system;public class ErrnoException extends Exception{public final int errno;public ErrnoException(String op,int e){super(op+" errno="+e);errno=e;}}''',
@@ -28,7 +28,7 @@ public class Os{
  public static StructStat fstat(FileDescriptor f)throws ErrnoException{if(statFails)throw new ErrnoException("fstat",5);StructStat s=lstat("");if(changed)s.st_ino++;if(nonRegular)s.st_mode=0040000|mode;return s;}
  public static void close(FileDescriptor f){closes++;}public static void chmod(String p,int m){chmods++;}
 }''',
-    'top/rongshangs/lumacurve/refactor/RootControl.java': '''package top.rongshangs.lumacurve.refactor;import java.io.*;class RootControl{static final File DATA=new File("build/panel-access-tests");static void process(String... p){}}''',
+    'top/rongshangs/lumacurve/refactor/RootControl.java': '''package top.rongshangs.lumacurve.refactor;import java.io.*;class RootControl{static final File DATA=new File("build/panel-access-tests");static String process(String... p){return "";}}''',
     'top/rongshangs/lumacurve/refactor/PanelNodeDiscovery.java': '''package top.rongshangs.lumacurve.refactor;import java.io.*;import org.json.*;class PanelNodeDiscovery{static JSONObject selected;static int number(File f){return 951;}static JSONObject discover(File f)throws Exception{return new JSONObject(selected.toString());}}''',
     'top/rongshangs/lumacurve/refactor/NativePanelClient.java': '''package top.rongshangs.lumacurve.refactor;import java.io.*;import org.json.*;class NativePanelClient{static JSONObject guard;static JSONObject call(String s)throws Exception{if(guard==null)throw new IOException("Connection refused");return guard;}static void require(String s){}}''',
     'top/rongshangs/lumacurve/refactor/PanelAccessTest.java': r'''package top.rongshangs.lumacurve.refactor;
@@ -106,13 +106,13 @@ c.write_text(r'''
 #ifndef O_NOFOLLOW
 #define O_NOFOLLOW 0400000
 #endif
-#define RECORD "record"
+static char record_path[]="record";
 static char node[PANEL_NODE_PATH_SIZE]="/sys/class/backlight/panel0-backlight/brightness",real_node[PANEL_REAL_PATH_SIZE]="/sys/devices/panel0/brightness",boot_id[40]="5a30f9e3-021b-4ec1-8131-47f151ebb7aa";
 static dev_t node_device=1;static ino_t node_inode=2;static int output=-1,original=-1,active_fold_port=-1;
 static int mode,deny,changed,live,opens,closes,chmods,restores,record_writes,record_exists,chmod_mode,fail_chmod,fail_sync;
 static int same_node(void){return live;}
 static int fake_open(const char *path,int flags,...){
- if(!strcmp(path,RECORD)){if(record_exists){errno=EEXIST;return -1;}record_exists=1;return 20;}
+ if(!strcmp(path,record_path)){if(record_exists){errno=EEXIST;return -1;}record_exists=1;return 20;}
  opens++;if(flags!=(O_WRONLY|O_CLOEXEC|O_NOFOLLOW)){errno=EINVAL;return -1;}if(deny){errno=deny;return -1;}return 10;
 }
 static int fake_close(int fd){if(fd==10)closes++;return 0;}

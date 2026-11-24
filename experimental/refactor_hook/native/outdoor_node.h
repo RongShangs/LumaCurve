@@ -1,6 +1,5 @@
 #include "outdoor_node_policy.h"
 #define OUTDOOR_LEASE "/data/system/hyperlux-outdoor-node-lease"
-#define OUTDOOR_HEALTH DIR "/outdoor-node-health.json"
 static struct outdoor_fold_ids outdoor_ids;
 static uint64_t outdoor_physical;
 static char outdoor_ids_text[168];
@@ -38,9 +37,10 @@ static int outdoor_process(int pid){
  return n>0&&!strcmp(name,"system_server");
 }
 static void outdoor_health(const struct outdoor_node_state *s,const char *reason){
- char temp[]=OUTDOOR_HEALTH ".new";int f=open(temp,O_WRONLY|O_CREAT|O_TRUNC|O_NOFOLLOW|O_CLOEXEC,0644);if(f<0)return;
+ char temp[PATH_MAX],target[PATH_MAX];if(snprintf(target,sizeof(target),"%s",outdoor_health_path)<=0||snprintf(temp,sizeof(temp),"%s.new",outdoor_health_path)<=0)return;
+ int f=open(temp,O_WRONLY|O_CREAT|O_TRUNC|O_NOFOLLOW|O_CLOEXEC,0644);if(f<0)return;
  char b[1024];int n=snprintf(b,sizeof(b),"{\"pid\":%d,\"held\":%s,\"inhibited\":%s,\"base\":%d,\"target\":%d,\"reason\":\"%s\",\"fold_route\":%s,\"fold_ids\":\"%s\",\"fold_port\":%d,\"physical_id\":%llu,\"write_attempts\":%d,\"write_errno\":%d,\"write_stage\":\"%s\",\"uptime_ms\":%lld}\n",getpid(),s->held?"true":"false",s->inhibited?"true":"false",s->base,s->target,reason,outdoor_folded()?"true":"false",outdoor_ids_text,active_fold_port,(unsigned long long)outdoor_physical,outdoor_write_attempts,outdoor_report_errno,outdoor_report_stage,(long long)clock_ms());
- int ok=n>0&&n<(int)sizeof(b)&&write(f,b,(size_t)n)==n;close(f);if(ok)rename(temp,OUTDOOR_HEALTH);else unlink(temp);
+ int ok=n>0&&n<(int)sizeof(b)&&write(f,b,(size_t)n)==n;close(f);if(ok)rename(temp,target);else unlink(temp);
 }
 static int outdoor_lock(void){
  return private_open_lock("main-panel.lock");

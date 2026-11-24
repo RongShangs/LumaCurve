@@ -18,7 +18,7 @@ final class LogCompatibilityPanel {
         routeEntry=a.action("详细兼容路线",a::showFeatureChecks);routeEntry.setTextSize(14);routeEntry.setMaxLines(2);routeEntry.setEllipsize(null);routeEntry.setPadding(a.dp(12),a.dp(10),a.dp(12),a.dp(10));routeEntry.setGravity(Gravity.CENTER);routeEntry.setBackground(a.ripple(0xffe5edff,12));body.addView(routeEntry,new LinearLayout.LayoutParams(-1,-2));update(null,null);
     }
     void update(JSONObject answer,JSONObject rootReport){LogCompatibilityState state=LogCompatibilityState.read(answer,rootReport,a.appFeatureReport,a.english);render(state);}
-    void render(LogCompatibilityState state){for(int i=0;i<3;i++){states[i].setText(state.items[i].status);states[i].setTextColor(state.items[i].tone==2?a.themed(0xffbd6a28):state.items[i].tone==1?a.BLUE:a.MUTED);}title.setText(state.title);detail.setText(state.detail);}
+    void render(LogCompatibilityState state){for(int i=0;i<3;i++){states[i].setText(state.items[i].status);states[i].setTextColor(state.items[i].tone==2?a.themed(0xffbd6a28):state.items[i].tone==1?a.BLUE:a.MUTED);}title.setText(state.title);title.setVisibility(state.title.isEmpty()?View.GONE:View.VISIBLE);detail.setText(state.detail);detail.setVisibility(state.detail.isEmpty()?View.GONE:View.VISIBLE);}
 
     void failed(){render(LogCompatibilityState.read(null,null,a.appFeatureReport,a.english));states[0].setText(a.english?"Read failed":"读取失败");states[0].setTextColor(a.themed(0xffbd6a28));title.setText(a.english?"APP connection interrupted":"APP 读取连接中断");detail.setText(a.english?"This does not prove that the injected module stopped. Restore Root access and check again; your settings are retained.":"本次读取失败不表示系统中的模块已经停止。请恢复所需访问权限后重新检测；原设置仍保留。");}
 }

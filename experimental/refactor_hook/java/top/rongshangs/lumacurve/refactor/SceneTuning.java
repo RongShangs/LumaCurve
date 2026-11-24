@@ -58,6 +58,26 @@ final class SceneTuning {
         if(cap==null){cap=new HashSet<>();capabilities.put(cls,cap);}cap.add(group);
     }catch(Throwable missing){HookTransaction.rollbackAll(added);XposedBridge.log("HyperLux scene option "+group+" unavailable: "+missing);}}
     static boolean hasSharedSceneConsumer(Class<?> cls){Set<Integer> cap=capabilities.get(cls);return cap!=null&&cap.contains(4);}
+    /** An absent native input cannot complete confirmation. Never substitute another vendor type. */
+    static boolean missingStreamSensor(HookRuntime s,Object scene){
+        if(!"active".equals(s.phase)||!s.onDisplayThread()||!s.appliesToUser()||!s.screenOn()||!hasSharedSceneConsumer(scene.getClass()))return false;
+        try{
+            Object abc=object(s,"abc");if(!Boolean.TRUE.equals(HookRuntime.optionalBoolean(abc,"mLightSensorEnabled"))||!Boolean.TRUE.equals(HookRuntime.optionalBoolean(abc,"mAmbientLuxValid")))return false;
+            Class<?> cls=scene.getClass();
+            Field display=streamField(cls,"mDisplayId",int.class),state=streamField(cls,"mProxState",int.class),enabled=streamField(cls,"mTransientProximityEnabled",boolean.class);
+            if(display.getInt(scene)!=0||state.getInt(scene)!=7||!enabled.getBoolean(scene))return false;
+            Field input=HookEntry.field(cls,"mStreamProximitySensor"),manager=HookEntry.field(cls,"mSensorManager");
+            if(Modifier.isStatic(input.getModifiers())||Modifier.isStatic(manager.getModifiers())||!input.getType().getName().equals("android.hardware.Sensor")||!manager.getType().getName().equals("android.hardware.SensorManager")||input.get(scene)!=null)return false;
+            for(String name:new String[]{"mNeedCheckProximitySensor","mNeedCheckAonFlare"})streamField(cls,name,boolean.class);
+            Method admission=cls.getDeclaredMethod("isNeedStreamProximitySensorEnabled"),registration=cls.getDeclaredMethod("setStreamProximitySensorEnabled",boolean.class);
+            if(admission.getReturnType()!=boolean.class||registration.getReturnType()!=void.class||Modifier.isStatic(admission.getModifiers())||Modifier.isStatic(registration.getModifiers()))return false;
+            Object sensors=manager.get(scene);if(sensors==null)return false;
+            Method lookup=manager.getType().getMethod("getDefaultSensor",int.class);
+            if(lookup.getReturnType()!=input.getType()||Modifier.isStatic(lookup.getModifiers()))return false;
+            return lookup.invoke(sensors,33171005)==null;
+        }catch(Throwable unavailable){return false;}
+    }
+    static Field streamField(Class<?> cls,String name,Class<?> type)throws Exception{Field f=HookEntry.field(cls,name);if(f.getType()!=type||Modifier.isStatic(f.getModifiers()))throw new IllegalStateException("stream input ABI");return f;}
     static String inactiveReason(HookRuntime s,int group){
         if(group==0||group==4||group==5)try{
             Object scene=object(s,"scene");Set<Integer> cap=capabilities.get(scene.getClass());
@@ -80,14 +100,25 @@ final class SceneTuning {
                 else if(name.equals("setSunLightModeActive")){if(denied)p.args[0]=false;}
                 else if(name.equals("dropAmbientLuxIfNeeded")&&denied)save(p,"mUseProximityEnabled",false);
                 else if(name.equals("dropDecreaseLuxIfNeeded")&&denied)save(p,"mIsGameSceneEnable",false);
-                else if(name.equals("updateAmbientLux")){if(denied)save(p,"mTransientProximityEnabled",false);if(c.blocked(5)){save(p,"mMinAonFlareEnableLux",Float.MAX_VALUE);save(p,"mMaxAonFlareEnableLux",-1f);}}
+                else if(name.equals("updateAmbientLux")){boolean missing=missingStreamSensor(s,p.thisObject);if(denied||missing)save(p,"mTransientProximityEnabled",false);if(missing)c.missingStreamAdmissions++;if(c.blocked(5)){save(p,"mMinAonFlareEnableLux",Float.MAX_VALUE);save(p,"mMaxAonFlareEnableLux",-1f);}}
             }catch(Throwable failure){restore(p);c.stop();c.error="场景接口异常，已停止自定义场景";}
         }
         protected void afterHookedMethod(MethodHookParam p){restore(p);if(p.hasThrowable())return;String kind=group==2?"touch":"scene";HookRuntime s=state(p.thisObject,kind,name.equals("isNightTime"));if(s==null||s.probingScenes)return;SceneController c=s.scenes;
             if(name.equals("isNightTime")&&c.enabled&&c.denied[0])p.setResult(false);
             else if(name.equals("isTouchCoverProtectionActive")&&c.blocked(2))p.setResult(false);
             else if(name.equals("isReflectiveScene")&&c.blocked(5))p.setResult(false);
-            else if(name.equals("isNeedSkipBrightnessChange")&&c.enabled){Object rear=HookRuntime.optionalBoolean(p.thisObject,"mNeedCheckProximitySensor"),aon=HookRuntime.optionalBoolean(p.thisObject,"mNeedCheckAonFlare");if(rear instanceof Boolean&&aon instanceof Boolean)p.setResult((Boolean)rear&&!c.blocked(4)||(Boolean)aon&&!c.blocked(5));}
+            else if(name.equals("isNeedSkipBrightnessChange")){
+                boolean missing=missingStreamSensor(s,p.thisObject);if(!c.enabled&&!missing)return;
+                Object rear=HookRuntime.optionalBoolean(p.thisObject,"mNeedCheckProximitySensor"),aon=HookRuntime.optionalBoolean(p.thisObject,"mNeedCheckAonFlare");
+                if(rear instanceof Boolean&&aon instanceof Boolean){
+                    // An unexpected native/other-hook result is not evidence of this two-flag wait.
+                    boolean blockStream=c.blocked(4),blockAon=c.blocked(5),nativeWait=(Boolean)rear||(Boolean)aon;
+                    if(missing&&!blockStream&&!blockAon&&!Boolean.valueOf(nativeWait).equals(p.getResult()))return;
+                    boolean result=(Boolean)rear&&!blockStream&&!missing||(Boolean)aon&&!blockAon;
+                    if(missing&&Boolean.TRUE.equals(p.getResult())&&!result)c.missingStreamReleases++;
+                    p.setResult(result);
+                }
+            }
         }
     };}
     static void save(XC_MethodHook.MethodHookParam p,String name,Object value)throws Exception{@SuppressWarnings("unchecked") Map<Field,FieldOverride> saved=(Map<Field,FieldOverride>)p.getObjectExtra("hyperlux.scene.saved");if(saved==null){saved=new LinkedHashMap<>();p.setObjectExtra("hyperlux.scene.saved",saved);}Field f=HookEntry.field(p.thisObject.getClass(),name);FieldOverride scope=saved.get(f);if(scope==null)saved.put(f,FieldOverride.apply(p.thisObject,f,value));else scope.replace(value);}

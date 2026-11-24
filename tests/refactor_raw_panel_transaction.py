@@ -11,6 +11,7 @@ files={
 'top/rongshangs/lumacurve/refactor/RootControl.java':r'''package top.rongshangs.lumacurve.refactor;
 import org.json.*;import java.util.*;import java.io.*;import java.nio.file.*;import java.nio.charset.StandardCharsets;
 class ControlCenterRoot{static final String PROFILE="profile";static boolean fail;static int retired;static void reconcile(Object settings,JSONObject runtime,String raw)throws Exception{if(fail)throw new IOException("mapping pending");}static void retireIdleWriter(){retired++;}}
+class RootWorkspace{static File directory(){return RootControl.DATA;}}
 class RootControl{static final String CONFIG="config";
 static final File DATA=new File("build/raw-panel-transaction-tests");Settings settings=new Settings();boolean reject,failMode,failHook,loseBeginAck;String session="";int hookCalls,aborts;List<String> calls=new ArrayList<>();
 class Settings{String config;String get(String key){return config;}boolean put(String key,String value){return true;}String mode="1";String getSystem(String key){return mode;}boolean putSystem(String key,String value){if(failMode)return false;mode=value;return true;}}
@@ -36,7 +37,7 @@ public class RawTransactionTest{
 static int cases;static void check(boolean b){if(!b)throw new AssertionError("case "+cases);cases++;}
 static RootControl ctl(){NativePanelRoot.reset();return new RootControl();}
 static String req(String action,Object value,String token)throws Exception{return Base64.getEncoder().encodeToString(new JSONObject().put("action",action).put("value",value).put("session",token).toString().getBytes(StandardCharsets.UTF_8));}
-static String failed(RootControl c,String action,Object value,String token)throws Exception{try{c.rawPanel(req(action,value,token));throw new AssertionError("operation passed");}catch(IOException expected){String message=expected.getMessage();check(new String(Files.readAllBytes(new File(RootControl.DATA,"last-panel-error.txt").toPath()),StandardCharsets.UTF_8).contains(message));return message;}}
+static String failed(RootControl c,String action,Object value,String token)throws Exception{try{c.rawPanel(req(action,value,token));throw new AssertionError("operation passed");}catch(IOException expected){String message=expected.getMessage();check(new String(Files.readAllBytes(new File(RootWorkspace.directory(),"last-panel-error.txt").toPath()),StandardCharsets.UTF_8).contains(message));return message;}}
 public static void main(String[] ignored)throws Exception{
 RootControl c=ctl();check(c.rawPanel(req("begin",12000,"new")).getBoolean("ok"));check(c.settings.mode.equals("0")&&NativePanelClient.actual==12000);check(NativePanelClient.calls.equals(Arrays.asList("ARM new 123","SET new 12000")));check(c.calls.equals(Arrays.asList("raw_begin","raw_ready")));check(NativePanelRoot.starts==1);
 check(c.rawPanel(req("set",16000,"new")).getBoolean("ok"));check(NativePanelClient.actual==16000&&NativePanelRoot.starts==1);check(NativePanelClient.calls.get(2).equals("SET new 16000"));

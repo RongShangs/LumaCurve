@@ -9,13 +9,14 @@ def between(file,start,end):
  text=(S/file).read_text(encoding='utf-8');a=text.index(start);return text[a:text.index(end,a)]
 stop=between('RootControl.java','    JSONObject stop()','    String export()')
 start=between('NativePanelRoot.java',' static void start(',' static IOException startFailure')
-matches=between('NativePanelRoot.java',' static boolean matches(',' static void install(')
+start_failure=between('NativePanelRoot.java',' static IOException startFailure(',' static void stop()')
+matches=between('NativePanelRoot.java',' static boolean matches(',' static File install(')
 runtime_close=between('HookRuntime.java','    void close()','    boolean relaxThermal()')
 
 decode=between('MainActivity.java','    Bitmap decodeAsset(','    AlertDialog dialog(')
 test=O/'edges/ReviewEdges.java';test.parent.mkdir(exist_ok=True)
 test.write_text(r'''package top.rongshangs.lumacurve.refactor;
-import java.io.*;import java.nio.file.Files;import java.util.*;import org.json.*;
+import java.io.*;import java.nio.file.*;import java.nio.charset.StandardCharsets;import java.util.*;import org.json.*;
 class OutdoorNodeRoot{static void stop(){}}
 class ControlCenterRoot{static final String PROFILE="control_center_profile";}
 class RootControl{
@@ -30,9 +31,12 @@ class PanelNodeDiscovery{static JSONObject value;static int scans;static JSONObj
 class ActivePanelNode{static final String PROFILE="fold_default_display";static JSONObject discover()throws Exception{return PanelNodeDiscovery.discover(new File("/sys"));}}
 class NativePanelClient{static JSONObject reply;static int probes;static JSONObject call(String action)throws Exception{probes++;return new JSONObject(reply.toString());}}
 class NativePanelRoot{
- static File BIN=new File("never-launch-on-host");static int installs,stops;static boolean changeDuringInstall;
- static void install()throws Exception{installs++;if(changeDuringInstall)PanelNodeDiscovery.value.put("maximum",100);}
- static void stop(){stops++;}static IOException startFailure(File log,String reason){return new IOException(reason);}
+ static final String WORKSPACE="--workspace=";static File BIN=new File("never-launch-on-host");static int installs,stops;static boolean changeDuringInstall;
+ static File bin(File dir){return new File(dir,"hyperlux-main-panel");}
+ static File install()throws Exception{installs++;if(changeDuringInstall)PanelNodeDiscovery.value.put("maximum",100);return new File("workspace");}
+ static void stop(){stops++;}
+'''+start_failure+r'''
+ static File logFile(File dir){return new File(dir,"main-panel.log");}
 '''+matches+start+r'''}
 class Bitmap{int width,height;Bitmap(int w,int h){width=w;height=h;}static class Config{}}
 class AssetStream extends InputStream{final int w,h;boolean closed;AssetStream(int w,int h){this.w=w;this.h=h;}public int read(){return -1;}public void close(){closed=true;}}
@@ -53,7 +57,7 @@ public class ReviewEdges{
  static int cases;static void check(boolean b){if(!b)throw new AssertionError("case "+cases);cases++;}
  static RootControl owner(String kind,boolean wasAuto,int user)throws Exception{NativePanelRoot.stops=0;RootControl c=new RootControl();c.settings.put("hyperlux_brightness_owner_v1",new JSONObject().put("owner",kind).put("was_auto",wasAuto).put("user",user).put("session","session").toString());return c;}
  static JSONObject node()throws Exception{return new JSONObject().put("supported",true).put("path","/sys/class/backlight/panel0-backlight/brightness").put("canonical_path","/sys/devices/panel0/brightness").put("maximum",16383);}
- static void nodes()throws Exception{PanelNodeDiscovery.value=node();PanelNodeDiscovery.scans=NativePanelClient.probes=NativePanelRoot.installs=0;NativePanelRoot.changeDuringInstall=false;NativePanelClient.reply=node().put("ok",true).put("native_build","raw08-slider");}
+ static void nodes()throws Exception{PanelNodeDiscovery.value=node();PanelNodeDiscovery.scans=NativePanelClient.probes=NativePanelRoot.installs=NativePanelRoot.stops=0;NativePanelRoot.changeDuringInstall=false;NativePanelClient.reply=node().put("ok",true).put("native_build","raw08-slider");}
  public static void main(String[] args)throws Exception{
   for(String kind:new String[]{"dark","app","raw_panel"}){RootControl c=owner(kind,true,0);check(c.stop().getBoolean("ok"));check(c.settings.mode.equals("1")&&c.settings.modeWrites==1);check(c.settings.get("hyperlux_brightness_owner_v1")==null);check(!new JSONObject(c.settings.get("config")).getBoolean("enabled"));check(NativePanelRoot.stops==1&&c.resumes==0);}
   for(String kind:new String[]{"dark","app","raw_panel","panel","unknown"}){RootControl c=owner(kind,false,0);c.stop();check(c.settings.mode.equals("0")&&c.settings.modeWrites==0);}
@@ -68,9 +72,13 @@ public class ReviewEdges{
   nodes();NativePanelClient.reply.put("native_build","raw09-slider");NativePanelRoot.start(node());check(NativePanelClient.probes==1);
   nodes();NativePanelClient.reply.put("path","/sys/class/leds/lcd-backlight/brightness");try{NativePanelRoot.start(node());throw new AssertionError("other guard accepted");}catch(IOException expected){check(true);}check(NativePanelClient.probes==1);
   nodes();JSONObject fold=node().put("discovery",ActivePanelNode.PROFILE).put("physical_display_id","local:1234").put("fold_port",1);PanelNodeDiscovery.value=fold;NativePanelClient.reply=new JSONObject(fold.toString()).put("ok",true).put("native_build","raw12-slider").put("control_center_listener",true).put("control_center_pid",123);NativePanelRoot.start(fold,true,123);check(NativePanelClient.probes==1&&NativePanelRoot.installs==1);
-  check(NativePanelRoot.command(fold,true,123).containsAll(Arrays.asList("--active-fold=1","--control-center=123")));check(!NativePanelRoot.command(fold,false,0).contains("--control-center=0"));
+  check(NativePanelRoot.command(fold,true,123,new File("workspace")).containsAll(Arrays.asList("--active-fold=1","--control-center=123")));check(!NativePanelRoot.command(fold,false,0,new File("workspace")).contains("--control-center=0"));
   for(String key:new String[]{"physical_display_id","fold_port"}){nodes();JSONObject selected=new JSONObject(fold.toString());PanelNodeDiscovery.value=new JSONObject(fold.toString()).put(key,key.equals("fold_port")?0:"local:other");try{NativePanelRoot.start(selected,true,123);throw new AssertionError();}catch(IOException expected){check(NativePanelRoot.installs==0&&NativePanelClient.probes==0);}}
   nodes();try{NativePanelRoot.start(fold,true,1);throw new AssertionError();}catch(IOException expected){check(NativePanelRoot.installs==0&&PanelNodeDiscovery.scans==0);}
+  File panelLog=new File("build/refactor-recovery-tests/edges/panel.log");Files.write(panelLog.toPath(),"NATIVE_START_FAIL stage=root_private_lock exit=2\n".getBytes("UTF-8"));
+  check(NativePanelRoot.startFailure(panelLog,"exit=2").getMessage().contains("root_private_lock"));
+  nodes();NativePanelClient.reply=node().put("ok",true).put("native_build","raw13-slider").put("workspace","/other/workspace");
+  try{NativePanelRoot.start(node());throw new AssertionError("other workspace accepted");}catch(IOException expected){check(NativePanelRoot.stops==1);}
   int[][] assets={{1080,1080,46},{748,748,240},{571,571,240}};
   for(int density:new int[]{1,2,3,4})for(int[] asset:assets){ImageCandidate image=new ImageCandidate();image.density=density;image.loader.width=asset[0];image.loader.height=asset[1];BitmapFactory.boundsCalls=BitmapFactory.decodeCalls=0;Bitmap b=image.decodeAsset("fixture.jpg",asset[2]);check(b.width>0&&b.height>0);check(b.width<=image.dp(asset[2])*2+1&&b.height<=image.dp(asset[2])*2+1);int sample=BitmapFactory.last.inSampleSize;check(sample>=1&&(sample&(sample-1))==0);check(image.loader.streams.size()==2&&image.loader.streams.get(0).closed&&image.loader.streams.get(1).closed);check(BitmapFactory.boundsCalls==1&&BitmapFactory.decodeCalls==1);}
   for(boolean failure:new boolean[]{false,true}){RuntimeCandidate runtime=new RuntimeCandidate();runtime.context.failFirst=failure;runtime.close();check(runtime.closed&&runtime.outdoorTest.stops==1);check(runtime.context.firstCalls==1&&runtime.context.secondCalls==1);check(runtime.context.receivers==1&&runtime.power.removed==1);check(runtime.persistentMemory.closes==1&&runtime.brightnessControl.closes==1&&runtime.memoryLifecycle.closes==1);check(runtime.disabled==1&&runtime.kernel.configures==1);runtime.close();check(runtime.context.firstCalls==1&&runtime.context.secondCalls==1&&runtime.disabled==1&&runtime.outdoorTest.stops==1);}

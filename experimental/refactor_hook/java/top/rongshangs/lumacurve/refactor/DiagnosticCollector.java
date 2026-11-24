@@ -45,7 +45,7 @@ final class DiagnosticCollector {
     }
     void command(String name,int seconds,String...args)throws Exception{
         long remaining=remainingMillis();if(remaining<=0){note(name,"skipped_budget","total collection time budget exhausted");return;}
-        File temp=File.createTempFile("diagnostic-",".txt",RootControl.DATA);Process process=null;
+        File temp=File.createTempFile("diagnostic-",".txt",RootWorkspace.directory());Process process=null;
         byte[] output=null;
         try{
             process=new ProcessBuilder(args).redirectErrorStream(true).redirectOutput(temp).start();

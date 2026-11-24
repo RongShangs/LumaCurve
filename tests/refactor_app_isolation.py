@@ -11,7 +11,7 @@ files={
 'com/android/server/display/DisplayPowerController.java':'''package com.android.server.display;import com.android.server.display.brightness.*;public class DisplayPowerController{public int mDisplayId;public DisplayBrightnessController mDisplayBrightnessController=new DisplayBrightnessController();public android.hardware.display.DisplayManagerInternal.DisplayPowerRequest mPowerRequest=new android.hardware.display.DisplayManagerInternal.DisplayPowerRequest();public DisplayPowerState state=new DisplayPowerState();public int manual;public void setTemporaryBrightness(float b){manual++;}public void syncBrightnessToSettingAndUi(float b,DisplayBrightnessState s){}public DisplayPowerState getDisplayPowerState(){return state;}}''',
 'com/android/server/display/DisplayPowerControllerImpl.java':'''package com.android.server.display;import com.android.server.display.brightness.*;import top.rongshangs.lumacurve.refactor.IsolationTest;public class DisplayPowerControllerImpl{public int mDisplayId,syncs,drags;public boolean hdr,fail;public float delta;public DisplayPowerControllerImpl nested;public DisplayPowerController mDisplayPowerController=new DisplayPowerController();public boolean isHdrScene(){return hdr;}private void requestBrightnessSync(float b){syncs++;}public boolean consumePendingBrightnessSync(){return false;}private void updateOverrideDragMode(boolean on,float b){drags++;}public float limitQRCodeBrightnessMax(float base,float b,BrightnessReason r)throws Throwable{if(nested!=null)IsolationTest.scope(nested,b);IsolationTest.call(this,"updateOverrideDragMode",new Class[]{boolean.class,float.class},true,b+delta);IsolationTest.call(this,"requestBrightnessSync",new Class[]{float.class},b+delta);if(fail)throw new IllegalStateException("native scope");return Math.min(b,.99f);}}''',
 'top/rongshangs/lumacurve/refactor/HookEntry.java':'''package top.rongshangs.lumacurve.refactor;import java.lang.reflect.*;import java.util.*;class HookEntry{static final Map<Object,HookRuntime> states=new IdentityHashMap<>();static HookRuntime ownerState(Object o){return states.get(o);}static Field field(Class<?> c,String n)throws Exception{for(Class<?> p=c;p!=null;p=p.getSuperclass())try{Field f=p.getDeclaredField(n);f.setAccessible(true);return f;}catch(NoSuchFieldException absent){}throw new NoSuchFieldException(n);}}''',
-'top/rongshangs/lumacurve/refactor/HookRuntime.java':'''package top.rongshangs.lumacurve.refactor;class HookRuntime{final Object owner;boolean closed,changing,onThread=true,user=true;String phase="active";final Control brightnessControl=new Control();final Kernel kernel=new Kernel();HookRuntime(Object o){owner=o;HookEntry.states.put(o,this);}boolean onDisplayThread(){return onThread;}boolean appliesToUser(){return user;}static class Kernel{int serial;int integer(String n){return serial;}}static class Control{boolean independent;boolean independentActive(){return independent;}boolean unlocked(){return true;}final BrightnessControlOptions options=new BrightnessControlOptions();String owner="none";}}''',
+'top/rongshangs/lumacurve/refactor/HookRuntime.java':'''package top.rongshangs.lumacurve.refactor;class HookRuntime{final Object owner;boolean closed,changing,onThread=true,user=true;String phase="active",revision="fixture";final Control brightnessControl=new Control();final Kernel kernel=new Kernel();HookRuntime(Object o){owner=o;HookEntry.states.put(o,this);}boolean onDisplayThread(){return onThread;}boolean appliesToUser(){return user;}static class Kernel{int serial;int integer(String n){return serial;}}static class Control{boolean independent;boolean independentActive(){return independent;}boolean unlocked(){return true;}final BrightnessControlOptions options=new BrightnessControlOptions();String owner="none";}}''',
 'top/rongshangs/lumacurve/refactor/IsolationTest.java':r'''package top.rongshangs.lumacurve.refactor;
 import java.lang.reflect.*;import java.util.*;import org.json.*;import com.android.server.display.*;import com.android.server.display.brightness.*;import android.hardware.display.DisplayManagerInternal.DisplayBrightnessOverrideRequest;import top.rongshangs.lumacurve.refactor.hooking.*;
 public class IsolationTest{
@@ -26,6 +26,7 @@ public class IsolationTest{
   XposedBridge.initialize(new XposedBridge.Backend(){public XC_MethodHook.Unhook hook(Method m,XC_MethodHook cb){installs++;if(installs==failAt)throw new IllegalStateException("install failure");hooks.computeIfAbsent(m,k->new ArrayList<>()).add(cb);return new XC_MethodHook.Unhook(()->{List<XC_MethodHook> v=hooks.get(m);v.remove(cb);if(v.isEmpty())hooks.remove(m);});}public Object original(Method m,Object o,Object[] a)throws Throwable{return invoke(m,o,a);}public void log(String s){}});
   String scenario=args.length==0?"scoped":args[0];Class<?> cls=DisplayPowerControllerImpl.class;
   if(scenario.equals("install_failure")){for(int n=1;n<=5;n++){failAt=installs+n;AppBrightnessIsolation.install(cls);check(!AppBrightnessIsolation.profiles.containsKey(cls)&&hooks.isEmpty());}XposedBridge.unhookAll();System.out.println("App isolation: "+cases+" cases PASS; atomic installation rollback");return;}
+  if(scenario.equals("handoff_install_failure")){for(int n=1;n<=4;n++){failAt=installs+n;AppBrightnessIsolation.install(cls);check(!AppBrightnessIsolation.profiles.containsKey(cls)&&hooks.isEmpty());}System.out.println("App isolation: "+cases+" cases PASS; handoff rollback");return;}
   AppBrightnessIsolation.install(cls);
   if(!scenario.equals("scoped")&&!scenario.equals("native")){check(!AppBrightnessIsolation.profiles.containsKey(cls)&&hooks.isEmpty());check(!AppBrightnessIsolation.errors.isEmpty());System.out.println("App isolation: "+cases+" cases PASS; rejected "+scenario);return;}
   DisplayPowerControllerImpl o=new DisplayPowerControllerImpl();HookRuntime s=new HookRuntime(o);
@@ -47,17 +48,65 @@ public class IsolationTest{
   XposedBridge.unhookAll();check(hooks.isEmpty());System.out.println("App isolation: "+cases+" cases PASS; production hooks, native output preserved, source and ownership guards");
  }
 }'''}
+handoff_cases=r'''  if(scenario.equals("handoff")||scenario.equals("both")){
+   boolean handoff=scenario.equals("handoff");
+   check(AppBrightnessIsolation.profiles.get(cls).route.equals(handoff?AppBrightnessIsolation.HANDOFF:AppBrightnessIsolation.SCOPED));
+   check(hooks.size()==(handoff?4:5));
+   DisplayPowerControllerImpl player=new DisplayPowerControllerImpl();HookRuntime live=enabled(player);
+   check(!AppBrightnessIsolation.status(live).getBoolean("native_isolated"));
+   check(scope(player,1f)==.99f&&player.drags==0);
+   check(AppBrightnessIsolation.status(live).getLong(handoff?"blocked_handoffs":"blocked_syncs")==1);
+   if(handoff){
+    float prior=player.mDisplayPowerController.afterExit(.25f);
+    live.brightnessControl.options.appIsolation=false;
+    check(scope(player,.8f)==.8f&&player.drags==1&&player.mDisplayPowerController.afterExit(.25f)==.8f&&prior==.25f);
+    live.brightnessControl.options.appIsolation=true;
+    temporary(player,.4f);scope(player,.8f);check(player.drags==2);
+    window(player,Float.NaN,"");scope(player,.8f);check(player.drags==3);
+    window(player,.8f,"player");scope(player,.8f);check(player.drags==3);
+    player.mDisplayPowerController.mUniqueDisplayId="local:2";scope(player,.8f);check(player.drags==4);
+    window(player,.8f,"player");scope(player,.8f);check(player.drags==4);
+    player.mDisplayPowerController.mUniqueDisplayId="external:2";scope(player,.8f);check(player.drags==5);
+    player.mDisplayPowerController.mUniqueDisplayId="local:2";
+    player.mAutoBrightnessEnable=false;scope(player,.8f);check(player.drags==6);
+    player.mAutoBrightnessEnable=true;player.hdr=true;scope(player,.8f);check(player.drags==7);
+    player.hdr=false;player.delta=.01f;scope(player,.8f);check(player.drags==8);
+    player.delta=0;player.fail=true;try{scope(player,.8f);throw new AssertionError();}catch(IllegalStateException expected){cases++;}
+    check(AppBrightnessIsolation.current.get()==null);
+    call(player,"updateOverrideDragMode",new Class[]{boolean.class,float.class},true,.8f);check(player.drags==9);
+    check(AppBrightnessIsolation.status(live).getLong("blocked_syncs")==0);
+   }
+   System.out.println("App isolation: "+cases+" cases PASS; "+scenario);return;
+  }
+'''
 total=0
-for scenario in ['scoped','native','partial','wrong_sync','wrong_request','install_failure']:
+for scenario in ['scoped','native','partial','wrong_sync','wrong_request','install_failure','handoff','both','handoff_partial','handoff_wrong','handoff_install_failure']:
  out=O/scenario;out.mkdir(parents=True,exist_ok=True);paths=[]
  for name,code in files.items():
-  if scenario=='native':
-   if name.endswith('DisplayPowerControllerImpl.java'):code=code.replace('requestBrightnessSync(float b)','oldSync(float b)').replace('consumePendingBrightnessSync()','oldConsume()')
+  if scenario=='native' or scenario.startswith('handoff'):
+   if name.endswith('DisplayPowerControllerImpl.java'):
+    code=code.replace('requestBrightnessSync(float b)','oldSync(float b)').replace('consumePendingBrightnessSync()','oldConsume()').replace(',"requestBrightnessSync",',',"oldSync",')
    if name.endswith('DisplayPowerController.java'):code=code.replace('syncBrightnessToSettingAndUi(','oldSync(')
+  if scenario.startswith('handoff') or scenario=='both':
+   if name.endswith('DisplayPowerController.java'):
+    code=code.replace('public int mDisplayId;', 'public int mDisplayId; public String mUniqueDisplayId="local:1"; public boolean updateOverrideBrightnessSetting,mIsOverrideDragPolicy; public float mOverrideBrightness; public void updateOverrideDragMode(boolean on,float b){mIsOverrideDragPolicy=on;mOverrideBrightness=b;} public float afterExit(float normal){return mIsOverrideDragPolicy?mOverrideBrightness:normal;}')
+    if scenario=='handoff_partial':code=code.replace('updateOverrideBrightnessSetting,','')
+    if scenario=='handoff_wrong':code=code.replace('String mUniqueDisplayId="local:1"', 'Object mUniqueDisplayId="local:1"')
+   if name.endswith('DisplayPowerControllerImpl.java'):
+    code=code.replace('public int mDisplayId,syncs,drags;', 'public int mDisplayId,syncs,drags; public boolean mAutoBrightnessEnable=true; public AutomaticBrightnessControllerImpl mAutomaticBrightnessControllerImpl=new AutomaticBrightnessControllerImpl();')
+    code=code.replace('drags++;','drags++;mAutomaticBrightnessControllerImpl.updateOverrideDragMode(on,b,42f);mDisplayPowerController.updateOverrideDragMode(on,b);')
+   if name.endswith('DisplayBrightnessController.java'):
+    code=code.replace('public boolean applied=', 'public void updateScreenBrightnessSetting(float b,float min,float max){} public void saveBrightnessIfNeeded(){} public boolean applied=')
+   if name.endswith('IsolationTest.java'):
+    start=code.index('  if(!scenario')
+    code=code[:start]+handoff_cases+code[start:]
   if scenario=='partial' and name.endswith('DisplayPowerControllerImpl.java'):code=code.replace('requestBrightnessSync(float b)','oldSync(float b)')
   if scenario=='wrong_sync' and name.endswith('DisplayPowerControllerImpl.java'):code=code.replace('private void requestBrightnessSync(float b){syncs++;}','private int requestBrightnessSync(float b){syncs++;return 0;}')
   if scenario=='wrong_request' and name.endswith('DisplayManagerInternal.java'):code=code.replace('CharSequence tag','String tag')
   p=out/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_text(code,'utf-8');paths.append(p)
+ abc=out/'com/android/server/display/AutomaticBrightnessControllerImpl.java'
+ abc.write_text('package com.android.server.display; public class AutomaticBrightnessControllerImpl { public boolean mIsOverrideDragPolicy; public float mOverrideBrightness,mLastLux; public void updateOverrideDragMode(boolean on,float b,float lux){mIsOverrideDragPolicy=on;mOverrideBrightness=b;mLastLux=lux;} public float getOverrideLimitBrightness(float b,boolean user,float lux){return mIsOverrideDragPolicy?mOverrideBrightness:b;} }','utf-8')
+ paths.append(abc)
  C=out/'classes';C.mkdir(exist_ok=True)
  names=['AppBrightnessIsolation','BrightnessControlOptions','hooking/XposedBridge','hooking/XC_MethodHook','hooking/HookTransaction']
  subprocess.run(['javac','--release','8','-encoding','UTF-8','-cp',str(J),'-d',str(C),*[str(S/(n+'.java')) for n in names],*map(str,paths)],check=True)

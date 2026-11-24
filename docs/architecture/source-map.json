@@ -40,7 +40,7 @@
     {
       "file": "AppBrightnessIsolation.java",
       "layer": "adapters",
-      "purpose": "同屏/同用户/真实窗口来源限定同步隔离，系统原生隔离状态与保存选择分开；不执行旧版窗口共享"
+      "purpose": "按真实窗口来源及所有权抑制旧偏好同步或原生亮度保持交接，原生隔离状态与保存选择分开"
     },
     {
       "file": "AppBuild.java",
@@ -815,7 +815,7 @@
     {
       "file": "SceneTuning.java",
       "layer": "adapters",
-      "purpose": "设备接口与所有权；场景各能力独立核验，新式 SceneDetector 只把已核验的 AON 窗口映射到反射确认，缺少瞬时遮挡与跳过亮度变化入口时流式距离保持不可用，不伪造传感器行为"
+      "purpose": "设备接口与所有权；场景各能力独立核验，新式 SceneDetector 只把已核验的 AON 窗口映射到反射确认，缺少瞬时遮挡与跳过亮度变化入口时流式距离保持不可用，不伪造传感器行为；完整旧式流式ABI下明确缺失原生输入时仅修正不可完成的等待，保留AON/有效输入和未知结果，调用退出恢复"
     },
     {
       "file": "ScreenBrightnessReading.java",

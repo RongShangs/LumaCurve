@@ -1,17 +1,17 @@
 {
   "name": "HyperLux",
-  "version": "4.6.0",
-  "versionCode": 46000,
+  "version": "4.6.1",
+  "versionCode": 46100,
   "distribution": "apk",
   "requires": [
     "Root",
     "LSPosed",
     "HyperOS"
   ],
-  "apkUrl": "https://lc.rongshangs.top/downloads/HyperLux-4.6.0.apk",
-  "sourceUrl": "https://lc.rongshangs.top/downloads/LumaCurve-4.6.0-source.zip",
-  "bundleUrl": "https://lc.rongshangs.top/downloads/LumaCurve-4.6.0.zip",
-  "releaseUrl": "https://github.com/RongShangs/LumaCurve/releases/tag/v4.6.0",
-  "sha256": "72c40c1897f95107ac006f7e579895cd89c56f6af071c8a1ca8de08640e15687",
-  "changelog": "# HyperLux 4.6.0 正式版\n\n1. 重做高亮增强设置，支持四点拖动目标曲线、恢复默认及最高亮度限制。\n2. 新增短时激发测试，显示剩余时间、当前亮度和测试最高亮度。\n3. 完善应用临时亮度隔离：正常小窗保留临时亮度，最小浮窗或贴边挂起后交回系统。\n4. 修复应用从小窗最大化后未恢复独立亮度的问题。\n5. 精简多个设置页面的冗余说明，优化布局、状态展示及深色模式。"
+  "apkUrl": "https://lc.rongshangs.top/downloads/HyperLux-4.6.1.apk",
+  "sourceUrl": "https://lc.rongshangs.top/downloads/LumaCurve-4.6.1-source.zip",
+  "bundleUrl": "https://lc.rongshangs.top/downloads/LumaCurve-4.6.1.zip",
+  "releaseUrl": "https://github.com/RongShangs/LumaCurve/releases/tag/v4.6.1",
+  "sha256": "a05bd34b7c3c0b1cb9235a3d39e50bea478b94795e00185e507bb46236e54ada",
+  "changelog": "# HyperLux 4.6.1 正式版\n\n## 4.6.1 简略更新\n\n1. 精简日志和部分亮度设置页的说明。\n2. 主屏原生守护在首选目录不可用时尝试经过相同校验的备用目录。(修复用户启用了ADB Root后无法使用主屏手动亮度的问题）\n3. 适配部分固件退出播放窗口后仍保留临时亮度的情况。\n4. 尝试修复部分移植系统缺少流式距离输入时的无效等待。\n\n## 4.6.0 累计简略更新\n\n1. 重做高亮增强设置，支持四点拖动目标曲线、恢复默认及最高亮度限制。\n2. 新增短时激发测试，显示剩余时间、当前亮度和测试最高亮度。\n3. 完善应用临时亮度隔离：正常小窗保留临时亮度，最小浮窗或贴边挂起后交回系统。\n4. 修复应用从小窗最大化后未恢复独立亮度的问题。\n5. 精简多个设置页面的冗余说明，优化布局、状态展示及深色模式。\n\n## 详细更新\n\n### 4.6.1\n\n- 日志连接正常时显示三个状态卡和兼容路线入口。设置页精简重复说明，保留暗光门槛、温控条件和背光节点单位。\n- 首选 Root 工作目录不可用时，原生守护使用通过相同检查的备用目录。权限恢复和日志跟随实际目录，户外守护读取时也核验目录。\n- 窗口亮度隔离覆盖部分固件的原生亮度保持路径。播放页仍可临时调亮，退出后将亮度调节交回系统。\n- 只在系统明确缺少流式距离输入、且自动亮度所需条件满足时处理无效等待，保留有效输入及旧路线。\n\n### 4.6.0\n\n高亮增强加入四点目标曲线和短时激发测试。临时亮度隔离区分正常小窗和挂起窗口，并修复小窗最大化后独立亮度的恢复。见 [4.6.0 更新日志](4.6.0.md)。"
 }

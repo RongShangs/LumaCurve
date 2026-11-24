@@ -30,7 +30,7 @@
 | [控制中心节点映射](../features/control_center.md) | `coordinate_v2`、`coordinate_v2_calibrated`、`raw_node_v3`、`partition_node_v4`、`partition_ddc_hbm`、`partition_hbm_normal` |
 | [日落后暗光锁定](../features/dark_lock_schedule.md) | `system_twilight` |
 | [熄屏前降亮与息屏显示协调](../features/dim_aod.md) | `automatic_dim_aod_cap`、`automatic_dim_aod_cap_modern` |
-| [应用临时亮度隔离](../features/app_brightness_isolation.md) | `app_override_scoped_sync`、`native_window_no_sync` |
+| [应用临时亮度隔离](../features/app_brightness_isolation.md) | `app_override_scoped_sync`、`app_override_native_handoff`、`native_window_no_sync` |
 | [控制中心开机恢复](../features/mapping_startup.md) | `android_boot_job`、`root_service_directory` |
 | [短时强光输入模拟](../features/outdoor_test.md) | `abc_native_lux_lease` |
 | [独立高亮目标曲线](../features/outdoor_curve.md) | `physical_outdoor_target` |
@@ -109,6 +109,8 @@
 | `dim_aod_signature` · `DimAodCompatibility.java` | `legacy_five_param_with_inner` / `modern_four_param_mAppliedDimming` | 保留五参SDR及完整息屏子阶段、双全屏AOD探测的旧路线。四参mAppliedDimming路线缺少已验证AOD消费者语义，本次禁用：不安装Hook、不修改任何原生结果，独立报告unsupported；不增加设置或更改保存配置。候选实现仅保留供后续验证，不能由接口匹配自动启用。 | [refactor_dim_aod.py](../../tests/refactor_dim_aod.py) |
 | `assist_pending_reset_optional` · `LowLightAssistEvidence.java` | `declared_boolean` / `field_absent` | 辅助暗光闸门只把 pending 复位字段当作可选证据：字段存在时必须为非静态 boolean，值为 true 时不确认；字段整体缺失（本机 DualSensorPolicy 没有该状态）视为没有待复位，继续用辅助使能、预热时间和环形缓冲确认，不伪造复位状态。 | [refactor_advanced_hooks.py](../../tests/refactor_advanced_hooks.py) |
 | `outdoor_test_notification_visibility` · `OutdoorLightTestAccess.java` | `public_declared_notification` / `nonpublic_or_inherited_notification` | 按实际声明类型逐层查找同签名非静态void照度通知方法；非public不等于缺失，错误返回类型/静态签名直接拒绝，不降级绕过。只对已绑定主屏范围/策略对象使用。 | [refactor_outdoor_light_test.py](../../tests/refactor_outdoor_light_test.py) |
+| `scene_stream_sensor_missing` · `SceneTuning.java` | `native_sensor_available_or_unconfirmed` / `verified_missing_native_stream_input` | 保留完整旧式共享Hook组及新版无流式接口路线。额外检查非static mDisplayId/mProxState int、mTransientProximityEnabled及两等待位boolean、mStreamProximitySensor Sensor、mSensorManager SensorManager，注册void(boolean)与准入boolean()签名。模块active、同用户显示线程、亮屏有效自动输入、display0/state7、输入null且getDefaultSensor(33171005)==null才抑制不可完成的距离项。原生结果不等于两等待位OR时不自动改写；AON保留。调用结束/异常恢复临时标志；不清持久等待位、不注册传感器、不代用33181011、不按机型放行；类型错、未知/查询失败/有效输入/初始化中沿用原生。 | [refactor_scene_hooks.py](../../tests/refactor_scene_hooks.py) |
+| `app_override_native_handoff_abi` · `AppBrightnessIsolation.java` | `app_override_scoped_sync` / `app_override_native_handoff` / `native_window_no_sync` | 完整旧同步路径优先；三同步入口全缺时，以DPC updateOverrideBrightnessSetting字段或updateOverrideDragMode方法识别保持交接。核验DPC与ABC双接收者、自动亮度标记、持久化消费者与物理屏标识。只拦截limitQRCodeBrightnessMax调用栈中同一已接受窗口、同内置主屏/用户/配置且精确匹配当前亮度的保持开启调用。保留原生输出、退出调用、手动调节和HDR。疑似残缺保持结构不报原生隔离。 | [refactor_app_isolation.py](../../tests/refactor_app_isolation.py) |
 
 ## 原生协议与运行分支
 

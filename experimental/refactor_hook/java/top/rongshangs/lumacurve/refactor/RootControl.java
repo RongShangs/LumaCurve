@@ -16,7 +16,7 @@ import java.util.zip.*;
 /** A short-lived root command, not a brightness output service. */
 public final class RootControl implements AutoCloseable {
     static final String CONFIG="lumacurve_refactor_config_v1",STATUS="lumacurve_refactor_status_v1",REFRESH="lumacurve_refactor_refresh_v1",ACK="lumacurve_refactor_ack_v1",BUILD=AppBuild.BUILD;
-    static final File DATA=new File("/data/adb/luma_curve_refactor_test"),PAUSE_OWNED=new File(DATA,"old-pause-owned");
+    static File pauseOwned(){return new File(RootWorkspace.directory(),"old-pause-owned");}
     static final String OLD="/data/adb/modules/luma_curve/luma_curvectl.sh";
     final RootSettings settings;boolean selfCheckNext;String selfCheckReason="manual",processAccessError="";
     RootControl()throws Exception {
@@ -130,7 +130,7 @@ public final class RootControl implements AutoCloseable {
         }
         if(!exists(OLD)||exists("/data/adb/modules/luma_curve/disable")||exists("/data/adb/modules/luma_curve/remove"))return;
         progress("暂停旧版亮度引擎…");
-        if(!exists("/data/local/tmp/luma_curve.paused"))Files.write(PAUSE_OWNED.toPath(),new byte[]{'1'});
+        if(!exists("/data/local/tmp/luma_curve.paused"))Files.write(pauseOwned().toPath(),new byte[]{'1'});
         process("sh",OLD,"pause");
         for(int i=0;i<100;i++) {
             String processes=process("ps","-A","-o","ARGS");
@@ -140,9 +140,9 @@ public final class RootControl implements AutoCloseable {
         throw new IOException("旧引擎仍在退出，尚未启用新曲线");
     }
     void resumeOld()throws Exception {
-        if(!PAUSE_OWNED.exists())return;
+        if(!pauseOwned().exists())return;
         if(exists(OLD)&&!exists("/data/adb/modules/luma_curve/disable")&&!exists("/data/adb/modules/luma_curve/remove"))process("sh",OLD,"resume");
-        PAUSE_OWNED.delete();
+        pauseOwned().delete();
     }
     JSONObject apply(String encoded)throws Exception {
         JSONObject state=refreshedLive();if(state==null)throw new IOException("尚未连接 Hook：请在 LSPosed 启用本模块，勾选系统框架并重启");
@@ -221,7 +221,7 @@ public final class RootControl implements AutoCloseable {
                 }
             }catch(Exception rollback){failure.addSuppressed(rollback);}
             String detail=failure.getMessage()+"\n\n"+rollbackMessage;
-            try{Files.write(new File(DATA,"last-control-error.txt").toPath(),(new Date()+"\n"+detail).getBytes(StandardCharsets.UTF_8));}catch(Exception ignored){}
+            try{Files.write(new File(RootWorkspace.directory(),"last-control-error.txt").toPath(),(new Date()+"\n"+detail).getBytes(StandardCharsets.UTF_8));}catch(Exception ignored){}
             throw new IOException(detail,failure);
         }
     }
@@ -273,9 +273,12 @@ public final class RootControl implements AutoCloseable {
                     write(zip,"pipeline-trace.json",pipeline==null?"[]":pipeline.toString(2));write(zip,"output-trace.json",output==null?"[]":output.toString(2));
                     write(zip,"trace-readme.txt","Pipeline records group stages from ONE updateAutoBrightness call. Values are framework brightness coordinates (0..1), not nit or percent. Missing fields mean unobserved, not disabled.\nOutput records are separate later calls, not automatically attributed to a calculation. Use uptime_ms within this boot, or unix_ms for wall time. Sensor readings are OEM filtered readings, not raw samples.\nBounded history: latest 24 calculations and 16 output calls.\n");
                 }
-                write(zip,"config.json",String.valueOf(settings.get(CONFIG)));write(zip,"manual-memory.json",String.valueOf(settings.get(PersistentMemory.KEY)));write(zip,"stored-hook-status.json",String.valueOf(settings.get(STATUS)));write(zip,"configuration-ack.json",String.valueOf(settings.get(ACK)));File controlError=new File(DATA,"last-control-error.txt");if(controlError.isFile()&&controlError.length()<=16384)write(zip,"last-control-error.txt",new String(Files.readAllBytes(controlError.toPath()),StandardCharsets.UTF_8));write(zip,"injection.json",String.valueOf(settings.get("lumacurve_refactor_injection_v1")));for(String f:new String[]{"main-panel-permissions","main-panel.log","main-panel.previous.log","last-panel-error.txt"}){optionalFile(zip,f,new File(DATA,f),65536);}write(zip,"native-storage.json",RootWorkspace.nativeEvidence().toString(2));
+                write(zip,"config.json",String.valueOf(settings.get(CONFIG)));write(zip,"manual-memory.json",String.valueOf(settings.get(PersistentMemory.KEY)));write(zip,"stored-hook-status.json",String.valueOf(settings.get(STATUS)));write(zip,"configuration-ack.json",String.valueOf(settings.get(ACK)));File nativeDirectory=RootWorkspace.directory();File controlError=new File(nativeDirectory,"last-control-error.txt");if(controlError.isFile()&&controlError.length()<=16384)write(zip,"last-control-error.txt",new String(Files.readAllBytes(controlError.toPath()),StandardCharsets.UTF_8));write(zip,"injection.json",String.valueOf(settings.get("lumacurve_refactor_injection_v1")));for(String f:new String[]{"main-panel-permissions","main-panel.log","main-panel.previous.log","last-panel-error.txt"}){optionalFile(zip,f,new File(nativeDirectory,f),65536);}
+                // Keep the previous workspace's evidence after a fallback so a repair can be audited.
+                if(!nativeDirectory.equals(RootWorkspace.PRIMARY))for(String f:new String[]{"main-panel-permissions","main-panel.log","main-panel.previous.log","last-panel-error.txt"}){optionalFile(zip,"retained/"+f,new File(RootWorkspace.PRIMARY,f),65536);}
+                write(zip,"native-storage.json",RootWorkspace.nativeEvidence().toString(2));
                 for(String f:new String[]{"hyperlux-main-panel-lease","hyperlux-main-panel-health"}){optionalFile(zip,f,new File("/data/system",f),1024);}
-                write(zip,"build.txt",BUILD+"\n"+Build.FINGERPRINT+"\n");
+                write(zip,"build.txt",BUILD+"\n"+Build.FINGERPRINT+"\nworkspace="+nativeDirectory+"\n");
                 for(String key:new String[]{ControlCenterEngine.UI,ControlCenterHooks.NODE_REQUEST,ControlCenterRoot.RECOVERY,ControlCenterRoot.RECOVERY+"_root",RootMappingBoot.KEY,ControlCenterRoot.PROFILE,ControlCenterEngine.TABLES}){
                     String value=null,issue=null;try{value=settings.get(key);}catch(Exception unavailable){issue=unavailable.toString();}
                     boolean oversized=value!=null&&value.length()>262144;
@@ -393,7 +396,7 @@ public final class RootControl implements AutoCloseable {
         }
         }catch(Exception failure){
             String detail="主屏操作失败（"+step+"）："+failure.getMessage();
-            try{Files.write(new File(DATA,"last-panel-error.txt").toPath(),(new Date()+"\n"+detail+"\n"+failure).getBytes(StandardCharsets.UTF_8));}catch(Exception ignored){}
+            try{Files.write(new File(RootWorkspace.directory(),"last-panel-error.txt").toPath(),(new Date()+"\n"+detail+"\n"+failure).getBytes(StandardCharsets.UTF_8));}catch(Exception ignored){}
             throw new IOException(detail,failure);
         }
     }

@@ -10,6 +10,9 @@ expected='3cf6cd6892e32e2b4c1c39e0f52f5248a2f5b37646fdfbb79a66b46b618414ed'
 assert hashlib.sha256(jar.read_bytes()).hexdigest()==expected,'host JSON dependency changed'
 stub='''package top.rongshangs.lumacurve.refactor;
 import java.io.*;import java.nio.charset.StandardCharsets;import java.util.zip.*;
+final class RootWorkspace {
+ static File directory(){return new File(System.getProperty("java.io.tmpdir"));}
+}
 final class RootControl {
  static final File DATA=new File(System.getProperty("java.io.tmpdir"));
  static void progress(String s){}

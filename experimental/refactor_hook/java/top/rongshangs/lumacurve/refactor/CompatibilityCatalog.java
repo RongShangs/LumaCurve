@@ -32,7 +32,7 @@ final class CompatibilityCatalog {
             route("native_auxiliary","系统原生辅助光感","原生辅助槽已有传感器时优先使用，继续沿用系统采样和融合。"),
             route("ported_auxiliary","移植系统辅助补位","原生槽为空；唯一 zte.sensor.light_second 候选通过类型、单位、权限、线程及主屏检查后，补入 OEM 槽并同步双光感能力缓存。")};
         case "suspended_window_brightness":return new Route[]{route("wm_mini_pin_gate","窗口最小化/贴边亮度筛选","窗口服务完整门禁和原生小窗谓词匹配，仅筛除主用户主屏最小或挂起应用窗口；正常小窗与原生拒绝保留。")};
-        case "app_brightness_isolation":return new Route[]{route("app_override_scoped_sync","应用覆盖来源限定同步隔离","完整窗口来源、亮屏原因及同步ABI匹配；只拦截同一主屏窗口导致的偏好同步，控制中心主动调整优先。"),route("native_window_no_sync","原生窗口覆盖，无所针对的同步链路","原生窗口接口完整，三个同步入口均不存在；不安装隔离Hook，不代表拦截应用直接写系统设置。")};
+        case "app_brightness_isolation":return new Route[]{route("app_override_scoped_sync","应用覆盖来源限定同步隔离","完整窗口来源、亮屏原因及同步ABI匹配；只拦截同一主屏窗口导致的偏好同步，控制中心主动调整优先。"),route("app_override_native_handoff","应用窗口亮度保持交接隔离","三项同步入口全缺且原生双控制器保持链路完整，只拦截同物理屏、同用户、来源已确认的窗口保持启动。"),route("native_window_no_sync","原生窗口覆盖，无所针对的同步链路","原生窗口接口完整，且同步与保持交接入口均不存在时沿用原生。")};
         case "app_independent":return new Route[]{route("focused_app_fixed_manual","应用或分组独立固定亮度","当前默认主屏同用户焦点应用匹配互斥名单，原生普通范围与手动输入接口完整；复用应用模式租约，退出恢复此前系统调节。")};
         case "app_brightness_share":return new Route[]{route("app_override_screen_shared","旧版窗口共享（已停用）","保留历史路线说明和旧配置字段；不再执行，不作为当前可用功能。")};
         case "apps":return new Route[]{route("visible_tasks","可见任务路径（含小窗 / 分屏）","可见任务接口完整；任一名单应用仍可见时保持暂停。"),route("focus_fallback","前台焦点回退路径","没有完整的可见任务能力时按系统焦点判断，并提示小窗限制。")};
@@ -58,7 +58,7 @@ final class CompatibilityCatalog {
         case "outdoor_test":return new Route[]{route("abc_native_lux_lease","短时原生强光输入","核验主屏 ABC 的照度、重算、短期模型保护及手动退出接口；显式启动20秒模拟，不改驱动采样或保存设置。")};
         case "outdoor":return new Route[]{route("override_target","系统覆盖目标入口","通过 getOverrideLimitBrightness 增强自动目标，保留原生手动接管与下游保护。"),route("legacy_custom_target","传统物理曲线目标入口","没有覆盖目标接口且旧调用结构完整；在原生自定义曲线目标返回后增强，仍经场景否决、范围裁剪及温控输出。"),route("native_range_only","原生普通范围增强","原生明确没有 HBM 数据且支持谓词为否；在实际允许的亮度范围内提高强光目标，不新增 HBM 范围或预算。")};
         case "main_panel_node":return new Route[]{route("fold_default_display","折叠屏当前主屏节点","原生折叠布局允许不同物理屏作为默认屏；根据实时默认屏地址、成对背光与唯一点亮 DSI 选择节点；显示端口与内核编号不一致时独立核验默认屏点亮状态，切屏释放旧接管。"),route("backlight_node","主屏 backlight 节点","扫描 backlight，验证主屏身份、真实路径及 brightness / max_brightness 配对。"),route("display_led_node","显示专用 leds 节点","仅接受明确标识为主屏背光的 leds 节点，排除通知灯、手电与背屏。")};
-        case "root_storage":return new Route[]{route("root_private_storage","Root 私有数据目录","只检查配置 / 分析目录的读写能力，不安装或启动输出程序。"),route("root_temporary_storage","Root 独立操作目录","原目录受限时使用受验证的私有目录；不迁移原生输出程序或用户设置。")};
+        case "root_storage":return new Route[]{route("root_private_storage","Root 私有数据目录","只检查配置 / 分析目录的读写能力，不安装或启动输出程序。"),route("root_temporary_storage","Root 独立操作目录","原目录受限时按同一身份规则使用备用私有目录；原生程序、锁、权限记录和日志跟随同一目录，不迁移用户设置。")};
         case "root_identity":return new Route[]{route("root_actual_identity","实际进程权限信息","记录实际UID、Capabilities及SELinux上下文，不以Root管理器名称判定权限。")};
         case "root_settings":return new Route[]{route("external_provider","原生设置接口","优先使用原有设置服务；写入仍需系统授权与读回确认。"),route("cmd_settings","系统设置命令服务","原入口不可读时核验cmd设置服务；不重放失败的写入。"),route("settings_cli","系统设置命令入口","前两条不可读时核验系统settings入口；仍遵守系统权限。")};
         case "root_process_identity":return new Route[]{route("root_proc_identity","系统进程有效身份","核验当前系统进程、启动标识和构建；权限不足时不跳过校验。")};

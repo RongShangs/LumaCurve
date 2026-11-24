@@ -86,7 +86,7 @@ workspace={
 'android/system/ErrnoException.java':'package android.system;public class ErrnoException extends Exception{public int errno;public ErrnoException(int e){errno=e;}}',
 'android/system/OsConstants.java':'package android.system;public class OsConstants{public static int EEXIST=17;public static boolean S_ISDIR(int mode){return (mode&0170000)==0040000;}public static boolean S_ISREG(int mode){return (mode&0170000)==0100000;}}',
 'android/system/Os.java':r'''package android.system;import java.io.*;import java.util.*;
-public class Os{public static int mkdirs,chmods;public static String denied="",wrongOwner="",unsafe="",shared="";public static StructStat lstat(String p)throws Exception{if(p.equals(denied))throw new IOException("Permission denied");if(!new File(p).exists())throw new IOException("ENOENT");StructStat s=new StructStat();s.st_uid=p.equals(wrongOwner)?1000:0;s.st_mode=p.equals(unsafe)?0040777:p.equals(shared)?0040755:0040700;return s;}public static void mkdir(String p,int mode)throws Exception{mkdirs++;if(!new File(p).mkdir())throw new ErrnoException(17);}public static void chmod(String p,int mode){chmods++;shared="";}}''',
+public class Os{public static int mkdirs,chmods;public static boolean denyAll;public static String denied="",wrongOwner="",unsafe="",shared="";public static StructStat lstat(String p)throws Exception{if(denyAll||p.equals(denied))throw new IOException("Permission denied");if(!new File(p).exists())throw new IOException("ENOENT");StructStat s=new StructStat();s.st_uid=p.equals(wrongOwner)?1000:0;s.st_mode=p.equals(unsafe)?0040777:p.equals(shared)?0040755:0040700;return s;}public static void mkdir(String p,int mode)throws Exception{mkdirs++;if(!new File(p).mkdir())throw new ErrnoException(17);}public static void chmod(String p,int mode){chmods++;shared="";}}''',
 P+'WorkspaceTest.java':r'''package top.rongshangs.lumacurve.refactor;import java.io.*;import android.system.*;import org.json.*;
 public class WorkspaceTest{static int cases;static void check(boolean b){if(!b)throw new AssertionError("case "+cases);cases++;}
  static void failure(RunnableThrows r)throws Exception{try{r.run();throw new AssertionError("accepted");}catch(IOException expected){cases++;}}
@@ -94,13 +94,17 @@ public class WorkspaceTest{static int cases;static void check(boolean b){if(!b)t
  public static void main(String[] a)throws Exception{
   RootWorkspace.PRIMARY.getParentFile().mkdirs();RootWorkspace.temporary().getParentFile().mkdirs();
   check(RootWorkspace.require().equals(RootWorkspace.PRIMARY));check(Os.mkdirs==1);check(RootWorkspace.report().getBoolean("selected_usable"));check(Os.mkdirs==1&&Os.chmods==0);
-  RootWorkspace.selected=null;Os.denied=RootWorkspace.PRIMARY.getParent();check(RootWorkspace.require().equals(RootWorkspace.temporary()));check(Os.mkdirs==2);failure(()->RootWorkspace.requireNative());check(Os.mkdirs==2);check(RootWorkspace.report().getBoolean("selected_usable"));
-  Os.wrongOwner=RootWorkspace.temporary().toString();check(!RootWorkspace.report().getBoolean("selected_usable"));check(!RootWorkspace.report().getString("selected_error").isEmpty());failure(()->RootWorkspace.require());check(Os.chmods==0);
-  RootWorkspace.selected=null;Os.wrongOwner="";Os.unsafe=RootWorkspace.temporary().getParent();failure(()->RootWorkspace.require());check(Os.mkdirs==2);RootWorkspace.initialize();check(RootWorkspace.report().getString("selected").isEmpty());check(Os.mkdirs==2);
-  Os.denied="";Os.unsafe="";Os.wrongOwner=RootWorkspace.PRIMARY.toString();failure(()->RootWorkspace.requireNative());check(Os.chmods==0);
-  Os.wrongOwner="";Os.shared=RootWorkspace.PRIMARY.toString();failure(()->RootWorkspace.secure(RootWorkspace.PRIMARY,false));check(Os.chmods==0);RootWorkspace.secure(RootWorkspace.PRIMARY,true);check(Os.chmods==1);
+  // The native tool follows the verified fallback instead of refusing it.
+  check(RootWorkspace.requireNative().equals(RootWorkspace.PRIMARY));check(Os.mkdirs==1);check(Os.chmods==0);
+  RootWorkspace.selected=null;Os.denied=RootWorkspace.PRIMARY.getParent();check(RootWorkspace.require().equals(RootWorkspace.temporary()));check(Os.mkdirs==2);check(RootWorkspace.requireNative().equals(RootWorkspace.temporary()));check(RootWorkspace.report().getBoolean("selected_usable"));
+  // Neither workspace passes: fail closed and name both candidates.
+  RootWorkspace.selected=null;Os.denyAll=true;failure(()->RootWorkspace.require());failure(()->RootWorkspace.requireNative());check(Os.mkdirs==2);Os.denyAll=false;
+  Os.denied="";RootWorkspace.selected=null;Os.wrongOwner=RootWorkspace.PRIMARY.toString();check(RootWorkspace.requireNative().equals(RootWorkspace.temporary()));check(Os.chmods==0);
+  RootWorkspace.selected=null;Os.wrongOwner=RootWorkspace.PRIMARY.toString();Os.unsafe=RootWorkspace.temporary().getParent();failure(()->RootWorkspace.require());check(Os.mkdirs==2);RootWorkspace.initialize();check(RootWorkspace.report().getString("selected").isEmpty());check(Os.mkdirs==2);
+  Os.unsafe="";Os.wrongOwner="";
+  Os.shared=RootWorkspace.PRIMARY.toString();failure(()->RootWorkspace.secure(RootWorkspace.PRIMARY,false));check(Os.chmods==0);RootWorkspace.secure(RootWorkspace.PRIMARY,true);check(Os.chmods==1);
   android.os.Process.uid=1000;failure(()->RootWorkspace.requireNative());check(Os.chmods==1);
-  int beforeChmod=Os.chmods,beforeMkdir=Os.mkdirs;org.json.JSONObject evidence=RootWorkspace.nativeEvidence();check(evidence.getBoolean("read_only")&&evidence.getInt("uid")==1000);check(evidence.getJSONArray("files").length()==4);check(evidence.getJSONArray("files").getJSONObject(0).getInt("uid")==0);check(Os.chmods==beforeChmod&&Os.mkdirs==beforeMkdir);
+  int beforeChmod=Os.chmods,beforeMkdir=Os.mkdirs;org.json.JSONObject evidence=RootWorkspace.nativeEvidence();check(evidence.getBoolean("read_only")&&evidence.getInt("uid")==1000);check(evidence.getJSONArray("files").length()==10);check(evidence.getString("selected").equals(RootWorkspace.PRIMARY.toString()));check(evidence.getJSONArray("files").getJSONObject(0).getInt("uid")==0);check(Os.chmods==beforeChmod&&Os.mkdirs==beforeMkdir);
   System.out.println("Root workspace host: "+cases+" cases PASS");
  }}'''}
 # Android fixed directories are relocated only in this host fixture; checks stay production.
@@ -182,7 +186,7 @@ assert 'root_settings_unavailable' in control and 'root_process_visibility' in c
 assert 'RootAccess.report(settings)' in control
 assert 'root_warning' in control and control.index('if(!waitFor(revision,true))')<control.index('return afterApply(config);')
 assert 'if(requireFresh||selfCheckNext)throw denied;return state;' in control
-assert 'RootWorkspace.requireNative();' in (S/'NativePanelRoot.java').read_text('utf-8')
+assert 'install(RootWorkspace.requireNative())' in (S/'NativePanelRoot.java').read_text('utf-8')
 assert 'AppRootDiagnostics.export(this,lastAnswer,rootFailure)' in (S/'MainActivity.java').read_text('utf-8')
 assert 'if(!selfCheckNext){' in control
 total+=9

@@ -99,10 +99,10 @@ public class OutdoorFoldTest{
   JSONObject config=new JSONObject().put("enabled",true).put("outdoor_node_boost",true).put("revision","new");
   JSONObject state=new JSONObject().put("phase","active").put("revision","new").put("outdoor",new JSONObject().put("options",new JSONObject().put("outdoor_node_boost",true)));
   for(String reason:new String[]{"write_failed","node_changed","start_failed"}){
-   JSONObject health=new JSONObject().put("reason",reason).put("failure_revision","new");Files.write(OutdoorNodeRoot.HEALTH.toPath(),health.toString().getBytes("UTF-8"));
+   JSONObject health=new JSONObject().put("reason",reason).put("failure_revision","new");Files.write(OutdoorNodeRoot.healthFile().toPath(),health.toString().getBytes("UTF-8"));
    OutdoorNodeRoot.reconcile(state,config.toString());check(OutdoorNodeRoot.health().getString("reason").equals(reason));
    // New revision, old error: ordinary reconcile remains latched too.
-   health.put("failure_revision",reason.equals("start_failed")?"new":"old");Files.write(OutdoorNodeRoot.HEALTH.toPath(),health.toString().getBytes("UTF-8"));
+   health.put("failure_revision",reason.equals("start_failed")?"new":"old");Files.write(OutdoorNodeRoot.healthFile().toPath(),health.toString().getBytes("UTF-8"));
    OutdoorNodeRoot.reconcile(state,config.toString());check(OutdoorNodeRoot.health().getString("failure_revision").equals("new"));
    // No compatible runtime: explicit recovery reaches full support validation,
    // fails closed and records it. It cannot launch a writer on this host fixture.
@@ -110,6 +110,17 @@ public class OutdoorFoldTest{
    check(OutdoorNodeRoot.health().getString("reason").equals("start_failed"));check(OutdoorNodeRoot.running()<0);
   }
   JSONObject before=OutdoorNodeRoot.health();state.put("revision","not-confirmed");OutdoorNodeRoot.reconcileAfterApply(state,config.toString());check(OutdoorNodeRoot.health().toString().equals(before.toString()));
+  Path healthFile=OutdoorNodeRoot.healthFile().toPath();byte[] existing=Files.readAllBytes(healthFile);
+  RootWorkspace.denied=true;
+  check(OutdoorNodeRoot.health().length()==0&&OutdoorNodeRoot.anyRunning()<0);
+  state.put("revision","new");
+  try{OutdoorNodeRoot.reconcileAfterApply(state,config.toString());throw new AssertionError("invalid runtime accepted");}
+  catch(java.io.IOException expected){check(expected.getSuppressed().length==1);}
+  check(java.util.Arrays.equals(Files.readAllBytes(healthFile),existing));
+  RootWorkspace.denied=false;
+  String oversized=new JSONObject().put("pid",42).put("detail",new String(new char[2100]).replace('\0','x')).toString();
+  Files.write(healthFile,oversized.getBytes("UTF-8"));check(OutdoorNodeRoot.health().length()==0);
+  Files.write(healthFile,existing);check(OutdoorNodeRoot.health().toString().equals(before.toString()));
   System.out.println("Outdoor explicit recovery: "+cases+" cases PASS");
  }
 }'''

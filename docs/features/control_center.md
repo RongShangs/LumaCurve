@@ -113,6 +113,6 @@
 | [ControlCenterSettings.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ControlCenterSettings.java) | `47eab653db15059f` |
 | [ControlCenterSetup.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ControlCenterSetup.java) | `daa3c13a325dc0c9` |
 | [ControlCenterStatus.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ControlCenterStatus.java) | `4751c6f78fffe8d1` |
-| [ManualPanelLimitSettings.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ManualPanelLimitSettings.java) | `24a5ee33acf371d6` |
+| [ManualPanelLimitSettings.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ManualPanelLimitSettings.java) | `8a289539d35b29b4` |
 | [MappingRecoveryState.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/MappingRecoveryState.java) | `846a31654e6cb880` |
 | [SystemUiAccess.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/SystemUiAccess.java) | `9335400ed1723c1b` |

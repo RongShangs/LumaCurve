@@ -7,17 +7,20 @@ tree=ast.parse((R/'tests/refactor_advanced_hooks.py').read_text(encoding='utf-8'
 common=ast.literal_eval(next(n.value for n in tree.body if isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id=='sources' for t in n.targets)))
 sources={k:common[k] for k in ['top/rongshangs/lumacurve/refactor/hooking/XC_MethodHook.java','top/rongshangs/lumacurve/refactor/hooking/XposedBridge.java','top/rongshangs/lumacurve/refactor/HookEntry.java']}
 sources.update({
+'android/hardware/Sensor.java':'package android.hardware;public class Sensor{}',
+'android/hardware/SensorManager.java':'''package android.hardware;public class SensorManager{public Sensor available;public boolean throwing;public int lookups;public Sensor getDefaultSensor(int type){if(type!=33171005)throw new AssertionError("vendor substitution");lookups++;if(throwing)throw new IllegalStateException("lookup failure");return available;}}''',
+
 'android/os/SystemClock.java':'package android.os;public class SystemClock{public static long now=1000;public static long uptimeMillis(){return now;}}',
 'android/os/Handler.java':'''package android.os;import java.util.*;public class Handler{public final Map<Runnable,Long> pending=new IdentityHashMap<>();public boolean post(Runnable r){pending.put(r,0L);return true;}public boolean postDelayed(Runnable r,long delay){pending.put(r,delay);return true;}public void removeCallbacks(Runnable r){pending.remove(r);}}''',
 'top/rongshangs/lumacurve/refactor/HookRuntime.java':'''package top.rongshangs.lumacurve.refactor;import org.json.*;import android.os.*;class HookRuntime{
- final Object owner;final Handler handler=new Handler();final SceneController scenes;boolean closed,probingScenes,display=true,user=true,on=true;int recalculations;
+ String phase="active";final Object owner;final Handler handler=new Handler();final SceneController scenes;boolean closed,probingScenes,display=true,user=true,on=true;int recalculations;
  HookRuntime(Object owner){this.owner=owner;scenes=new SceneController(this);}boolean onDisplayThread(){return !closed&&display;}boolean appliesToUser(){return user;}boolean screenOn(){return on;}void requestRecalculation(){recalculations++;}
  static float optionalNumber(Object o,String f){try{return ((Number)HookEntry.get(o,f)).floatValue();}catch(Exception e){return Float.NaN;}}static Boolean optionalBoolean(Object o,String f){try{return (Boolean)HookEntry.get(o,f);}catch(Exception e){return null;}}
  static void readBoolean(JSONObject j,String key,Object o,String f){try{Boolean b=optionalBoolean(o,f);if(b!=null)j.put(key,b);}catch(Exception e){}}static void readNumber(JSONObject j,String key,Object o,String f){try{float v=optionalNumber(o,f);if(Float.isFinite(v)&&v>=0)j.put(key,v);}catch(Exception e){}}
 }''',
 'com/android/server/display/SceneDetector.java':'''package com.android.server.display;import top.rongshangs.lumacurve.refactor.hooking.*;public class SceneDetector{
  public boolean mUseDrivingModeForBrt=true,mTransientProximityEnabled=true,mUseAonFlareEnabled=true,mNeedCheckProximitySensor=true,mNeedCheckAonFlare=true,mIsNightDrivingMode=true,mProximityStatus=true,throwing;
- public int mProxState=8;public float mMinAonFlareEnableLux=17,mMaxAonFlareEnableLux=200;public boolean sawRear,sawAon;public int applies;
+ public int mDisplayId=0;public android.hardware.Sensor mStreamProximitySensor=new android.hardware.Sensor();public android.hardware.SensorManager mSensorManager=new android.hardware.SensorManager();public boolean isNeedStreamProximitySensorEnabled(){return true;}public void setStreamProximitySensorEnabled(boolean enabled){}public int mProxState=8;public float mMinAonFlareEnableLux=17,mMaxAonFlareEnableLux=200;public boolean sawRear,sawAon;public int applies;
  private boolean isNightTime(){return true;}private void applyNightDrivingBrightness(){applies++;mIsNightDrivingMode=(Boolean)XposedBridge.call(this,"isNightTime",new Class<?>[0]);}
  public void updateAmbientLux(int event,float lux,boolean dark){sawRear=mTransientProximityEnabled;sawAon=lux>=mMinAonFlareEnableLux&&lux<=mMaxAonFlareEnableLux;if(throwing)throw new IllegalStateException("OEM failure");}public boolean isNeedSkipBrightnessChange(){return mNeedCheckProximitySensor||mNeedCheckAonFlare;}public boolean isReflectiveScene(){return true;}
 }''',
@@ -76,6 +79,29 @@ public class SceneHookTest{
    SceneTuning.capabilities.get(scene.getClass()).remove(group);check(SceneTuning.inactiveReason(s,group).isEmpty());SceneTuning.capabilities.get(scene.getClass()).add(group);
    nativeFlag.setBoolean(scene,true);check(SceneTuning.supported(s,group));check(SceneTuning.inactiveReason(s,group).isEmpty());
   }
+  // Reproduce the supplied ROM: native stream input missing, waiting flag stuck.
+  s.scenes.stop();scene.mProxState=7;scene.mStreamProximitySensor=null;scene.mSensorManager.available=null;scene.mNeedCheckProximitySensor=true;scene.mNeedCheckAonFlare=false;
+  JSONObject prior=new JSONObject();s.scenes.options.put(prior);String saved=prior.toString();check(SceneTuning.missingStreamSensor(s,scene));
+  check(!(Boolean)call(scene,"isNeedSkipBrightnessChange",new Class<?>[0]));check(scene.mNeedCheckProximitySensor&&scene.mTransientProximityEnabled&&s.scenes.missingStreamReleases==1);
+  call(scene,"updateAmbientLux",new Class<?>[]{int.class,float.class,boolean.class},0,50f,true);check(!scene.sawRear&&scene.sawAon&&scene.mTransientProximityEnabled&&s.scenes.missingStreamAdmissions==1);JSONObject retained=new JSONObject();s.scenes.options.put(retained);check(retained.toString().equals(saved)&&!s.scenes.enabled);
+  scene.throwing=true;try{call(scene,"updateAmbientLux",new Class<?>[]{int.class,float.class,boolean.class},0,50f,true);throw new AssertionError("native error lost");}catch(RuntimeException expected){cases++;}check(scene.mTransientProximityEnabled);scene.throwing=false;
+  scene.mNeedCheckAonFlare=true;check((Boolean)call(scene,"isNeedSkipBrightnessChange",new Class<?>[0]));scene.mNeedCheckAonFlare=false;
+  // Valid input or temporary object initialization never bypasses native protection.
+  scene.mStreamProximitySensor=new android.hardware.Sensor();check(!SceneTuning.missingStreamSensor(s,scene));check((Boolean)call(scene,"isNeedSkipBrightnessChange",new Class<?>[0]));scene.mStreamProximitySensor=null;
+  scene.mSensorManager.available=new android.hardware.Sensor();check(!SceneTuning.missingStreamSensor(s,scene));check((Boolean)call(scene,"isNeedSkipBrightnessChange",new Class<?>[0]));scene.mSensorManager.available=null;
+  scene.mSensorManager.throwing=true;check(!SceneTuning.missingStreamSensor(s,scene));check((Boolean)call(scene,"isNeedSkipBrightnessChange",new Class<?>[0]));scene.mSensorManager.throwing=false;
+  for(int state:new int[]{0,6,8,9}){scene.mProxState=state;check(!SceneTuning.missingStreamSensor(s,scene));check((Boolean)call(scene,"isNeedSkipBrightnessChange",new Class<?>[0]));}scene.mProxState=7;
+  scene.mDisplayId=1;check(!SceneTuning.missingStreamSensor(s,scene));scene.mDisplayId=0;
+  for(int scope=0;scope<7;scope++){s.display=scope!=0;s.user=scope!=1;s.on=scope!=2;s.phase=scope==3?"attached":"active";abc.mLightSensorEnabled=scope!=4;abc.mAmbientLuxValid=scope!=5;s.probingScenes=scope==6;check(scope==6||!SceneTuning.missingStreamSensor(s,scene));check((Boolean)call(scene,"isNeedSkipBrightnessChange",new Class<?>[0]));}s.display=s.user=s.on=abc.mLightSensorEnabled=abc.mAmbientLuxValid=true;s.phase="active";s.probingScenes=false;
+  scene.mTransientProximityEnabled=false;check(!SceneTuning.missingStreamSensor(s,scene));scene.mTransientProximityEnabled=true;
+  android.hardware.SensorManager manager=scene.mSensorManager;scene.mSensorManager=null;check(!SceneTuning.missingStreamSensor(s,scene));scene.mSensorManager=manager;
+  // An unrelated earlier hook forcing a result is preserved by the automatic correction.
+  java.lang.reflect.Method getter=SceneDetector.class.getDeclaredMethod("isNeedSkipBrightnessChange");
+  top.rongshangs.lumacurve.refactor.hooking.XC_MethodHook.MethodHookParam unexpected=new top.rongshangs.lumacurve.refactor.hooking.XC_MethodHook.MethodHookParam();unexpected.thisObject=scene;unexpected.args=new Object[0];unexpected.setResult(false);
+  java.lang.reflect.Method after=SceneTuning.hook(4,"isNeedSkipBrightnessChange").getClass().getDeclaredMethod("afterHookedMethod",top.rongshangs.lumacurve.refactor.hooking.XC_MethodHook.MethodHookParam.class);after.setAccessible(true);after.invoke(SceneTuning.hook(4,"isNeedSkipBrightnessChange"),unexpected);check(Boolean.FALSE.equals(unexpected.getResult()));
+  block(s,0);unexpected.setResult(false);after.invoke(SceneTuning.hook(4,"isNeedSkipBrightnessChange"),unexpected);check(Boolean.FALSE.equals(unexpected.getResult()));s.scenes.stop();
+  scene.mNeedCheckAonFlare=true;block(s,4);check((Boolean)call(scene,"isNeedSkipBrightnessChange",new Class<?>[0]));block(s,5);check(!(Boolean)call(scene,"isNeedSkipBrightnessChange",new Class<?>[0]));s.scenes.stop();
+  JSONObject diagnostic=new JSONObject();s.scenes.put(diagnostic);check(diagnostic.getJSONObject("scene_control").getJSONObject("stream_sensor_compatibility").getLong("waits_released")>=1);check(!diagnostic.getJSONObject("scene_control").getJSONObject("stream_sensor_compatibility").getBoolean("sensor_substitution"));
   System.out.println("Scene hooks/lifecycle: "+cases+" cases PASS; actual callbacks with OEM and Looper doubles, Android not tested");
  }
 }''',encoding='utf-8')
@@ -128,3 +154,23 @@ for variant,wrong in [('aon',False),('aon_partial',True),('aon_legacy_marker',Tr
  c=out/'classes';c.mkdir(exist_ok=True)
  subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(J),'-d',str(c),*[str(S/(n+'.java')) for n in ['SceneOptions','ScenePolicy','SceneController','SceneTuning','FieldOverride']],*paths,str(t),str(S/'hooking/HookTransaction.java')],check=True)
  r=subprocess.run(['java','-cp',str(c)+os.pathsep+str(J),'top.rongshangs.lumacurve.refactor.SceneAonTest'],capture_output=True,text=True,check=True);print(variant+': '+r.stdout.strip())
+
+# Optional missing-input accessor rejects every partial/wrong/static structure.
+for variant,old,new in [
+ ('valid_missing','',''),
+ ('display_type','public int mDisplayId=0;','public long mDisplayId=0;'),
+ ('static_sensor','public android.hardware.Sensor mStreamProximitySensor','public static android.hardware.Sensor mStreamProximitySensor'),
+ ('manager_type','public android.hardware.SensorManager mSensorManager','public Object mSensorManager'),
+ ('missing_registration','void setStreamProximitySensorEnabled(boolean enabled)','void otherRegistration(boolean enabled)'),
+ ('registration_result','void setStreamProximitySensorEnabled(boolean enabled){}','int setStreamProximitySensorEnabled(boolean enabled){return 1;}'),
+ ('static_admission','boolean isNeedStreamProximitySensorEnabled()','static boolean isNeedStreamProximitySensorEnabled()'),
+ ('missing_sensor_field','mStreamProximitySensor=','otherSensor=')]:
+ src=dict(sources);key='com/android/server/display/SceneDetector.java';src[key]=src[key].replace('public int mProxState=8;','public int mProxState=7;').replace('mStreamProximitySensor=new android.hardware.Sensor()','mStreamProximitySensor=null')
+ if old:assert old in src[key];src[key]=src[key].replace(old,new)
+ out=R/'build'/('refactor-stream-'+variant+'-tests');out.mkdir(exist_ok=True);paths=[]
+ for name,code in src.items():
+  q=out/name;q.parent.mkdir(parents=True,exist_ok=True);q.write_text(code,'utf-8');paths.append(str(q))
+ test=out/'StreamAbiTest.java';test.write_text('package top.rongshangs.lumacurve.refactor;import com.android.server.display.*;public class StreamAbiTest{static class Owner{AutomaticBrightnessControllerImpl mAutomaticBrightnessControllerImpl=new AutomaticBrightnessControllerImpl();}public static void main(String[] args)throws Exception{SceneTuning.install(StreamAbiTest.class.getClassLoader());Owner o=new Owner();HookRuntime s=new HookRuntime(o);HookEntry.states.put(o,s);boolean missing=SceneTuning.missingStreamSensor(s,o.mAutomaticBrightnessControllerImpl.mSceneDetector);if(missing!='+str(variant=='valid_missing').lower()+')throw new AssertionError("stream ABI '+variant+'");System.out.println("Missing stream ABI '+variant+': PASS");}}','utf-8')
+ c=out/'classes';c.mkdir(exist_ok=True)
+ subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(J),'-d',str(c),*[str(S/(n+'.java')) for n in ['SceneOptions','ScenePolicy','SceneController','SceneTuning','FieldOverride']],*paths,str(test),str(S/'hooking/HookTransaction.java')],check=True)
+ subprocess.run(['java','-cp',str(c)+os.pathsep+str(J),'top.rongshangs.lumacurve.refactor.StreamAbiTest'],check=True)

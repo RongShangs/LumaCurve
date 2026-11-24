@@ -10,6 +10,7 @@ final class SceneController {
     final HookRuntime s;final ScenePolicy policy=new ScenePolicy();SceneOptions options=new SceneOptions();
     volatile boolean[] denied=new boolean[SceneOptions.IDS.length];volatile boolean enabled;
     boolean evaluating,reconciling;long stepOriginal=-1;boolean[] wakeOriginal;String error="";long next=-1;
+    long missingStreamAdmissions,missingStreamReleases;
     final Runnable timer;
     SceneController(HookRuntime s){this.s=s;timer=()->{next=-1;if(enabled&&!s.closed){refresh();reconcile();}};}
     void configure(SceneOptions nextOptions){boolean wasEnabled=enabled;s.handler.removeCallbacks(timer);next=-1;options=nextOptions;policy.reset();enabled=options.custom();denied=new boolean[SceneOptions.IDS.length];if(enabled||wasEnabled){try{Object abc=SceneTuning.object(s,"abc");if(stepOriginal<0){float value=HookRuntime.optionalNumber(abc,"mStepModeDarkenDebounceConfig");if(Float.isFinite(value)&&value>=0)stepOriginal=(long)value;}if(wakeOriginal==null){Boolean mode=HookRuntime.optionalBoolean(abc,"mIsNightWakeMode"),target=HookRuntime.optionalBoolean(abc,"mSetNightWakeBrightness");if(mode!=null&&target!=null)wakeOriginal=new boolean[]{mode,target};}}catch(Throwable absent){}refresh();reconcile();}}
@@ -41,5 +42,5 @@ final class SceneController {
         error="";s.requestRecalculation();
     }catch(Throwable unavailable){error="场景重新确认未完成，沿用系统下一次事件";}finally{reconciling=false;}}
     static Object call(Object object,String name,Class<?>[] types,Object...args)throws Exception{Method m=object.getClass().getDeclaredMethod(name,types);m.setAccessible(true);return m.invoke(object,args);}
-    void put(JSONObject status)throws JSONException{for(int i=0;i<SceneOptions.IDS.length;i++)status.put("scene_"+SceneOptions.IDS[i]+"_supported",SceneTuning.supported(s,i));JSONObject current=new JSONObject(),policies=new JSONObject();for(int i=0;i<denied.length;i++){current.put(SceneOptions.IDS[i],enabled&&denied[i]);policies.put(SceneOptions.IDS[i],options.entries[i].mode);}status.put("scene_control",new JSONObject().put("denied",current).put("policies",policies).put("error",error));}
+    void put(JSONObject status)throws JSONException{for(int i=0;i<SceneOptions.IDS.length;i++)status.put("scene_"+SceneOptions.IDS[i]+"_supported",SceneTuning.supported(s,i));JSONObject current=new JSONObject(),policies=new JSONObject();for(int i=0;i<denied.length;i++){current.put(SceneOptions.IDS[i],enabled&&denied[i]);policies.put(SceneOptions.IDS[i],options.entries[i].mode);}status.put("scene_control",new JSONObject().put("denied",current).put("policies",policies).put("error",error).put("stream_sensor_compatibility",new JSONObject().put("profile","missing_native_input_guard").put("admissions_avoided",missingStreamAdmissions).put("waits_released",missingStreamReleases).put("sensor_substitution",false)));}
 }

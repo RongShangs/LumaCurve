@@ -16,7 +16,7 @@ final class ManualPanelLimitSettings {
         LinearLayout row=a.column();row.setOrientation(LinearLayout.HORIZONTAL);row.setGravity(Gravity.CENTER_VERTICAL);row.setBaselineAligned(false);parent.addView(row);
         input=a.input("输入节点数值");input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);row.addView(input,new LinearLayout.LayoutParams(0,-2,1));
         apply=a.action("设定",()->{if(a.busy)return;try{int value=Integer.parseInt(input.getText().toString());if(value<10||value>maximum)throw new IllegalArgumentException();a.controls.manualMaximum=value;input.clearFocus();a.dirty=true;a.drawCurve();}catch(Exception bad){input.setError(a.tr("请输入范围内的节点值"));}});apply.setMinHeight(a.dp(44));apply.setMinimumHeight(a.dp(44));apply.setMinimumWidth(0);LinearLayout.LayoutParams size=new LinearLayout.LayoutParams(a.dp(64),-2);size.leftMargin=a.dp(8);row.addView(apply,size);
-        parent.addView(a.text("仅限制磁贴面板；控制中心分区和户外高亮上限分别设置。",12,a.MUTED));refresh();
+        parent.addView(a.text("上限仅用于此面板，单位为背光节点值。",12,a.MUTED));refresh();
     }
     void resetMaximum(){if(!a.busy){a.controls.manualMaximum=0;input.clearFocus();a.dirty=true;a.drawCurve();}}
     void refresh(){

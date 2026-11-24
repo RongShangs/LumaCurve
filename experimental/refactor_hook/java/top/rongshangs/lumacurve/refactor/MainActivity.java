@@ -23,7 +23,7 @@ public final class MainActivity extends Activity {
     MemoryOptions memoryOptions=new MemoryOptions(false,30);Switch persistSwitch;SeekBar retentionSlider,pointLimitSlider;TextView retentionLabel,pointLimitLabel;Bundle restoredUi;
     final ExecutorService worker=Executors.newSingleThreadExecutor(),network=Executors.newSingleThreadExecutor();final Handler ui=new Handler(Looper.getMainLooper());
     FrameLayout content,pageSurface;ImmersiveLayout viewport;FloatingNavigation floatingNavigation;SettingsSearch settingsSearch;ScrollView aboutScroll;AboutPage aboutPage;LinearLayout settingsActions;LinearLayout root,header,pages[]=new LinearLayout[4];
-    TextView badge,note,stateTitle,luxReading,nitReading,flow,thermalState,userState,logText,curveHint,memoryText,memoryStatus;
+    TextView badge,note,stateTitle,luxReading,nitReading,flow,thermalState,userState,logText,curveHint,memoryText;
     Button apply,stop;Switch thermalSwitch;SeekBar ceilingSlider;TextView ceilingText;
     float factors[]={1,1,1,1},factoryLux[],factoryNit[],minimum,maximum,thermalCeiling=43,memoryStrength=1;boolean thermalRelax,memoryEnabled=true,busy,visible,dirty,destroyed;
     Switch memorySwitch;SeekBar memorySlider;PipelineBoard pipeline;boolean english,rereadPending,legacyChecked;String permissionNotice="",loadedBaseline="";boolean permissionDialogVisible,permissionBlocked;ScrollView logScroller;
@@ -329,8 +329,6 @@ public final class MainActivity extends Activity {
         memoryFlag(b,"memory_hold_theme","切换深浅色模式后保持");
         b.addView(text("独立基础曲线开启时，此项由亮度曲线页的记忆处理选择接管，原选择保留。",12,MUTED));
         memoryFlag(b,"memory_persist","重启后保持");persistSwitch=memorySwitches.get("memory_persist");
-        b.addView(text("新调整继续更新偏好；主动清除、修改基础曲线或切换用户后，不恢复旧偏好。",12,MUTED));
-        memoryStatus=text("等待读取手动锚点",12,MUTED);b.addView(memoryStatus);
         LinearLayout holdCard=b;b=settingsDetails(b,"memory-hold");
         memoryParameter(b,"memory_retention_days","存档保留天数",1,90,1," 天");retentionLabel=memoryLabels.get("memory_retention_days");retentionSlider=memoryParameters.get("memory_retention_days");
         memoryParameter(b,"memory_max_points","最多保存手动点",0,7,1," 个");pointLimitLabel=memoryLabels.get("memory_max_points");pointLimitSlider=memoryParameters.get("memory_max_points");
@@ -378,12 +376,12 @@ public final class MainActivity extends Activity {
     void makeThermalSettings(){
         LinearLayout b=card(settingsTarget);b.addView(text("温控",18,INK));LinearLayout thermalPresets=row(b);compact("系统默认",()->quickPreset("thermal",0),thermalPresets);compact("略微放宽",()->quickPreset("thermal",1),thermalPresets);LinearLayout moreThermal=row(b);compact("更多放宽",()->quickPreset("thermal",2),moreThermal);compact("最大放宽",()->quickPreset("thermal",3),moreThermal);thermalSwitch=new Switch(this);thermalSwitch.setText(tr("减少温控降亮"));thermalSwitch.setTextSize(14);thermalSwitch.setShowText(false);b.addView(thermalSwitch,new LinearLayout.LayoutParams(-1,dp(48)));
         thermalSwitch.setOnCheckedChangeListener((v,on)->{if(on!=thermalRelax){thermalRelax=on;dirty=true;drawCurve();}});
-        b.addView(text("默认关闭。开启后可减少显示层的温控限亮；严重过热或达到电池温度阈值时恢复系统策略。",12,MUTED));
+        b.addView(text("严重过热或达到电池温度阈值时，恢复系统温控。",12,MUTED));
         b=settingsDetails(b,"thermal");
         ceilingText=text("电池温度阈值：43℃（建议）",13,INK);b.addView(ceilingText);ceilingSlider=new SeekBar(this);ceilingSlider.setMax(12);ceilingSlider.setProgress(5);b.addView(ceilingSlider,new LinearLayout.LayoutParams(-1,dp(40)));
         ceilingSlider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){public void onProgressChanged(SeekBar s,int p,boolean from){if(from){thermalCeiling=p+38;dirty=true;drawCurve();}}public void onStartTrackingTouch(SeekBar s){}public void onStopTrackingTouch(SeekBar s){}});
         coolingLabel=text("",13,INK);b.addView(coolingLabel);coolingSlider=parameter(b,4,0,value->thermalCooling=1+value*.5f);
-        b.addView(text("可设 38～50℃。达到阈值交回系统，冷却到设定幅度后再允许减少降亮。",12,MUTED));
+        b.addView(text("阈值可设 38～50 ℃。降温达到设定幅度后，重新减少降亮。",12,MUTED));
     }
     void makeMainResponseSettings(){
         LinearLayout b=card(settingsTarget);b.addView(text("主光感确认",18,INK));quickPresetRow(b,"response","反应灵敏","减少波动");responseSwitch=new Switch(this);responseSwitch.setText(tr("自定义变化确认时间"));responseSwitch.setTextSize(14);b.addView(responseSwitch,new LinearLayout.LayoutParams(-1,dp(48)));responseSwitch.setOnCheckedChangeListener((v,on)->{if(on!=responseOverride){responseOverride=on;dirty=true;drawCurve();}});
@@ -400,8 +398,6 @@ public final class MainActivity extends Activity {
         LinearLayout b=card(settingsTarget);b.addView(text("暗光稳定",18,INK));
         quickPresetRow(b,"low","暗光少动","暗光更稳");
         lowLightSwitch=new Switch(this);lowLightSwitch.setText(tr("暗光稳定"));lowLightSwitch.setTextSize(14);b.addView(lowLightSwitch,new LinearLayout.LayoutParams(-1,dp(48)));lowLightSwitch.setOnCheckedChangeListener((v,on)->{if(on!=lowLightStability){lowLightStability=on;dirty=true;drawCurve();}});
-        b.addView(text("减少暗处小波动引起的调节。默认关闭；手动、熄屏、HDR 等特殊场景沿用系统。",12,MUTED));
-        b.addView(text("「暗光少动」提高亮暗门槛，并在本机支持时启用辅助闸门。选择后记得保存并应用。",12,MUTED));
         b=settingsDetails(b,"low");
         lowLimitLabel=text("",13,INK);b.addView(lowLimitLabel);lowLimitSlider=parameter(b,19,9,value->lowLightLimit=5+value*5);
         lowBrightLabel=text("",13,INK);b.addView(lowBrightLabel);lowBrightSlider=parameter(b,6,4,value->lowLightBrighten=1000+value*500);
@@ -422,9 +418,9 @@ public final class MainActivity extends Activity {
         LinearLayout b=card(settingsTarget);b.addView(text("暗光锁定",18,INK));
         LinearLayout presets=row(b);compact("不锁定",()->{controls.darkLock=false;dirty=true;drawCurve();},presets);compact("暗处保持",()->{controls.holdInDarkness();dirty=true;drawCurve();},presets);
         button("日落后锁定",()->{controls.afterSunset();dirty=true;drawCurve();},b);
-        b.addView(text("暗处保持：全天按照度判断。日落后锁定：仅夜间按照度判断。两个预设均为低于或等于 10 lux 持续 1 分钟锁定，达到 50 lux 持续 1 秒恢复自动；可在详细参数中调整。",12,MUTED));
+        b.addView(text("暗处保持全天可用，日落后锁定仅夜间可用。预设在 ≤10 lux 持续 1 分钟后锁定，≥50 lux 持续 1 秒后恢复自动。",12,MUTED));
         darkLockSwitch=new Switch(this);darkLockSwitch.setText(tr("暗光持续后关闭自动亮度"));b.addView(darkLockSwitch,new LinearLayout.LayoutParams(-1,dp(48)));darkLockSwitch.setOnCheckedChangeListener((v,on)->{if(on!=controls.darkLock){controls.darkLock=on;dirty=true;drawCurve();}});
-        b.addView(text("保持进入时的亮度；照度明显升高后恢复自动。息屏或重新开启自动亮度即退出。你主动关闭的自动亮度不会被重新开启。",12,MUTED));
+        b.addView(text("锁定时保持当前亮度，环境变亮后恢复自动。熄屏或手动开启自动亮度会退出锁定。",12,MUTED));
         darkSunsetSwitch=new Switch(this);darkSunsetSwitch.setText(tr("仅在日落后至日出前启用"));darkSunsetSwitch.setTextSize(14);darkSunsetSwitch.setMinimumHeight(dp(48));b.addView(darkSunsetSwitch,new LinearLayout.LayoutParams(-1,-2));
         darkSunsetSwitch.setOnCheckedChangeListener((v,on)->{if(controls.sunsetOnly!=on){controls.sunsetOnly=on;dirty=true;drawCurve();}});
         darkScheduleStatus=text("",12,MUTED);b.addView(darkScheduleStatus);
@@ -439,9 +435,7 @@ public final class MainActivity extends Activity {
         controlCenterSettings=new ControlCenterSettings(this,settingsTarget);controlCenterChoice=controlCenterSettings.heading;
         LinearLayout b=card(settingsTarget);b.addView(text("主屏手动亮度",18,INK));manualPanelSwitch=new Switch(this);manualPanelSwitch.setText(tr("允许磁贴手动调节"));manualPanelSwitch.setTextSize(14);manualPanelSwitch.setMinimumHeight(dp(48));b.addView(manualPanelSwitch,new LinearLayout.LayoutParams(-1,-2));manualPanelSwitch.setOnCheckedChangeListener((v,on)->{if(on!=controls.manualPanel){controls.manualPanel=on;dirty=true;drawCurve();}});
         manualPanelLimitSettings=new ManualPanelLimitSettings(this,b);
-        b.addView(text("打开独立面板直接调节主屏背光；拖动后切为手动亮度。",12,MUTED));
-        b.addView(text("锁屏期间暂停接管，解锁后恢复；重新开启自动亮度结束保持。",12,MUTED));
-        b.addView(text("面板拉满使用上方设置的最高节点；不是 nit。实际亮度仍受驱动与面板限制。",12,MUTED));
+        b.addView(text("拖动面板滑块即切到手动亮度。锁屏时暂停，解锁后恢复，开启自动亮度后结束。",12,MUTED));
         button("打开主屏亮度面板",this::showManualPanel,b);button("添加控制中心磁贴",this::addBrightnessTile,b);
     }
     ControlCenterSettings controlCenterSettings;ManualPanelLimitSettings manualPanelLimitSettings;View controlCenterChoice;
@@ -850,8 +844,7 @@ if(request!=501||result!=RESULT_OK||data==null||data.getData()==null)return;Uri 
             String thermal=!runtime.optBoolean("thermal_supported")?"该固件接口未兼容":!runtime.optBoolean("thermal_relax")?"系统温控生效":runtime.optBoolean("thermal_permitted")?"减少温控降亮已启用":!runtime.has("battery_temperature")||runtime.optInt("thermal_severity",-1)<0?"等待温度读数，系统温控生效":"温度较高，系统温控生效";
             thermalState.setText("温控："+thermal+"\n电池 "+(runtime.has("battery_temperature")?format(runtime.optDouble("battery_temperature"))+"℃":"无读数")+"；系统热状态 "+severity(runtime.optInt("thermal_severity",-1)));
             double anchor=runtime.optDouble("user_anchor_lux",-1);userState.setText("手动偏好："+(anchor>=0?"系统锚点位于 "+format(anchor)+" lux":"当前没有手动锚点"));
-            memoryStatus.setText("当前手动节点："+CurveCompatibility.read(runtime).liveCount+" 个 · 已保存 "+runtime.optInt("memory_saved_points")+" 个\n"+runtime.optString("memory_persist_status","尚无已保存的手动记忆"));
-            
+
             JSONArray logs=runtime.optJSONArray("logs");StringBuilder lines=new StringBuilder();if(logs!=null)for(int i=0;i<logs.length();i++)lines.append(logs.getString(i)).append('\n');String next=lines.length()==0?"尚无运行记录":lines.toString();
             if(!tr(next).contentEquals(logText.getText())){int position=logScroller.getScrollY();logText.setText(next);if(autoScroll)scrollLogs();else logScroller.post(()->logScroller.scrollTo(0,position));}
             // After an OTA, an unsupported option that was enabled must still be switchable off.

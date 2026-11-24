@@ -22,9 +22,13 @@
 #include "panel_node.h"
 #include "fold_panel.h"
 typedef DIR panel_directory;
-#define DIR "/data/adb/luma_curve_refactor_test"
-#define RECORD DIR "/main-panel-permissions"
+#define DEFAULT_DIR "/data/adb/luma_curve_refactor_test"
 #define SOCKET_NAME "hyperlux.main.panel.raw04"
+/* Java selects this directory only after the same identity checks. Locks, the
+   permission record and health all derive from one verified path. */
+static char workspace[PATH_MAX]=DEFAULT_DIR;
+static char record_path[PATH_MAX]=DEFAULT_DIR "/main-panel-permissions";
+static char outdoor_health_path[PATH_MAX]=DEFAULT_DIR "/outdoor-node-health.json";
 static char node[PANEL_NODE_PATH_SIZE],max_node[PANEL_NODE_PATH_SIZE],real_node[PANEL_REAL_PATH_SIZE];
 static char boot_id[40];
 static dev_t node_device;static ino_t node_inode;
@@ -76,18 +80,18 @@ static int open_output(void){
  return fd;
 }
 static int restore_record(void){
- int fd=open(RECORD,O_RDONLY|O_CLOEXEC|O_NOFOLLOW);if(fd<0)return errno==ENOENT?0:-1;
+ int fd=open(record_path,O_RDONLY|O_CLOEXEC|O_NOFOLLOW);if(fd<0)return errno==ENOENT?0:-1;
  struct stat st;if(fstat(fd,&st)||st.st_uid||!S_ISREG(st.st_mode)||(st.st_mode&0077)){close(fd);return -1;}
  char b[1200];ssize_t n=read(fd,b,sizeof(b)-1);close(fd);if(n<=0||n==(ssize_t)sizeof(b)-1){errno=EINVAL;return -1;}b[n]=0;
  struct panel_permissions record;if(!panel_permissions_parse(b,&record)){errno=EINVAL;return -1;}
  // sysfs permissions are recreated at boot. Never apply an old inode record to a new boot.
- if(panel_permissions_new_boot(&record,boot_id))return unlink(RECORD);
+ if(panel_permissions_new_boot(&record,boot_id))return unlink(record_path);
  struct stat saved;char resolved[PATH_MAX];
  if(lstat(record.path,&saved)||!S_ISREG(saved.st_mode)||!realpath(record.path,resolved)||strncmp(resolved,"/sys/devices/",13)){errno=ESTALE;return -1;}
  if(!panel_permissions_matches(&record,resolved,(unsigned long long)saved.st_dev,(unsigned long long)saved.st_ino)){errno=ESTALE;return -1;}
  int target=open(record.path,O_RDONLY|O_NOFOLLOW|O_CLOEXEC);if(target<0)return -1;
  struct stat opened;int matches=!fstat(target,&opened)&&opened.st_dev==saved.st_dev&&opened.st_ino==saved.st_ino;
- int ok=matches&&fchmod(target,(mode_t)record.mode)==0;int error=matches?errno:ESTALE;close(target);if(!ok){errno=error;return -1;}return unlink(RECORD);
+ int ok=matches&&fchmod(target,(mode_t)record.mode)==0;int error=matches?errno:ESTALE;close(target);if(!ok){errno=error;return -1;}return unlink(record_path);
 }
 static int release_output(void){
  if(output>=0)close(output);output=-1;
@@ -105,10 +109,10 @@ static int acquire_output(void){
  struct stat st;if(!same_node()){errno=ESTALE;return -1;}if(lstat(node,&st))return -1;
  original=st.st_mode&0777;
  // Save permissions before locking. The already-open descriptor remains writable.
- int f=open(RECORD,O_WRONLY|O_CREAT|O_EXCL|O_CLOEXEC|O_NOFOLLOW,0600);if(f<0)return -1;
+ int f=open(record_path,O_WRONLY|O_CREAT|O_EXCL|O_CLOEXEC|O_NOFOLLOW,0600);if(f<0)return -1;
  struct panel_permissions record={.mode=(unsigned)original,.device=(unsigned long long)st.st_dev,.inode=(unsigned long long)st.st_ino};record.fold_route=active_fold_port>=0;record.fold_port=active_fold_port;strcpy(record.boot,boot_id);strcpy(record.path,node);strcpy(record.real,real_node);
  char b[1200];int len=panel_permissions_format(b,sizeof(b),&record);int ok=len>0&&(size_t)len<sizeof(b)&&write(f,b,(size_t)len)==len&&fsync(f)==0;close(f);
- if(!ok){unlink(RECORD);return -1;}
+ if(!ok){unlink(record_path);return -1;}
  output=open_output();if(output<0){int error=errno;restore_record();errno=error;return -1;}
  if(fchmod(output,(mode_t)(original&~0222))){release_output();return -1;}return 0;
 }
@@ -144,29 +148,42 @@ static const char *private_stage="none";
 static int private_fail(int directory,int file,const char *stage,int error){
  if(file>=0)close(file);if(directory>=0)close(directory);private_stage=stage;errno=error?error:EIO;return -1;
 }
-static int private_directory(void){
+/* Accept one plain absolute path from Java and derive every workspace file. */
+static int workspace_set(const char *path){
+ if(!path)return 0;size_t n=strlen(path);if(n<2||n>195||path[0]!='/')return 0;
+ for(size_t i=0;i<n;i++){unsigned char c=(unsigned char)path[i];if(c<33||c>126||c=='"'||c=='\\')return 0;}
+ if(path[n-1]=='/')return 0;
+ snprintf(workspace,sizeof(workspace),"%s",path);
+ snprintf(record_path,sizeof(record_path),"%s/main-panel-permissions",path);
+ snprintf(outdoor_health_path,sizeof(outdoor_health_path),"%s/outdoor-node-health.json",path);
+ return 1;
+}
+static int private_directory(const char *dir){
  if(geteuid()!=0)return private_fail(-1,-1,"root_identity",EPERM);
- char parent[PATH_MAX]=DIR,resolved[PATH_MAX];char *slash=strrchr(parent,'/');
+ char parent[PATH_MAX],resolved[PATH_MAX];
+ if(!dir||!*dir||strlen(dir)>=PATH_MAX-1)return private_fail(-1,-1,"directory_path",EINVAL);
+ snprintf(parent,sizeof(parent),"%s",dir);
+ char *slash=strrchr(parent,'/');
  if(!slash||slash==parent)return private_fail(-1,-1,"directory_path",EINVAL);*slash=0;
  struct stat p,path,opened;
  if(lstat(parent,&p))return private_fail(-1,-1,"parent_stat",errno);
  if(!S_ISDIR(p.st_mode)||p.st_uid||(p.st_mode&0022))return private_fail(-1,-1,"parent_identity",EACCES);
- if(!realpath(DIR,resolved))return private_fail(-1,-1,"directory_realpath",errno);
- if(strcmp(resolved,DIR))return private_fail(-1,-1,"directory_alias",ELOOP);
- if(lstat(DIR,&path))return private_fail(-1,-1,"directory_stat",errno);
+ if(!realpath(dir,resolved))return private_fail(-1,-1,"directory_realpath",errno);
+ if(strcmp(resolved,dir))return private_fail(-1,-1,"directory_alias",ELOOP);
+ if(lstat(dir,&path))return private_fail(-1,-1,"directory_stat",errno);
  if(!S_ISDIR(path.st_mode)||path.st_uid)return private_fail(-1,-1,"directory_identity",EACCES);
- int directory=open(DIR,O_RDONLY|O_DIRECTORY|O_CLOEXEC|O_NOFOLLOW);if(directory<0)return private_fail(-1,-1,"directory_open",errno);
+ int directory=open(dir,O_RDONLY|O_DIRECTORY|O_CLOEXEC|O_NOFOLLOW);if(directory<0)return private_fail(-1,-1,"directory_open",errno);
  if(fstat(directory,&opened))return private_fail(directory,-1,"directory_fstat",errno);
  if(!S_ISDIR(opened.st_mode)||opened.st_uid||opened.st_dev!=path.st_dev||opened.st_ino!=path.st_ino)return private_fail(directory,-1,"directory_changed",ESTALE);
  // Tighten only this verified root-owned private directory; never change its owner.
  if((opened.st_mode&0777)!=0700&&fchmod(directory,0700))return private_fail(directory,-1,"directory_mode",errno);
- if(fstat(directory,&opened)||lstat(DIR,&path))return private_fail(directory,-1,"directory_verify",errno);
+ if(fstat(directory,&opened)||lstat(dir,&path))return private_fail(directory,-1,"directory_verify",errno);
  if(!S_ISDIR(opened.st_mode)||!S_ISDIR(path.st_mode)||opened.st_uid||path.st_uid||(opened.st_mode&0777)!=0700||(path.st_mode&0777)!=0700||opened.st_dev!=path.st_dev||opened.st_ino!=path.st_ino)return private_fail(directory,-1,"directory_verify",ESTALE);
  return directory;
 }
 static int private_open_lock(const char *name){
  if(strcmp(name,"main-panel.lock")&&strcmp(name,"outdoor-node.lock"))return private_fail(-1,-1,"lock_name",EINVAL);
- int directory=private_directory();if(directory<0)return -1;
+ int directory=private_directory(workspace);if(directory<0)return -1;
  int file=openat(directory,name,O_RDWR|O_CREAT|O_NOFOLLOW|O_CLOEXEC,0600);if(file<0)return private_fail(directory,-1,"lock_open",errno);
  struct stat st,path,dir,dirpath;
  if(fstat(file,&st))return private_fail(directory,file,"lock_fstat",errno);
@@ -175,14 +192,14 @@ static int private_open_lock(const char *name){
  if(flock(file,LOCK_EX|LOCK_NB))return private_fail(directory,file,"lock_acquire",errno);
  // Contents are unused. Repair mode on the same locked inode, never unlink a lock.
  if((st.st_mode&0777)!=0600&&fchmod(file,0600))return private_fail(directory,file,"lock_mode",errno);
- if(fstat(file,&st)||fstatat(directory,name,&path,AT_SYMLINK_NOFOLLOW)||fstat(directory,&dir)||lstat(DIR,&dirpath))return private_fail(directory,file,"lock_verify",errno);
+ if(fstat(file,&st)||fstatat(directory,name,&path,AT_SYMLINK_NOFOLLOW)||fstat(directory,&dir)||lstat(workspace,&dirpath))return private_fail(directory,file,"lock_verify",errno);
  if(!S_ISREG(st.st_mode)||st.st_uid||path.st_uid||st.st_nlink!=1||path.st_nlink!=1||(st.st_mode&0777)!=0600||(path.st_mode&0777)!=0600||!S_ISREG(path.st_mode)||path.st_dev!=st.st_dev||path.st_ino!=st.st_ino||!S_ISDIR(dirpath.st_mode)||dirpath.st_uid||(dirpath.st_mode&0777)!=0700||dir.st_dev!=dirpath.st_dev||dir.st_ino!=dirpath.st_ino)return private_fail(directory,file,"lock_changed",ESTALE);
  close(directory);private_stage="ready";return file;
 }
 /* PRIVATE_STORAGE_END */
 static int private_lock(void){lock_fd=private_open_lock("main-panel.lock");return lock_fd<0?-1:0;}
 static void response(int c,int ok,const char *reason){
- char out[2048];int n=snprintf(out,sizeof(out),"{\"ok\":%s,\"reason\":\"%s\",\"backend\":\"raw_main_node\",\"native_build\":\"raw12-slider\",\"path\":\"%s\",\"canonical_path\":\"%s\",\"fold_port\":%d,\"control_center_listener\":%s,\"control_center_pid\":%d,\"target\":%d,\"actual\":%d,\"maximum\":%d,\"armed\":%s,\"paused\":%s,\"session\":\"%s\",\"write_attempts\":%d,\"write_successes\":%d,\"corrections\":%d,\"errno\":%d}\n",ok?"true":"false",reason,node,real_node,active_fold_port,control_center_listener?"true":"false",control_center_pid,state.target,number(node),maximum,state.armed?"true":"false",state.paused?"true":"false",state.token,attempts,successes,corrections,last_error);
+ char out[2048];int n=snprintf(out,sizeof(out),"{\"ok\":%s,\"reason\":\"%s\",\"backend\":\"raw_main_node\",\"native_build\":\"raw13-slider\",\"workspace\":\"%s\",\"path\":\"%s\",\"canonical_path\":\"%s\",\"fold_port\":%d,\"control_center_listener\":%s,\"control_center_pid\":%d,\"target\":%d,\"actual\":%d,\"maximum\":%d,\"armed\":%s,\"paused\":%s,\"session\":\"%s\",\"write_attempts\":%d,\"write_successes\":%d,\"corrections\":%d,\"errno\":%d}\n",ok?"true":"false",reason,workspace,node,real_node,active_fold_port,control_center_listener?"true":"false",control_center_pid,state.target,number(node),maximum,state.armed?"true":"false",state.paused?"true":"false",state.token,attempts,successes,corrections,last_error);
  if(n>0&&(size_t)n<sizeof(out))send(c,out,(size_t)n,MSG_NOSIGNAL);
 }
 static int read_lease(struct panel_lease *lease){
@@ -243,24 +260,32 @@ static int escape_freezer(void){
 static int startup_fail(int code,const char *stage){int error=errno?errno:EIO;fprintf(stderr,"NATIVE_START_FAIL stage=%s exit=%d errno=%d (%s) uid=%lu euid=%lu private_stage=%s\n",stage,code,error,strerror(error),(unsigned long)getuid(),(unsigned long)geteuid(),private_stage);return code;}
 #include "outdoor_node.h"
 int main(int argc,char **argv){
- if((argc==4||argc==5)&&!strcmp(argv[1],"--outdoor")&&!strcmp(argv[2],"--node")){
-  if(geteuid()!=0)return 2;if(argc==5){if(strncmp(argv[4],"--fold-ids=",11)||!outdoor_fold_ids_parse(argv[4]+11,&outdoor_ids))return 2;snprintf(outdoor_ids_text,sizeof(outdoor_ids_text),"%s",argv[4]+11);}return outdoor_run(argv[3]);
+ /* One optional --workspace selects the Java-verified directory for every mode. */
+ char *args[8];int count=0,workspace_seen=0;
+ for(int i=0;i<argc;i++){
+  if(!strncmp(argv[i],"--workspace=",12)){
+   if(i==0||workspace_seen++)return 2;if(!workspace_set(argv[i]+12))return 2;
+  }else{if(count>=8)return 2;args[count++]=argv[i];}
+ }
+ if(count==2&&!strcmp(args[1],"--version")){printf("NATIVE_VERSION workspace-v1\n");return 0;}
+ if((count==4||count==5)&&!strcmp(args[1],"--outdoor")&&!strcmp(args[2],"--node")){
+  if(geteuid()!=0)return 2;if(count==5){if(strncmp(args[4],"--fold-ids=",11)||!outdoor_fold_ids_parse(args[4]+11,&outdoor_ids))return 2;snprintf(outdoor_ids_text,sizeof(outdoor_ids_text),"%s",args[4]+11);}return outdoor_run(args[3]);
  }
  if(geteuid()!=0){errno=EPERM;private_stage="root_identity";return startup_fail(2,"root_identity");}
  if(private_lock())return startup_fail(2,"root_private_lock");
  if(load_boot())return startup_fail(3,"boot_identity");
  if(restore_record())return startup_fail(3,"restore_permissions");
- if(argc==2&&!strcmp(argv[1],"--recover"))return 0;
- if(!control_center_options(argc,argv,&control_center_pid,&active_fold_port))return 2;
+ if(count==2&&!strcmp(args[1],"--recover"))return 0;
+ if(!control_center_options(count,args,&control_center_pid,&active_fold_port))return 2;
  control_center_listener=control_center_pid>1;
- if(resolve_node(argv[3]))return startup_fail(4,"primary_node_identity");
+ if(resolve_node(args[3]))return startup_fail(4,"primary_node_identity");
  if(active_fold_port>=0&&!fold_panel_live("/sys",active_fold_port))return startup_fail(4,"fold_display_not_active");
  setsid();if(escape_freezer())return startup_fail(6,"escape_app_freezer");
  maximum=number(max_node);int current=number(node);if(maximum<=10||maximum>65535||current<0||current>maximum)return startup_fail(4,"main_panel_range");
  // Open-only check before Java asks the system to disable automatic brightness.
  int probe=open_output();if(probe<0)return startup_fail(4,"primary_node_open");close(probe);
  int server=bind_server();if(server<0)return startup_fail(5,"control_socket");
- fprintf(stderr,"NATIVE_READY build=raw12-slider pid=%d maximum=%d path=%s real=%s\n",getpid(),maximum,node,real_node);
+ fprintf(stderr,"NATIVE_READY build=raw13-slider pid=%d maximum=%d path=%s real=%s workspace=%s\n",getpid(),maximum,node,real_node,workspace);
  signal(SIGTERM,signal_stop);signal(SIGINT,signal_stop);signal(SIGHUP,signal_stop);signal(SIGPIPE,SIG_IGN);panel_clear(&state);
  // Lease rename wakes the guard immediately on screen-off/DOZE or automatic mode.
  int events=inotify_init1(IN_NONBLOCK|IN_CLOEXEC);

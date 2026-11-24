@@ -42,7 +42,7 @@
 | 项目 | 要求 |
 | --- | --- |
 | 触发 | 用户选择对应保持范围，发生锁屏/亮屏、重启或主题切换，并满足原生点回放和当前环境确认。 |
-| 需求与行为 | 分别支持锁屏、重启及主题保持；仅需要跨重启时落盘，校验设备、基准、用户和主题；期限点数按实际后端能力 |
+| 需求与行为 | 分别支持锁屏、重启及主题保持；仅需要跨重启时落盘，校验设备、基准、用户和主题；期限点数按实际后端能力。保持卡片显示开关及详细参数入口，节点数与恢复记录可在曲线与记忆区域查看。 |
 | 退出 / 失败 | 停用对应保持时取消其待恢复任务；坏存档独立报告并保留，身份/基准不符时不回放。 |
 | 默认 | `off` · 新配置关闭额外保持 |
 | 配置键 | `memory_persist`、`memory_restore_unlock`、`memory_hold_theme`、`memory_retention_days`、`memory_max_points` |
@@ -180,7 +180,7 @@
 | [CurveEditor.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/CurveEditor.java) | `66423535b50b13ee` |
 | [CurvePlan.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/CurvePlan.java) | `6064003310ae7433` |
 | [HookRuntime.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/HookRuntime.java) | `3363c0fe90e8ef02` |
-| [MainActivity.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/MainActivity.java) | `9497bcbaa8505aed` |
+| [MainActivity.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/MainActivity.java) | `080961a9b06d3e9c` |
 | [MapperContextAccess.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/MapperContextAccess.java) | `778e604c1ff57198` |
 | [MemoryLifecycle.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/MemoryLifecycle.java) | `ee4d215c8a92a43b` |
 | [MemoryPersistence.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/MemoryPersistence.java) | `09c7bd896953ad71` |

@@ -34,9 +34,13 @@ public final class UiText {
         WORDS.put("应用覆盖来源限定同步隔离","Source-scoped application override isolation");
         WORDS.put("完整窗口来源、亮屏原因及同步ABI匹配；只拦截同一主屏窗口导致的偏好同步，控制中心主动调整优先。","Requires matching window source, brightness reason and sync interfaces. Only isolates preference sync from that main-display window; Control Center adjustments take priority.");
         WORDS.put("原生窗口覆盖，无所针对的同步链路","Native window override without the targeted sync path");
+        WORDS.put("应用窗口亮度保持交接隔离","Isolate app window brightness handoff");
+        WORDS.put("三项同步入口全缺且原生双控制器保持链路完整，只拦截同物理屏、同用户、来源已确认的窗口保持启动。","When all three sync entry points are absent and both native hold controllers match, block hold activation only for a confirmed window on the same physical display and user.");
+        WORDS.put("原生窗口接口完整，且同步与保持交接入口均不存在时沿用原生。","Use the native behavior when the window interface is complete and both sync and hold handoff entry points are absent.");
         WORDS.put("原生窗口接口完整，三个同步入口均不存在；不安装隔离Hook，不代表拦截应用直接写系统设置。","Native window interfaces are complete and all three sync entry points are absent. No isolation hooks are installed; direct app writes to system settings are outside this feature.");
         WORDS.put("应用隔离：","Application isolation:");
         WORDS.put("\n已拦截同步：","\nBlocked syncs:");
+        WORDS.put("\n已拦截亮度交接：","\nBlocked brightness handoffs:");
         WORDS.put("\n窗口状态：","\nWindow state:");
         WORDS.put("亮度百分比","Brightness percentage");
         WORDS.put("可调范围：0% ～ 100%","Range: 0% – 100%");
@@ -47,10 +51,9 @@ public final class UiText {
         WORDS.put("按本机曲线范围输入百分比，相邻节点按需联动。","Enter a percentage of this device’s curve range. Adjacent points adjust as needed.");
         WORDS.put("需要“系统界面”作用域 · 点击查看","SystemUI scope required · Tap for instructions");
         WORDS.put("磁贴最高节点","Tile maximum node");
-        WORDS.put("仅限制磁贴面板；控制中心分区和户外高亮上限分别设置。","Applies to the tile panel only. Control Center partition and outdoor limits are separate.");
+        WORDS.put("上限仅用于此面板，单位为背光节点值。","This panel's limit uses raw backlight values.");
         WORDS.put("长期保持同一亮度会增加烧屏风险","Holding one brightness level for long periods increases burn-in risk");
         WORDS.put("部分设备可能无法承受接口提供的亮度上限（如 Redmi K100 系列），极端亮度下可能出现偏色。建议实测后为最高节点设置上限。","Some displays may not tolerate the maximum exposed by their interface (for example, Redmi K100 series) and may show color shifts at extreme brightness. Test your display and set a lower node ceiling.");
-        WORDS.put("面板拉满使用上方设置的最高节点；不是 nit。实际亮度仍受驱动与面板限制。","Full scale uses the node ceiling above, not nits. Actual output remains limited by the driver and display.");
         WORDS.put("重启","Restart");
         WORDS.put("重启系统界面","Restart SystemUI");
         WORDS.put("点击核对系统界面作用域","Tap to check the SystemUI scope");
@@ -151,8 +154,7 @@ public final class UiText {
         WORDS.put("请在控制中心确认实际效果。","Verify the actual result in Control Center.");
         WORDS.put("已有选择已保存；可先重新检测，确认亮度引擎正在运行。","Your selection is saved. Recheck to confirm that the brightness engine is running.");
         WORDS.put("等待映射配置生效","Waiting for the saved mapping configuration");
-        WORDS.put("锁屏期间暂停接管，解锁后恢复；重新开启自动亮度结束保持。","Pauses while locked and resumes after unlock. Turning automatic brightness on ends the hold.");
-        WORDS.put("打开独立面板直接调节主屏背光；拖动后切为手动亮度。","Open the separate panel to adjust the primary backlight. Dragging switches to manual brightness.");
+        WORDS.put("拖动面板滑块即切到手动亮度。锁屏时暂停，解锁后恢复，开启自动亮度后结束。","Dragging switches to manual brightness. Control pauses while locked, resumes after unlock, and ends when auto brightness is enabled.");
         WORDS.put("手动和自动亮度","Manual and automatic brightness");
         WORDS.put("仅手动亮度","Manual brightness only");
         WORDS.put("设备换算已就绪。请在控制中心确认效果；若仍沿用系统亮度条，可检查系统界面作用域及兼容详情。","Device conversion is ready. Verify the slider in Control Center; if it is unchanged, check the System UI scope and compatibility details.");
@@ -210,7 +212,7 @@ public final class UiText {
         WORDS.put("私有操作目录","Private workspace");
 
         WORDS.put("Root 独立操作目录","Independent root workspace");
-        WORDS.put("原目录受限时使用受验证的私有目录；不迁移原生输出程序或用户设置。","Use a verified private workspace when the original is restricted; keep native output and saved settings in place.");
+        WORDS.put("原目录受限时按同一身份规则使用备用私有目录；原生程序、锁、权限记录和日志跟随同一目录，不迁移用户设置。","Use the fallback private workspace under the same identity checks; the native tool, locks, permission record and logs follow that directory, and saved settings do not move.");
         WORDS.put("实际进程权限信息","Actual process privileges");
         WORDS.put("记录实际UID、Capabilities及SELinux上下文，不以Root管理器名称判定权限。","Record the actual UID, capabilities and SELinux context rather than infer permissions from the root manager name.");
         WORDS.put("原生设置接口","Original settings provider");
@@ -549,7 +551,7 @@ public final class UiText {
         WORDS.put("手动调整后退出锁定","Exit low-light lock after manual adjustments");
         WORDS.put("当前方案：保留新亮度并继续锁定；任一光感持续达到退出阈值后恢复自动亮度。","Current behavior: hold the newly selected brightness and keep monitoring; restore auto after either sensor continuously reaches the exit threshold.");
         WORDS.put("当前方案：手动调整即结束锁定，保持手动亮度；环境变亮后也不自动开启。","Current behavior: a manual adjustment ends the lock and retains manual mode, even when the environment brightens.");
-        WORDS.put("保持进入时的亮度；照度明显升高后恢复自动。息屏或重新开启自动亮度即退出。你主动关闭的自动亮度不会被重新开启。","Hold brightness at entry and restore auto when the environment brightens. Screen off or enabling auto ends the lock. Auto mode you disabled yourself is not restored.");
+        WORDS.put("锁定时保持当前亮度，环境变亮后恢复自动。熄屏或手动开启自动亮度会退出锁定。","Holds the current brightness until it gets brighter. Turning the screen off or enabling auto brightness ends the hold.");
         WORDS.put("强制达到节点上限","Force backlight node target");
         WORDS.put("增强目标节点：","Boost node target: ");
         WORDS.put("等待读取主屏节点上限","Waiting for the primary backlight node limit");
@@ -873,7 +875,7 @@ public final class UiText {
         WORDS.put("✓ Root 授权已通过\n○ 系统框架连接未建立\n请核对 LSPosed 作用域和是否重启","✓ Root granted\n○ System Hook not connected\nCheck the LSPosed scope and restart the phone");
         WORDS.put("通过 LSPosed 接入系统曲线，沿用系统光感与亮度输出。Root 用于设置与诊断。","LSPosed connects to the system curve while keeping its sensors and brightness output. Root is used for settings and diagnostics.");
         WORDS.put("变亮 0.5～10 秒，变暗 1～15 秒。小幅变亮、闲置与驾驶模式继续沿用系统策略。","Brighten: 0.5–10 s; dim: 1–15 s. Small increases, idle and driving modes retain system policy.");
-        WORDS.put("默认关闭。开启后可减少显示层的温控限亮；严重过热或达到电池温度阈值时恢复系统策略。","Off by default. Reduces display-layer thermal dimming. System protection resumes during severe heat or at the battery threshold.");
+        WORDS.put("严重过热或达到电池温度阈值时，恢复系统温控。","System thermal limits resume during severe overheating or at the battery temperature threshold.");
         WORDS.put("变亮 0.5～10 秒，变暗 1～15 秒。闲置与驾驶模式继续沿用系统策略。","Brighten: 0.5–10 s; dim: 1–15 s. Idle and driving modes retain system policy.");
         WORDS.put("节点受系统上下限和相邻节点约束，亮度随照度不递减；最高照度端保持系统上限。","Points stay within system limits and cannot fall below their neighbors. The last point stays at the system maximum.");
         WORDS.put("关闭后不再记入新调整，已有记忆保留。记忆可能被系统重置，不保证跨重启保留。","Turning this off keeps existing memory. The system may reset it, and a reboot may clear it.");
@@ -882,7 +884,7 @@ public final class UiText {
         WORDS.put("手动亮度立即生效，也会影响附近照度的曲线。强度越低，每次记住的调整越少。","Manual changes take effect immediately and shape the curve nearby. Lower strength remembers less each time.");
         WORDS.put("尚未连接 Hook：请在 LSPosed 启用本模块，勾选系统框架并重启","Hook disconnected. Enable the module in LSPosed, select System Framework, and restart.");
         WORDS.put("请在 Root 管理器中卸载这些旧模块并重启，避免多套引擎同时调节亮度。","Uninstall these old modules in your Root manager, then restart to avoid overlapping brightness control.");
-        WORDS.put("可设 38～50℃。达到阈值交回系统，冷却到设定幅度后再允许减少降亮。","Range: 38–50℃. System control resumes at the threshold; relaxation returns after cooling by the margin.");
+        WORDS.put("阈值可设 38～50 ℃。降温达到设定幅度后，重新减少降亮。","Set a threshold from 38 to 50 °C. Reduced dimming resumes after the temperature drops by the cooling margin.");
         WORDS.put("可设 38～50℃，冷却 1℃后重新允许。硬件及其他系统限制仍生效。","Range: 38–50°C; resumes after cooling by 1°C. Hardware and other system limits still apply.");
         WORDS.put("导出到手机存储根目录，包含运行记录、设备状态、显示链路与温控信息。","Exports logs, device status, display and thermal information to the storage root.");
         WORDS.put("在相近照度范围内延续同一次记忆；暗处至少保留 5 lux 的容差。","Nearby light levels share one adjustment, with at least 5 lux tolerance in dim light.");
@@ -1463,11 +1465,9 @@ public final class UiText {
         WORDS.put("亮屏后确认照度，再恢复一次；新手动调整优先。开启完整偏好可替换旧备用点，关闭则只补空缺。","Restores once after wake and lux confirmation; new manual adjustments take priority. Complete preference restoration may replace older backup nodes; otherwise it only fills missing memory.");
         WORDS.put("熄屏够久且照度变化够大，或超过最长时长时，允许系统重判偏好；不会删除存档。默认沿用系统。","Allows native preference reassessment after enough screen-off time and lux change, or the maximum duration. Archives remain. Uses native rules by default.");
         WORDS.put("到时后，系统在下一次有效照度下重判。只影响新计时，不立即清除曲线。","After expiry, the next valid lux sample triggers native reassessment. Applies to new timers and does not clear the curve immediately.");
-        WORDS.put("减少暗处小波动引起的调节。默认关闭；手动、熄屏、HDR 等特殊场景沿用系统。","Reduces adjustments from small dim-light fluctuations. Off by default; manual, screen-off, HDR, and other special modes use native handling.");
         WORDS.put("确认时间受采样窗口限制，保留系统更长等待。","Confirmation is bounded by the sensor history window; longer native waits remain.");
         WORDS.put("实际生效时间见下方「参数生效状态」。","See Parameter activity below for the effective timing.");
         WORDS.put("比例、最小照度差和系统门槛取更严格者；持续变化才调节，不修改光感读数。","Uses the stricter of the relative margin, minimum lux difference, and native threshold. Requires sustained change without modifying sensor readings.");
-        WORDS.put("「暗光少动」提高亮暗门槛，并在本机支持时启用辅助闸门。选择后记得保存并应用。","Less movement raises dim-light thresholds and enables the assist gate when supported. Save and apply after choosing.");
         WORDS.put("仅主光感变亮、辅助近期稳定时多等一会儿。辅助变化、遮挡、过期，或明显变亮、等待到时即放行。","Waits briefly when only the main sensor rises and recent assist readings stay stable. Releases on assist changes, cover, stale data, a strong main rise, or timeout.");
         WORDS.put("倍率越大越不易调节，最小照度差过滤小波动。仅在设定照度内生效，特殊场景沿用系统。","Higher multipliers require larger changes; minimum lux differences filter small fluctuations. Applies within the chosen lux range; special modes use native thresholds.");
         WORDS.put("调整辅助光感的确认时间；暗光稳定开启时取更长等待，最长 4 秒。","Sets assist sensor confirmation. When dim-light stability is enabled, the longer wait applies, up to 4 seconds.");
@@ -2018,7 +2018,6 @@ public final class UiText {
         WORDS.put("锁屏后保持","Keep across screen off");
         WORDS.put("重启后保持","Keep across restarts");
         WORDS.put("同时跨开关、锁屏和重启保持，不因时间或照度变化过期。","Keeps preferences across mode switches, screen off and restarts, without age or ambient-light expiry.");
-        WORDS.put("新调整继续更新偏好；主动清除、修改基础曲线或切换用户后，不恢复旧偏好。","New adjustments keep updating your preferences. Clearing memory, changing the base curve or switching users prevents old preferences from being restored.");
         WORDS.put("0 为本机支持的最多数量。仅锁屏或开关保持时使用本次运行的记忆，开启重启保持才写入存档。","0 uses this device's maximum capacity. Screen-off and mode-switch retention use session memory; restart retention saves it to storage.");
         WORDS.put("照度条件用于锁屏和重启恢复；永久保持不受此条件限制。跨开关恢复完整偏好。","Ambient-light conditions apply to wake and restart restoration. Indefinite retention bypasses this condition. Mode switches restore the full preference set.");
         WORDS.put("系统重判规则","System reassessment rules");
@@ -2120,7 +2119,7 @@ public final class UiText {
         WORDS.put("完成","Done");
         WORDS.put("暗处保持","Hold in darkness");
         WORDS.put("日落后锁定","After-sunset low-light lock");
-        WORDS.put("暗处保持：全天按照度判断。日落后锁定：仅夜间按照度判断。两个预设均为低于或等于 10 lux 持续 1 分钟锁定，达到 50 lux 持续 1 秒恢复自动；可在详细参数中调整。","Hold in darkness works all day; the sunset preset works only at night. Both lock at 10 lux or below for 1 minute and resume auto at 50 lux for 1 second. Adjust these in detailed settings.");
+        WORDS.put("暗处保持全天可用，日落后锁定仅夜间可用。预设在 ≤10 lux 持续 1 分钟后锁定，≥50 lux 持续 1 秒后恢复自动。","Hold in darkness works all day; Sunset lock works at night. Both lock after 1 min at ≤10 lux and resume auto after 1 sec at ≥50 lux.");
         WORDS.put("仅在日落后至日出前启用","Only enable between sunset and sunrise");
         WORDS.put("使用系统提供的日出日落时间，不申请额外定位权限。日落后仍需满足暗光条件才锁定；日出时结束本模块的锁定。时间不可用时等待，不使用固定钟点代替。","Uses system sunrise/sunset times without additional location permission. Darkness must still be confirmed after sunset; sunrise releases locks owned by this module. Waits if times are unavailable, without guessing fixed hours.");
         WORDS.put("全天按照度判断，不限制日落日出","Light-based lock throughout the day");

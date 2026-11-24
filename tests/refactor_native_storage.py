@@ -4,6 +4,7 @@ import subprocess,re,os
 R=Path(__file__).resolve().parents[1];S=R/'experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor';N=R/'experimental/refactor_hook/native';O=R/'build/native-storage-tests';O.mkdir(exist_ok=True)
 native=(N/'main_panel.c').read_text('utf-8');storage=native.split('/* PRIVATE_STORAGE_BEGIN:',1)[1].split('*/',1)[1].split('/* PRIVATE_STORAGE_END */',1)[0]
 assert 'unlink(' not in storage and 'write(' not in storage and 'chown(' not in storage
+assert 'workspace_set(' in storage
 source=r'''
 #include <stdio.h>
 #include <stdlib.h>
@@ -11,7 +12,6 @@ source=r'''
 #include <errno.h>
 #include <sys/stat.h>
 #include <limits.h>
-#define DIR "/data/adb/luma_curve_refactor_test"
 #define O_RDONLY 0
 #define O_RDWR 2
 #define O_CREAT 64
@@ -30,16 +30,17 @@ source=r'''
 #ifndef EWOULDBLOCK
 #define EWOULDBLOCK EAGAIN
 #endif
+static char workspace[PATH_MAX]="/data/adb/luma_curve_refactor_test",record_path[PATH_MAX],outdoor_health_path[PATH_MAX],parent_path[PATH_MAX]="/data/adb";
 static int cases,uid,parent_uid,dir_uid,file_uid,parent_mode,dir_mode,file_mode,links,busy,alias,wrong_file,wrong_dir,changed_dir,changed_file,fail_dir_mode,fail_file_mode,lie_mode,open_failure;
 static int dir_chmods,file_chmods,file_opens,file_closes,dir_closes,dir_stats,lock_calls;
 static void fill(struct stat *s,int mode,int owner,int ino,int nlink){memset(s,0,sizeof(*s));s->st_mode=mode;s->st_uid=owner;s->st_dev=1;s->st_ino=ino;s->st_nlink=nlink;}
 static int fake_geteuid(void){return uid;}
 static int fake_lstat(const char *p,struct stat *s){
- if(!strcmp(p,"/data/adb")){fill(s,S_IFDIR|parent_mode,parent_uid,1,2);return 0;}
- if(strcmp(p,DIR))abort();dir_stats++;fill(s,(wrong_dir?S_IFREG:S_IFDIR)|dir_mode,dir_uid,changed_dir&&dir_stats>1?99:2,2);return 0;
+ if(!strcmp(p,parent_path)){fill(s,S_IFDIR|parent_mode,parent_uid,1,2);return 0;}
+ if(strcmp(p,workspace))abort();dir_stats++;fill(s,(wrong_dir?S_IFREG:S_IFDIR)|dir_mode,dir_uid,changed_dir&&dir_stats>1?99:2,2);return 0;
 }
-static char *fake_realpath(const char *p,char *out){if(strcmp(p,DIR))abort();strcpy(out,alias?"/different":DIR);return out;}
-static int fake_open(const char *p,int flags){if(strcmp(p,DIR)||(flags&(O_NOFOLLOW|O_DIRECTORY|O_CLOEXEC))!=(O_NOFOLLOW|O_DIRECTORY|O_CLOEXEC))abort();return 10;}
+static char *fake_realpath(const char *p,char *out){if(strcmp(p,workspace))abort();strcpy(out,alias?"/different":workspace);return out;}
+static int fake_open(const char *p,int flags){if(strcmp(p,workspace)||(flags&(O_NOFOLLOW|O_DIRECTORY|O_CLOEXEC))!=(O_NOFOLLOW|O_DIRECTORY|O_CLOEXEC))abort();return 10;}
 static int fake_openat(int dir,const char *name,int flags,int mode){if(dir!=10||(strcmp(name,"main-panel.lock")&&strcmp(name,"outdoor-node.lock"))||mode!=0600||(flags&(O_NOFOLLOW|O_CLOEXEC|O_CREAT|O_RDWR))!=(O_NOFOLLOW|O_CLOEXEC|O_CREAT|O_RDWR))abort();file_opens++;if(open_failure){errno=EACCES;return -1;}return 20;}
 static int fake_fstat(int fd,struct stat *s){if(fd==10)fill(s,S_IFDIR|dir_mode,dir_uid,2,2);else if(fd==20)fill(s,(wrong_file?S_IFDIR:S_IFREG)|file_mode,file_uid,3,links);else abort();return 0;}
 static int fake_fstatat(int fd,const char *name,struct stat *s,int flags){if(fd!=10||flags!=AT_SYMLINK_NOFOLLOW||!name)abort();fill(s,S_IFREG|file_mode,file_uid,changed_file?99:3,links);return 0;}
@@ -58,7 +59,7 @@ static int fake_close(int fd){if(fd==10)dir_closes++;else if(fd==20)file_closes+
 #define close fake_close
 '''+storage+r'''
 #define CHECK(x) do{if(!(x)){fprintf(stderr,"storage case %d line=%d stage=%s errno=%d\n",cases,__LINE__,private_stage,errno);return 1;}cases++;}while(0)
-static void reset(void){uid=parent_uid=dir_uid=file_uid=0;parent_mode=dir_mode=0700;file_mode=0600;links=1;busy=alias=wrong_file=wrong_dir=changed_dir=changed_file=fail_dir_mode=fail_file_mode=lie_mode=open_failure=0;dir_chmods=file_chmods=file_opens=file_closes=dir_closes=dir_stats=lock_calls=0;errno=0;private_stage="none";}
+static void reset(void){uid=parent_uid=dir_uid=file_uid=0;parent_mode=dir_mode=0700;file_mode=0600;links=1;busy=alias=wrong_file=wrong_dir=changed_dir=changed_file=fail_dir_mode=fail_file_mode=lie_mode=open_failure=0;dir_chmods=file_chmods=file_opens=file_closes=dir_closes=dir_stats=lock_calls=0;errno=0;private_stage="none";strcpy(parent_path,"/data/adb");workspace_set("/data/adb/luma_curve_refactor_test");}
 int main(void){
  // This reproduces the old errno=0 metadata rejection; it does not prove the user's file mode.
  reset();file_mode=0644;CHECK((file_mode&0077)!=0&&errno==0);CHECK(private_open_lock("main-panel.lock")==20);CHECK(file_mode==0600&&file_chmods==1&&lock_calls==1&&file_closes==0&&dir_closes==1);close(20);
@@ -84,7 +85,15 @@ int main(void){
  reset();changed_dir=1;CHECK(private_open_lock("main-panel.lock")<0&&errno==ESTALE&&!file_opens);
  reset();open_failure=1;CHECK(private_open_lock("main-panel.lock")<0&&errno==EACCES&&dir_closes==1);
  reset();CHECK(private_open_lock("../other")<0&&errno==EINVAL&&!file_opens);
- printf("Native storage locks: %d cases PASS; same-inode mode repair, contention and rejected identities; host only\n",cases);
+ // The verified fallback workspace follows the same parent/dir/lock rules.
+ reset();CHECK(workspace_set("/data/local/.hyperlux-root-0")&&!strcmp(record_path,"/data/local/.hyperlux-root-0/main-panel-permissions")&&!strcmp(outdoor_health_path,"/data/local/.hyperlux-root-0/outdoor-node-health.json"));strcpy(parent_path,"/data/local");CHECK(private_open_lock("main-panel.lock")==20);CHECK(dir_mode==0700&&file_opens==1);close(20);
+ reset();CHECK(workspace_set("/data/local/.hyperlux-root-0"));strcpy(parent_path,"/data/local");parent_mode=0777;CHECK(private_open_lock("main-panel.lock")<0&&errno==EACCES&&!file_opens&&!strcmp(private_stage,"parent_identity"));
+ reset();CHECK(workspace_set("/data/local/.hyperlux-root-0"));strcpy(parent_path,"/data/local");parent_uid=1000;CHECK(private_open_lock("main-panel.lock")<0&&errno==EACCES&&!file_opens);
+ reset();CHECK(workspace_set("/data/local/.hyperlux-root-0"));strcpy(parent_path,"/data/local");alias=1;CHECK(private_open_lock("main-panel.lock")<0&&errno==ELOOP&&!file_opens);
+ // Only one plain absolute path may become the workspace.
+ CHECK(!workspace_set(""));CHECK(!workspace_set("relative/path"));CHECK(!workspace_set("/data/adb/x/"));CHECK(!workspace_set("/data/adb/a b"));CHECK(!workspace_set("/data/adb/a\"b"));CHECK(!workspace_set("/data/adb/a\\b"));
+ char longpath[210];memset(longpath,'a',sizeof(longpath));longpath[0]='/';longpath[209]=0;CHECK(!workspace_set(longpath));
+ printf("Native storage locks: %d cases PASS; same-inode mode repair, contention, rejected identities and verified fallback; host only\n",cases);
  return 0;
 }
 '''
@@ -97,27 +106,34 @@ def method(text,signature):
  while depth:
   depth+=(text[i]=='{')-(text[i]=='}');i+=1
  return text[start:i]
-java=(S/'NativePanelRoot.java').read_text('utf-8');install=method(java,' static void install()')
-assert 'RootControl.process(BIN.toString(),"--recover")' not in install
+java=(S/'NativePanelRoot.java').read_text('utf-8');install=method(java,' static File install(File dir)')
+assert 'RootWorkspace.requireNative()' in java
+assert 'RootWorkspace.secure(dir,true)' in install
+assert 'WORKSPACE+dir.getAbsolutePath()' in install
+assert 'new File(RootControl.DATA' not in java
 sources={
 'android/system/Os.java':'''package android.system;public class Os{public static int chmods;public static void chmod(String p,int mode){if(mode!=0700)throw new AssertionError();chmods++;}}''',
-'top/rongshangs/lumacurve/refactor/NativePanelRoot.java':'''package top.rongshangs.lumacurve.refactor;import java.io.*;import java.nio.file.*;import java.security.MessageDigest;import android.system.Os;class NativePanelRoot{static final File BIN=new File(RootControl.DATA,"hyperlux-main-panel");'''+install+'}',
+'top/rongshangs/lumacurve/refactor/NativePanelRoot.java':'''package top.rongshangs.lumacurve.refactor;import java.io.*;import java.nio.file.*;import java.security.MessageDigest;import android.system.Os;class NativePanelRoot{static final String WORKSPACE="--workspace=";static File bin(File dir){return new File(dir,"hyperlux-main-panel");}'''+install+'''static File install()throws Exception{return install(RootWorkspace.requireNative());}}''',
 'top/rongshangs/lumacurve/refactor/StorageInstallTest.java':r'''package top.rongshangs.lumacurve.refactor;
 import java.nio.file.*;import java.io.*;import java.util.*;
-class RootWorkspace{static boolean fail;static void requireNative()throws IOException{if(fail)throw new IOException("native unavailable");}}
-class NativePanelClient{static int stops,probes;static void require(String s){stops++;}static void call(String s)throws IOException{probes++;throw new IOException("stopped");}}
-class RootControl{static final File DATA=new File(System.getProperty("fixture"));static int calls;static boolean fail;static File staged;static byte[] expected;static void process(String path,String action)throws Exception{calls++;staged=new File(path);if(staged.equals(NativePanelRoot.BIN)||!action.equals("--recover")||!staged.getCanonicalFile().getParentFile().equals(DATA.getCanonicalFile())||!Arrays.equals(Files.readAllBytes(staged.toPath()),expected))throw new AssertionError("wrong recovery payload");if(fail)throw new IOException("recovery rejected");}}
+class RootWorkspace{static boolean fail;static File primary;static File requireNative()throws IOException{if(fail)throw new IOException("native unavailable");return primary;}
+ static void secure(File f,boolean create)throws IOException{if(fail)throw new IOException("denied");if(create)f.mkdirs();}}
+class NativePanelClient{static int stops;static void require(String s){stops++;}static void call(String s)throws IOException{throw new IOException("stopped");}}
+class RootControl{static int calls;static boolean fail;static File staged,lastDir;static byte[] expected;
+ static String process(String...args)throws Exception{calls++;staged=new File(args[0]);if(args.length!=3||!args[1].equals("--recover")||!args[2].startsWith(NativePanelRoot.WORKSPACE))throw new AssertionError("arguments");lastDir=new File(args[2].substring(NativePanelRoot.WORKSPACE.length()));if(!staged.getCanonicalFile().getParentFile().equals(lastDir.getCanonicalFile()))throw new AssertionError("workspace mismatch");if(!Arrays.equals(Files.readAllBytes(staged.toPath()),expected))throw new AssertionError("wrong recovery payload");if(fail)throw new IOException("recovery rejected");return "";}}
 public class StorageInstallTest{static int cases;static void check(boolean b){if(!b)throw new AssertionError("install "+cases);cases++;}interface W{void run()throws Exception;}static void bad(W w)throws Exception{try{w.run();throw new AssertionError();}catch(IOException expected){cases++;}}
-public static void main(String[] args)throws Exception{
- RootControl.DATA.mkdirs();RootControl.expected=NativePanelAsset.read(new File(System.getenv("CLASSPATH")));byte[] old={1,2,3};Files.write(NativePanelRoot.BIN.toPath(),old);
- RootControl.fail=true;bad(()->NativePanelRoot.install());check(Arrays.equals(Files.readAllBytes(NativePanelRoot.BIN.toPath()),old));check(RootControl.calls==1&&!RootControl.staged.exists());check(NativePanelClient.stops==1);
- RootControl.fail=false;NativePanelRoot.install();check(Arrays.equals(Files.readAllBytes(NativePanelRoot.BIN.toPath()),RootControl.expected));check(RootControl.calls==2&&!RootControl.staged.exists());
- int stops=NativePanelClient.stops;NativePanelRoot.install();check(RootControl.calls==2&&NativePanelClient.stops==stops);
- RootWorkspace.fail=true;bad(()->NativePanelRoot.install());check(RootControl.calls==2&&Arrays.equals(Files.readAllBytes(NativePanelRoot.BIN.toPath()),RootControl.expected));
- System.out.println("Native storage installer: "+cases+" cases PASS; verified staged recovery, rollback and cached payload; host only");
-}}
-'''
-}
+ public static void main(String[] args)throws Exception{
+  File primary=new File(System.getProperty("fixture-primary"));primary.mkdirs();RootWorkspace.primary=primary;
+  File fallback=new File(System.getProperty("fixture-fallback"));fallback.mkdirs();for(File d:new File[]{primary,fallback})Files.deleteIfExists(new File(d,"hyperlux-main-panel").toPath());
+  RootControl.expected=NativePanelAsset.read(new File(System.getenv("CLASSPATH")));byte[] old={1,2,3};Files.write(new File(primary,"hyperlux-main-panel").toPath(),old);
+  RootControl.fail=true;bad(()->NativePanelRoot.install(primary));check(Arrays.equals(Files.readAllBytes(new File(primary,"hyperlux-main-panel").toPath()),old));check(RootControl.calls==1&&RootControl.lastDir.equals(primary)&&!RootControl.staged.exists());check(NativePanelClient.stops==1);
+  RootControl.fail=false;NativePanelRoot.install(primary);check(Arrays.equals(Files.readAllBytes(new File(primary,"hyperlux-main-panel").toPath()),RootControl.expected));check(RootControl.calls==2&&RootControl.lastDir.equals(primary)&&!RootControl.staged.exists());
+  int stops=NativePanelClient.stops;NativePanelRoot.install(primary);check(RootControl.calls==2&&NativePanelClient.stops==stops);
+  NativePanelRoot.install(fallback);check(new File(fallback,"hyperlux-main-panel").isFile()&&RootControl.lastDir.equals(fallback));check(RootControl.calls==3);
+  RootWorkspace.fail=true;bad(()->NativePanelRoot.install());check(RootControl.calls==3&&Arrays.equals(Files.readAllBytes(new File(primary,"hyperlux-main-panel").toPath()),RootControl.expected));
+  System.out.println("Native storage installer: "+cases+" cases PASS; staged recovery, workspace argument, rollback and cached payload; host only");
+ }}
+'''}
 import zipfile
 payload=bytearray(64);payload[:6]=bytes([127,69,76,70,2,1]);payload[18]=183
 apk=O/'input.apk'
@@ -128,6 +144,6 @@ for n,s in sources.items():
 C=O/'classes';C.mkdir(exist_ok=True)
 subprocess.run(['javac','--release','8','-encoding','UTF-8','-d',str(C),*files,str(S/'NativePanelAsset.java')],check=True)
 env=dict(os.environ,CLASSPATH=str(apk.resolve()))
-run=subprocess.run(['java','-Dfixture='+str((O/'workspace').resolve()),'-cp',str(C),'top.rongshangs.lumacurve.refactor.StorageInstallTest'],env=env,check=True,capture_output=True,text=True);print(run.stdout,end='')
+run=subprocess.run(['java','-Dfixture-primary='+str((O/'primary').resolve()),'-Dfixture-fallback='+str((O/'fallback').resolve()),'-cp',str(C),'top.rongshangs.lumacurve.refactor.StorageInstallTest'],env=env,check=True,capture_output=True,text=True);print(run.stdout,end='')
 installer_cases=int(re.search(r'(\d+) cases PASS',run.stdout).group(1))
 print(f'Native private storage: {lock_cases+installer_cases} cases PASS; production native checks and Java installer, no Android execution')
