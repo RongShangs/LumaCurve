@@ -35,7 +35,7 @@ fixture_sources=ast.literal_eval(next(n.value for n in fixture_tree.body if isin
 for name in ['top/rongshangs/lumacurve/refactor/hooking/XC_MethodHook.java','top/rongshangs/lumacurve/refactor/hooking/XposedBridge.java']:stubs[name[:-5]]=fixture_sources[name]
 stubs.update({
 'android/content/res/Configuration':'package android.content.res;public class Configuration{public int windowingMode=1;}',
-'android/app/WindowConfiguration':'package android.app;public class WindowConfiguration{public static final int WINDOWING_MODE_FULLSCREEN=1;}',
+'android/app/WindowConfiguration':'package android.app;public class WindowConfiguration{public static final int WINDOWING_MODE_FULLSCREEN=1;public static boolean isFloating(int mode){return mode==2||mode==5;}}',
 'com/android/server/wm/Task':'''package com.android.server.wm;public class Task{public int mUserId,mode=1;public int getWindowingMode(){return mode;}public void onConfigurationChanged(android.content.res.Configuration c){top.rongshangs.lumacurve.refactor.hooking.XposedBridge.invoke(this,"onConfigurationChanged",new Class<?>[]{android.content.res.Configuration.class},new Object[]{c},()->{mode=c.windowingMode;android.app.ActivityTaskManager.service.windowingMode=mode;return null;});}}''',
 'android/content/ComponentName':'''package android.content;public class ComponentName{String pkg;public ComponentName(String p){pkg=p;}public String getPackageName(){return pkg;}}''',
 'android/app/TaskInfo':'''package android.app;public class TaskInfo{public android.content.ComponentName topActivity;public int userId,displayId;public boolean isVisibleRequested=true;public int mode=1;public int getWindowingMode(){return mode;}}''',
@@ -66,7 +66,7 @@ static int writes(BrightnessControl c){return ((DisplayManager)c.s.context.displ
 static JSONObject command(BrightnessControl c,String action,String session,double value)throws Exception{String id="req"+cases+SystemClock.now+action;JSONObject r=new JSONObject().put("id",id).put("build","test").put("process_start","123").put("elapsed",SystemClock.now).put("gesture_elapsed",SystemClock.now).put("action",action).put("session",session).put("value",value);Settings.Global.putString(c.s.context.getContentResolver(),BrightnessControl.REQUEST,r.toString());return new JSONObject(Settings.Global.getString(c.s.context.getContentResolver(),BrightnessControl.ACK));}
 static JSONObject keep(BrightnessControl c,boolean on)throws Exception{JSONObject r=new JSONObject().put("id","keep"+cases).put("build","test").put("process_start","123").put("elapsed",SystemClock.now).put("action","keep_awake").put("session","panel").put("enabled",on);Settings.Global.putString(c.s.context.getContentResolver(),BrightnessControl.REQUEST,r.toString());return new JSONObject(Settings.Global.getString(c.s.context.getContentResolver(),BrightnessControl.ACK));}
 static void slider(ControlCenterEngine e,String token,double fraction,long gesture,long sent)throws Exception{JSONObject r=new JSONObject().put("id",java.util.UUID.randomUUID().toString()).put("build",AppBuild.BUILD).put("process_start","123").put("elapsed",sent).put("gesture_elapsed",gesture).put("session",token).put("fraction",fraction);Settings.Global.putString(e.s.context.getContentResolver(),ControlCenterEngine.REQUEST,r.toString());e.request();}
-static void focusIndependent(BrightnessControl c,String pkg){c.cancelForeground();c.acceptForeground(new ForegroundApps.Snapshot(pkg,0,0,new java.util.LinkedHashSet<>(java.util.Arrays.asList(pkg))));c.tick();}
+static void focusIndependent(BrightnessControl c,String pkg){c.cancelForeground();c.acceptForeground(new ForegroundApps.Snapshot(pkg,0,0,new java.util.LinkedHashSet<>(java.util.Arrays.asList(pkg)),pkg));c.tick();}
 static BrightnessControl independentController(boolean automatic)throws Exception{BrightnessControl c=controller();c.options.darkLock=false;if(!automatic)Settings.System.values.put("mode","0");BrightnessControlOptions o=new BrightnessControlOptions();o.independentApps.add("com.demo.a");o.independentApps.add("com.demo.b");BrightnessControlOptions.AppGroup g=new BrightnessControlOptions.AppGroup("videos","Videos");g.apps.add("com.demo.c");g.apps.add("com.demo.d");o.independentGroups.add(g);c.configure(o);c.cancelForeground();return c;}
 static void adjustIndependent(BrightnessControl c,float value){c.independent.enqueueUser(value);time(c,SystemClock.now+200);}
 static android.app.TaskInfo task(String pkg,int user,int display,boolean visible){android.app.TaskInfo i=new android.app.TaskInfo();i.topActivity=new android.content.ComponentName(pkg);i.userId=user;i.displayId=display;i.isVisibleRequested=visible;return i;}
@@ -466,11 +466,113 @@ c=independentController(true);c.options.independentKeepLock=true;focusIndependen
 c=independentController(false);focusIndependent(c,"com.demo.a");check(!c.auto()&&c.independentActive());adjustIndependent(c,.7f);focusIndependent(c,"com.android.launcher");check(!c.auto()&&Math.abs(((DisplayManager)c.s.context.display).value-.25f)<.00001f);c.close();
 // User re-enabling auto wins until the app leaves; reconfiguration does not erase old pause choices.
 // Window mode changes requery even when the resumed Activity and visibility are unchanged.
-c=independentController(true);atm.windowingMode=1;atm.mLastResumedActivity=new com.android.server.wm.ActivityRecord("com.demo.a",0,0);atm.visibleTasks=new java.util.ArrayList<>(java.util.Arrays.asList(task("com.demo.a",0,0,true)));c.invalidateForeground();settle(c);check(c.independentActive());com.android.server.wm.Task windowTask=new com.android.server.wm.Task();android.content.res.Configuration small=new android.content.res.Configuration();small.windowingMode=5;int beforeQueries=atm.queries;windowTask.onConfigurationChanged(small);check(atm.queries==beforeQueries);settle(c);check(c.auto()&&!c.independentActive()&&!c.foreground.independentAllowed);android.content.res.Configuration full=new android.content.res.Configuration();full.windowingMode=1;windowTask.onConfigurationChanged(full);settle(c);check(c.independentActive()&&!c.auto()&&c.foreground.independentAllowed);beforeQueries=atm.queries;windowTask.onConfigurationChanged(full);settle(c);check(atm.queries==beforeQueries);c.close();atm.windowingMode=1;atm.visibleTasks=null;
+c=independentController(true);atm.windowingMode=1;atm.mLastResumedActivity=new com.android.server.wm.ActivityRecord("com.demo.a",0,0);atm.visibleTasks=new java.util.ArrayList<>(java.util.Arrays.asList(task("com.demo.a",0,0,true)));c.invalidateForeground();settle(c);check(c.independentActive());com.android.server.wm.Task windowTask=new com.android.server.wm.Task();android.content.res.Configuration small=new android.content.res.Configuration();small.windowingMode=5;int beforeQueries=atm.queries;atm.visibleTasks.get(0).mode=5;windowTask.onConfigurationChanged(small);check(atm.queries==beforeQueries);settle(c);check(c.auto()&&!c.independentActive()&&c.foreground.independentPackage.isEmpty());android.content.res.Configuration full=new android.content.res.Configuration();full.windowingMode=1;atm.visibleTasks.get(0).mode=1;windowTask.onConfigurationChanged(full);settle(c);check(c.independentActive()&&!c.auto()&&c.foreground.independentPackage.equals("com.demo.a"));beforeQueries=atm.queries;windowTask.onConfigurationChanged(full);settle(c);check(atm.queries==beforeQueries);c.close();
+
+// A floating task can own focus while the fullscreen task retains its app or group lease.
+for(String packageName:new String[]{"com.demo.a","com.demo.c"}){
+ android.app.TaskInfo baseTask=task(packageName,0,0,true);
+ android.app.TaskInfo overlay=task("com.demo.b",0,0,true);
+ overlay.mode=5;
+ atm.visibleTasks=new java.util.ArrayList<>(java.util.Arrays.asList(overlay,baseTask));
+ atm.windowingMode=1;
+ atm.mLastResumedActivity=new com.android.server.wm.ActivityRecord(packageName,0,0);
+ c=independentController(true);
+ c.invalidateForeground();settle(c);
+ check(c.independentActive());
+ adjustIndependent(c,.66f);
+ String independentSession=c.session;
+ int independentWrites=writes(c);
+ atm.windowingMode=5;
+ atm.setLastResumedActivityUncheckLocked(new com.android.server.wm.ActivityRecord("com.demo.b",0,0),"floating-focus");
+ settle(c);
+ check(c.independentActive()&&!c.auto()&&c.session.equals(independentSession)&&c.independent.pkg.equals(packageName));
+ check(writes(c)==independentWrites&&Math.abs(c.held-.66f)<.00001f);
+ atm.windowingMode=1;
+ atm.setLastResumedActivityUncheckLocked(new com.android.server.wm.ActivityRecord(packageName,0,0),"fullscreen-focus");
+ settle(c);
+ check(c.independentActive()&&c.session.equals(independentSession)&&writes(c)==independentWrites);
+
+ // Shrinking the independent task releases it, and maximizing again needs no focus change.
+ atm.windowingMode=5;
+ atm.setLastResumedActivityUncheckLocked(new com.android.server.wm.ActivityRecord("com.demo.b",0,0),"floating-focus");
+ settle(c);
+ com.android.server.wm.Task changedTask=new com.android.server.wm.Task();
+ baseTask.mode=5;
+ changedTask.onConfigurationChanged(small);settle(c);
+ check(!c.independentActive()&&c.auto());
+ baseTask.mode=1;
+ changedTask.onConfigurationChanged(full);
+ atm.windowingMode=5;
+ settle(c);
+ check(c.independentActive()&&c.independent.pkg.equals(packageName)&&Math.abs(c.held-.66f)<.00001f);
+
+ // The first visible fullscreen task decides admission, including an unlisted one.
+ atm.visibleTasks.add(1,task("com.android.launcher",0,0,true));
+ c.invalidateForeground();settle(c);
+ check(!c.independentActive()&&c.auto());
+ c.close();
+}
+
+// A visible pause-list window yields to a newly fullscreen independent app.
+android.app.TaskInfo pauseOverlay=task("com.demo.chat",0,0,true);
+pauseOverlay.mode=5;
+atm.windowingMode=5;
+atm.mLastResumedActivity=new com.android.server.wm.ActivityRecord("com.demo.chat",0,0);
+atm.visibleTasks=new java.util.ArrayList<>(java.util.Arrays.asList(pauseOverlay,task("com.android.launcher",0,0,true)));
+c=independentController(true);
+c.options.manualApps.add("com.demo.chat");
+c.invalidateForeground();settle(c);
+check(c.owner.equals("app")&&!c.independentActive()&&!c.auto());
+atm.visibleTasks.set(1,task("com.demo.a",0,0,true));
+c.invalidateForeground();settle(c);
+check(c.independentActive()&&c.foreground.pkg.equals("com.demo.chat")&&c.independent.key.equals("app:com.demo.a"));
+adjustIndependent(c,.64f);
+check(c.independent.policy.values.get("app:com.demo.a")==.64f&&c.independent.policy.values.size()==1);
+
+android.app.TaskInfo unresolved=task("com.demo.unknown",0,0,true);
+unresolved.mode=0;
+atm.visibleTasks.add(1,unresolved);
+c.invalidateForeground();settle(c);
+check(!c.independentActive()&&c.owner.equals("app")&&!c.auto()&&c.foreground.independentPackage.isEmpty());
+atm.visibleTasks.remove(unresolved);
+c.invalidateForeground();settle(c);
+check(c.independentActive());
+c.close();
+
+// A floating independent app and entries on other displays cannot replace the actual fullscreen task.
+android.app.TaskInfo onlyFloating=task("com.demo.a",0,0,true);
+onlyFloating.mode=5;
+atm.windowingMode=5;
+atm.mLastResumedActivity=new com.android.server.wm.ActivityRecord("com.demo.a",0,0);
+atm.visibleTasks=new java.util.ArrayList<>(java.util.Arrays.asList(
+    task("com.demo.a",0,1,true),task("com.demo.a",0,0,false),onlyFloating,task("com.android.launcher",0,0,true)));
+c=independentController(true);
+c.invalidateForeground();settle(c);
+check(c.auto()&&!c.independentActive()&&c.foreground.independentPackage.equals("com.android.launcher"));
+atm.visibleTasks.set(3,task("com.demo.a",10,0,true));
+atm.visibleTasks.add(task("com.demo.a",0,0,true));
+c.invalidateForeground();settle(c);
+check(c.auto()&&!c.independentActive()&&c.foreground.independentPackage.isEmpty());
+atm.visibleTasks.remove(3);
+atm.windowingMode=6;
+c.invalidateForeground();settle(c);
+check(c.auto()&&!c.independentActive()&&c.foreground.independentPackage.isEmpty());
+
+java.lang.reflect.Method floatingMode=ForegroundApps.floatingWindowMode;
+ForegroundApps.floatingWindowMode=null;
+atm.windowingMode=5;
+c.invalidateForeground();settle(c);
+check(c.auto()&&!c.independentActive());
+atm.windowingMode=1;
+c.invalidateForeground();settle(c);
+check(!c.auto()&&c.independentActive());
+ForegroundApps.floatingWindowMode=floatingMode;
+c.close();
+atm.windowingMode=1;atm.visibleTasks=null;
 // Both own notifications may be delayed and read the final mode after a quick small-window round trip.
-c=independentController(true);Settings.System.deferMode=true;focusIndependent(c,"com.demo.a");c.cancelForeground();c.acceptForeground(new ForegroundApps.Snapshot("com.android.launcher",0,0,new java.util.LinkedHashSet<>(java.util.Arrays.asList("com.demo.a","com.android.launcher"))));c.tick();check(Settings.System.modeCallbacks.size()==2&&c.auto());for(Runnable callback:new java.util.ArrayList<>(Settings.System.modeCallbacks))callback.run();Settings.System.modeCallbacks.clear();Settings.System.deferMode=false;check(c.appExemptions.isEmpty());focusIndependent(c,"com.demo.a");check(c.independentActive());c.close();
+c=independentController(true);Settings.System.deferMode=true;focusIndependent(c,"com.demo.a");c.cancelForeground();c.acceptForeground(new ForegroundApps.Snapshot("com.android.launcher",0,0,new java.util.LinkedHashSet<>(java.util.Arrays.asList("com.demo.a","com.android.launcher")),"com.android.launcher"));c.tick();check(Settings.System.modeCallbacks.size()==2&&c.auto());for(Runnable callback:new java.util.ArrayList<>(Settings.System.modeCallbacks))callback.run();Settings.System.modeCallbacks.clear();Settings.System.deferMode=false;check(c.appExemptions.isEmpty());focusIndependent(c,"com.demo.a");check(c.independentActive());c.close();
 // Deferred own restoration must not look like a user override while the app remains visible in a small window.
-c=independentController(true);focusIndependent(c,"com.demo.a");check(c.independentActive());Settings.System.deferMode=true;c.cancelForeground();c.acceptForeground(new ForegroundApps.Snapshot("com.android.launcher",0,0,new java.util.LinkedHashSet<>(java.util.Arrays.asList("com.demo.a","com.android.launcher"))));c.tick();check(!c.independentActive()&&c.auto());for(Runnable callback:new java.util.ArrayList<>(Settings.System.modeCallbacks))callback.run();Settings.System.modeCallbacks.clear();Settings.System.deferMode=false;check(c.appExemptions.isEmpty());focusIndependent(c,"com.demo.a");check(c.independentActive()&&!c.auto());c.close();
+c=independentController(true);focusIndependent(c,"com.demo.a");check(c.independentActive());Settings.System.deferMode=true;c.cancelForeground();c.acceptForeground(new ForegroundApps.Snapshot("com.android.launcher",0,0,new java.util.LinkedHashSet<>(java.util.Arrays.asList("com.demo.a","com.android.launcher")),"com.android.launcher"));c.tick();check(!c.independentActive()&&c.auto());for(Runnable callback:new java.util.ArrayList<>(Settings.System.modeCallbacks))callback.run();Settings.System.modeCallbacks.clear();Settings.System.deferMode=false;check(c.appExemptions.isEmpty());focusIndependent(c,"com.demo.a");check(c.independentActive()&&!c.auto());c.close();
 c=independentController(true);focusIndependent(c,"com.demo.a");Settings.System.putInt(c.s.context.getContentResolver(),"mode",1);c.tick();check(c.auto()&&!c.independentActive()&&c.appExemptions.contains("com.demo.a"));focusIndependent(c,"com.android.launcher");focusIndependent(c,"com.demo.a");check(!c.auto()&&c.independentActive());c.close();
 // Manual changes by another writer are not overwritten on leaving a manual session.
 c=independentController(false);focusIndependent(c,"com.demo.a");((DisplayManager)c.s.context.display).value=.72f;focusIndependent(c,"com.android.launcher");check(!c.auto()&&Math.abs(((DisplayManager)c.s.context.display).value-.72f)<.00001f);c.close();

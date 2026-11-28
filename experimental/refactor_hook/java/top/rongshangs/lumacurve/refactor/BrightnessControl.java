@@ -308,7 +308,10 @@ final class BrightnessControl implements SensorEventListener {
         j.put("app_independent",independent.status());
         j.put("app_auto_supported",ForegroundApps.supported()).put("foreground_package",foreground.pkg).put("foreground_auto_suppressed",!appSuppressed.isEmpty());
         j.put("app_multiwindow_supported",ForegroundApps.multiWindowSupported).put("foreground_visibility_known",foreground.visibilityKnown).put("foreground_visible_packages",new JSONArray(foreground.visible)).put("foreground_matched_package",foreground.selected(options.manualApps)).put("foreground_visibility_pending",foregroundPending);
-        j.put("app_window_mode_supported",ForegroundApps.windowModeSupported).put("app_window_mode_detail",ForegroundApps.windowModeError).put("foreground_independent_allowed",foreground.independentAllowed);j.put("foreground_auto_exemptions",new JSONArray(appExemptions)).put("foreground_auto_override_pending",appSuppressionPending);
+        String independentPackage=foreground.independentPackage;
+        j.put("app_window_mode_supported",ForegroundApps.windowModeSupported).put("app_window_mode_detail",ForegroundApps.windowModeError)
+            .put("foreground_independent_allowed",!independentPackage.isEmpty()).put("foreground_independent_package",independentPackage);
+        j.put("foreground_auto_exemptions",new JSONArray(appExemptions)).put("foreground_auto_override_pending",appSuppressionPending);
         if(!ForegroundApps.error.isEmpty())j.put("app_auto_detail",ForegroundApps.error);
         if(DarkLockPolicy.valid(mainLux))j.put("watch_main_lux",mainLux);if(DarkLockPolicy.valid(assistLux))j.put("watch_assist_lux",assistLux);
         j.put("watch_main_samples",mainSamples).put("watch_assist_samples",assistSamples).put("watch_unmatched_samples",unmatchedSamples).put("watch_evaluations",sensorEvaluations).put("watch_requested_period_us",1000000).put("watch_main_age_ms",mainAt<0?-1:SystemClock.uptimeMillis()-mainAt).put("watch_assist_age_ms",assistAt<0?-1:SystemClock.uptimeMillis()-assistAt);

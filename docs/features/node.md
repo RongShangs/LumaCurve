@@ -56,7 +56,7 @@ backlight 或明确标识显示的 leds；真实 sysfs 路径与上限配对且�
 | 文件 | 当前源码 SHA-256 前16位 |
 | --- | --- |
 | [ActivePanelNode.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ActivePanelNode.java) | `ea6abe78d6c2a152` |
-| [BrightnessControl.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/BrightnessControl.java) | `e7797c2cfeb536ce` |
+| [BrightnessControl.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/BrightnessControl.java) | `3a7ac14251c18386` |
 | [ControlCenterRoot.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ControlCenterRoot.java) | `dae3fb7c2fbf775e` |
 | [NativePanelRoot.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/NativePanelRoot.java) | `5b4a55b1e4300792` |
 | [PanelNodeDiscovery.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/PanelNodeDiscovery.java) | `938d9d207da9e0c5` |

@@ -19,8 +19,8 @@
 
 | 项目 | 要求 |
 | --- | --- |
-| 触发 | 默认主屏同用户已核验的焦点应用属于独立名单或分组，实际原生普通范围和手动输入接口完整；无更高优先级节点/手动面板接管。 自检只核对接口，不安装输入Hook；该观察延迟到首次实际独立接管，租约恢复也只读检查，不因闲置功能增加启动Hook。 |
-| 需求与行为 | 进入后暂停自动亮度并使用逐应用或按稳定组ID保存的固定比例，普通页面也生效。每个应用只能在暂停名单、独立名单或一个分组中，最多3组、全部名单合计最多64个应用。只接受明确的原生手动亮度输入；即使播放窗口显示中，用户控制中心的普通调节仍可记忆，但窗口自身调用帧拒绝采集。窗口提亮、付款码、HDR、极端值和受保护范围不记忆；未记忆时使用系统首选值，不采集窗口实际亮度。同组切换不反复开关模式。 独立接管及退出恢复不得写入原生曲线或短期学习模型；恢复全局基线后先通过原生消费者排空待处理设置、清除临时亮度和用户更新标记，再恢复原模式；快速退出同样识别尚未合并的真实控制中心调节。 原生关闭自动亮度的异步交接可能覆盖首次写入；接管时仅在原生设置消费事件后，离开原生锁栈再检查实际手动模式并单次补交付记忆值，不轮询，不重复记忆；待处理真实手势及其他来源后写值优先。退出、锁屏、换组和代次变化撤销旧回调。 手动输入在延迟合并前快速退回桌面、切换独立应用或分组时，先按原租约与原记忆键补存最后一次有效调节；前台查询未完成时保留候选，不能记入新应用或被原生交接覆盖。仅补存明确输入，不从当前屏幕读数猜测偏好，不在离开时重写该输入。 完整任务模式ABI可用时仅全屏焦点进入，小窗退出，任务配置变化后重新最大化可再次进入，不要求杀应用或从桌面重启。模式重评估复用事件队列，无额外查询轮询；旧系统缺整个可选ABI时保留原焦点路线，存在但读取失败不当全屏。模块自己恢复自动亮度产生的延迟通知不添加用户豁免；用户真正主动开启自动亮度和控制中心请求继续保留原优先规则。 页面删除名单总览的两段长介绍，保留名单、分组、跨锁屏/重启开关及各块简述，记忆与互斥逻辑不变。 |
+| 触发 | 默认主屏同用户的全屏应用属于独立名单或分组，原生普通范围和手动输入接口完整，并且主屏未被节点或手动面板接管。 自检只核对接口，不安装输入Hook；该观察延迟到首次实际独立接管，租约恢复也只读检查，不因闲置功能增加启动Hook。 |
+| 需求与行为 | 进入后暂停自动亮度并使用逐应用或按稳定组ID保存的固定比例，普通页面也生效。每个应用只能在暂停名单、独立名单或一个分组中，最多3组、全部名单合计最多64个应用。只接受明确的原生手动亮度输入；即使播放窗口显示中，用户控制中心的普通调节仍可记忆，但窗口自身调用帧拒绝采集。窗口提亮、付款码、HDR、极端值和受保护范围不记忆；未记忆时使用系统首选值，不采集窗口实际亮度。同组切换不反复开关模式。 独立接管及退出恢复不得写入原生曲线或短期学习模型；恢复全局基线后先通过原生消费者排空待处理设置、清除临时亮度和用户更新标记，再恢复原模式；快速退出同样识别尚未合并的真实控制中心调节。 原生关闭自动亮度的异步交接可能覆盖首次写入；接管时仅在原生设置消费事件后，离开原生锁栈再检查实际手动模式并单次补交付记忆值，不轮询，不重复记忆；待处理真实手势及其他来源后写值优先。退出、锁屏、换组和代次变化撤销旧回调。 手动输入在延迟合并前快速退回桌面、切换独立应用或分组时，先按原租约与原记忆键补存最后一次有效调节；前台查询未完成时保留候选，不能记入新应用或被原生交接覆盖。仅补存明确输入，不从当前屏幕读数猜测偏好，不在离开时重写该输入。 按全屏应用决定逐应用和分组亮度。小窗获得焦点时，从主屏可见任务中确认最靠前的全屏任务，再匹配独立名单。小窗自身不进入独立亮度，该应用缩小后退出，最大化可重新进入。全屏独立亮度优先于可见小窗的暂停名单。使用已有焦点、可见性和任务配置事件重评估。缺少完整窗口模式ABI时沿用焦点兼容；已核验接口读数失败时等待有效结果。模块自己恢复自动亮度产生的延迟通知不添加用户豁免；用户真正主动开启自动亮度和控制中心请求继续保留原优先规则。 页面删除名单总览的两段长介绍，保留名单、分组、跨锁屏/重启开关及各块简述，记忆与互斥逻辑不变。 |
 | 退出 / 失败 | 离开后恢复进入前的模式及仍拥有的系统基线；原来手动就保持手动，用户主动开启自动亮度优先。锁屏撤销接管，默认清空记忆；显式保留后仅在对应应用回前台时使用。跨重启还需跨锁屏启用；按设备基线、物理屏和用户校验，旧异步结果不得重放。 系统进程重启只恢复同设备/用户/物理屏、首选值仍匹配租约时的基线，不覆盖后来写入的亮度。 锁屏默认仍清空；显式跨锁屏保留时，冻结待处理输入并在退出原生锁栈后验证、补存，重复屏幕事件不丢失或重放。待处理输入仍属于本租约时，先恢复基线及清理原生待处理设置再交回原模式。跨重启记忆读取被执行器拒绝不标记已加载，同一绑定最多提交3次，间隔250/1000毫秒；离页、锁屏、停用及代次失效撤销重试，实际失败不持续轮询，未读取的存档不被空快照覆盖。 |
 | 默认 | `off` · 独立名单与分组为空，跨锁屏/跨重启保留均关闭；旧暂停名单不变 |
 | 配置键 | `independent_brightness_apps`、`independent_brightness_groups`、`independent_brightness_keep_lock`、`independent_brightness_keep_reboot` |
@@ -30,17 +30,17 @@
 
 ### 选择边界
 
-旧暂停名单继续使用manual_brightness_apps及可见任务优先/缺接口才焦点回退。独立应用仅匹配已核验的同用户默认屏焦点，逐应用或稳定组ID选择一个固定值；最多3组、名单互斥。普通范围、窗口覆盖读数及原生setTemporaryBrightness接口完整才安装独立输入观察；不从窗口或实际输出学习，不按机型版本判断。视频分类取ApplicationInfo.category并按精确包名补充常用国内视频应用，游戏另可取本机专用分类文件；混合影像名单不整份当作视频。 迁移先生成只读草稿，弹窗确认后记录原处关闭；取消不得修改任何旧选择。批选迁移一次确认，返回时名单和已确认移除记录原子提交。 手动输入按真实原生入口及调用帧识别；窗口处于显示状态不等于该输入来自窗口，用户普通控制中心输入可记忆，窗口自身调用帧排除。 独立亮度接口探测与观察安装分离：启动/自检只读，首次实际接管才安装输入观察；恢复旧租约不因此安装新观察。 独立接口还核验ABC原生用户学习入口及DBC设置消费/临时值清理入口，按物理对象和显示线程隔离独立会话学习。 独立手动交接观察复用已核验DBC设置消费者，只在当前物理主屏/显示线程发出有界单次任务；实际模式与亮度的读取、写入均延后到原生锁栈退出。 完整任务窗口模式接口可用时仅全屏焦点进入独立亮度；配置变化触发一次既有前台查询，小窗还原全屏无需重新启动。接口缺失保留既有焦点路线；已存在接口读取损坏不冒充全屏。
+旧暂停名单继续使用manual_brightness_apps及可见任务优先/缺接口才焦点回退。独立应用在验明主屏、当前用户和全屏任务后匹配名单，逐应用或稳定组ID选择一个固定值；最多3组、名单互斥。普通范围、窗口覆盖读数及原生setTemporaryBrightness接口完整才安装独立输入观察；不从窗口或实际输出学习，不按机型版本判断。视频分类取ApplicationInfo.category并按精确包名补充常用国内视频应用，游戏另可取本机专用分类文件；混合影像名单不整份当作视频。 迁移先生成只读草稿，弹窗确认后记录原处关闭；取消不得修改任何旧选择。批选迁移一次确认，返回时名单和已确认移除记录原子提交。 手动输入按真实原生入口及调用帧识别；窗口处于显示状态不等于该输入来自窗口，用户普通控制中心输入可记忆，窗口自身调用帧排除。 独立亮度接口探测与观察安装分离：启动/自检只读，首次实际接管才安装输入观察；恢复旧租约不因此安装新观察。 独立接口还核验ABC原生用户学习入口及DBC设置消费/临时值清理入口，按物理对象和显示线程隔离独立会话学习。 独立手动交接观察复用已核验DBC设置消费者，只在当前物理主屏/显示线程发出有界单次任务；实际模式与亮度的读取、写入均延后到原生锁栈退出。 完整任务窗口模式接口下，已验证的全屏焦点可独立接管。WindowConfiguration.isFloating(int) 确认为小窗焦点时，复用系统有序可见任务列表，取默认屏最靠前的全屏任务，再校验用户身份并匹配名单。首个全屏任务身份缺失、归属不符或窗口模式读取失败时，独立接管等待有效结果。旧系统缺完整模式接口时保留既有焦点路线。配置变化触发一次既有前台查询，小窗还原全屏可重新接管。
 
 | 契约 | 内容 |
 | --- | --- |
 | 组合方式 | `per_feature` |
-| 统一输出 | 可见暂停名单与焦点独立名单分别收束，唯一应用/组记忆键和模式租约统一管理 |
+| 统一输出 | 可见暂停名单与全屏独立应用分别收束，唯一应用/组记忆键和模式租约统一管理 |
 | 坐标与身份 | 默认主屏同用户；固定值为框架亮度比例，不伪造nit，不把窗口/HDR输出当用户偏好 |
 
 ### 清理及回滚
 
-复用BrightnessControl应用租约，模式改动前持久记录恢复意图；退出恢复原模式及仍拥有的基线，用户主动开启自动亮度优先。暂停名单可见性规则保持；独立名单按焦点退出。屏幕事件立即撤销手动输入许可，清理延迟任务；默认锁屏清空，可显式保留锁屏/重启记忆。用户/物理屏/范围标定绑定变化拒绝旧值，异步读取按代次丢弃，写入合并为有界快照。列表页离开停止读取图标及分类，无新服务或持续轮询。 名单页先创建窗口内容再取系统栏控制器，控制器为空保留默认外观，不阻止打开页面。 退出仍拥有的独立值先恢复基线，原生消费待处理设置并清除临时值/用户更新标记后才恢复自动模式；不动外部后来写入的亮度。 等待原生模式确认的补交付按租约代次取消；先到的用户拖动与外部后来写入优先，不后台重试或轮询。 名单页只固定顶栏与搜索，批选/计数/名单共用列表滚动；连续圆角背景只画数据区域，行保持透明与回收。底部安全距离放滚动尾部，不缩短整个页面视口；导航栏透明，键盘出现时按实际遮挡预留。 分组页面缓存只缓存表现，删除/重命名回调按稳定ID解析当前草稿；确认前再次解析，已删除ID不复活或命中同名新组。名单Activity保持主题不透明窗口与静止背景，关闭双向系统整窗动画，仅内容淡变/轻位移，禁用系统动画时直接呈现。快速返回/离页取消旧内容动画并复原属性，退出被后台打断仍返回一次原草稿，不留旧完成回调。 快速交接先按原租约补存未合并的明确输入；跨锁屏候选在原生锁栈外处理，默认清空仍保留。存档提交被执行器拒绝不视为已加载，同一绑定最多3次、250/1000毫秒有界重试；锁屏/配置/停用撤销重试，过期回执拒绝，未读存档不被快照覆盖。 模块自身模式写入通知按有界待确认队列消费，不将延迟恢复自动亮度误当用户豁免；真正外部模式变化和已有控制中心指令仍优先。
+复用BrightnessControl应用租约，模式改动前持久记录恢复意图；退出恢复原模式及仍拥有的基线，用户主动开启自动亮度优先。暂停名单可见性规则保持；独立应用离开当前全屏位置或缩成小窗时退出。屏幕事件立即撤销手动输入许可，清理延迟任务；默认锁屏清空，可显式保留锁屏/重启记忆。用户/物理屏/范围标定绑定变化拒绝旧值，异步读取按代次丢弃，写入合并为有界快照。列表页离开停止读取图标及分类，无新服务或持续轮询。 名单页先创建窗口内容再取系统栏控制器，控制器为空保留默认外观，不阻止打开页面。 退出仍拥有的独立值先恢复基线，原生消费待处理设置并清除临时值/用户更新标记后才恢复自动模式；不动外部后来写入的亮度。 等待原生模式确认的补交付按租约代次取消；先到的用户拖动与外部后来写入优先，不后台重试或轮询。 名单页只固定顶栏与搜索，批选/计数/名单共用列表滚动；连续圆角背景只画数据区域，行保持透明与回收。底部安全距离放滚动尾部，不缩短整个页面视口；导航栏透明，键盘出现时按实际遮挡预留。 分组页面缓存只缓存表现，删除/重命名回调按稳定ID解析当前草稿；确认前再次解析，已删除ID不复活或命中同名新组。名单Activity保持主题不透明窗口与静止背景，关闭双向系统整窗动画，仅内容淡变/轻位移，禁用系统动画时直接呈现。快速返回/离页取消旧内容动画并复原属性，退出被后台打断仍返回一次原草稿，不留旧完成回调。 快速交接先按原租约补存未合并的明确输入；跨锁屏候选在原生锁栈外处理，默认清空仍保留。存档提交被执行器拒绝不视为已加载，同一绑定最多3次、250/1000毫秒有界重试；锁屏/配置/停用撤销重试，过期回执拒绝，未读存档不被快照覆盖。 模块自身模式写入通知按有界待确认队列消费，不将延迟恢复自动亮度误当用户豁免；真正外部模式变化和已有控制中心指令仍优先。
 
 ## 已实现的兼容路线
 
@@ -48,11 +48,11 @@
 | --- | --- |
 | `visible_tasks` · 可见任务路径（含小窗 / 分屏） | 可见任务接口完整；任一名单应用仍可见时保持暂停。 |
 | `focus_fallback` · 前台焦点回退路径 | 没有完整的可见任务能力时按系统焦点判断，并提示小窗限制。 |
-| `focused_app_fixed_manual` · 应用或分组独立固定亮度 | 当前默认主屏同用户焦点应用匹配互斥名单，原生普通范围与手动输入接口完整；复用应用模式租约，退出恢复此前系统调节。 |
+| `focused_app_fixed_manual` · 应用或分组独立固定亮度 | 按主屏同用户的全屏应用匹配独立名单。小窗获得焦点时核验背后的全屏任务。旧系统缺少窗口模式接口时按焦点兼容。 |
 
 路线内部 ABI：`sensor_identity`、`sensor_freshness`、`foreground_user_field`、`task_visibility_field`、`manual_node_hold_policy`；完整条件仅维护在 [ABI索引](../architecture/compatibility-index.md#abi-内部变体)。
 
-运行证据：`brightness_control.app_multiwindow_supported`、`app_independent_supported`、`brightness_control.app_independent.profile`、`brightness_control.app_independent.active`、`brightness_control.app_independent.key`、`brightness_control.app_independent.remembered`、`brightness_control.foreground_visibility_pending`、`brightness_control.app_independent.native_mode_pending`、`brightness_control.app_independent.native_reapply_queued`、`brightness_control.app_independent.memory_loaded`、`brightness_control.app_independent.memory_load_attempts`、`brightness_control.app_independent.memory_load_retry_queued`。
+运行证据：`brightness_control.app_multiwindow_supported`、`app_independent_supported`、`brightness_control.app_independent.profile`、`brightness_control.app_independent.active`、`brightness_control.app_independent.key`、`brightness_control.app_independent.remembered`、`brightness_control.foreground_visibility_pending`、`brightness_control.foreground_independent_package`、`brightness_control.app_independent.native_mode_pending`、`brightness_control.app_independent.native_reapply_queued`、`brightness_control.app_independent.memory_loaded`、`brightness_control.app_independent.memory_load_attempts`、`brightness_control.app_independent.memory_load_retry_queued`。
 
 验证入口：
 
@@ -69,13 +69,13 @@
 | 文件 | 当前源码 SHA-256 前16位 |
 | --- | --- |
 | [AppIndependentAccess.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/AppIndependentAccess.java) | `8b286b6e73e9c8e4` |
-| [AppIndependentControl.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/AppIndependentControl.java) | `4319b9b2027069a9` |
+| [AppIndependentControl.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/AppIndependentControl.java) | `ce5cc89587a53593` |
 | [AppIndependentPolicy.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/AppIndependentPolicy.java) | `bb280e32ae39556e` |
 | [ApplicationBrightnessSettings.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ApplicationBrightnessSettings.java) | `945b99c9e904c9e8` |
 | [ApplicationCategories.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ApplicationCategories.java) | `ebb67062fcd250e8` |
 | [ApplicationListActivity.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ApplicationListActivity.java) | `d635c67d2d4abfbb` |
 | [ApplicationSelection.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ApplicationSelection.java) | `5000cff5ae47ae03` |
-| [BrightnessControl.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/BrightnessControl.java) | `e7797c2cfeb536ce` |
+| [BrightnessControl.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/BrightnessControl.java) | `3a7ac14251c18386` |
 | [BrightnessControlOptions.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/BrightnessControlOptions.java) | `e5078bc085530fa2` |
 | [DeferredStateWriter.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/DeferredStateWriter.java) | `a1e1a507466fbff5` |
-| [ForegroundApps.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ForegroundApps.java) | `e5e9a47fa5c819c8` |
+| [ForegroundApps.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ForegroundApps.java) | `a9b068216145dc44` |

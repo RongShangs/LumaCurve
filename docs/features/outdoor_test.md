@@ -55,7 +55,7 @@
 
 | 文件 | 当前源码 SHA-256 前16位 |
 | --- | --- |
-| [BrightnessControl.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/BrightnessControl.java) | `e7797c2cfeb536ce` |
+| [BrightnessControl.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/BrightnessControl.java) | `3a7ac14251c18386` |
 | [OutdoorLightTest.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/OutdoorLightTest.java) | `b9aeac8dfe56cf02` |
 | [OutdoorLightTestAccess.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/OutdoorLightTestAccess.java) | `343564c5dd17c6c1` |
 | [OutdoorNodeBridge.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/OutdoorNodeBridge.java) | `4ac19727d9bfa689` |

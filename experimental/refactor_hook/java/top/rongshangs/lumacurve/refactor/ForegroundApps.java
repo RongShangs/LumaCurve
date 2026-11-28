@@ -1,5 +1,6 @@
 package top.rongshangs.lumacurve.refactor;
 
+import android.content.ComponentName;
 import java.lang.reflect.*;
 import java.util.*;
 import java.util.concurrent.*;
@@ -9,7 +10,7 @@ import top.rongshangs.lumacurve.refactor.hooking.*;
 final class ForegroundApps {
     static final Set<BrightnessControl> targets=Collections.newSetFromMap(new IdentityHashMap<BrightnessControl,Boolean>());
     static boolean installed,attempted,multiWindowSupported,windowModeSupported;
-    static Method focusedWindowMode;static int fullScreenMode;static String windowModeError="";
+    static Method taskWindowMode,floatingWindowMode;static int fullScreenMode;static String windowModeError="";
     static String error="";
     // No WM service query on the display handler. One lazy, bounded worker;
     // it exits after ten idle seconds and never polls or changes brightness.
@@ -24,10 +25,12 @@ final class ForegroundApps {
         });
     }
     static final class Snapshot {
-        final String pkg;final int user,display;final boolean independentAllowed;final Set<String> visible;final boolean visibilityKnown;
-        Snapshot(String p,int u,int d){this(p,u,d,null);}
-        Snapshot(String p,int u,int d,Set<String> packages){this(p,u,d,packages,true);}
-        Snapshot(String p,int u,int d,Set<String> packages,boolean allowed){independentAllowed=allowed;pkg=p==null?"":p;user=u;display=d;visibilityKnown=packages!=null;visible=packages==null?Collections.emptySet():Collections.unmodifiableSet(new LinkedHashSet<>(packages));}
+        final String pkg,independentPackage;final int user,display;final Set<String> visible;final boolean visibilityKnown;
+        Snapshot(String p,int u,int d){this(p,u,d,null,"");}
+        Snapshot(String p,int u,int d,Set<String> packages,String independentPackage){
+            pkg=p==null?"":p;user=u;display=d;this.independentPackage=independentPackage;
+            visibilityKnown=packages!=null;visible=packages==null?Collections.emptySet():Collections.unmodifiableSet(new LinkedHashSet<>(packages));
+        }
         boolean contains(String p){return visibilityKnown?visible.contains(p):user==0&&display==0&&pkg.equals(p);}
         String selected(Set<String> apps){if(contains(pkg)&&apps.contains(pkg))return pkg;for(String p:visible)if(apps.contains(p))return p;return "";}
         static Snapshot unknown(){return new Snapshot("",-1,-1);}
@@ -76,7 +79,13 @@ final class ForegroundApps {
             changed.setAccessible(true);mode.setAccessible(true);readMode.setAccessible(true);fullscreen.setAccessible(true);int full=fullscreen.getInt(null);if(full<=0)throw new IllegalStateException("Unknown fullscreen constant");
             XposedBridge.hookMethod(changed,new XC_MethodHook(){protected void beforeHookedMethod(MethodHookParam p){synchronized(ForegroundApps.class){if(targets.isEmpty())return;}try{p.setObjectExtra("hyperlux.foreground.previous_mode",mode.invoke(p.thisObject));}catch(Throwable ignored){}}
                 protected void afterHookedMethod(MethodHookParam p){if(p.hasThrowable())return;try{Object before=p.getObjectExtra("hyperlux.foreground.previous_mode");if(user.getInt(p.thisObject)==0&&before instanceof Integer&&!before.equals(mode.invoke(p.thisObject)))windowsChanged();}catch(Throwable ignored){}}
-            });focusedWindowMode=readMode;fullScreenMode=full;windowModeSupported=true;
+            });taskWindowMode=readMode;fullScreenMode=full;windowModeSupported=true;
+            try{
+                Method floating=window.getDeclaredMethod("isFloating",int.class);
+                if(floating.getReturnType()==boolean.class&&Modifier.isStatic(floating.getModifiers())){
+                    floating.setAccessible(true);floatingWindowMode=floating;
+                }
+            }catch(Throwable unavailable){/* The verified focused fullscreen path remains usable. */}
         }catch(Throwable unavailable){windowModeError="窗口模式事件不可用，沿用已有焦点判断："+unavailable;}
         return installed;
     }
@@ -96,22 +105,46 @@ final class ForegroundApps {
     static Snapshot query()throws Exception {
         Class<?> atm=Class.forName("android.app.ActivityTaskManager");Method get=atm.getDeclaredMethod("getService");get.setAccessible(true);Object service=get.invoke(null);
         Method focused=service.getClass().getMethod("getFocusedRootTaskInfo");focused.setAccessible(true);Object info=focused.invoke(service);
-        Object component=info==null?null:HookEntry.field(info.getClass(),"topActivity").get(info);
+        String pkg=info==null?"":packageName(info);
+        int user=pkg.isEmpty()?-1:HookEntry.field(info.getClass(),"userId").getInt(info);
+        int display=pkg.isEmpty()?-1:HookEntry.field(info.getClass(),"displayId").getInt(info);
+        String independent="";
+        boolean findFullscreen=false;
+        if(user==0&&display==0){
+            if(!windowModeSupported)independent=pkg;
+            else try{
+                int mode=(Integer)taskWindowMode.invoke(info);
+                if(mode==fullScreenMode)independent=pkg;
+                else findFullscreen=multiWindowSupported&&floatingWindowMode!=null&&(Boolean)floatingWindowMode.invoke(null,mode);
+                windowModeError="";
+            }catch(Exception unavailable){windowModeError="窗口模式读取失败："+unavailable;}
+        }
         Set<String> visible=null;
         if(multiWindowSupported){
             Method tasks=service.getClass().getMethod("getTasks",int.class,boolean.class,boolean.class,int.class);tasks.setAccessible(true);
             Object result=tasks.invoke(service,128,false,false,0);if(!(result instanceof List)||((List<?>)result).size()>128)throw new IllegalStateException("Invalid visible-task response");
             visible=new LinkedHashSet<>();
             for(Object task:(List<?>)result){
-                if(task==null||HookEntry.field(task.getClass(),"userId").getInt(task)!=0||HookEntry.field(task.getClass(),"displayId").getInt(task)!=0||!visibilityField(task.getClass()).getBoolean(task))continue;
-                Object top=HookEntry.field(task.getClass(),"topActivity").get(task);if(top==null)continue;
-                visible.add((String)top.getClass().getMethod("getPackageName").invoke(top));
+                if(task==null||HookEntry.field(task.getClass(),"displayId").getInt(task)!=0||!visibilityField(task.getClass()).getBoolean(task))continue;
+                String candidate=HookEntry.field(task.getClass(),"userId").getInt(task)==0?packageName(task):"";
+                if(!candidate.isEmpty())visible.add(candidate);
+                if(!findFullscreen)continue;
+                // RunningTasks puts the focused task first and retains window order for the other visible tasks.
+                // Resolve the foremost fullscreen task before applying any app or group settings.
+                try{
+                    int mode=(Integer)taskWindowMode.invoke(task);
+                    if(mode<=0)throw new IllegalStateException("可见任务的窗口模式未知");
+                    if(mode==fullScreenMode){independent=candidate;findFullscreen=false;}
+                }catch(Exception unavailable){
+                    findFullscreen=false;windowModeError="窗口模式读取失败："+unavailable;
+                }
             }
         }
-        if(component==null)return new Snapshot("",-1,-1,visible);
-        Method name=component.getClass().getMethod("getPackageName");
-        boolean allowed=true;if(windowModeSupported)try{allowed=((Integer)focusedWindowMode.invoke(info))==fullScreenMode;windowModeError="";}catch(Throwable unavailable){allowed=false;windowModeError="窗口模式读取失败："+unavailable;}
-        return new Snapshot((String)name.invoke(component),HookEntry.field(info.getClass(),"userId").getInt(info),HookEntry.field(info.getClass(),"displayId").getInt(info),visible,allowed);
+        return new Snapshot(pkg,user,display,visible,independent);
+    }
+    private static String packageName(Object task)throws Exception{
+        ComponentName top=(ComponentName)HookEntry.field(task.getClass(),"topActivity").get(task);
+        return top==null?"":top.getPackageName();
     }
     static Field visibilityField(Class<?> info)throws Exception{try{return HookEntry.field(info,"isVisibleRequested");}catch(NoSuchFieldException old){return HookEntry.field(info,"isVisible");}}
 }

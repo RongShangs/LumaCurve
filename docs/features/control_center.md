@@ -113,7 +113,7 @@
 
 | 文件 | 当前源码 SHA-256 前16位 |
 | --- | --- |
-| [BrightnessControl.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/BrightnessControl.java) | `e7797c2cfeb536ce` |
+| [BrightnessControl.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/BrightnessControl.java) | `3a7ac14251c18386` |
 | [BrightnessControlOptions.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/BrightnessControlOptions.java) | `e5078bc085530fa2` |
 | [ControlCenterCalibration.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ControlCenterCalibration.java) | `ad750d057839e101` |
 | [ControlCenterCurve.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ControlCenterCurve.java) | `e0e3f8e8862e574b` |

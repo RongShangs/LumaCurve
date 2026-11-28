@@ -56,7 +56,7 @@
 | --- | --- |
 | [AppIsolationSettings.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/AppIsolationSettings.java) | `390011a16a79bd1b` |
 | [AppWindowBrightness.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/AppWindowBrightness.java) | `5fc742f78b24d9f4` |
-| [BrightnessControl.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/BrightnessControl.java) | `e7797c2cfeb536ce` |
+| [BrightnessControl.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/BrightnessControl.java) | `3a7ac14251c18386` |
 | [BrightnessControlOptions.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/BrightnessControlOptions.java) | `e5078bc085530fa2` |
 | [ConfigurationCompatibility.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ConfigurationCompatibility.java) | `3da6875392d1ff92` |
 | [WindowBrightnessAccess.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/WindowBrightnessAccess.java) | `82a709dff433a51b` |

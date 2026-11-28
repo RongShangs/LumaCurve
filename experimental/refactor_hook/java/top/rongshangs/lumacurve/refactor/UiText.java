@@ -2266,7 +2266,7 @@ public final class UiText {
         WORDS.put("应用独立亮度","Independent app brightness");
         WORDS.put("应用临时亮度隔离","Temporary app brightness isolation");
         WORDS.put("应用或分组独立固定亮度","Fixed brightness per app or group");
-        WORDS.put("当前默认主屏同用户焦点应用匹配互斥名单，原生普通范围与手动输入接口完整；复用应用模式租约，退出恢复此前系统调节。","A verified focused app on the current main display and user matches an exclusive list. Native ordinary-range and manual-input interfaces are complete. Reuse the app mode lease and restore prior system control on leaving.");
+        WORDS.put("按主屏同用户的全屏应用匹配独立名单。小窗获得焦点时核验背后的全屏任务。旧系统缺少窗口模式接口时按焦点兼容。","Use the fullscreen app on the main display for the current user. When a floating window gets focus, verify the fullscreen task behind it. Older systems without window-mode information use focus.");
         WORDS.put("旧版窗口共享（已停用）","Legacy window sharing (retired)");
         WORDS.put("保留历史路线说明和旧配置字段；不再执行，不作为当前可用功能。","Historical route and saved fields are retained. This feature no longer runs or reports as available.");
         WORDS.put("暂停名单、逐应用及分组亮度记忆","Pause auto brightness, or remember brightness per app or group");

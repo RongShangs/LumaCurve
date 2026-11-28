@@ -33,7 +33,7 @@ final class CompatibilityCatalog {
             route("ported_auxiliary","移植系统辅助补位","原生槽为空；唯一 zte.sensor.light_second 候选通过类型、单位、权限、线程及主屏检查后，补入 OEM 槽并同步双光感能力缓存。")};
         case "suspended_window_brightness":return new Route[]{route("wm_mini_pin_gate","窗口最小化/贴边亮度筛选","窗口服务完整门禁和原生小窗谓词匹配，仅筛除主用户主屏最小或挂起应用窗口；正常小窗与原生拒绝保留。")};
         case "app_brightness_isolation":return new Route[]{route("app_override_scoped_sync","应用覆盖来源限定同步隔离","完整窗口来源、亮屏原因及同步ABI匹配；只拦截同一主屏窗口导致的偏好同步，控制中心主动调整优先。"),route("app_override_native_handoff","应用窗口亮度保持交接隔离","三项同步入口全缺且原生双控制器保持链路完整，只拦截同物理屏、同用户、来源已确认的窗口保持启动。"),route("native_window_no_sync","原生窗口覆盖，无所针对的同步链路","原生窗口接口完整，且同步与保持交接入口均不存在时沿用原生。")};
-        case "app_independent":return new Route[]{route("focused_app_fixed_manual","应用或分组独立固定亮度","当前默认主屏同用户焦点应用匹配互斥名单，原生普通范围与手动输入接口完整；复用应用模式租约，退出恢复此前系统调节。")};
+        case "app_independent":return new Route[]{route("focused_app_fixed_manual","应用或分组独立固定亮度","按主屏同用户的全屏应用匹配独立名单。小窗获得焦点时核验背后的全屏任务。旧系统缺少窗口模式接口时按焦点兼容。")};
         case "app_brightness_share":return new Route[]{route("app_override_screen_shared","旧版窗口共享（已停用）","保留历史路线说明和旧配置字段；不再执行，不作为当前可用功能。")};
         case "apps":return new Route[]{route("visible_tasks","可见任务路径（含小窗 / 分屏）","可见任务接口完整；任一名单应用仍可见时保持暂停。"),route("focus_fallback","前台焦点回退路径","没有完整的可见任务能力时按系统焦点判断，并提示小窗限制。")};
         case "hbm":return new Route[]{route("timed_budget","HBM 照度＋时间预算","时间窗口、最大时长与最短时长均通过预算校验；复制本机数据后调整。"),route("ambient_only","HBM 仅照度门槛（原生零计时）","三个时间字段全部为零且接口完整；只调整照度，保留三个零计时值。"),route("enabled_field","控制器：原生启用字段","读取 mHbmControllerIsEnabled；存在此字段时始终优先，不回退绕过错误。"),route("native_support_method","控制器：原生能力方法","没有启用字段且旧结构完整；调用 deviceSupportsHbm 判断实际支持，继续保留照度、时间与省电条件。")};

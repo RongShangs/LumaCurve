@@ -29,14 +29,14 @@ final class AppIndependentControl {
     boolean blocksLearning(){return active;}
     AppIndependentAccess access()throws Exception{AppIndependentAccess.install(s.owner.getClass());AppIndependentAccess p=AppIndependentAccess.profiles.get(s.owner.getClass());if(p==null)throw new IllegalStateException(AppIndependentAccess.errors.getOrDefault(s.owner.getClass(),"独立亮度接口尚未就绪"));return p;}
     boolean bound(AppIndependentAccess p)throws Exception{return physical.equals(p.identity(s))&&range==p.hbm.get(s.owner)&&configuration==p.configuration.get(s.owner);}
-    String focused(){ForegroundApps.Snapshot f=c.foreground;return !c.foregroundPending&&!c.foregroundQuerying&&f.user==0&&f.display==0&&f.independentAllowed?f.pkg:"";}
+    String qualifyingApp(){return c.foregroundPending||c.foregroundQuerying?"":c.foreground.independentPackage;}
     void configure(BrightnessControlOptions before,BrightnessControlOptions next){
         String nextSignature=next.independentSignature();if(!signature.equals(nextSignature)){generation++;resetLoad();input=lockInput=null;signature=nextSignature;policy.retain(next);}
         if((before.independentKeepReboot||!next.independentApps.isEmpty()||!next.independentGroups.isEmpty())&&(!next.independentKeepReboot||!next.independentKeepLock))persist(false);
     }
     boolean step()throws Exception{
-        if((c.foregroundPending||c.foregroundQuerying)&&owned()&&!suspended&&c.enabled()&&c.awake()&&c.unlocked())return true;
-        String nextPkg=focused(),next=c.options.independentKey(nextPkg);
+        if((c.foregroundPending||c.foregroundQuerying)&&owned()&&!suspended&&c.enabled()&&c.mainDisplay()&&c.awake()&&c.unlocked())return true;
+        String nextPkg=qualifyingApp(),next=c.options.independentKey(nextPkg);
         boolean allowed=!next.isEmpty()&&c.enabled()&&c.mainDisplay()&&c.awake()&&c.unlocked()&&!c.appExemptions.contains(nextPkg);
         if(!allowed){if(owned())c.relinquish("independent_left",true);return false;}
         if(c.owner.equals("raw_panel")||c.owner.equals("panel"))return false;
@@ -48,7 +48,11 @@ final class AppIndependentControl {
         if(owned()&&next.equals(key)){pkg=nextPkg;suspended=false;nativeFrame();return true;}
         float initial;boolean transfer=owned();
         if(transfer){saveInput();initial=baseline;generation++;s.handler.removeCallbacks(userUpdate);s.handler.removeCallbacks(nativeUpdate);nativeQueued=false;queued=false;}
-        else{if(c.owner.equals("dark"))c.relinquish("independent_entered",true);else if(!c.owner.equals("none"))return false;initial=(float)c.display.read().getDouble("value");wasAuto=c.auto();baseline=initial;}
+        else{
+            if(c.owner.equals("dark")||c.owner.equals("app"))c.relinquish("independent_entered",true);
+            else if(!c.owner.equals("none"))return false;
+            initial=(float)c.display.read().getDouble("value");wasAuto=c.auto();baseline=initial;
+        }
         float target=policy.get(next,initial,ceiling);if(!Float.isFinite(target))return false;
         physical=id;range=p.hbm.get(s.owner);configuration=p.configuration.get(s.owner);key=next;pkg=nextPkg;suspended=false;
         if(transfer){boolean previous=c.busy;c.busy=true;try{owned=c.display.write(target);c.held=owned;updateLease();}finally{c.busy=previous;}}
@@ -56,14 +60,14 @@ final class AppIndependentControl {
         c.reason="app_independent";s.queueControlPublish();return true;
     }
     synchronized void enqueueUser(float value){
-        if(!active||suspended||s.closed||!focused().equals(pkg))return;input=new Pending(this,value);pending=value;pendingGeneration=generation;pendingAt=SystemClock.uptimeMillis();if(queued)return;queued=true;if(!s.handler.postDelayed(userUpdate,180))queued=false;
+        if(!active||suspended||s.closed||!qualifyingApp().equals(pkg))return;input=new Pending(this,value);pending=value;pendingGeneration=generation;pendingAt=SystemClock.uptimeMillis();if(queued)return;queued=true;if(!s.handler.postDelayed(userUpdate,180))queued=false;
     }
     void applyUser(){
         final Pending candidate;final float value;final long epoch,at;synchronized(this){queued=false;candidate=input;if(candidate==null)return;value=candidate.value;epoch=candidate.generation;at=candidate.at;}
         // A foreground query may outlast the debounce. The lease handover will
         // consume this input once its destination is known.
         if(c.foregroundPending||c.foregroundQuerying)return;
-        try{if(!owned()||suspended||epoch!=generation||SystemClock.uptimeMillis()-at>2000||!focused().equals(pkg)||c.auto()||!c.enabled()||!c.awake()||!c.unlocked())return;
+        try{if(!owned()||suspended||epoch!=generation||SystemClock.uptimeMillis()-at>2000||!qualifyingApp().equals(pkg)||c.auto()||!c.enabled()||!c.awake()||!c.unlocked())return;
             AppIndependentAccess p=access();if(!bound(p)||!p.ordinaryScene(s)||!AppIndependentPolicy.ordinary(value,p.ceiling(s)))return;
             boolean previous=c.busy;c.busy=true;try{owned=c.display.write(value);c.held=owned;c.brightnessSnapshot=c.brightnessValues();updateLease();}finally{c.busy=previous;}
             if(policy.remember(key,value,p.ceiling(s))){persist(true);s.queueControlPublish();}
@@ -95,7 +99,7 @@ final class AppIndependentControl {
     void applyNative(){
         nativeQueued=false;
         if(!awaitingNative||nativeGeneration!=generation||!owned()||suspended)return;
-        try{if(c.auto()||!c.enabled()||!c.awake()||!c.unlocked()||!focused().equals(pkg))return;
+        try{if(c.auto()||!c.enabled()||!c.awake()||!c.unlocked()||!qualifyingApp().equals(pkg))return;
             AppIndependentAccess p=access();if(!bound(p)||!p.ordinaryScene(s)||!Boolean.FALSE.equals(s.kernel.get("mUseAutoBrightness")))return;
             awaitingNative=false;
             // A real drag queued after mode handover owns the next write. A later
@@ -146,7 +150,7 @@ final class AppIndependentControl {
     }
     void cancelLoadRetry(){s.handler.removeCallbacks(loadRetry);loadRetryQueued=false;}
     void resetLoad(){loadGeneration++;cancelLoadRetry();loading=loaded=false;loadAttempts=0;loadBinding="";}
-    void retryLoad(){loadRetryQueued=false;if(s.closed||retryGeneration!=loadGeneration||!loadBinding.equals(policy.binding)||!c.enabled()||!c.awake()||!c.unlocked()||c.options.independentKey(focused()).isEmpty()||!c.options.independentKeepLock||!c.options.independentKeepReboot)return;load();}
+    void retryLoad(){loadRetryQueued=false;if(s.closed||retryGeneration!=loadGeneration||!loadBinding.equals(policy.binding)||!c.enabled()||!c.awake()||!c.unlocked()||c.options.independentKey(qualifyingApp()).isEmpty()||!c.options.independentKeepLock||!c.options.independentKeepReboot)return;load();}
     void persist(boolean requested){
         // A rejected read must not erase a still-unread archive.
         if(requested&&c.options.independentKeepLock&&c.options.independentKeepReboot&&!loaded)return;
