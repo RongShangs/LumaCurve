@@ -9,8 +9,8 @@
 | 项目 | 要求 |
 | --- | --- |
 | 触发 | 户外会话生效且用户启用HBM调整，真实原生数据、照度与预算结构可调。 |
-| 需求与行为 | 控制器ABI与计时ABI分开；合法零计时仅调整照度，有限预算受原时间窗口限制；不制造HBM数据；数据身份接受 config.* 十字段或 DisplayDeviceConfig 内嵌七字段，逐项校验 |
-| 退出 / 失败 | 停用时仅在字段仍指向本次克隆时恢复原对象，不覆盖系统新配置。 |
+| 需求与行为 | 合法零计时仅调整照度，有限预算受原时间窗口限制。数据身份接受 config.* 十字段或 DisplayDeviceConfig 内嵌七字段。有效值与原生相同则沿用原对象。旧自动亮度路线明确处于同一物理屏临时原因清零阶段时，只在既有的短时确认窗口内保留已持有的配置，各亮度写入仍须重新通过自动归属检查。 |
+| 退出 / 失败 | 停用、保护条件成立或临时原因持续不明时，仅在字段仍指向本次克隆时恢复原对象，保留系统后来写入的配置。 |
 | 默认 | `native` · 不额外修改 |
 | 配置键 | `outdoor_hbm_tuning`、`outdoor_hbm_lux_factor`、`outdoor_hbm_budget_factor` |
 | 依赖能力 | `outdoor` |
@@ -53,5 +53,5 @@
 
 | 文件 | 当前源码 SHA-256 前16位 |
 | --- | --- |
-| [HbmAccess.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/HbmAccess.java) | `1b60fcde7b4ab2b7` |
-| [OutdoorController.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/OutdoorController.java) | `04002b346d81ba8d` |
+| [HbmAccess.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/HbmAccess.java) | `86fd4fb593012bc1` |
+| [OutdoorController.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/OutdoorController.java) | `6cb4592f934055d4` |

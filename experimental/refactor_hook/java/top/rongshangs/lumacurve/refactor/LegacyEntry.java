@@ -10,7 +10,6 @@ import top.rongshangs.lumacurve.refactor.hooking.XposedBridge;
 public final class LegacyEntry implements IXposedHookLoadPackage {
     public void handleLoadPackage(XC_LoadPackage.LoadPackageParam p)throws Throwable {
         XposedBridge.initialize(new LegacyBackend());
-        XposedBridge.log("HyperLux "+AppBuild.BUILD+" legacy API 82 entry; process="+p.processName);
         if("com.android.systemui".equals(p.packageName)){ControlCenterHooks.install(p.classLoader);return;}
         HookEntry.handleLoadPackage(new HookEntry.LoadParam(p.packageName,p.processName,p.classLoader));
     }

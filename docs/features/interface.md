@@ -95,7 +95,7 @@
 | 项目 | 要求 |
 | --- | --- |
 | 触发 | 对应页面可见或用户明确触发。 |
-| 需求与行为 | 日志页正常状态显示访问、注入、亮度引擎三个状态和详细兼容路线入口，异常时补充提示。独立自检页面按功能展示采用/未采用路线、依据和固定检测时间；查看展开只读；分析包导出确认后打开系统分享。自动亮度模式读取失败独立记录，保留曲线、运行日志及其他诊断。 |
+| 需求与行为 | 日志页正常状态显示访问、注入、亮度引擎三个状态和详细兼容路线入口，异常时补充提示。运行记录标题独立一行，下方工具栏靠左依次放日志级别和刷新，自动滚动开关靠右。日志级别默认完整，保存后一并控制 LSPosed 写入和 App 运行日志快照。仅错误停记照度跳变、光感参考切换等普通事件，错误继续记录。分析包使用已记录的快照和原有诊断。升级首次连接时迁移旧日志级别，系统已保存的选择优先。独立自检页面按功能展示采用/未采用路线、依据和固定检测时间；查看展开只读；分析包导出确认后打开系统分享。自动亮度模式读取失败独立记录，保留曲线、运行日志及其他诊断。 |
 | 退出 / 失败 | 查看/展开不执行控制；导出或分享失败保留原包，并明确不完整诊断范围。 |
 | 默认 | `observe` · 只控制对应界面或用户明确操作，不自动调整屏幕亮度。 |
 | 配置键 | 无独立持久化亮度配置键 |
@@ -147,11 +147,12 @@
 | [AutomaticModeAccess.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/AutomaticModeAccess.java) | `89cb3474888f3cb7` |
 | [BrightnessControlOptions.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/BrightnessControlOptions.java) | `e5078bc085530fa2` |
 | [ConfigurationFile.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ConfigurationFile.java) | `c431d5091d245285` |
-| [FeatureCheckPage.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/FeatureCheckPage.java) | `c299b03f761fe6f0` |
+| [FeatureCheckPage.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/FeatureCheckPage.java) | `cb44241c6543b5ac` |
 | [FloatingNavigation.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/FloatingNavigation.java) | `4aedf6324f3f0d15` |
-| [HookRuntime.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/HookRuntime.java) | `3363c0fe90e8ef02` |
-| [MainActivity.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/MainActivity.java) | `080961a9b06d3e9c` |
+| [HookRuntime.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/HookRuntime.java) | `36596cadff1071b5` |
+| [MainActivity.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/MainActivity.java) | `20e4170a35bf7399` |
 | [QuickSetupPlan.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/QuickSetupPlan.java) | `ba3faf56456e4cc8` |
+| [RuntimeLog.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/RuntimeLog.java) | `40091b4ec2d46f1b` |
 | [SettingsSearch.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/SettingsSearch.java) | `e6d35527a7fccfc5` |
 | [StatusPageLayout.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/StatusPageLayout.java) | `82c2f0e363a062f6` |
 | [ThemePalette.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ThemePalette.java) | `3d2dc43cc46249cd` |

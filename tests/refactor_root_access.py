@@ -127,7 +127,7 @@ P+'DiagnosticsTest.java':r'''package top.rongshangs.lumacurve.refactor;import or
 public class DiagnosticsTest{static int cases;static void check(boolean b){if(!b)throw new AssertionError("case "+cases);cases++;}
  static JSONObject unpack(byte[] bytes)throws Exception{try(ZipInputStream zip=new ZipInputStream(new ByteArrayInputStream(bytes))){check(zip.getNextEntry().getName().equals("app-root-diagnostics.json"));ByteArrayOutputStream b=new ByteArrayOutputStream();byte[] data=new byte[1024];int n;while((n=zip.read(data))>0)b.write(data,0,n);JSONObject out=new JSONObject(new String(b.toByteArray(),StandardCharsets.UTF_8));check(zip.getNextEntry().getName().equals("analysis-readme.txt"));check(zip.read(data)>0);check(zip.getNextEntry()==null);return out;}}
  public static void main(String[] args)throws Exception{JSONObject previous=new JSONObject().put("ok",true).put("config",new JSONObject().put("unchanged",true));String original=previous.toString();JSONObject report=unpack(AppRootDiagnostics.archive(previous,new IOException("Permission denied")));check(report.getBoolean("partial_root_report")&&report.getString("root_error").contains("Permission denied"));check(previous.toString().equals(original));check(report.getJSONObject("last_known_state").getJSONObject("config").getBoolean("unchanged"));check(!report.has("runtime"));check(!unpack(AppRootDiagnostics.archive(null,new IOException("missing"))).has("last_known_state"));
- JSONObject unavailable=AppRootDiagnostics.unavailable(new IOException("cannot start"));check(unavailable.getString("mode").equals("app_observed_failure"));check(unavailable.getJSONArray("features").length()==8);for(int i=0;i<8;i++)check(unavailable.getJSONArray("features").getJSONObject(i).getString("state").equals("pending"));
+ JSONObject unavailable=AppRootDiagnostics.unavailable(new IOException("cannot start"));check(unavailable.getString("mode").equals("app_observed_failure"));JSONArray rows=unavailable.getJSONArray("features");check(rows.length()==9);boolean systemUi=false;for(int i=0;i<rows.length();i++){JSONObject row=rows.getJSONObject(i);check(row.getString("state").equals("pending"));if(row.getString("id").equals("control_center_system_ui"))systemUi=true;}check(systemUi);
  Context context=new Context();JSONObject result=AppRootDiagnostics.export(context,previous,new IOException("denied"));check(result.getBoolean("ok")&&result.getBoolean("partial_root_report"));check(result.getString("path").startsWith("Download/HyperLux/"));check(context.resolver.inserted.v.get("pending").equals(1)&&context.resolver.updated.v.get("pending").equals(0));check(context.resolver.deleted==0);check(unpack(context.resolver.bytes.toByteArray()).getBoolean("partial_root_report"));
  for(boolean open:new boolean[]{true,false}){Context bad=new Context();bad.resolver.failOpen=open;bad.resolver.failUpdate=!open;try{AppRootDiagnostics.export(bad,null,new IOException("denied"));throw new AssertionError("accepted");}catch(IOException expected){cases++;}check(bad.resolver.deleted==1);}
  System.out.println("APP partial diagnostics host: "+cases+" cases PASS");}}
@@ -141,17 +141,19 @@ P+'Doubles.java':r'''package top.rongshangs.lumacurve.refactor;import org.json.*
 class RootSettings{boolean readable;boolean available(){return readable;}}
 class RootWorkspace{static File PRIMARY=new File("/original");}
 class RootAccess{static JSONObject report(RootSettings s){return new JSONObject().put("uid",0).put("workspace",new JSONObject().put("selected","/alternative").put("selected_usable",false).put("selection_error","Permission denied")).put("settings",new JSONObject().put("route",s.readable?"cmd_settings":"").put("write_confirmed",false).put("routes",new JSONArray().put(new JSONObject().put("id","external_provider").put("readable",false).put("detail","provider denied"))));}}
+class PanelNodeDiscovery{static JSONObject directAccess(JSONObject n){return n;}}
 class ActivePanelNode{static int calls;static JSONObject discover(){calls++;return new JSONObject().put("supported",true);}}
 class NativePanelRoot{static void probe(JSONObject n)throws Exception{throw new IOException("node denied");}}
 class OutdoorNodeRoot{static int calls;static boolean supported(JSONObject n){calls++;return false;}}
 class NativePanelAsset{static int calls;static byte[] read(File f){calls++;return new byte[0];}}
+class SystemUiAccess{static JSONObject coordinateCheck(RootSettings s){return s.readable?new JSONObject().put("state","available").put("system_ui_route","gamma"):new JSONObject().put("state","pending").put("detail","无法读取 SystemUI 回执");}}
 ''',
 P+'RootFeatureTest.java':r'''package top.rongshangs.lumacurve.refactor;import org.json.*;
 public class RootFeatureTest{static int cases;static void check(boolean b){if(!b)throw new AssertionError("case "+cases);cases++;}static JSONObject find(JSONObject r,String id){JSONArray a=r.getJSONArray("features");for(int i=0;i<a.length();i++)if(a.getJSONObject(i).getString("id").equals(id))return a.getJSONObject(i);throw new AssertionError(id);}
  public static void main(String[] args)throws Exception{
-  RootSettings settings=new RootSettings();JSONObject r=RootFeatureChecks.run(null,null,settings);check(r.getJSONArray("features").length()==9);check(find(r,"root_settings").getString("state").equals("pending"));check(find(r,"root_identity").getString("state").equals("available"));check(find(r,"stored_config").getString("state").equals("pending"));check(find(r,"main_panel_node").getString("state").equals("pending"));check(find(r,"main_panel_node").getString("detail").contains("node denied"));check(ActivePanelNode.calls==1&&OutdoorNodeRoot.calls==1&&NativePanelAsset.calls==1);check(find(r,"root_storage").getString("state").equals("pending"));check(find(r,"root_storage").getString("detail").contains("Permission denied"));
+  RootSettings settings=new RootSettings();JSONObject r=RootFeatureChecks.run(null,null,settings);check(r.getJSONArray("features").length()==10);check(find(r,"root_settings").getString("state").equals("pending"));check(find(r,"root_identity").getString("state").equals("available"));check(find(r,"stored_config").getString("state").equals("pending"));check(find(r,"main_panel_node").getString("state").equals("pending"));check(find(r,"main_panel_node").getString("detail").contains("node denied"));check(ActivePanelNode.calls==1&&OutdoorNodeRoot.calls==1&&NativePanelAsset.calls==1);check(find(r,"root_storage").getString("state").equals("pending"));check(find(r,"root_storage").getString("detail").contains("Permission denied"));check(find(r,"control_center_system_ui").getString("state").equals("pending"));
   settings.readable=true;r=RootFeatureChecks.run(new JSONObject(),"{}",settings);check(find(r,"root_settings").getString("state").equals("available"));check(find(r,"root_settings").getString("settings_route").equals("cmd_settings"));check(find(r,"root_settings").getString("detail").contains("自检不试写"));check(find(r,"root_settings").getJSONArray("settings_attempts").length()==1);check(find(r,"root_process_identity").getString("state").equals("available"));check(find(r,"stored_config").getString("state").equals("available"));check(ActivePanelNode.calls==2&&OutdoorNodeRoot.calls==2&&NativePanelAsset.calls==2);
-  r=RootFeatureChecks.run(new JSONObject(),"invalid-json",settings);check(find(r,"stored_config").getString("state").equals("pending"));check(find(r,"root_settings").getString("state").equals("available"));check(NativePanelAsset.calls==3);System.out.println("Root independent checks host: "+cases+" cases PASS");
+  r=RootFeatureChecks.run(null,"invalid-json",settings);check(find(r,"stored_config").getString("state").equals("pending"));check(find(r,"root_settings").getString("state").equals("available"));check(NativePanelAsset.calls==3);JSONObject ui=find(r,"control_center_system_ui");check(ui.getString("state").equals("available")&&ui.getString("system_ui_route").equals("gamma")&&find(r,"root_process_identity").getString("state").equals("pending"));System.out.println("Root independent checks host: "+cases+" cases PASS");
  }}'''}
 old_classpath=os.environ.get('CLASSPATH');os.environ['CLASSPATH']='fixture-only.apk'
 total+=run_java('RootFeatureTest',['RootFeatureChecks.java','FeatureSelfCheck.java'],independent,'independent')
@@ -166,17 +168,57 @@ config_test={P+'ConfigRootTest.java':r'''package top.rongshangs.lumacurve.refact
 +  JSONObject caps=new JSONObject().put("curve_backend","physical_mapping").put("baseline_id","same").put("user_serial",0).put("outdoor_node_supported",false);JSONObject proposed=new JSONObject(stored.toString());String old=stored.toString(),draft=proposed.toString();
 +  JSONObject validation=ConfigurationCompatibility.submissionValidation(proposed,caps,stored,"maker/device:new");check(!validation.getBoolean("outdoor_node_boost"));check(stored.toString().equals(old)&&proposed.toString().equals(draft));check(proposed.getBoolean("outdoor_node_boost")&&proposed.getInt("outdoor_node_target")==5000);
 +  for(JSONObject invalid:new JSONObject[]{null,new JSONObject(stored.toString()).put("baseline_id","other"),new JSONObject(stored.toString()).put("outdoor_node_boost",false)})check(ConfigurationCompatibility.submissionValidation(proposed,caps,invalid,"maker/device:new").getBoolean("outdoor_node_boost"));
-+  check(ConfigurationCompatibility.submissionValidation(new JSONObject(draft).put("outdoor_strength",.5),caps,stored,"maker/device:new").getBoolean("outdoor_node_boost"));check(ConfigurationCompatibility.submissionValidation(proposed,new JSONObject(caps.toString()).put("outdoor_node_supported",true),stored,"maker/device:new").getBoolean("outdoor_node_boost"));
++  caps.put("outdoor_supported",true).put("outdoor_range_supported",true).put("outdoor_opr_supported",true).put("outdoor_hbm_supported",true);
++  JSONObject edited=new JSONObject(draft).put("outdoor_enter_lux",8000).put("outdoor_session_ms",240000).put("outdoor_strength",.5).put("outdoor_hbm_lux_factor",.8).put("outdoor_hbm_tuning",true);
++  JSONObject checkEdit=ConfigurationCompatibility.submissionValidation(edited,caps,stored,"maker/device:new");
++  OutdoorOptions.parse(checkEdit).verify(caps);
++  check(!checkEdit.getBoolean("outdoor_node_boost")&&checkEdit.getDouble("outdoor_strength")==.5&&edited.getBoolean("outdoor_node_boost")&&edited.getInt("outdoor_node_target")==5000);
++  check(ConfigurationCompatibility.submissionValidation(new JSONObject(draft).put("outdoor_node_target",4900),caps,stored,"maker/device:new").getBoolean("outdoor_node_boost"));
++  check(ConfigurationCompatibility.submissionValidation(proposed,new JSONObject(caps.toString()).put("outdoor_node_supported",true),stored,"maker/device:new").getBoolean("outdoor_node_boost"));
++  try{OutdoorOptions.parse(ConfigurationCompatibility.submissionValidation(edited,new JSONObject(caps.toString()).put("outdoor_hbm_supported",false),stored,"maker/device:new")).verify(new JSONObject(caps.toString()).put("outdoor_hbm_supported",false));throw new AssertionError("invalid HBM accepted");}catch(IllegalArgumentException expected){cases++;}
 +  for(int mask=0;mask<4;mask++){OutdoorNodeRoot.fail=(mask&1)!=0;ControlCenterRoot.fail=(mask&2)!=0;OutdoorNodeRoot.calls=ControlCenterRoot.calls=0;RootControl root=new RootControl();JSONObject result=root.afterApply(proposed);check(result.getBoolean("ok"));check(OutdoorNodeRoot.calls==1&&ControlCenterRoot.calls==1);check(result.getString("root_warning").isEmpty()==(mask==0));check(stored.toString().equals(old)&&proposed.toString().equals(draft));}
++  RootControl root=new RootControl();JSONObject snapshot=new JSONObject().put("node_saved",true);
++  check(root.startOutdoorTest("normal",new JSONObject()).getBoolean("ok")&&root.steps.toString().equals("[outdoor_test_start]"));
++  OutdoorNodeRoot.unavailable=false;root.steps.clear();check(root.startOutdoorTest("supported",snapshot).getBoolean("ok")&&root.steps.toString().equals("[outdoor_test_start]"));
++  OutdoorNodeRoot.unavailable=true;root.steps.clear();check(root.startOutdoorTest("paused",snapshot).getBoolean("ok")&&root.steps.toString().equals("[outdoor_test_prepare, stop_guard, outdoor_test_start]"));
++  root.steps.clear();root.rejectPrepare=true;check(!root.startOutdoorTest("prepare-rejected",snapshot).getBoolean("ok")&&root.steps.toString().equals("[outdoor_test_prepare]"));root.rejectPrepare=false;
++  root.steps.clear();root.rejectStart=true;check(!root.startOutdoorTest("start-rejected",snapshot).getBoolean("ok")&&root.steps.toString().equals("[outdoor_test_prepare, stop_guard, outdoor_test_start, outdoor_test_stop]"));root.rejectStart=false;
++  root.steps.clear();OutdoorNodeRoot.failStop=true;try{root.startOutdoorTest("stop-failed",snapshot);throw new AssertionError("failed native stop ignored");}catch(IOException expected){cases++;}
++  check(root.steps.toString().equals("[outdoor_test_prepare, stop_guard, outdoor_test_stop]"));
++  check(root.logLevel("read").getString("log_level").equals("full")&&root.settings.writes==0);
++  check(root.logLevel("migrate-errors").getString("log_level").equals("errors")&&root.settings.writes==1);
++  check(root.logLevel("errors").getString("log_level").equals("errors")&&root.settings.writes==1);
++  check(root.logLevel("full").getString("log_level").equals("full")&&root.settings.writes==2);
++  check(root.logLevel("migrate-errors").getString("log_level").equals("full")&&root.settings.writes==2);
++  try{root.logLevel("unknown");throw new AssertionError("unknown log level was saved");}catch(IOException expected){cases++;}
++  root.settings.deny=true;try{root.logLevel("errors");throw new AssertionError("unconfirmed log write accepted");}catch(IOException expected){cases++;}
++  check(root.logLevel("read").getString("log_level").equals("full"));
 +  System.out.println("Core/root independence host: "+cases+" cases PASS");
 + }}
-+class OutdoorNodeRoot{static int calls;static boolean fail;static void reconcileAfterApply(JSONObject s,String raw)throws Exception{calls++;if(fail)throw new IOException("node denied");}}
++class OutdoorNodeRoot{static int calls;static boolean fail,unavailable,failStop;static void reconcileAfterApply(JSONObject s,String raw)throws Exception{calls++;if(fail)throw new IOException("node denied");}
++ static boolean requested(JSONObject s){return s.optBoolean("node_saved");}
++ static JSONObject testPauseBinding(JSONObject state){return unavailable?new JSONObject().put("physical",7):null;}
++ static void stop()throws Exception{RootControl.steps.add("stop_guard");if(failStop)throw new IOException("node stop denied");}
++}
++class OutdoorNodeBridge{static final long LEASE_MS=1500;}
 +class ControlCenterRoot{static int calls;static boolean fail;static void reconcile(Object settings,JSONObject s,String raw)throws Exception{calls++;if(fail)throw new IOException("profile denied");}}
-+class RootControl{Object settings;JSONObject live(){return new JSONObject();}AFTER_APPLY}
-+'''.replace('\n+','\n')}
++class LogSetting{String value;boolean deny;int writes;String get(String key){if(!RuntimeLog.KEY.equals(key))throw new AssertionError(key);return value;}boolean put(String key,String next){get(key);if(deny)return false;value=next;writes++;return true;}}
++class RootControl{LogSetting settings=new LogSetting();static final java.util.List<String> steps=new java.util.ArrayList<>();boolean rejectPrepare,rejectStart;JSONObject live(){return new JSONObject();}
++ JSONObject refreshedLive(boolean fresh){if(!fresh)throw new AssertionError("stale fixture");return new JSONObject().put("live",true);}
++ JSONObject requestBrightness(JSONObject request,JSONObject state){
++   String action=request.getString("action");steps.add(action);
++   if(action.equals("outdoor_test_prepare")&&(!state.optBoolean("live")||request.getJSONObject("node_binding").getLong("physical")!=7))throw new AssertionError("invalid preparation");
++   if(action.equals("outdoor_test_start")&&request.optBoolean("requires_node_pause")!=steps.contains("stop_guard"))throw new AssertionError("invalid start");
++   return new JSONObject().put("ok",!(rejectPrepare&&action.equals("outdoor_test_prepare"))&&!(rejectStart&&action.equals("outdoor_test_start"))).put("node_ready_uptime_ms",100);
++ }
++ AFTER_APPLY START_TEST LOG_LEVEL
++}
++'''.replace('\n+','\n'),'android/os/SystemClock.java':'package android.os;public class SystemClock{public static long uptimeMillis(){return 100;}}'}
 source=(S/'RootControl.java').read_text('utf-8');start=source.index('    JSONObject afterApply(');end=source.index('    JSONObject stop()',start)
-config_test[P+'ConfigRootTest.java']=config_test[P+'ConfigRootTest.java'].replace('AFTER_APPLY',source[start:end])
-total+=run_java('ConfigRootTest',['BrightnessControlOptions.java','ConfigurationCompatibility.java','MemoryOptions.java','OutdoorTargetCurve.java','OutdoorOptions.java','OutdoorNodeTarget.java','AdvancedPolicy.java'],config_test,'configuration')
+test_start=source.index('    private JSONObject startOutdoorTest(');test_end=source.index('    JSONObject rawPanel(',test_start)
+log_start=source.index('    JSONObject logLevel(');log_end=source.index('    JSONObject execute(',log_start)
+config_test[P+'ConfigRootTest.java']=config_test[P+'ConfigRootTest.java'].replace('AFTER_APPLY',source[start:end]).replace('START_TEST',source[test_start:test_end].replace('private JSONObject','JSONObject',1)).replace('LOG_LEVEL',source[log_start:log_end])
+total+=run_java('ConfigRootTest',['BrightnessControlOptions.java','ConfigurationCompatibility.java','MemoryOptions.java','OutdoorTargetCurve.java','OutdoorOptions.java','OutdoorNodeTarget.java','AdvancedPolicy.java','RuntimeLog.java'],config_test,'configuration')
 
 # Production call sites retain independent optional-tool failures and no write on probe.
 control=(S/'RootControl.java').read_text('utf-8')

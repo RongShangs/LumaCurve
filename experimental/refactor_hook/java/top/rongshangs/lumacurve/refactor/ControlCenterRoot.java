@@ -36,7 +36,7 @@ final class ControlCenterRoot {
     static void captureBinding(JSONObject config,JSONObject runtime,JSONObject stored,int mode)throws Exception{
         JSONObject node=null;Exception unavailable=null;
         try{node=NativePanelRoot.status();}catch(Exception failure){unavailable=failure;}
-        if(node!=null&&node.optBoolean("supported")&&runtime.optBoolean(BrightnessControlOptions.capability(mode))){
+        if(node!=null&&node.optBoolean("supported")&&(mode<3||node.optString("direct_write_block").isEmpty())&&runtime.optBoolean(BrightnessControlOptions.capability(mode))){
             config.put("control_center_node_maximum",node.getInt("maximum")).put("control_center_node_path",node.getString("canonical_path"));return;
         }
         if(mode>=3&&stored!=null&&stored.optInt("control_center_node_mode")==mode&&stored.optInt("control_center_node_maximum")>10&&stored.optInt("control_center_node_maximum")<=65535&&!stored.optString("control_center_node_path").isEmpty()){
@@ -54,6 +54,11 @@ final class ControlCenterRoot {
             return;
         }
         JSONObject node=NativePanelRoot.status();
+        if(options.nodeSliderMode>=3&&!node.optString("direct_write_block").isEmpty()){
+            if(!settings.put(PROFILE,null))throw new IllegalStateException("控制中心节点映射停用未确认");
+            retireBlockedWriter(runtime.getInt("pid"));
+            throw new IllegalStateException("主屏当前不可直写，控制中心使用系统调光（"+node.getString("direct_write_block")+"）");
+        }
         if(!node.optBoolean("supported")&&ActivePanelNode.PROFILE.equals(node.optString("discovery"))&&"fold_binding_pending".equals(node.optString("reason"))){settings.put(PROFILE,null);throw new java.util.concurrent.TimeoutException("等待确认当前折叠主屏");}
         if(!ActivePanelNode.matchesSavedBinding(node,config.optString("control_center_node_path"),config.optInt("control_center_node_maximum"))){settings.put(PROFILE,null);throw new IllegalStateException("控制中心主屏节点身份已变化，请重新保存");}
         String tableRaw=settings.get(ControlCenterEngine.TABLES),boot=settings.get("boot_count");
@@ -74,4 +79,21 @@ final class ControlCenterRoot {
         if(!profile.toString().equals(settings.get(PROFILE))&&!settings.put(PROFILE,profile.toString()))throw new IllegalStateException("节点映射配置未写入");
     }
     static void retireIdleWriter(){try{JSONObject guard=NativePanelClient.call("STATUS");if(guard.optBoolean("control_center_listener")&&!guard.optBoolean("armed"))NativePanelRoot.stop();}catch(Exception absent){}}
+    private static void retireBlockedWriter(int pid)throws Exception{
+        JSONObject guard;
+        try{guard=NativePanelClient.call("STATUS");}catch(Exception absent){return;}
+        if(!guard.optBoolean("control_center_listener")||guard.optInt("control_center_pid",-1)!=pid)return;
+        String token=guard.optString("session");
+        if(!guard.optBoolean("armed"))retireIdleWriter();
+        else if(token.matches("cc_[A-Za-z0-9_-]{1,77}"))NativePanelClient.require("STOP "+token);
+    }
+    static void annotateNodeCapability(JSONObject runtime,JSONObject node)throws JSONException{
+        if(runtime==null||!runtime.optBoolean("control_center_raw_supported")&&!runtime.optBoolean("control_center_partition_supported"))return;
+        String reason=node.optString("direct_write_block");
+        if(reason.isEmpty())return;
+        boolean pending="mtk_led_mode_pending".equals(reason);
+        for(String key:new String[]{"control_center_raw_supported","control_center_partition_supported"})
+            runtime.put(key,false).put(key+"_state",pending?"pending":"unsupported");
+        runtime.put("control_center_node_detail",pending?"主屏调光模式尚未确认，控制中心使用系统调光。":"主屏当前由系统调光，节点映射暂停，已保存的设置会保留。");
+    }
 }

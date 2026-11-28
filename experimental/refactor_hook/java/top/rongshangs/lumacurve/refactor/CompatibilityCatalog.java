@@ -8,7 +8,7 @@ import java.util.*;
  */
 final class CompatibilityCatalog {
     private CompatibilityCatalog(){}
-    private static final String[] FEATURES={"curve","manual_memory","saved_curve","persistent_memory","memory_mode","memory_forever","memory_reset","memory_timeout","main_sensor","assist_sensor","response","small_response","low_light","low_threshold","threshold_override","assist_gate","assist_override","animation_override","sunlight_override","touch_override","scene_night_driving","scene_step","scene_touch","scene_proximity","scene_stream_proximity","scene_reflection","scene_night_wake","scene_manual_sunlight","scene_game","dark_lock","dark_lock_schedule","manual_panel","control_center_slider","control_center_raw","control_center_partition","apps","app_independent","thermal","outdoor","hbm","outdoor_range","opr","opr_curve","outdoor_curve","outdoor_test","nit_limit","node_output","main_panel_node","root_storage","root_identity","root_settings","root_process_identity","stored_config","outdoor_node_device","native_payload","launcher","preferences","app_files","dim_aod","app_brightness_isolation","suspended_window_brightness","mapping_startup","mapping_boot"};
+    private static final String[] FEATURES={"curve","manual_memory","saved_curve","persistent_memory","memory_mode","memory_forever","memory_reset","memory_timeout","main_sensor","assist_sensor","response","small_response","low_light","low_threshold","threshold_override","assist_gate","assist_override","animation_override","sunlight_override","touch_override","scene_night_driving","scene_step","scene_touch","scene_proximity","scene_stream_proximity","scene_reflection","scene_night_wake","scene_manual_sunlight","scene_game","dark_lock","dark_lock_schedule","manual_panel","control_center_slider","control_center_raw","control_center_partition","control_center_system_ui","apps","app_independent","thermal","outdoor","hbm","outdoor_range","opr","opr_curve","outdoor_curve","outdoor_test","nit_limit","node_output","main_panel_node","root_storage","root_identity","root_settings","root_process_identity","stored_config","outdoor_node_device","native_payload","launcher","preferences","app_files","dim_aod","app_brightness_isolation","suspended_window_brightness","mapping_startup","mapping_boot"};
     static String[] features(){return FEATURES.clone();}
     static final class Route {
         final String id,name,condition;
@@ -46,6 +46,10 @@ final class CompatibilityCatalog {
         case "control_center_partition":return new Route[]{route("partition_node_v4","普通亮度与节点分区控制","使用本机普通亮度边界划分区间；普通区间保留自动亮度与原学习。到达边界松手后，三秒内再次向上滑动才使用共用节点保持；返回普通区间可恢复自动或保持手动。"),route("partition_ddc_hbm","原机配置普通上限","优先读取原始HBM过渡点，按本机标定换算普通区间；类型或数据错误不降级绕过。"),route("partition_hbm_normal","控制器普通上限","原机配置没有该入口或合法无HBM数据时，读取实际普通亮度上限；不按固定比例猜测。")};
         case "control_center_raw":return new Route[]{route("raw_node_v3","完整主屏节点与手动保持","独立选择开启；按实际 max_brightness 比例下发节点目标。拖动退出暗光锁定并关闭自动亮度，复用主屏节点租约；重开自动亮度立即结束。需要实际可写节点与系统界面接口；未知折叠监听布局不套用。")};
         case "control_center_slider":return new Route[]{route("coordinate_v2","双向设备坐标映射","使用本机亮度到背光的转换表；可可靠单调反解才启用。保留自动亮度、手动记忆与暗光锁定的原有控制权。"),route("coordinate_v2_calibrated","标定有效区间映射","仅完整原生标定与双向样条一致、端点裁剪和有效区间可反解时，排除最低或最高端的平台；中段异常及额外低亮度标定不套用。")};
+        case "control_center_system_ui":return new Route[]{
+            route("oem_v1","V1 原生换算接口","系统提供原生 V1 亮度到滑块进度的换算方法。"),
+            route("oem_v1_native_progress","V1 原生回显校验","系统直接生成 V1 滑块进度，通过原生回显核验坐标。"),
+            route("gamma","Gamma 换算接口","系统使用 Gamma 在亮度与滑块进度之间换算。")};
         case "thermal":return new Route[]{route("display_thermal","显示层温控接口","仅调整显示亮度限制；严重温控、电池温度门槛及其他系统温控继续有效。")};
         case "response":case "small_response":case "low_light":case "low_threshold":case "threshold_override":case "assist_gate":case "assist_override":return new Route[]{
             route("native_driving","原生确认与夜间驾驶保护","使用已验证的主辅光感确认和阈值；保留原生夜间驾驶判断及附加等待。"),

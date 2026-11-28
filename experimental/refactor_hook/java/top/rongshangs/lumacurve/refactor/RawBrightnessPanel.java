@@ -15,7 +15,7 @@ final class RawBrightnessPanel {
  final Activity host;final Runnable dismiss;final FrameLayout root;final LinearLayout card;
  final Handler ui=new Handler(Looper.getMainLooper());final ExecutorService worker=Executors.newSingleThreadExecutor();
  final RootPanelBridge bridge;final boolean dark,en,landscape;final int ink,muted,blue,bg,surface;
- TextView state,current,target,range,fault;TextView inputAction,maxAction,keepAwakeAction;boolean keepingAwake;String lastFault="";NodeSlider slider;
+ TextView state,current,target,range,fault;TextView inputAction,maxAction,restoreAction,keepAwakeAction;boolean keepingAwake;String lastFault="";NodeSlider slider;
  AlertDialog activeDialog;
  volatile boolean closed;boolean sending,dragging,claimed;Integer pending;String panelDisplayId="";String session=UUID.randomUUID().toString();int generation,maximum=10;long gesture;
  final Runnable poll,flush;
@@ -39,7 +39,7 @@ final class RawBrightnessPanel {
   target=metric(info,"目标节点",blue,22);current=metric(info,"节点读回",ink,18);range=metric(info,"节点上限",muted,15);
   slider=new NodeSlider();LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(dp(72),-1);sp.leftMargin=dp(12);row.addView(slider,sp);
   LinearLayout actions=new LinearLayout(host);actions.setOrientation(landscape?LinearLayout.VERTICAL:LinearLayout.HORIZONTAL);actions.setBaselineAligned(false);LinearLayout.LayoutParams ap=landscape?new LinearLayout.LayoutParams(dp(152),height):new LinearLayout.LayoutParams(-1,-2);if(landscape)ap.leftMargin=dp(12);else ap.topMargin=dp(12);body.addView(actions,ap);
-  inputAction=action("输入数值",this::number,actions,false);maxAction=action("节点最大值",()->begin(maximum),actions,true);action("恢复自动",this::restore,actions,true);inputAction.setEnabled(false);maxAction.setEnabled(false);
+  inputAction=action("输入数值",this::number,actions,false);maxAction=action("节点最大值",()->begin(maximum),actions,true);restoreAction=action("恢复自动",this::restore,actions,true);inputAction.setEnabled(false);maxAction.setEnabled(false);
   LinearLayout extra=new LinearLayout(host);extra.setBaselineAligned(false);LinearLayout.LayoutParams extraLayout=new LinearLayout.LayoutParams(-1,-2);extraLayout.topMargin=dp(8);card.addView(extra,extraLayout);
   keepAwakeAction=action("临时常亮",this::toggleKeepAwake,extra,false);keepAwakeAction.setMinHeight(dp(48));
   fault=text("",12,dark?0xffff9696:0xffb33535);fault.setVisibility(View.GONE);fault.setOnClickListener(v->showFault());card.addView(fault);
@@ -55,23 +55,28 @@ final class RawBrightnessPanel {
  void start(){submit(new JSONObjectRequest("status"),false);ui.postDelayed(poll,1000);}
  void show(JSONObject answer){
   if(closed)return;JSONObject node=answer.optJSONObject("node");JSONObject runtime=answer.optJSONObject("runtime");
+  BrightnessTileService.publish(runtime);
+  boolean blocked=node!=null&&node.has("direct_write_block");
+  restoreAction.setEnabled(!blocked);restoreAction.setAlpha(blocked?.4f:1);
+  keepAwakeAction.setAlpha(blocked?.4f:1);
   if(node==null||!node.optBoolean("supported")){
    String reason=node==null?"":node.optString("reason");
-   String message=reason.startsWith("fold_")?(en?"Waiting for a confirmed active fold display; export diagnostics if it persists":"等待确认当前折叠主屏；持续不可用请导出分析包"):
+   String message=blocked?tr("当前主屏不支持节点直写"):
+       reason.startsWith("fold_")?(en?"Waiting for a confirmed active fold display; export diagnostics if it persists":"等待确认当前折叠主屏；持续不可用请导出分析包"):
        "ambiguous_primary_nodes".equals(reason)?(en?"Multiple display nodes; primary screen is uncertain":"发现多个显示节点，暂不能确定主屏"):
        "scan_incomplete".equals(reason)?(en?"Node scan incomplete; export diagnostics":"节点扫描不完整，请导出分析包"):
        "guard_node_mismatch".equals(reason)?(en?"Writer changed; restore automatic brightness first":"守护节点已变化，请先恢复自动亮度"):
        "node_not_writable".equals(reason)?(en?"Display node is read-only; export diagnostics":"已找到显示节点，但未取得写入权限"):
        (en?"No identifiable primary brightness node":"未找到可识别的主屏亮度节点");
    if(node!=null&&node.has("write_errno"))message+=" (errno "+node.optInt("write_errno")+")";
-   state.setText(message);current.setText(node!=null&&node.has("actual")?String.valueOf(node.optInt("actual")):"—");target.setText("—");range.setText(node!=null&&node.has("maximum")?String.valueOf(node.optInt("maximum")):"—");
+   if(blocked){keepAwakeAction.setEnabled(false);if(claimed||dragging){generation++;claimed=false;dragging=false;pending=null;if(activeDialog!=null)activeDialog.dismiss();}}
+   state.setText(message);current.setText(!blocked&&node!=null&&node.has("actual")?String.valueOf(node.optInt("actual")):"—");target.setText("—");range.setText(!blocked&&node!=null&&node.has("maximum")?String.valueOf(node.optInt("maximum")):"—");
    slider.ready=false;inputAction.setEnabled(false);maxAction.setEnabled(false);inputAction.setAlpha(.4f);maxAction.setAlpha(.4f);slider.invalidate();return;
   }
   String physical=node.optString("physical_display_id");
   if(!panelDisplayId.equals(physical)){generation++;claimed=false;pending=null;dragging=false;session=UUID.randomUUID().toString();if(activeDialog!=null)activeDialog.dismiss();clearFault();panelDisplayId=physical;}
   JSONObject configuration=runtime==null?null:runtime.optJSONObject("brightness_control");maximum=BrightnessControlOptions.manualCeiling(configuration==null?0:configuration.optInt("manual_panel_maximum",0),node.optInt("maximum",10));int actual=node.optInt("actual",-1);JSONObject guard=node.optJSONObject("guard");
   boolean auto=runtime==null||runtime.optBoolean("auto_mode");JSONObject owner=runtime==null?null:runtime.optJSONObject("brightness_control");
-  BrightnessTileService.publish(runtime);
   keepingAwake=owner!=null&&owner.optBoolean("temporary_screen_on");keepAwakeAction.setText(tr(keepingAwake?"取消临时常亮":"临时常亮"));keepAwakeAction.setEnabled(runtime!=null&&"active".equals(runtime.optString("phase")));
   if(claimed&&(auto||owner==null||!session.equals(owner.optString("session"))||!"raw_panel".equals(owner.optString("owner")))){generation++;claimed=false;pending=null;dragging=false;state.setText(tr("已退让；再次滑动才会关闭自动亮度"));}
   else state.setText(tr(auto?"自动亮度中；滑动切换为手动":guard!=null&&guard.optBoolean("paused")?"解锁后恢复":guard!=null&&guard.optBoolean("armed")&&guard.optInt("target",-1)>=10?"节点亮度保持中":"手动模式；滑动接管节点"));

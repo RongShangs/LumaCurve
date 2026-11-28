@@ -21,9 +21,10 @@ final class ManualPanelLimitSettings {
     void resetMaximum(){if(!a.busy){a.controls.manualMaximum=0;input.clearFocus();a.dirty=true;a.drawCurve();}}
     void refresh(){
         maximum=ControlCenterStatus.maximum(a.runtime,a.rootFeatureReport);boolean known=maximum>=10;int value=BrightnessControlOptions.manualCeiling(a.controls.manualMaximum,maximum);
-        boolean enabled=known&&!a.busy&&a.controls.manualPanel;
+        boolean blocked=a.runtime!=null&&!a.runtime.optString("manual_panel_direct_block").isEmpty();
+        boolean enabled=known&&!blocked&&!a.busy&&a.controls.manualPanel;
         updating=true;slider.setMax(known?maximum-10:0);slider.setProgress(known?Math.max(0,value-10):0);updating=false;
-        slider.setEnabled(enabled);input.setEnabled(enabled);apply.setEnabled(enabled);reset.setEnabled(!a.busy);
+        slider.setEnabled(enabled);input.setEnabled(enabled);apply.setEnabled(enabled);reset.setEnabled(!blocked&&!a.busy);
         if(!input.hasFocus())input.setText(known?String.valueOf(value):a.controls.manualMaximum>0?String.valueOf(a.controls.manualMaximum):"");
         label.setText(a.tr("磁贴最高节点")+(known?" · "+value+" / "+maximum:""));
     }

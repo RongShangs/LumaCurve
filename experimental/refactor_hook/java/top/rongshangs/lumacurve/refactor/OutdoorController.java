@@ -20,6 +20,7 @@ final class OutdoorController {
     // Exit debounce only; the write gate still consumes block() directly.
     int exitFailures;long exitFirst,exitLast;boolean debounceFirstLatched,debounceRecoverLatched;
     OutdoorOutputAccess.Decision lastDecision;String lastBlock;
+    long hbmPhysical;
     final LiveLimitEvidence liveLimits=new LiveLimitEvidence();
     NitBrightnessLimit nitLimit;
     OutdoorOprEnvelope oprEnvelope;
@@ -71,7 +72,7 @@ final class OutdoorController {
         float cap=nitCeiling(options.values[OutdoorOptions.MAX_NIT]);return OutdoorPolicy.valid(cap)?Math.min(value,cap):value;
     }
     void stop(){oprCurveMapping=null;oprCurveError="";oprCurveRequestedNit=Double.NaN;oprCurveDelivered=Float.NaN;oprCurveAt=-1;s.handler.removeCallbacks(wake);deadline=-1;exitFailures=0;exitFirst=exitLast=0;goal=Float.NaN;liveLimits.clear();options=new OutdoorOptions();policy.step(options,Float.NaN,SystemClock.uptimeMillis(),null);failed=false;
-        if(access!=null)try{boolean changed=access.restore();if(changed)access.reevaluate(lux());}catch(Throwable failed){error=failed.toString();s.log("户外增强恢复异常："+error);}}
+        if(access!=null)try{boolean changed=access.restore();if(changed)access.reevaluate(lux());}catch(Throwable failed){error=failed.toString();s.logError("户外增强恢复异常："+error);}}
     float lux(){if(s.outdoorTest.active)return OutdoorLightTest.TEST_LUX;try{Object impl=HookEntry.get(s.owner,"mAutomaticBrightnessControllerImpl"),abc=HookEntry.get(impl,"mAutomaticBrightnessController");if(!Boolean.TRUE.equals(HookRuntime.optionalBoolean(abc,"mAmbientLuxValid")))return Float.NaN;return HookRuntime.optionalNumber(abc,"mAmbientLux");}catch(Throwable unknown){return Float.NaN;}}
     String block(){return block(true);}
     String testBlock(){return block(false);}
@@ -96,7 +97,8 @@ final class OutdoorController {
                     else{
                         int failing=0;if(decision.reasonMod!=null)failing|=decision.reasonMod;if(decision.tempMod!=null)failing|=decision.tempMod;
                         // Protected modifiers are an explicit owner signal, never a transient frame.
-                        result=decision.cosmetic!=null&&(failing&~decision.cosmetic)!=0?"output_modifier":"output_override";
+                        result=decision.cosmetic!=null&&(failing&~decision.cosmetic)!=0?"output_modifier":
+                            decision.pendingReset?"output_reset":"output_override";
                     }}
             }
         }catch(Throwable unknown){result="unknown";}
@@ -106,6 +108,7 @@ final class OutdoorController {
     /** Single-frame tolerance for output provenance only. Any upstream block or protected
      *  modifier keeps exiting immediately; write callers still use {@link #block()}. */
     String exitBlock(String gate){
+        if("output_reset".equals(gate))gate="output_override";
         if(!"output_override".equals(gate)||!policy.active){
             if(exitFailures>0&&gate==null&&policy.active&&!debounceRecoverLatched){debounceRecoverLatched=true;latch("debounce_recover");}
             exitFailures=0;exitFirst=exitLast=0;return gate;
@@ -137,7 +140,7 @@ final class OutdoorController {
             row.put("tick",inTick).put("block",result==null?"":result).put("active",policy.active).put("policy_reason",policy.reason).put("cooldown_left_ms",Math.max(0,policy.cooldownUntil-SystemClock.uptimeMillis()));
             if(lux==lux)row.put("lux",lux);
             if(Float.isFinite(goal))row.put("requested",goal);
-            try{Object dpc=HookEntry.get(s.owner,"mDisplayPowerController"),display=dpc.getClass().getMethod("getDisplayPowerState").invoke(dpc);float actual=((Number)display.getClass().getMethod("getScreenBrightness").invoke(display)).floatValue();if(OutdoorPolicy.valid(actual))row.put("brightness",actual);}catch(Throwable absent){}
+            float actual=OutdoorOutputAccess.diagnosticBrightness(s);if(OutdoorPolicy.valid(actual))row.put("brightness",actual);
             if(decision!=null){
                 row.put("profile",decision.profile);
                 if(decision.name!=null)row.put("output",decision.name);
@@ -171,8 +174,7 @@ final class OutdoorController {
     /** Bounded latch outside the diagnostic ring; every call is a real observed transition. */
     void latch(String kind){
         try{
-            float lux=lux(),brightness=Float.NaN;
-            try{Object dpc=HookEntry.get(s.owner,"mDisplayPowerController"),display=dpc.getClass().getMethod("getDisplayPowerState").invoke(dpc);brightness=((Number)display.getClass().getMethod("getScreenBrightness").invoke(display)).floatValue();}catch(Throwable absent){}
+            float lux=lux(),brightness=OutdoorOutputAccess.diagnosticBrightness(s);
             JSONObject row=new JSONObject().put("kind",kind).put("uptime_ms",SystemClock.uptimeMillis()).put("unix_ms",System.currentTimeMillis()).put("block",lastBlock==null?"":lastBlock)
                 .put("active",policy.active).put("policy_reason",policy.reason).put("cooldown_left_ms",Math.max(0,policy.cooldownUntil-SystemClock.uptimeMillis()));
             if(lux==lux)row.put("lux",lux);
@@ -204,7 +206,14 @@ final class OutdoorController {
             if(options.flags[0]&&lux==lux){float enter=(float)options.values[0],exit=(float)(options.values[0]*options.values[4]);
                 if(lux>=enter){belowExit=false;if(!aboveEnter){aboveEnter=true;latch("lux_enter");}}
                 else if(lux<exit){aboveEnter=false;if(!belowExit){belowExit=true;latch("lux_exit");}}}
-            boolean dataChanged=h!=null&&h.configure(options,gate==null&&policy.active);
+            // A cleared pending reason is only a gap within the OEM calculation. Keep the
+            // already-owned configuration through the bounded exit check on the same panel.
+            // All output writers still use block() and stay closed until automatic is proven.
+            boolean retaining=h!=null&&h.applied!=null&&policy.active&&blocked==null&&"output_reset".equals(gate)
+                &&options.flags[1]&&hbmPhysical>0&&hbmPhysical==OutdoorOutputAccess.physical(s);
+            boolean dataChanged=h!=null&&!retaining&&h.configure(options,gate==null&&policy.active);
+            if(h==null||h.applied==null)hbmPhysical=0;
+            else if(dataChanged)hbmPhysical=OutdoorOutputAccess.physical(s);
             if(dataChanged)h.reevaluate(lux);
             // Entry/expiry timers also change the target/range without any new sensor event.
             // Recompute through the OEM pipeline so activation and release take effect promptly.

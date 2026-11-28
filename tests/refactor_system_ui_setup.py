@@ -7,9 +7,10 @@ files={
 'android/database/Cursor.java':'''package android.database;public class Cursor implements AutoCloseable{public static final int FIELD_TYPE_NULL=0,FIELD_TYPE_INTEGER=1;public int[] values;public String[] names;public int type=1,index;boolean nullEnabled;public Cursor(int[] v,int t,boolean n){values=v;type=t;nullEnabled=n;}public Cursor(String[] n){names=n;}public boolean moveToFirst(){index=0;return names!=null?names.length>0:values!=null;}public boolean moveToNext(){return names!=null&&++index<names.length;}public int getType(int n){return n==0&&nullEnabled?0:type;}public int getInt(int n){return values[n];}public String getString(int n){return names[index];}public void close(){}}''',
 'android/database/sqlite/SQLiteDatabase.java':'''package android.database.sqlite;import android.database.*;import java.util.*;public class SQLiteDatabase implements AutoCloseable{public static final int OPEN_READONLY=1,NO_LOCALIZED_COLLATORS=16;public static Map<String,int[]> rows=new HashMap<>();public static String bad="",typed="",noEnabled="",partial="";String path;public static int opens;public static SQLiteDatabase openDatabase(String p,Object ignored,int flags,DatabaseErrorHandler handler){if(flags!=(OPEN_READONLY|NO_LOCALIZED_COLLATORS)||handler==null)throw new AssertionError("read-only flags/corruption handler");opens++;if(p.equals(bad))throw new SecurityException("denied");SQLiteDatabase d=new SQLiteDatabase();d.path=p;return d;}public Cursor rawQuery(String sql,String[] args){if(sql.equals("PRAGMA table_info(modules)"))return new Cursor(path.equals(partial)?new String[]{"mid"}:path.equals(noEnabled)?new String[]{"mid","module_pkg_name","apk_path"}:new String[]{"mid","module_pkg_name","apk_path","enabled"});if(sql.equals("PRAGMA table_info(scope)"))return new Cursor(new String[]{"mid","app_pkg_name","user_id"});if(!sql.startsWith("SELECT ")||!sql.contains("LIMIT 2")||args.length!=3||!args[0].equals("com.android.systemui")||!args[1].equals("0")||!args[2].equals("top.rongshangs.lumacurve"))throw new AssertionError("scope query escaped own primary-user module");if(sql.startsWith("SELECT NULL")!=path.equals(noEnabled))throw new AssertionError("schema route");return new Cursor(rows.get(path),path.equals(typed)?3:1,path.equals(noEnabled));}public void close(){}}''',
 'android/os/SystemClock.java':'package android.os;public class SystemClock{public static long elapsedRealtime(){return 100;}}',
+'android/os/UserHandle.java':'package android.os;public final class UserHandle{final int id;private UserHandle(int id){this.id=id;}public static UserHandle getUserHandleForUid(int uid){return new UserHandle(uid/100000);}public boolean equals(Object other){return other instanceof UserHandle&&id==((UserHandle)other).id;}public int hashCode(){return id;}}',
 'android/system/Os.java':'package android.system;public class Os{public static void kill(int pid,int signal){throw new AssertionError("Real signal must not run in host tests");}}',
 'android/system/OsConstants.java':'package android.system;public class OsConstants{public static final int SIGKILL=9;}',
-'top/rongshangs/lumacurve/refactor/RootSettings.java':'package top.rongshangs.lumacurve.refactor;class RootSettings{String get(String key){return null;}}',
+'top/rongshangs/lumacurve/refactor/RootSettings.java':'package top.rongshangs.lumacurve.refactor;class RootSettings{boolean denied;String get(String key){if(denied)throw new SecurityException("denied");return null;}}',
 'top/rongshangs/lumacurve/refactor/RootCommand.java':'package top.rongshangs.lumacurve.refactor;class RootCommand{static String run(long t,String...a){throw new AssertionError("No shell operations in host tests");}}',
 'top/rongshangs/lumacurve/refactor/ControlCenterEngine.java':'package top.rongshangs.lumacurve.refactor;class ControlCenterEngine{static final String UI="ui";}',
 'top/rongshangs/lumacurve/refactor/SystemUiAccessTest.java':r'''package top.rongshangs.lumacurve.refactor;
@@ -19,6 +20,7 @@ public class SystemUiAccessTest{
  static File db(File dir,String name)throws Exception{File f=new File(dir,name);f.createNewFile();return f;}
  static class Processes implements SystemUiAccess.Processes{SystemUiAccess.Identity current;int signals;public SystemUiAccess.Identity read(int pid){return current;}public void terminate(int pid){check(pid==42);signals++;}}
  static SystemUiAccess.Identity id(int pid,int uid,String name,String start){return new SystemUiAccess.Identity(pid,uid,name,start);}
+ static JSONObject coordinates(JSONObject ui,File proc)throws Exception{return SystemUiAccess.coordinateCheck(SystemUiAccess.injection(new JSONObject(),ui.toString(),proc));}
  public static void main(String[] args)throws Exception{
   File dir=Files.createTempDirectory("hyperlux-scope-test").toFile();File one=db(dir,"one.db"),two=db(dir,"two.db");
   for(int active=0;active<=1;active++)for(int selected=0;selected<=1;selected++){SQLiteDatabase.rows.put(one.toString(),new int[]{active,selected});JSONObject r=SystemUiAccess.scopes(new File[]{one});check(r.getString("scope_state").equals(selected==1?"present":"missing"));check(r.getBoolean("module_enabled")== (active==1));}
@@ -32,6 +34,37 @@ public class SystemUiAccessTest{
   r=SystemUiAccess.injection(new JSONObject(),ui.toString(),proc);check(r.getString("injection_state").equals("current")&&r.getBoolean("coordinate_abi")&&!r.getBoolean("profile_ready"));
   check(SystemUiAccess.injection(new JSONObject(),new JSONObject(ui.toString()).put("build","old").toString(),proc).getString("injection_state").equals("old_build"));
   for(String bad:new String[]{null,"bad",new JSONObject(ui.toString()).put("process_start","999").toString(),new JSONObject().put("build",AppBuild.BUILD).toString()})check(SystemUiAccess.injection(new JSONObject(),bad,proc).getString("injection_state").equals("unconfirmed"));
+  ui.put("observers_ready",true);
+  for(String route:new String[]{"oem_v1","gamma"}){
+   r=coordinates(ui.put("route",route),proc);
+   check(r.getString("state").equals("available")&&r.getString("system_ui_route").equals(route));
+  }
+  check(!coordinates(ui.put("route","unknown"),proc).has("system_ui_route"));
+  ui.put("route","oem_v1_native_progress").put("coordinate_abi",false);
+  check(coordinates(ui,proc).getString("detail").equals("等待映射配置送达 SystemUI"));
+  ui.put("profile_ready",true).put("coordinate_evidence","native_levels/waiting_second_progress");
+  r=coordinates(ui,proc);
+  check(r.getString("state").equals("pending")&&r.getString("system_ui_route").equals("oem_v1_native_progress")&&r.getString("detail").equals("等待第二个原生回显点"));
+  r=coordinates(ui.put("coordinate_evidence","native_levels/native_level_mismatch"),proc);
+  check(r.getString("detail").equals("原生回显与坐标校验不一致"));
+  check(coordinates(ui.put("coordinate_abi",true),proc).getString("state").equals("pending"));
+  r=coordinates(ui.put("coordinate_evidence","native_levels/confirmed"),proc);
+  check(r.getString("state").equals("available")&&r.getString("detail").equals("原生回显坐标已核验"));
+  r=coordinates(ui.put("coordinate_evidence","calibration/confirmed"),proc);
+  check(r.getString("state").equals("available")&&r.getString("detail").equals("已按设备标定核验回显坐标"));
+  check(coordinates(ui.put("observers_ready",false),proc).getString("detail").equals("等待 SystemUI 观察器就绪"));
+  ui.put("observers_ready",true);
+  r=coordinates(new JSONObject(ui.toString()).put("build","old"),proc);
+  check(r.getString("state").equals("pending")&&!r.has("system_ui_route")&&r.getString("detail").equals("SystemUI 仍加载旧版模块"));
+  r=coordinates(new JSONObject(ui.toString()).put("process_start","999"),proc);
+  check(r.getString("state").equals("pending")&&!r.has("system_ui_route"));
+  r=coordinates(new JSONObject(ui.toString()).put("build",JSONObject.NULL),proc);
+  check(r.getString("detail").equals("尚未取得当前 SystemUI 回执")&&!r.has("system_ui_route"));
+  Files.write(new File(p,"status").toPath(),"Uid:\t1010123 1010123 1010123 1010123\n".getBytes("UTF-8"));
+  r=coordinates(ui,proc);
+  check(r.getString("state").equals("pending")&&!r.has("system_ui_route"));
+  RootSettings denied=new RootSettings();denied.denied=true;
+  check(SystemUiAccess.coordinateCheck(denied).getString("detail").equals("无法读取 SystemUI 回执"));
   Files.write(new File(p,"cmdline").toPath(),"system_server\0".getBytes("UTF-8"));check(SystemUiAccess.injection(new JSONObject(),ui.toString(),proc).getString("injection_state").equals("unconfirmed"));
   Processes fake=new Processes();SystemUiAccess.Identity expected=id(42,10123,"com.android.systemui","123");fake.current=expected;check(SystemUiAccess.restartTarget(fake,expected,10123)&&fake.signals==1);
   for(SystemUiAccess.Identity changed:new SystemUiAccess.Identity[]{id(42,10123,"system_server","123"),id(42,10123,"com.android.systemui:other","123"),id(42,10124,"com.android.systemui","123"),id(42,10123,"com.android.systemui","124"),id(43,10123,"com.android.systemui","123")}){fake.current=changed;check(!SystemUiAccess.restartTarget(fake,expected,10123));check(fake.signals==1);}

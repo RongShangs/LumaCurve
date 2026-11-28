@@ -80,7 +80,8 @@ final class HbmAccess {
     boolean allowed()throws Exception{return Boolean.TRUE.equals(allowedMethod.invoke(controller));}
     long originalLong(String f)throws Exception{return ((Number)HookEntry.get(original,f)).longValue();}
     float originalLux()throws Exception{return ((Number)HookEntry.get(original,"minimumLux")).floatValue();}
-    boolean budgetTunable(){try{if(!managed()||!copyable)return false;OutdoorPolicy.budget(originalLong("timeWindowMillis"),originalLong("timeMaxMillis"),originalLong("timeMinMillis"),1);return true;}catch(Throwable unknown){return false;}}
+    static boolean timedBudget(long window,long maximum,long minimum){return window>0&&maximum>0&&minimum>=0&&minimum<=maximum&&maximum<=window;}
+    boolean budgetTunable(){try{return managed()&&copyable&&timedBudget(originalLong("timeWindowMillis"),originalLong("timeMaxMillis"),originalLong("timeMinMillis"));}catch(Throwable unknown){return false;}}
     /** Some OEM profiles use the ambient gate with all three timers disabled. */
     boolean zeroBudget(){try{return originalLong("timeWindowMillis")==0&&originalLong("timeMaxMillis")==0&&originalLong("timeMinMillis")==0;}catch(Throwable unknown){return false;}}
     boolean tunable(){try{return managed()&&copyable&&Float.isFinite(originalLux())&&originalLux()>0&&(budgetTunable()||zeroBudget());}catch(Throwable unknown){return false;}}
@@ -88,10 +89,15 @@ final class HbmAccess {
     boolean configure(OutdoorOptions options,boolean permitted)throws Exception{
         observeReplacement();
         if(!permitted||!options.flags[0]||!options.flags[1])return restore();
-        if(!tunable())throw new IllegalStateException("HBM budget interface changed");
-        float lux=(float)Math.max(2000,originalLux()*options.values[8]);
+        if(!managed()||!copyable)throw new IllegalStateException("HBM budget interface changed");
+        float stockLux=originalLux();
+        long window=originalLong("timeWindowMillis"),stockBudget=originalLong("timeMaxMillis"),minimum=originalLong("timeMinMillis");
+        boolean timed=timedBudget(window,stockBudget,minimum);
+        if(!Float.isFinite(stockLux)||stockLux<=0||!timed&&(window!=0||stockBudget!=0||minimum!=0))throw new IllegalStateException("HBM budget interface changed");
+        float lux=options.values[8]==1?stockLux:(float)Math.max(2000,stockLux*options.values[8]);
         // Preserve the original zero timers: do not manufacture or bypass a budget.
-        long budget=budgetTunable()?OutdoorPolicy.budget(originalLong("timeWindowMillis"),originalLong("timeMaxMillis"),originalLong("timeMinMillis"),options.values[9]):originalLong("timeMaxMillis");
+        long budget=timed?OutdoorPolicy.budget(window,stockBudget,minimum,options.values[9]):stockBudget;
+        if(Float.compare(lux,stockLux)==0&&budget==stockBudget)return restore();
         if(applied!=null&&Float.compare(lux,appliedLux)==0&&budget==appliedBudget)return false;
         Object clone=copyData(original);HookEntry.field(clone.getClass(),"minimumLux").setFloat(clone,lux);HookEntry.field(clone.getClass(),"timeMaxMillis").setLong(clone,budget);
         dataField.set(controller,clone);applied=clone;appliedLux=lux;appliedBudget=budget;return true;

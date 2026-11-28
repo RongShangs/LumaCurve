@@ -11,9 +11,10 @@ import org.json.*;
 /** Observes the actual system owner; never starts Root or a brightness writer. */
 public final class BrightnessTileService extends TileService {
  static WeakReference<BrightnessTileService> visible=new WeakReference<>(null);
+ static boolean directBlocked;
  final Handler ui=new Handler(Looper.getMainLooper());boolean registered;
  final ContentObserver observer=new ContentObserver(ui){public void onChange(boolean self){refresh();}};
- static void publish(JSONObject runtime){BrightnessTileService tile=visible.get();if(tile!=null)tile.render(runtime);}
+ static void publish(JSONObject runtime){if(runtime!=null)directBlocked=!runtime.optString("manual_panel_direct_block").isEmpty();BrightnessTileService tile=visible.get();if(tile!=null)tile.render(runtime);}
  @Override public void onStartListening(){super.onStartListening();visible=new WeakReference<>(this);if(!registered){
   for(String key:new String[]{HookRuntime.STATUS,BrightnessControl.OWNER})getContentResolver().registerContentObserver(Settings.Global.getUriFor(key),false,observer);
   getContentResolver().registerContentObserver(Settings.System.getUriFor(Settings.System.SCREEN_BRIGHTNESS_MODE),false,observer);registered=true;
@@ -29,9 +30,9 @@ public final class BrightnessTileService extends TileService {
   render(runtime);
  }catch(Throwable unavailable){render(null);}}
  void render(JSONObject runtime){Tile tile=getQsTile();if(tile==null)return;boolean active=RawPanelTilePolicy.active(runtime),paused=RawPanelTilePolicy.paused(runtime),en=!Locale.getDefault().getLanguage().equals("zh");
-  tile.setState(active?Tile.STATE_ACTIVE:Tile.STATE_INACTIVE);tile.setLabel(UiText.translate("主屏亮度",en));tile.setSubtitle(UiText.translate(active?"手动保持中":paused?"解锁后恢复":"滑动接管",en));
+  tile.setState(directBlocked?Tile.STATE_UNAVAILABLE:active?Tile.STATE_ACTIVE:Tile.STATE_INACTIVE);tile.setLabel(UiText.translate("主屏亮度",en));tile.setSubtitle(UiText.translate(directBlocked?"当前主屏不支持节点直写":active?"手动保持中":paused?"解锁后恢复":"滑动接管",en));
   try{tile.setActivityLaunchForClick(panelIntent());}catch(Throwable optional){}tile.updateTile();
  }
  PendingIntent panelIntent(){return PendingIntent.getActivity(this,2,new Intent(this,BrightnessPanelActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_SINGLE_TOP),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);}
- @Override public void onClick(){super.onClick();unlockAndRun(()->startActivityAndCollapse(panelIntent()));}
+ @Override public void onClick(){super.onClick();if(!directBlocked)unlockAndRun(()->startActivityAndCollapse(panelIntent()));}
 }

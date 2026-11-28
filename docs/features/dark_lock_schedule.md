@@ -51,5 +51,5 @@
 
 | 文件 | 当前源码 SHA-256 前16位 |
 | --- | --- |
-| [BrightnessControl.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/BrightnessControl.java) | `7f6e8cc411da5e30` |
+| [BrightnessControl.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/BrightnessControl.java) | `e7797c2cfeb536ce` |
 | [DarkLockSchedule.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/DarkLockSchedule.java) | `5eb5ea9490286917` |

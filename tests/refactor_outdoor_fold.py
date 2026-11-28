@@ -26,6 +26,7 @@ runtime=runtime[:start]+''' public static class Impl{public Object mAutomaticBri
 
 runtime=runtime[:runtime.rfind('}')]+'long lastManualAdjustment=-1,memoryWindow=5000;boolean normalTuningAllowed(Object a,Object b){return true;}    boolean animationTuningAllowed(Object abc,Object impl){\n        if(!normalTuningAllowed(abc,impl)||(lastManualAdjustment>=0&&android.os.SystemClock.uptimeMillis()-lastManualAdjustment<=memoryWindow))return false;\n        // Share the verified current-output contract; a retained automatic-strategy slot alone\n        // does not prove that it currently owns brightness or animation.\n        return "AutomaticBrightnessStrategy".equals(OutdoorOutputAccess.name(this));\n    }\n'+runtime[runtime.rfind('}'):]
 sources[base+'HookRuntime.java']=runtime
+sources[base+'PanelNodeDiscovery.java']='package top.rongshangs.lumacurve.refactor;import org.json.*;class PanelNodeDiscovery{static JSONObject directAccess(JSONObject node){return node;}}'
 sources[base+'ActivePanelNode.java']='''package top.rongshangs.lumacurve.refactor;import org.json.*;class ActivePanelNode{static final String PROFILE="fold_default_display";static JSONObject selected;static JSONObject discover(){return new JSONObject(selected.toString());}}'''
 sources[base+'NativePanelRoot.java']='''package top.rongshangs.lumacurve.refactor;import java.io.*;import org.json.*;class NativePanelRoot{static final String WORKSPACE="--workspace=";static File bin(File dir){return new File(dir,"hyperlux-main-panel");}static int probes;static void probe(JSONObject node){probes++;}static File install(){throw new AssertionError("read-only tests must not install");}}'''
 sources[base+'RootControl.java']='''package top.rongshangs.lumacurve.refactor;import java.io.*;class RootControl{static final File DATA=new File("build/outdoor-fold-tests/no-health");}'''
@@ -41,6 +42,22 @@ public class OutdoorFoldTest{
  static JSONObject node(long physical,int port){return new JSONObject().put("supported",true).put("discovery","fold_default_display").put("physical_display_id","local:"+physical).put("fold_port",port).put("maximum",4095).put("path","/sys/class/backlight/panel"+port+"-backlight/brightness").put("canonical_path","/sys/devices/controller/backlight/panel"+port+"-backlight/brightness").put("fold_physical_ids",new JSONArray().put(4630947024259405955L).put(4630947024259405956L));}
  static JSONObject state(long id){return new JSONObject().put("outdoor_node_supported",true).put("outdoor_node_physical_id",id).put("curve_backend","physical_mapping").put("max_logical_nit",2600).put("manual_panel_supported",true).put("outdoor_range_supported",true).put("outdoor",new JSONObject().put("device_mapping_max",1).put("sdr_compatibility_profile","legacy_opr"));}
  public static void main(String[] args)throws Exception{
+  JSONObject blocked=node(4630947024259405956L,1).put("direct_write_block","atomic_backlight");
+  ActivePanelNode.selected=blocked;NativePanelRoot.probes=0;
+  check(!OutdoorNodeRoot.supported(state(4630947024259405956L))&&NativePanelRoot.probes==0);
+  JSONObject paused=state(4630947024259405956L);OutdoorNodeRoot.annotate(paused);
+  check(!paused.optBoolean("outdoor_node_supported")&&paused.optString("outdoor_node_detail").contains("atomic_backlight"));
+  final long panel=4630947024259405956L;
+  JSONObject wanted=state(panel).put("phase","active").put("revision","current").put("user_serial",0);
+  wanted.getJSONObject("outdoor").put("options",new JSONObject().put("outdoor_node_boost",true));
+  JSONObject binding=OutdoorNodeRoot.testPauseBinding(wanted);
+  check(binding.getLong("physical")==panel&&binding.getString("revision").equals("current")&&binding.getInt("user_serial")==0);
+  JSONObject copied=new JSONObject(wanted.toString());OutdoorNodeRoot.annotate(copied);check(!copied.getBoolean("outdoor_test_node_conflict")&&wanted.getBoolean("outdoor_node_supported"));
+  ActivePanelNode.selected=node(panel,1);check(OutdoorNodeRoot.testPauseBinding(wanted)==null);
+  copied=new JSONObject(wanted.toString());OutdoorNodeRoot.annotate(copied);check(copied.getBoolean("outdoor_test_node_conflict"));
+  ActivePanelNode.selected=node(panel-1,0);
+  try{OutdoorNodeRoot.testPauseBinding(wanted);throw new AssertionError("mixed-display evidence accepted");}catch(java.io.IOException expected){cases++;}
+  ActivePanelNode.selected=node(panel,1);
   HookRuntime s=runtime();List<String> writes=new ArrayList<>();OutdoorNodeBridge b=bridge(s,writes);
   check(OutdoorNodeBridge.interfaces(s,true));check(OutdoorOutputAccess.profile(s).equals("automatic_strategy2_reason"));check(b.allowed());b.evaluate();check(writes.get(0).startsWith("v3 ")&&writes.get(0).endsWith("0 1 4630947024259405956\n"));
   for(int modifier:new int[]{1,2,4,3,7}){dpc(s).mBrightnessReason.modifier=modifier;dpc(s).mBrightnessReasonTemp.modifier=modifier;check(b.allowed());}

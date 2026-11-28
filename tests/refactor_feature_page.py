@@ -67,6 +67,25 @@ public class FeaturePageTest{
   int inspections=a.requests;a.closeFeatureChecks();a.showFeatureChecks();a.closeFeatureChecks();a.showFeatureChecks();check(a.requests==inspections);
     // Repeated refresh must detach/reparent the summary correctly and retain route expansion.
   a.runtime=runtime();a.featureChecksVisible=true;for(int i=0;i<12;i++){a.featureCheckPage.render(a.runtime,a.rootFeatureReport,a.appFeatureReport);a.featureCheckPage.scroll.drain();check(a.featureCheckPage.summary.getParent()!=null);check(a.preferenceWrites==0&&a.dirty);}
+  a.runtime.put("control_center_slider",new JSONObject().put("kind","coordinate_v2").put("calibration_profile","coordinate_v2_calibrated"));
+  a.runtime.getJSONObject("feature_self_check").getJSONArray("features").put(feature("control_center_slider","控制中心节点映射","available"));
+  JSONObject systemUi=feature("control_center_system_ui","SystemUI 亮度条接口","pending")
+    .put("system_ui_route","oem_v1_native_progress").put("detail","等待第二个原生回显点");
+  JSONObject checkResult=new JSONObject().put("root_feature_self_check",new JSONObject().put("features",new JSONArray().put(systemUi)));
+  a.finishFeatureCheckRequest("self-check",checkResult);
+  TextView systemTitle=find(a.featureCheckPage.body,"SystemUI 亮度条接口");check(systemTitle!=null);
+  LinearLayout systemCard=(LinearLayout)((View)systemTitle.getParent()).getParent();
+  check(find(systemCard,"V1 原生回显校验")!=null&&find(systemCard,"等待第二个原生回显点")!=null);
+  check(find(a.featureCheckPage.body,"标定有效区间映射")!=null);
+  find(systemCard,"路线").performClick();
+  check(find(systemCard,"V1 原生回显校验 · 已识别")!=null&&find(systemCard,"V1 原生换算接口 · 未采用")!=null&&find(systemCard,"Gamma 换算接口 · 未采用")!=null);
+  systemUi.put("state","available").put("detail","原生回显坐标已核验");
+  a.finishFeatureCheckRequest("self-check",checkResult);
+  check(find(a.featureCheckPage.body,"V1 原生回显校验 · 已采用")!=null&&find(a.featureCheckPage.body,"原生回显坐标已核验")!=null);
+  systemUi.put("state","pending").put("detail","SystemUI 仍加载旧版模块").remove("system_ui_route");
+  a.finishFeatureCheckRequest("self-check",checkResult);
+  check(find(a.featureCheckPage.body,"具体路线尚未确认")!=null&&find(a.featureCheckPage.body,"V1 原生回显校验 · 尚未确认")!=null);
+  check(a.requests==inspections&&a.preferenceWrites==0);
   System.out.println("Feature check page: "+cases+" cases PASS; actual page, navigation and parent-aware widgets; Android layout not tested");
  }
 }'''

@@ -54,8 +54,8 @@
 
 | 文件 | 当前源码 SHA-256 前16位 |
 | --- | --- |
-| [HbmAccess.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/HbmAccess.java) | `1b60fcde7b4ab2b7` |
-| [OutdoorController.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/OutdoorController.java) | `04002b346d81ba8d` |
+| [HbmAccess.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/HbmAccess.java) | `86fd4fb593012bc1` |
+| [OutdoorController.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/OutdoorController.java) | `6cb4592f934055d4` |
 | [OutdoorPolicy.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/OutdoorPolicy.java) | `4439f553657f8494` |
-| [OutdoorSettings.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/OutdoorSettings.java) | `8d26ce76f27d7383` |
+| [OutdoorSettings.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/OutdoorSettings.java) | `163c89304aaed519` |
 | [OutdoorTuning.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/OutdoorTuning.java) | `84ee79e3de745ecc` |

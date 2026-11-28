@@ -3,6 +3,9 @@ package top.rongshangs.lumacurve.refactor;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.NoSuchFileException;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.*;
 import org.json.*;
 
@@ -28,6 +31,41 @@ final class PanelNodeDiscovery {
             if(!s.matches("[0-9]{1,5}"))throw new IOException("invalid_integer");
             int value=Integer.parseInt(s);if(value>65535)throw new IOException("range_exceeds_protocol");return value;
         }
+    }
+    /** Read MediaTek display LED ABI only on its verified platform device. */
+    static int mtkDisplayLedType(JSONObject selected)throws Exception {
+        if(!selected.optBoolean("supported")||!"leds".equals(selected.optString("class"))
+                ||!"identified_primary".equals(selected.optString("reason")))return -1;
+        File directory=new File(selected.getString("canonical_path")).getParentFile();
+        File type=new File(directory,"led_type");
+        BasicFileAttributes typeAttributes;
+        try{typeAttributes=Files.readAttributes(type.toPath(),BasicFileAttributes.class,LinkOption.NOFOLLOW_LINKS);}
+        catch(NoSuchFileException absent){return -1;}
+        File compatible=new File(directory,"../../of_node/compatible");
+        try(InputStream in=Files.newInputStream(compatible.toPath())){
+            byte[] bytes=new byte[513];int used=0,n;
+            while(used<bytes.length&&(n=in.read(bytes,used,bytes.length-used))>0)used+=n;
+            if(used==bytes.length)throw new IOException("mtk_led_compatible_too_long");
+            String[] names=new String(bytes,0,used,StandardCharsets.US_ASCII).split("\u0000");
+            if(!Arrays.asList(names).contains("mediatek,disp-leds"))return -1;
+        }catch(NoSuchFileException absent){return -1;}
+        File mode=new File(directory,"led_mode");
+        if(!mode.isFile()||!typeAttributes.isRegularFile()||Files.isSymbolicLink(mode.toPath()))
+            throw new IOException("mtk_led_mode_unavailable");
+        if(number(mode)!=4)return -1;
+        int value=number(type);
+        if(value>2)throw new IOException("mtk_led_type_unknown");
+        return value;
+    }
+    static JSONObject directAccess(JSONObject node)throws JSONException {
+        if(!node.optBoolean("supported"))return node;
+        try{
+            int mode=mtkDisplayLedType(node);
+            if(mode>=0)node.put("mtk_led_type",mode);
+            if(mode==1)node.put("direct_write_block","atomic_backlight");
+            if(mode==2)node.put("direct_write_block","factory_backlight");
+        }catch(Exception unavailable){node.put("direct_write_block","mtk_led_mode_pending").put("mtk_led_type_error",unavailable.toString());}
+        return node;
     }
     static JSONObject discover(File sys)throws Exception {
         JSONArray candidates=new JSONArray();Map<String,JSONObject> eligible=new LinkedHashMap<>();

@@ -70,6 +70,8 @@ class HookRuntime {
  boolean closed,user=true,on=true,hdr,thread=true;String phase="active",revision="revision";final Kernel kernel=new Kernel();final Outdoor outdoor=new Outdoor();final Control brightnessControl=new Control();final Power power=new Power();final Handler handler=new Handler();final Owner owner=new Owner();int thermalSeverity,batteryLevel=90;float batteryTemperature=30,thermalCeiling=43;String strategy="AutomaticBrightnessStrategy";
  boolean appliesToUser(){return user;}boolean onDisplayThread(){return thread;}boolean screenOn(){return on;}Boolean hdrActive(){return hdr;}String outputStrategy(Object o){return strategy;}
  public static class Kernel{public float max=1200;String name(){return "physical_mapping";}}
+ final TestSession outdoorTest=new TestSession();
+ public static class TestSession{boolean blocked;boolean blocksNodes(){return blocked;}}
  public static class Power{boolean interactive=true,save;boolean isInteractive(){return interactive;}boolean isPowerSaveMode(){return save;}}
  public static class Handler{final java.util.Map<Runnable,Long> tasks=new java.util.IdentityHashMap<>();boolean post(Runnable r){tasks.put(r,android.os.SystemClock.now);return true;}boolean postDelayed(Runnable r,long t){tasks.put(r,android.os.SystemClock.now+t);return true;}void removeCallbacks(Runnable r){tasks.remove(r);}}
  public static class Owner{public Dpc mDisplayPowerController=new Dpc();public float mBatteryThermalLimitBrightness=1;}
@@ -94,6 +96,10 @@ public class NodeBridgeTest{
   List<String> writes=new ArrayList<>();HookRuntime s=new HookRuntime();OutdoorNodeBridge b=new OutdoorNodeBridge(s,Runnable::run,writes::add);b.frame=1;
   check(b.allowed());b.evaluate();check(b.requested&&writes.size()==1&&writes.get(0).startsWith("v2 ")&&writes.get(0).endsWith("0 1\n"));
   s.owner.mDisplayPowerController.screen.value=.9f;check(!b.allowed());b.evaluate();check(!b.requested&&writes.get(1).endsWith("0 0\n")&&!s.handler.tasks.containsKey(b.check));s.owner.mDisplayPowerController.screen.value=1;
+  android.os.SystemClock.now=250;b.evaluate();check(b.requested);s.outdoorTest.blocked=true;
+  check(b.pauseForTest()==1750&&!b.requested&&writes.get(writes.size()-1).endsWith("0 0\n"));
+  int suspendedWrites=writes.size();b.frame(1);b.evaluate();check(writes.size()==suspendedWrites&&!b.allowed()&&!s.handler.tasks.containsKey(b.check));
+  s.outdoorTest.blocked=false;b.evaluate();check(b.requested);
   for(int i=0;i<15;i++){
    s=new HookRuntime();b=new OutdoorNodeBridge(s,Runnable::run,writes::add);b.frame=1;
    switch(i){case 0:s.on=false;break;case 1:s.hdr=true;break;case 2:s.user=false;break;case 3:s.thermalSeverity=1;break;case 4:s.batteryTemperature=44;break;case 5:s.batteryTemperature=Float.NaN;break;case 6:s.batteryLevel=29;break;case 7:s.brightnessControl.owner="raw_panel";break;case 8:s.brightnessControl.automatic=false;break;case 9:s.brightnessControl.unlocked=false;break;case 10:((HookRuntime.Clamp)s.owner.mDisplayPowerController.mBrightnessClamperController).cap=.99f;break;case 11:s.owner.mBatteryThermalLimitBrightness=.9f;break;case 12:s.outdoor.options.values[10]=2000;break;case 13:s.outdoor.lux=20000;break;case 14:s.strategy="TemporaryBrightnessStrategy";}

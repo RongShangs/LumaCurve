@@ -14,7 +14,7 @@ import java.util.zip.*;
 final class AppRootDiagnostics {
  static JSONObject unavailable(Throwable failure)throws JSONException{
   FeatureSelfCheck checks=new FeatureSelfCheck();String detail="Root 辅助进程未完成检查，不能据此判断 LSPosed 或设备不兼容。 "+String.valueOf(failure);if(detail.length()>1024)detail=detail.substring(0,1024);
-  for(String[] feature:new String[][]{{"root_identity","Root 进程身份与限制"},{"root_settings","系统设置访问"},{"root_process_identity","系统进程身份核验"},{"root_storage","私有操作目录"},{"stored_config","配置读取"},{"main_panel_node","主屏节点与打开权限"},{"outdoor_node_device","节点高亮设备条件"},{"native_payload","主屏控制程序完整性"}}){checks.check(feature[0],feature[1],null,true,()->false);checks.explain(feature[0],detail);}
+  for(String[] feature:new String[][]{{"root_identity","Root 进程身份与限制"},{"root_settings","系统设置访问"},{"root_process_identity","系统进程身份核验"},{"root_storage","私有操作目录"},{"stored_config","配置读取"},{"main_panel_node","主屏节点与打开权限"},{"outdoor_node_device","节点高亮设备条件"},{"native_payload","主屏控制程序完整性"},{"control_center_system_ui","SystemUI 亮度条接口"}}){checks.check(feature[0],feature[1],null,true,()->false);checks.explain(feature[0],detail);}
   return checks.report(android.os.SystemClock.elapsedRealtime(),"app-observed-root-failure").put("mode","app_observed_failure");
  }
  static byte[] archive(JSONObject last,Throwable failure)throws Exception{

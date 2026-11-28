@@ -9,7 +9,7 @@
 | 项目 | 要求 |
 | --- | --- |
 | 触发 | Root只读检查或状态注释需要当前物理屏的节点与真实上限。 |
-| 需求与行为 | 实际默认内部屏与backlight/明确显示led或折叠端口唯一绑定；读真实节点与上限；缺nit显示节点，普通模式可退到实际系统比例 |
+| 需求与行为 | 实际默认内部屏与backlight/明确显示led或折叠端口唯一绑定；读真实节点与上限；缺nit显示节点，普通模式可退到实际系统比例。驱动直写能力检查区分已确认缺少接口与读取失败，读取失败时暂停节点路径。 |
 | 退出 / 失败 | 切屏或身份不一致时丢弃旧节点/nit读数；只读发现不启动写入或改权限。 |
 | 默认 | `observe` · 只读发现不试写 |
 | 配置键 | 无独立持久化亮度配置键 |
@@ -56,9 +56,9 @@ backlight 或明确标识显示的 leds；真实 sysfs 路径与上限配对且�
 | 文件 | 当前源码 SHA-256 前16位 |
 | --- | --- |
 | [ActivePanelNode.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ActivePanelNode.java) | `ea6abe78d6c2a152` |
-| [BrightnessControl.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/BrightnessControl.java) | `7f6e8cc411da5e30` |
-| [ControlCenterRoot.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ControlCenterRoot.java) | `49074e9977d153a4` |
-| [NativePanelRoot.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/NativePanelRoot.java) | `d68ba2614b5cc7a3` |
-| [PanelNodeDiscovery.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/PanelNodeDiscovery.java) | `85b38c1512206283` |
-| [RootControl.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/RootControl.java) | `9710b9c86220f344` |
+| [BrightnessControl.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/BrightnessControl.java) | `e7797c2cfeb536ce` |
+| [ControlCenterRoot.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ControlCenterRoot.java) | `dae3fb7c2fbf775e` |
+| [NativePanelRoot.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/NativePanelRoot.java) | `5b4a55b1e4300792` |
+| [PanelNodeDiscovery.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/PanelNodeDiscovery.java) | `938d9d207da9e0c5` |
+| [RootControl.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/RootControl.java) | `2ce6934df8434829` |
 | [ScreenBrightnessReading.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ScreenBrightnessReading.java) | `d907847857002944` |

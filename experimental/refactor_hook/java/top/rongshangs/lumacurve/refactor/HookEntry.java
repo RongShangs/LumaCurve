@@ -50,7 +50,6 @@ public final class HookEntry {
         // Compatibility is determined independently from actual display interfaces.
 
         InjectionStatus.write(null,"injected","LSPosed 已加载，正在识别设备曲线");
-        XposedBridge.log("HyperLux "+AppBuild.BUILD+": system_server entry, package="+p.packageName+", process="+p.processName);
         if(discover(p.classLoader))return;
         // Some ROMs create a separate MIUI services loader later. Remove this startup
         // discovery hook as soon as the owner class is found; never poll brightness.
@@ -143,7 +142,7 @@ public final class HookEntry {
                 installed.add(owner);
             }catch(Throwable error){HookTransaction.rollbackAll(added);throw error;}
             HookTransaction.rollbackAll(discovery);discovery.clear();
-            XposedBridge.log("HyperLux "+AppBuild.BUILD+": verified hooks installed");return true;
+            return true;
         }catch(ClassNotFoundException absent){return false;}
         catch(Throwable error){XposedBridge.log("LumaCurve incompatible Refactor interface: "+error);return false;}
         finally{discovering=false;}

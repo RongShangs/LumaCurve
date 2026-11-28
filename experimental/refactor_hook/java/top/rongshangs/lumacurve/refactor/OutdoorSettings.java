@@ -38,7 +38,7 @@ final class OutdoorSettings {
     String remaining(JSONObject state,String key,boolean subtractAge){double value=reading(state,key);return Double.isFinite(value)&&value>=0?number(a,Math.ceil(Math.max(0,value-(subtractAge?Math.max(0,age()):0))/1000))+a.tr(" 秒"):"—";}
     void refreshStatus(JSONObject state){
         boolean fresh=state!=null&&age()>=0&&age()<=15000&&"active".equals(a.runtime.optString("phase"));for(TextView value:new TextView[]{statusMode,statusActual,statusLimit,statusGate,statusTime,statusBudget})value.setText("—");statusTimeLabel.setText(a.tr("增强剩余"));a.outdoorStatus.setText(!fresh?a.tr(state==null?"等待读取户外高亮条件":"状态待刷新"):a.outdoorSummary(state));if(!fresh)return;
-        JSONObject applied=state.optJSONObject("options");if(state.opt("enabled") instanceof Boolean&&!state.optBoolean("enabled"))statusMode.setText(a.tr(LEVELS[0]));else if(applied!=null&&applied.opt(OutdoorOptions.FLAGS[0]) instanceof Boolean&&applied.opt(OutdoorOptions.FLAGS[2]) instanceof Boolean&&applied.opt(OutdoorOptions.FLAGS[3]) instanceof Boolean){int current=!applied.optBoolean(OutdoorOptions.FLAGS[0])?0:applied.optBoolean(OutdoorOptions.FLAGS[3])?3:applied.optBoolean(OutdoorOptions.FLAGS[2])?2:1;statusMode.setText(a.tr(applied.optBoolean("outdoor_node_boost")?"旧版节点控制":applied.optBoolean(OutdoorOptions.OPR_CURVE_ENABLED)?"旧版曲线上限":LEVELS[current]));}
+        JSONObject applied=state.optJSONObject("options");if(state.opt("enabled") instanceof Boolean&&!state.optBoolean("enabled"))statusMode.setText(a.tr(LEVELS[0]));else if(applied!=null&&applied.opt(OutdoorOptions.FLAGS[0]) instanceof Boolean&&applied.opt(OutdoorOptions.FLAGS[2]) instanceof Boolean&&applied.opt(OutdoorOptions.FLAGS[3]) instanceof Boolean){int current=!applied.optBoolean(OutdoorOptions.FLAGS[0])?0:applied.optBoolean(OutdoorOptions.FLAGS[3])?3:applied.optBoolean(OutdoorOptions.FLAGS[2])?2:1;statusMode.setText(a.tr(applied.optBoolean("outdoor_node_boost")&&cap("outdoor_node_supported")?"旧版节点控制":applied.optBoolean(OutdoorOptions.OPR_CURVE_ENABLED)?"旧版曲线上限":LEVELS[current]));}
         statusActual.setText(output(a.runtime,"actual_nit","actual_brightness",true));double limit=state.has("maximum_nit")?reading(state,"maximum_nit"):reading(applied,OutdoorOptions.KEYS[OutdoorOptions.MAX_NIT]);if(Double.isFinite(limit)&&limit>=0)statusLimit.setText(limit>0?number(a,limit)+" nit":a.tr("不额外限制"));statusGate.setText(statusNumber(state,"effective_minimumLux"," lux"));
         if(state.optBoolean("active"))statusTime.setText(remaining(state,"session_left_ms",true));else if(reading(state,"cooldown_left_ms")>0){statusTimeLabel.setText(a.tr("冷却剩余"));statusTime.setText(remaining(state,"cooldown_left_ms",true));}statusBudget.setText(remaining(state,"hbm_remaining_estimate_ms",false));
     }
@@ -52,13 +52,35 @@ final class OutdoorSettings {
     static String number(MainActivity a,double value){return Double.isFinite(value)?a.format(value).replaceAll("\\.0$",""):"—";}
     long age(){long stamp=a.runtime==null?-1:a.runtime.optLong("elapsed_ms",-1);return stamp<0?-1:android.os.SystemClock.elapsedRealtime()-stamp;}
     String output(JSONObject source,String nit,String fraction,boolean live){if(source==null||live&&ScreenBrightnessReading.directSafe(source))return "—";double n=source.optDouble(nit,Double.NaN);if(Double.isFinite(n)&&n>=0&&(!live||"device_backlight_mapping".equals(source.optString("actual_nit_source"))))return number(a,n)+" nit";double f=source.optDouble(fraction,Double.NaN);if(Double.isFinite(f)&&f>=0&&f<=1&&(!live||"display_power_state".equals(source.optString("actual_brightness_source"))))return number(a,f*100)+"%";return "—";}
-    void refreshTest(){JSONObject test=testState();boolean active=test!=null&&test.optBoolean("active"),fresh=age()>=0&&age()<=15000;long remaining=test==null?0:Math.max(0,(test.optLong("remaining_ms")-Math.max(0,age())+999)/1000);testButton.setText(a.tr(active?"停止测试":"开始测试"));testButton.setEnabled(!a.busy&&(active||fresh&&cap("outdoor_test_supported")&&!a.outdoorOptions.nodeBoost));testCurrent.setText(fresh?output(a.runtime,"actual_nit","actual_brightness",true):"—");testPeakLabel.setText(a.tr(active?"本次最高":"上次最高"));testPeak.setText(output(test,"recorded_peak_nit","recorded_peak_brightness",false));boolean ended=test!=null&&!test.optString("reason","idle").equals("idle");testRemaining.setText(active?(fresh?remaining+" "+a.tr("秒"):"—"):(ended?"0 ":"20 ")+a.tr("秒"));String note=!fresh?a.tr("状态待刷新"):active?a.tr("测试中"):!cap("outdoor_test_supported")?a.tr("接口未就绪"):a.tr("未开始");if(test!=null&&!active&&!test.optString("reason","idle").equals("idle"))note=a.tr(testReason(test.optString("reason")));testStatus.setText(note);}
+    boolean nodeTestConflict(){
+        JSONObject runtime=a.runtime;
+        if(runtime==null)return false;
+        if(runtime.has("outdoor_test_node_conflict"))return runtime.optBoolean("outdoor_test_node_conflict",true);
+        JSONObject outdoor=runtime.optJSONObject("outdoor"),applied=outdoor==null?null:outdoor.optJSONObject("options");
+        return applied!=null&&applied.optBoolean("outdoor_node_boost");
+    }
+    void refreshTest(){
+        JSONObject test=testState();
+        long age=age();boolean active=test!=null&&test.optBoolean("active"),fresh=age>=0&&age<=15000,conflict=nodeTestConflict();
+        long remaining=test==null?0:Math.max(0,(test.optLong("remaining_ms")-Math.max(0,age)+999)/1000);
+        testButton.setText(a.tr(active?"停止测试":"开始测试"));
+        testButton.setEnabled(!a.busy&&(active||fresh&&cap("outdoor_test_supported")&&!conflict));
+        testCurrent.setText(fresh?output(a.runtime,"actual_nit","actual_brightness",true):"—");
+        testPeakLabel.setText(a.tr(active?"本次最高":"上次最高"));
+        testPeak.setText(output(test,"recorded_peak_nit","recorded_peak_brightness",false));
+        String reason=test==null?"idle":test.optString("reason","idle");boolean ended=!"idle".equals(reason);
+        testRemaining.setText(active?(fresh?remaining+" "+a.tr("秒"):"—"):(ended?"0 ":"20 ")+a.tr("秒"));
+        String note=!fresh?"状态待刷新":active?"测试中":!cap("outdoor_test_supported")?"接口未就绪":conflict?"已启用节点增亮":"未开始";
+        if(!active&&ended&&!conflict)note=testReason(reason);
+        testStatus.setText(a.tr(note));
+    }
     org.json.JSONObject testState(){return a.runtime==null?null:a.runtime.optJSONObject("outdoor_light_test");}
     boolean testing(){org.json.JSONObject state=testState();return state!=null&&state.optBoolean("active");}
     String testPayload(String action,String session){try{return java.util.Base64.getEncoder().encodeToString(new org.json.JSONObject().put("action",action).put("session",session).toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));}catch(Exception invalid){throw new IllegalStateException(invalid);}}
     void requestTest(boolean confirmed){
         if(a.busy)return;org.json.JSONObject state=testState();if(state!=null&&state.optBoolean("active")){a.run("outdoor-test",testPayload("stop",state.optString("session")));return;}
         if(a.dirty||a.runtime==null||!a.runtime.optString("phase").equals("active")){a.show("请先保存并应用，再开始强光测试");return;}if(!cap("outdoor_test_supported")){a.show("本机强光测试接口尚未就绪");return;}
+        if(nodeTestConflict()){a.show("已启用节点增亮");return;}
         if(!confirmed){a.messageDialog("开始强光测试","将临时模拟100000 lux强光，最多20秒，结束后恢复真实光感输入。温控、电量和HBM预算继续有效；测试显示设备换算值。","开始",()->requestTest(true));return;}
         testSession=java.util.UUID.randomUUID().toString();stoppingTest=false;a.run("outdoor-test",testPayload("start",testSession));
     }
@@ -88,7 +110,10 @@ final class OutdoorSettings {
     String seconds(int key){return number(a,a.outdoorOptions.values[key]/1000)+" "+a.tr("秒");}
     void refresh(){
         int current=level();OutdoorOptions o=a.outdoorOptions;for(int i=0;i<4;i++){boolean chosen=current==i,available=chosen||supportsLevel(i);levels[i].setText((chosen?"●  ":"○  ")+a.tr(LEVELS[i]));levels[i].setEnabled(!a.busy&&!testing()&&available);levels[i].setSelected(chosen);levels[i].setTextColor(chosen?a.BLUE:a.INK);levels[i].setBackgroundColor(android.graphics.Color.TRANSPARENT);optionFrames[i].setBackground(a.ripple(chosen?0xffeef3ff:0xfff4f5f7,16));optionFrames[i].setEnabled(levels[i].isEnabled());optionFrames[i].setClickable(levels[i].isEnabled());optionFrames[i].setSelected(chosen);optionFrames[i].setContentDescription(a.tr(LEVELS[i])+(chosen?" · "+a.tr("已选中"):""));optionFrames[i].setAlpha(available?1:.5f);}
-        boolean legacy=o.nodeBoost||o.oprCurveEnabled;legacyNote.setText(a.tr(o.nodeBoost?"当前保留旧版节点控制，改用曲线需确认。":o.oprCurveEnabled?"当前保留旧版曲线上限，改用目标曲线需确认。":""));legacyNote.setVisibility(legacy?View.VISIBLE:View.GONE);curveAdopt.setVisibility(legacy?View.VISIBLE:View.GONE);curveAdopt.setEnabled(!a.busy&&!testing()&&current>0&&cap("outdoor_target_curve_supported"));
+        boolean legacy=o.nodeBoost||o.oprCurveEnabled;
+        String legacySummary=o.nodeBoost?(cap("outdoor_node_supported")?"当前保留旧版节点控制，改用曲线需确认。":"主屏节点控制已暂停，设置已保留。"):
+            o.oprCurveEnabled?"当前保留旧版曲线上限，改用目标曲线需确认。":"";
+        legacyNote.setText(a.tr(legacySummary));legacyNote.setVisibility(legacy?View.VISIBLE:View.GONE);curveAdopt.setVisibility(legacy?View.VISIBLE:View.GONE);curveAdopt.setEnabled(!a.busy&&!testing()&&current>0&&cap("outdoor_target_curve_supported"));
         workspace.setVisibility(View.VISIBLE);ceilingBody.setVisibility(View.VISIBLE);a.oprCurveSettings.refresh();a.oprCurveSettings.body.setVisibility(View.VISIBLE);admission.setVisibility(View.VISIBLE);protectionBody.setVisibility(View.VISIBLE);fallbackBody.setVisibility(current>0&&a.oprCurveSettings.model==null?View.VISIBLE:View.GONE);nodeBody.setVisibility(o.nodeBoost?View.VISIBLE:View.GONE);
         JSONObject state=a.runtime==null?null:a.runtime.optJSONObject("outdoor");boolean hbm=current>=2&&cap("outdoor_hbm_supported"),budget=state!=null&&state.optBoolean("hbm_budget_supported");showRow(hbmEntry,hbm);hbmBody.setVisibility(hbmExpanded&&hbm?View.VISIBLE:View.GONE);hbmSummary.setVisibility(current>=2?View.VISIBLE:View.GONE);String gate=state==null||!state.has("original_minimum_lux")?"—":number(a,state.optDouble("original_minimum_lux")*(o.flags[1]?o.values[8]:1))+" lux";hbmSummary.setText(a.tr("系统高亮门槛：")+gate+a.tr("；需同时满足增强条件。"));
         for(int i=0;i<10;i++)if(parameterButtons[i]!=null){boolean enabled=!a.busy&&!testing()&&current>0&&cap("outdoor_supported")&&(i<8||hbm&&o.flags[1])&&(i!=9||budget);parameterButtons[i].setEnabled(enabled);editors[i].setVisibility(editing==i&&enabled?View.VISIBLE:View.GONE);showRow(parameterButtons[i],i!=9||budget);}

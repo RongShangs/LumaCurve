@@ -8,7 +8,16 @@ files={
 'android/widget/Toast.java':'package android.widget;public class Toast{public static final int LENGTH_SHORT=0;public static int count;public static String text;public static Toast makeText(android.content.Context c,String s,int d){text=s;return new Toast();}public void show(){count++;}public void cancel(){}}',
 
 'android/os/SystemClock.java':'package android.os;public class SystemClock{public static long now=1000;public static long elapsedRealtime(){return now;}}',
-'android/animation/ValueAnimator.java':'package android.animation;public class ValueAnimator{public int cancelled;public void cancel(){cancelled++;}}',
+'android/animation/ValueAnimator.java':'''package android.animation;
+public class ValueAnimator{
+ public int cancelled;
+ public int[] points;
+ public Runnable update;
+ public static ValueAnimator ofInt(int... values){ValueAnimator animator=new ValueAnimator();animator.setIntValues(values);return animator;}
+ public void setIntValues(int... values){points=values.clone();}
+ public void start(){if(update!=null)update.run();}
+ public void cancel(){cancelled++;}
+}''',
 'android/os/Looper.java':'package android.os;public class Looper{public static Looper getMainLooper(){return new Looper();}}',
 'android/os/Handler.java':'package android.os;public class Handler{public Handler(Looper l){}public boolean post(Runnable r){r.run();return true;}public void removeCallbacks(Runnable r){}public boolean postDelayed(Runnable r,long ms){return true;}}',
 'android/database/ContentObserver.java':'package android.database;public class ContentObserver{public ContentObserver(android.os.Handler h){}public void onChange(boolean s){}}',
@@ -203,6 +212,302 @@ owner.write_bytes(original_class.replace(b'onStop',b'noStop'))
 try:
  result=subprocess.run(['java','-cp',str(classes)+os.pathsep+str(jar),'top.rongshangs.lumacurve.refactor.InputTest'],check=True,timeout=20,capture_output=True,text=True);print('Original stop route: '+result.stdout,end='');ui_cases+=int(re.search(r'(\d+) cases PASS',result.stdout).group(1))
 finally:owner.write_bytes(original_class)
+
+# Firmware may inline the logical converter and rename both associated classes.
+# Exercise native direct feedback and the controller's integer animator with that shape.
+observed=OUT/'observed'
+renamed={name.replace('HyperOSBrightnessPolicyV1','RenamedBrightnessPolicy').replace('ToggleSlidersControllerImpl','RenamedSliders'):
+         source.replace('HyperOSBrightnessPolicyV1','RenamedBrightnessPolicy').replace('ToggleSlidersControllerImpl','RenamedSliders').replace('mSliderTargetValue','renamedTargetValue')
+         for name,source in files.items()}
+policy_name='com/android/systemui/controlcenter/policy/RenamedBrightnessPolicy.java'
+renamed[policy_name]=renamed[policy_name].replace('public static int brightnessToSliderProgress(float x){return Math.round(x*1000);}','')
+controller_name='com/android/systemui/controlcenter/policy/MiuiBrightnessController.java'
+renamed[controller_name]=renamed[controller_name].split('public void updateSlider(float value)')[0]+r'''
+ public int offset;
+ public boolean animated,foreignAnimation;
+ public android.animation.ValueAnimator lastAnimation;
+ public void updateSlider(float value){
+  Slider slider=mToggleSlidersController.sliders.get(0);
+  int progress=mBrightnessPolicy.enabled?slider.min+(int)Math.round(Math.cbrt(value*value)*(slider.max-slider.min))+offset:
+   (Integer)InputTest.invokeStatic(BrightnessUtils.class,"convertLinearToGammaFloat",new Class<?>[]{float.class,float.class,float.class},value,0f,1f);
+  if(animated){
+   int[] points={slider.value,progress};
+   android.animation.ValueAnimator animation=(android.animation.ValueAnimator)InputTest.invokeStatic(
+    android.animation.ValueAnimator.class,"ofInt",new Class<?>[]{int[].class},points);
+   lastAnimation=animation;
+   if(!foreignAnimation)mSliderAnimator=animation;
+   animation.update=()->setProgress(animation.points[1]);
+   InputTest.invoke(animation,"start",new Class<?>[0]);
+  }else setProgress(progress);
+  if(fail)throw new IllegalStateException("native feedback failed");
+ }
+ void setProgress(int progress){
+  InputTest.invoke(mToggleSlidersController,"setValue",new Class<?>[]{int.class,ToggleSliderBase.class},progress,null);
+ }
+}
+'''
+renamed['top/rongshangs/lumacurve/refactor/ObservedProgressTest.java']=r'''
+package top.rongshangs.lumacurve.refactor;
+import android.provider.Settings;
+import com.android.systemui.controlcenter.policy.*;
+import com.android.systemui.plugins.miui.controlcenter.ToggleSliderBase;
+import java.lang.reflect.Method;
+import java.util.Objects;
+import org.json.JSONObject;
+import top.rongshangs.lumacurve.refactor.hooking.*;
+
+public class ObservedProgressTest{
+ static int cases;
+ static void check(boolean value){if(!value)throw new AssertionError("observed progress case "+cases);cases++;}
+ static void feedback(MiuiBrightnessController owner,double nativeFraction){InputTest.feedback(owner,(float)Math.pow(nativeFraction,1.5));}
+ static String request(){return Settings.Global.values.get(ControlCenterHooks.NODE_REQUEST);}
+ public static void main(String[] args)throws Exception{
+  XposedBridge.initialize(new XposedBridge.Backend(){
+   public XC_MethodHook.Unhook hook(Method method,XC_MethodHook callback){InputTest.hooks.put(method,callback);return new XC_MethodHook.Unhook(()->InputTest.hooks.remove(method));}
+   public Object original(Method method,Object owner,Object[] args)throws Throwable{return method.invoke(owner,args);}
+   public void log(String text){}
+  });
+  ControlCenterHooks.install(ObservedProgressTest.class.getClassLoader());
+  if(args.length!=0){
+   check(!ControlCenterHooks.installed&&InputTest.hooks.isEmpty());
+   check(ControlCenterHooks.error.contains("未知逻辑亮度坐标签名"));
+   System.out.println("Control center observed: "+cases+" cases PASS");
+   return;
+  }
+  check(ControlCenterHooks.installed);
+  JSONObject json=InputTest.config(4).put("kind","partition_node_v4").put("physical","panel-a")
+   .put("partition",new JSONObject().put("node",.5)).put("partition_maximum",12000);
+  Settings.Global.values.put("profile",json.toString());
+  Settings.Global.values.put("tables",json.toString());
+  Settings.Global.values.put("boot_count","1");
+  android.content.ContentResolver.release.countDown();
+  ControlCenterHooks.bind(new android.app.Application());
+  InputTest.flush();
+  MiuiBrightnessController owner=new MiuiBrightnessController();
+  owner.mBrightnessPolicy.enabled=true;
+  Slider bar=new Slider();
+  InputTest.invoke(owner,"addToggleSlider",new Class<?>[]{ToggleSliderBase.class},bar);
+  ControlCenterHooks.Binding binding=ControlCenterHooks.bindings.get(owner.mToggleSlidersController);
+  check(binding.abi.policy.getType()==RenamedBrightnessPolicy.class&&binding.abi.toggles.getType()==RenamedSliders.class);
+  check(binding.abi.logicalProgress==null&&!ControlCenterHooks.abiReady&&binding.active()==null);
+  InputTest.flush();
+  JSONObject unverified=new JSONObject(Settings.Global.values.get("ui"));
+  check(!unverified.getBoolean("coordinate_abi")&&unverified.getString("detail").contains("等待核对"));
+  InputTest.call(owner,bar,true,950,true);
+  InputTest.flush();
+  check(owner.received==950&&request()==null);
+  owner.offset=100;
+  feedback(owner,.4);
+  feedback(owner,.6);
+  check(!binding.observed.ready&&bar.value==700);
+  owner.offset=0;
+  feedback(owner,.5);
+  feedback(owner,.5);
+  check(!binding.observed.ready&&bar.value==500);
+  owner.animated=true;
+  owner.foreignAnimation=true;
+  feedback(owner,.6);
+  check(!binding.observed.ready&&owner.lastAnimation.points[1]==600&&bar.value==600);
+  owner.foreignAnimation=false;
+  feedback(owner,.65);
+  check(binding.observed.ready&&ControlCenterHooks.abiReady&&binding.active()!=null);
+  check(owner.lastAnimation.points[0]==600&&Math.abs(owner.lastAnimation.points[1]-488)<=1);
+  check(Math.abs(bar.value-488)<=1&&ControlCenterHooks.feedbackPosition.get()==null);
+
+  owner.animated=false;
+  feedback(owner,.7);
+  check(Math.abs(bar.value-525)<=1&&owner.mAutomatic&&request()==null);
+  owner.fail=true;
+  try{feedback(owner,.6);throw new AssertionError("expected native feedback failure");}
+  catch(IllegalStateException expected){check(!binding.observed.ready&&binding.active()==null&&ControlCenterHooks.feedbackPosition.get()==null);}
+  owner.fail=false;
+  feedback(owner,.4);
+  feedback(owner,.55);
+  check(binding.observed.ready);
+  InputTest.call(owner,bar,true,375,false);
+  check(owner.received==500&&owner.mAutomatic&&bar.value==375);
+  InputTest.call(owner,bar,false,375,true);
+  android.os.SystemClock.now+=2000;
+  feedback(owner,.5);
+  check(Math.abs(bar.value-375)<=1&&request()==null);
+  int inputCalls=owner.calls;
+  InputTest.call(owner,bar,true,950,false);
+  InputTest.call(owner,bar,false,950,true);
+  check(owner.calls==inputCalls+2&&owner.received==1000&&request()==null);
+  android.os.SystemClock.now+=500;
+  InputTest.call(owner,bar,true,1000,false);
+  InputTest.call(owner,bar,false,1000,true);
+  ControlCenterHooks.flushNode();
+  InputTest.flush();
+  JSONObject request=new JSONObject(request());
+  check(request.getInt("target")==12000&&ControlCenterPartition.Gate.proof(request)&&owner.calls==inputCalls+2);
+
+  android.app.KeyguardManager.locked=true;
+  InputTest.call(owner,bar,true,900,true);
+  InputTest.flush();
+  check(owner.received==900&&Objects.equals(request.toString(),request()));
+  android.app.KeyguardManager.locked=false;
+  ControlCenterHooks.applyProfile(new ControlCenterHooks.Profile(json.put("revision","new")),"new");
+  check(!binding.observed.ready&&!ControlCenterHooks.abiReady&&binding.active()==null);
+  bar.min=100;
+  bar.max=1200;
+  InputTest.invoke(owner,"addToggleSlider",new Class<?>[]{ToggleSliderBase.class},bar);
+  feedback(owner,.3);
+  feedback(owner,.6);
+  check(binding.observed.ready&&Math.abs(bar.value-595)<=1);
+  owner.mBrightnessPolicy.enabled=false;
+  bar.min=0;
+  bar.max=1000;
+  InputTest.call(owner,bar,true,375,false);
+  check(ControlCenterHooks.abiReady&&ControlCenterHooks.route.equals("gamma")&&owner.received!=375);
+  ControlCenterHooks.io.shutdownNow();
+  XposedBridge.unhookAll();
+  System.out.println("Control center observed: "+cases+" cases PASS");
+ }
+}
+'''
+observed_classes=observed/'classes'
+observed_classes.mkdir(parents=True,exist_ok=True)
+observed_sources=[]
+for name,source in renamed.items():
+ path=observed/name;path.parent.mkdir(parents=True,exist_ok=True);path.write_text(source,encoding='utf-8');observed_sources.append(path)
+observed_sources.extend(p for p in paths if SRC in p.parents)
+observed_cp=str(observed_classes)+os.pathsep+str(jar)
+subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(jar),'-d',str(observed_classes),*map(str,observed_sources)],check=True)
+observed_runner=['java','-cp',observed_cp,'top.rongshangs.lumacurve.refactor.ObservedProgressTest']
+result=subprocess.run(observed_runner,check=False,timeout=20,capture_output=True,text=True)
+print(result.stdout,end='')
+if result.returncode:print(result.stderr,end='')
+result.check_returncode();ui_cases+=int(re.search(r'(\d+) cases PASS',result.stdout).group(1))
+native_controller=observed/controller_name
+native_source=renamed[controller_name].replace('public int offset;',
+ 'public float mSliderTargetValue,mRealtimeValue; public int offset;')
+native_source=native_source.replace('Math.cbrt(value*value)',
+ 'Math.max(0f,Math.min(1f,!animated&&mRealtimeValue>0f?mRealtimeValue:mSliderTargetValue))')
+factory='''android.animation.ValueAnimator animation=(android.animation.ValueAnimator)InputTest.invokeStatic(
+    android.animation.ValueAnimator.class,"ofInt",new Class<?>[]{int[].class},points);'''
+assert factory in native_source
+native_source=native_source.replace(factory,'''android.animation.ValueAnimator animation=new android.animation.ValueAnimator();
+   InputTest.invoke(animation,"setIntValues",new Class<?>[]{int[].class},points);''')
+native_controller.write_text(native_source,encoding='utf-8')
+native_test=observed/'top/rongshangs/lumacurve/refactor/NativeSourceTest.java'
+native_test.write_text(r'''
+package top.rongshangs.lumacurve.refactor;
+import android.provider.Settings;
+import com.android.systemui.controlcenter.policy.*;
+import com.android.systemui.plugins.miui.controlcenter.ToggleSliderBase;
+import java.lang.reflect.Method;
+import org.json.JSONObject;
+import top.rongshangs.lumacurve.refactor.hooking.*;
+
+public class NativeSourceTest{
+ static int cases;
+ static void check(boolean passes){if(!passes)throw new AssertionError("native source case "+cases);cases++;}
+ public static void main(String[] args)throws Exception{
+  XposedBridge.initialize(new XposedBridge.Backend(){
+   public XC_MethodHook.Unhook hook(Method m,XC_MethodHook callback){InputTest.hooks.put(m,callback);return new XC_MethodHook.Unhook(()->InputTest.hooks.remove(m));}
+   public Object original(Method m,Object owner,Object[] args)throws Throwable{return m.invoke(owner,args);}
+   public void log(String text){}
+  });
+  ControlCenterHooks.install(NativeSourceTest.class.getClassLoader());
+  JSONObject profile=InputTest.config(4).put("kind","partition_node_v4").put("physical","panel-a")
+   .put("partition",new JSONObject().put("node",.5)).put("partition_maximum",12000);
+  Settings.Global.values.put("profile",profile.toString());
+  Settings.Global.values.put("tables",profile.toString());
+  Settings.Global.values.put("boot_count","1");
+  android.content.ContentResolver.release.countDown();
+  ControlCenterHooks.bind(new android.app.Application());
+  InputTest.flush();
+  MiuiBrightnessController owner=new MiuiBrightnessController();
+  owner.mBrightnessPolicy.enabled=true;
+  Slider bar=new Slider();
+  InputTest.invoke(owner,"addToggleSlider",new Class<?>[]{ToggleSliderBase.class},bar);
+  ControlCenterHooks.Binding binding=ControlCenterHooks.bindings.get(owner.mToggleSlidersController);
+  check(binding.abi.hasNativeLevels()&&binding.active()==null);
+  owner.mSliderTargetValue=.55f;
+  owner.mRealtimeValue=.4f;
+  owner.offset=100;
+  InputTest.feedback(owner,.15f);
+  check(!binding.observed.ready&&binding.observed.first<0&&binding.observed.evidence.equals("native_level_mismatch"));
+  owner.offset=0;
+  InputTest.feedback(owner,.15f);
+  check(binding.observed.first==400&&!binding.observed.ready&&bar.value==400);
+  owner.animated=true;
+  owner.mSliderTargetValue=.65f;
+  owner.mRealtimeValue=.2f;
+  InputTest.feedback(owner,.18f);
+  check(binding.observed.ready&&binding.active()!=null&&owner.lastAnimation.points[1]!=650);
+  InputTest.flush();
+  JSONObject evidence=new JSONObject(Settings.Global.values.get("ui"));
+  check(evidence.getBoolean("coordinate_abi")&&evidence.getString("coordinate_evidence").equals("native_levels/confirmed"));
+  InputTest.call(owner,bar,true,375,false);
+  check(owner.received==500&&owner.mAutomatic);
+  InputTest.call(owner,bar,false,375,true);
+  android.os.SystemClock.now+=2000;
+  InputTest.call(owner,bar,true,950,false);
+  InputTest.call(owner,bar,false,950,true);
+  check(Settings.Global.values.get(ControlCenterHooks.NODE_REQUEST)==null);
+  android.os.SystemClock.now+=500;
+  InputTest.call(owner,bar,true,1000,false);
+  InputTest.call(owner,bar,false,1000,true);
+  ControlCenterHooks.flushNode();
+  InputTest.flush();
+  JSONObject request=new JSONObject(Settings.Global.values.get(ControlCenterHooks.NODE_REQUEST));
+  check(request.getInt("target")==12000&&ControlCenterPartition.Gate.proof(request));
+
+  // The stock V1 widget stays on its logical scale even when the panel uses a different node range.
+  ControlCenterHooks.applyProfile(new ControlCenterHooks.Profile(
+   profile.put("revision","fixed-v1-range").put("maximum",15000)),"fixed-v1-range");
+  Settings.Global.values.remove(ControlCenterHooks.NODE_REQUEST);
+  bar.max=16383;
+  InputTest.invoke(owner,"addToggleSlider",new Class<?>[]{ToggleSliderBase.class},bar);
+  owner.animated=false;
+  owner.mRealtimeValue=0f;
+  owner.mSliderTargetValue=1f;
+  InputTest.feedback(owner,.15f);
+  check(binding.active()==null&&bar.value==bar.max);
+  owner.mRealtimeValue=.4f;
+  owner.offset=100;
+  InputTest.feedback(owner,.15f);
+  check(binding.active()==null&&binding.observed.evidence.equals("native_level_mismatch"));
+  owner.offset=0;
+  InputTest.feedback(owner,.15f);
+  check(binding.active()!=null&&bar.value!=Math.round(.4f*bar.max));
+  InputTest.feedback(owner,.15f);
+  check(binding.active()!=null);
+  InputTest.flush();
+  evidence=new JSONObject(Settings.Global.values.get("ui"));
+  check(evidence.getBoolean("coordinate_abi")&&evidence.getString("coordinate_evidence").equals("native_levels/confirmed"));
+
+  InputTest.call(owner,bar,true,bar.max,false);
+  InputTest.call(owner,bar,false,bar.max,true);
+  InputTest.flush();
+  check(Settings.Global.values.get(ControlCenterHooks.NODE_REQUEST)==null);
+  android.os.SystemClock.now+=500;
+  InputTest.call(owner,bar,true,bar.max,false);
+  InputTest.call(owner,bar,false,bar.max,true);
+  ControlCenterHooks.flushNode();
+  InputTest.flush();
+  request=new JSONObject(Settings.Global.values.get(ControlCenterHooks.NODE_REQUEST));
+  check(request.getInt("maximum")==15000&&request.getInt("target")==12000&&ControlCenterPartition.Gate.proof(request));
+
+  ControlCenterHooks.io.shutdownNow();
+  XposedBridge.unhookAll();
+  System.out.println("Control center native logical source: "+cases+" cases PASS");
+ }
+}
+''',encoding='utf-8')
+subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',observed_cp,'-d',str(observed_classes),str(native_controller),str(native_test)],check=True)
+result=subprocess.run(['java','-cp',observed_cp,'top.rongshangs.lumacurve.refactor.NativeSourceTest'],check=False,timeout=20,capture_output=True,text=True)
+print(result.stdout,end='')
+if result.returncode:print(result.stderr,end='')
+result.check_returncode();ui_cases+=int(re.search(r'(\d+) cases PASS',result.stdout).group(1))
+policy=observed/policy_name
+original_policy=policy.read_text(encoding='utf-8')
+policy.write_text(original_policy.rstrip()[:-1]+'public float brightnessToSliderProgress(float x){return x;}}',encoding='utf-8')
+subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',observed_cp,'-d',str(observed_classes),str(policy)],check=True)
+result=subprocess.run(observed_runner+['wrong-signature'],check=True,timeout=20,capture_output=True,text=True)
+print("Malformed known converter: "+result.stdout,end='');ui_cases+=int(re.search(r'(\d+) cases PASS',result.stdout).group(1))
 result=subprocess.run(['python',str(ROOT/'tests/refactor_control_center_root.py')],check=True,capture_output=True,text=True);print(result.stdout,end='');root_cases=int(re.search(r'(\d+) cases PASS',result.stdout).group(1))
 
 c=OUT/'lease.c'

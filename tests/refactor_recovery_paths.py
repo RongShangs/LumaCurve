@@ -27,7 +27,7 @@ class RootControl{
  String get(String k){return values.get(k);}boolean put(String k,String v){if(v==null)values.remove(k);else values.put(k,v);return true;}
  String getSystem(String k){return mode;}boolean putSystem(String k,String v){modeWrites++;if(rejectMode)return false;mode=v;return true;}}
 ''' +stop+r'''}
-class PanelNodeDiscovery{static JSONObject value;static int scans;static JSONObject discover(File f)throws Exception{scans++;return new JSONObject(value.toString());}}
+class PanelNodeDiscovery{static JSONObject value;static int scans;static JSONObject directAccess(JSONObject node){return node;}static JSONObject discover(File f)throws Exception{scans++;return new JSONObject(value.toString());}}
 class ActivePanelNode{static final String PROFILE="fold_default_display";static JSONObject discover()throws Exception{return PanelNodeDiscovery.discover(new File("/sys"));}}
 class NativePanelClient{static JSONObject reply;static int probes;static JSONObject call(String action)throws Exception{probes++;return new JSONObject(reply.toString());}}
 class NativePanelRoot{
@@ -47,11 +47,11 @@ class AssetLoader{int width,height;List<AssetStream> streams=new ArrayList<>();I
 class ImageCandidate{final AssetLoader loader=new AssetLoader();int density=1;int dp(int v){return v*density;}AssetLoader getAssets(){return loader;}
 '''+decode+r'''}
 class RuntimeCandidate{
- boolean closed,receiverRegistered=true,thermalRegistered=true;final Part outdoorTest=new Part(),outdoorNode=new Part(),persistentMemory=new Part(),brightnessControl=new Part(),memoryLifecycle=new Part(),kernel=new Part(),stateWriter=new Part(),controlCenter=new Part();
- final Object observer=new Object(),refresh=new Object(),batteryListener=new Object(),thermalListener=new Object();final ContextDouble context=new ContextDouble(observer);final Part power=new Part();int disabled;
+ boolean closed,receiverRegistered=true,thermalRegistered=true,logLevelObserved;final Part outdoorTest=new Part(),outdoorNode=new Part(),persistentMemory=new Part(),brightnessControl=new Part(),memoryLifecycle=new Part(),kernel=new Part(),stateWriter=new Part(),controlCenter=new Part();
+ final Object observer=new Object(),refresh=new Object(),logLevelObserver=new Object(),batteryListener=new Object(),thermalListener=new Object();final ContextDouble context=new ContextDouble(observer,logLevelObserver);final Part power=new Part();int disabled;
  void disableOverrides(){disabled++;}
  static class Part{int closes,configures,removed,stops;void stop(String reason){if(!reason.equals("engine_closed"))throw new AssertionError(reason);stops++;}void close(){closes++;}Object plan(){return new Object();}void configure(Object p){configures++;}void removeThermalStatusListener(Object p){removed++;}}
- static class ContextDouble{final Object first;int firstCalls,secondCalls,receivers;boolean failFirst;ContextDouble(Object o){first=o;}ContextDouble getContentResolver(){return this;}void unregisterContentObserver(Object o){if(o==first){firstCalls++;if(failFirst)throw new IllegalStateException("injected unregister failure");}else secondCalls++;}void unregisterReceiver(Object r){receivers++;}}
+ static class ContextDouble{final Object first,log;int firstCalls,secondCalls,logCalls,receivers;boolean failFirst;ContextDouble(Object first,Object log){this.first=first;this.log=log;}ContextDouble getContentResolver(){return this;}void unregisterContentObserver(Object o){if(o==first){firstCalls++;if(failFirst)throw new IllegalStateException("injected unregister failure");}else if(o==log)logCalls++;else secondCalls++;}void unregisterReceiver(Object r){receivers++;}}
 ''' + runtime_close + r'''}
 public class ReviewEdges{
  static int cases;static void check(boolean b){if(!b)throw new AssertionError("case "+cases);cases++;}
@@ -81,7 +81,14 @@ public class ReviewEdges{
   try{NativePanelRoot.start(node());throw new AssertionError("other workspace accepted");}catch(IOException expected){check(NativePanelRoot.stops==1);}
   int[][] assets={{1080,1080,46},{748,748,240},{571,571,240}};
   for(int density:new int[]{1,2,3,4})for(int[] asset:assets){ImageCandidate image=new ImageCandidate();image.density=density;image.loader.width=asset[0];image.loader.height=asset[1];BitmapFactory.boundsCalls=BitmapFactory.decodeCalls=0;Bitmap b=image.decodeAsset("fixture.jpg",asset[2]);check(b.width>0&&b.height>0);check(b.width<=image.dp(asset[2])*2+1&&b.height<=image.dp(asset[2])*2+1);int sample=BitmapFactory.last.inSampleSize;check(sample>=1&&(sample&(sample-1))==0);check(image.loader.streams.size()==2&&image.loader.streams.get(0).closed&&image.loader.streams.get(1).closed);check(BitmapFactory.boundsCalls==1&&BitmapFactory.decodeCalls==1);}
-  for(boolean failure:new boolean[]{false,true}){RuntimeCandidate runtime=new RuntimeCandidate();runtime.context.failFirst=failure;runtime.close();check(runtime.closed&&runtime.outdoorTest.stops==1);check(runtime.context.firstCalls==1&&runtime.context.secondCalls==1);check(runtime.context.receivers==1&&runtime.power.removed==1);check(runtime.persistentMemory.closes==1&&runtime.brightnessControl.closes==1&&runtime.memoryLifecycle.closes==1);check(runtime.disabled==1&&runtime.kernel.configures==1);runtime.close();check(runtime.context.firstCalls==1&&runtime.context.secondCalls==1&&runtime.disabled==1&&runtime.outdoorTest.stops==1);}
+  for(boolean failure:new boolean[]{false,true})for(boolean observing:new boolean[]{false,true}){
+   RuntimeCandidate runtime=new RuntimeCandidate();runtime.context.failFirst=failure;runtime.logLevelObserved=observing;runtime.close();
+   check(runtime.closed&&runtime.outdoorTest.stops==1);check(runtime.context.firstCalls==1&&runtime.context.secondCalls==1);
+   check(runtime.context.logCalls==(observing?1:0));check(runtime.context.receivers==1&&runtime.power.removed==1);
+   check(runtime.persistentMemory.closes==1&&runtime.brightnessControl.closes==1&&runtime.memoryLifecycle.closes==1);
+   check(runtime.disabled==1&&runtime.kernel.configures==1);runtime.close();
+   check(runtime.context.firstCalls==1&&runtime.context.secondCalls==1&&runtime.context.logCalls==(observing?1:0)&&runtime.disabled==1&&runtime.outdoorTest.stops==1);
+  }
   System.out.println("Review edges: "+cases+" cases PASS; disconnected recovery, node ordering and image decode models; Android not tested");
  }
 }

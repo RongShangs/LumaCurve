@@ -162,6 +162,7 @@ final class BrightnessControl implements SensorEventListener {
         }catch(Throwable unknown){error=unknown.toString();return false;}
     }
     boolean available(){try{if(!supported())return false;display.read();return true;}catch(Throwable unknown){error=unknown.toString();return false;}}
+    boolean manualPanelSupported(){return mainDisplay()&&RawPanelOutputHooks.supports(s.owner.getClass());}
     boolean bindSensors(){
         try{
             BrightnessSensorAccess.Binding selected=BrightnessSensorAccess.read(s.owner);
@@ -298,10 +299,10 @@ final class BrightnessControl implements SensorEventListener {
             if(listening)s.handler.postDelayed(timer,next<0?health:Math.max(1,Math.min(health,next-now)));
         }catch(Throwable failure){fail(failure);}
     }
-    void fail(Throwable failure){error=failure.toString();failed=true;relinquish("error",true);unlisten();s.handler.removeCallbacks(timer);s.handler.removeCallbacks(retry);if((options.darkLock||!options.applications().isEmpty()||options.manualPanel&&!registered)&&!s.closed&&s.phase.equals("active")&&s.screenOn())s.handler.postDelayed(retry,30000);s.log("主屏亮度控制退出："+error);s.queuePublish();}
+    void fail(Throwable failure){error=failure.toString();failed=true;relinquish("error",true);unlisten();s.handler.removeCallbacks(timer);s.handler.removeCallbacks(retry);if((options.darkLock||!options.applications().isEmpty()||options.manualPanel&&!registered)&&!s.closed&&s.phase.equals("active")&&s.screenOn())s.handler.postDelayed(retry,30000);s.logError("主屏亮度控制退出："+error);s.queuePublish();}
     boolean sensorsReady(){try{BrightnessSensorAccess.read(s.owner);return true;}catch(Throwable unavailable){return false;}}
     JSONObject status()throws JSONException{
-        JSONObject j=new JSONObject();options.put(j);boolean supported=supported();j.put("elapsed_ms",SystemClock.elapsedRealtime()).put("manual_panel_supported",mainDisplay()&&RawPanelOutputHooks.supports(s.owner.getClass())).put("dark_lock_supported",supported&&sensorsReady()).put("owner",owner).put("reason",reason).put("error",error).put("auto",auto()).put("listening",listening).put("session",session).put("raw_physical_display_id",rawPhysicalId).put("raw_target",rawTarget).put("raw_paused",rawPaused).put("raw_confirmed",rawConfirmed).put("raw_blocked_output_calls",rawBlockedWrites);
+        JSONObject j=new JSONObject();options.put(j);boolean supported=supported();j.put("elapsed_ms",SystemClock.elapsedRealtime()).put("manual_panel_supported",manualPanelSupported()).put("dark_lock_supported",supported&&sensorsReady()).put("owner",owner).put("reason",reason).put("error",error).put("auto",auto()).put("listening",listening).put("session",session).put("raw_physical_display_id",rawPhysicalId).put("raw_target",rawTarget).put("raw_paused",rawPaused).put("raw_confirmed",rawConfirmed).put("raw_blocked_output_calls",rawBlockedWrites);
         j.put("dark_lock_schedule",schedule.status());
         j.put("watch_binding_active",listening).put("watch_main_profile",listening&&sensorBinding!=null?sensorBinding.profile:"").put("watch_physical_display_id",listening&&sensorBinding!=null?sensorBinding.physicalId:"");
         j.put("app_independent",independent.status());
@@ -340,7 +341,7 @@ final class BrightnessControl implements SensorEventListener {
             rawPaused=paused;reason=paused?"raw_screen_paused":"manual_panel";writeRawLease(!paused);
             s.handler.postDelayed(rawRenew,2000);
             if(changed){s.log(paused?"主屏节点已释放，保留手动目标等待解锁":"解锁后恢复主屏手动目标："+rawTarget);s.queueControlPublish();}
-        }catch(Throwable failure){boolean restore=rawWasAuto;relinquish("raw_guard_error",false);if(restore)try{setAuto(true);}catch(Throwable ignored){}s.log("主屏节点守护续约失败，已退让");s.queuePublish();}
+        }catch(Throwable failure){boolean restore=rawWasAuto;relinquish("raw_guard_error",false);if(restore)try{setAuto(true);}catch(Throwable ignored){}s.logError("主屏节点守护续约失败，已退让");s.queuePublish();}
     }
     void armRaw(String token,int target)throws Exception{armRaw(token,target,"");}
     void armRaw(String token,int target,String physical)throws Exception{
@@ -371,10 +372,13 @@ final class BrightnessControl implements SensorEventListener {
             JSONObject request=new JSONObject(raw);id=request.getString("id");if(id.equals(lastRequest))return;lastRequest=id;
             if(!id.matches("[A-Za-z0-9_-]{1,80}")||!request.getString("build").equals(HookRuntime.BUILD)||!request.getString("process_start").equals(HookRuntime.processStart())||Math.abs(SystemClock.elapsedRealtime()-request.getLong("elapsed"))>15000)throw new IllegalArgumentException("亮度请求已过期，请重新打开面板");
             String action=request.getString("action"),token=request.getString("session");
-            if(action.equals("outdoor_test_start")||action.equals("outdoor_test_stop")){
+            if(action.equals("outdoor_test_prepare")||action.equals("outdoor_test_start")||action.equals("outdoor_test_stop")){
                 if(!token.matches("[A-Za-z0-9_-]{1,80}"))throw new IllegalArgumentException("测试会话无效");
-                if(action.equals("outdoor_test_start"))s.outdoorTest.start(token);else s.outdoorTest.stopFor(token);
-                JSONObject ack=new JSONObject().put("id",id).put("ok",true).put("state",s.outdoorTest.status());Settings.Global.putString(s.context.getContentResolver(),ACK,ack.toString());s.queueControlPublish();return;
+                JSONObject ack=new JSONObject().put("id",id).put("ok",true);
+                if(action.equals("outdoor_test_prepare"))ack.put("node_ready_uptime_ms",s.outdoorTest.prepare(token,request.optJSONObject("node_binding")));
+                else if(action.equals("outdoor_test_start"))s.outdoorTest.start(token,request.optBoolean("requires_node_pause"));
+                else s.outdoorTest.stopFor(token);
+                ack.put("state",s.outdoorTest.status());Settings.Global.putString(s.context.getContentResolver(),ACK,ack.toString());s.queueControlPublish();return;
             }
             s.outdoorTest.stop("control_changed");
             if(!enabled()||!awake()||!mainDisplay())throw new IllegalStateException("请先启用引擎并保持主屏亮起");

@@ -24,7 +24,7 @@ sources['top/rongshangs/lumacurve/refactor/HookRuntime.java']='''package top.ron
  String themeMemoryScope="";String fingerprint="firmware",phase="active";boolean closed,changing,user=true,onThread=true,hdr;float memoryStrength=1;int logs;
  final MemoryLifecycle memoryLifecycle;final MemoryPersistence persistentMemory;
  HookRuntime(CurveBackend k,Object owner){kernel=k;this.owner=owner;memoryLifecycle=new MemoryLifecycle(this);persistentMemory=new MemoryPersistence(this);}
- String baselineId(){return "device";}boolean appliesToUser(){return user;}boolean onDisplayThread(){return onThread;}Boolean hdrActive(){return hdr;}void log(String m){logs++;}void queuePublish(){}void requestRecalculation(){}
+ String baselineId(){return "device";}boolean appliesToUser(){return user;}boolean onDisplayThread(){return onThread;}Boolean hdrActive(){return hdr;}void log(String m){logs++;}void logError(String m){log(m);}void queuePublish(){}void requestRecalculation(){}
 }'''
 sources['top/rongshangs/lumacurve/refactor/LifecycleHostTest.java']=r'''package top.rongshangs.lumacurve.refactor;
 import org.json.*;import top.rongshangs.lumacurve.refactor.hooking.*;import android.os.SystemClock;

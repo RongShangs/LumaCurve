@@ -9,10 +9,11 @@ import java.util.concurrent.*;
 /** No I/O in OEM output hooks. Fresh, short leases are emitted off the display thread. */
 final class OutdoorNodeBridge {
     static final String LEASE="/data/system/hyperlux-outdoor-node-lease";
+    static final long LEASE_MS=1500;
     static final Executor IO=Executors.newSingleThreadExecutor(r->{Thread t=new Thread(r,"HyperLux-outdoor-lease");t.setDaemon(true);return t;});
     interface Sink {void write(String value)throws Exception;}
     final HookRuntime s;final Runnable check=this::evaluate;final Executor executor;final Sink sink;volatile boolean failed;String acceptedRevision="";
-    volatile float frame=Float.NaN;boolean queued,requested,closed;String pending;boolean writing;
+    volatile float frame=Float.NaN;boolean queued,requested,closed;String pending;boolean writing;long lastActiveUntil;
     OutdoorNodeBridge(HookRuntime state){this(state,IO,OutdoorNodeBridge::writeLease);}
     OutdoorNodeBridge(HookRuntime state,Executor executor,Sink sink){s=state;this.executor=executor;this.sink=sink;}
     static boolean interfaces(HookRuntime s,boolean range)throws Exception{
@@ -38,9 +39,9 @@ final class OutdoorNodeBridge {
         return ((Number)legacy.invoke(clamp)).floatValue();
     }
     void frame(float value){frame=value;changed();}
-    void changed(){if(closed||s.closed||!s.outdoor.options.nodeBoost&&!requested||queued)return;queued=true;if(!s.handler.post(check))queued=false;}
+    void changed(){if(closed||s.closed||s.outdoorTest.blocksNodes()||!s.outdoor.options.nodeBoost&&!requested||queued)return;queued=true;if(!s.handler.post(check))queued=false;}
     boolean allowed()throws Exception{
-        if(failed||closed||s.closed||!s.outdoor.options.nodeBoost||!s.phase.equals("active")||!s.appliesToUser()||!s.onDisplayThread()||!s.screenOn()||s.power==null||!s.power.isInteractive()||s.power.isPowerSaveMode())return false;
+        if(failed||closed||s.closed||s.outdoorTest.blocksNodes()||!s.outdoor.options.nodeBoost||!s.phase.equals("active")||!s.appliesToUser()||!s.onDisplayThread()||!s.screenOn()||s.power==null||!s.power.isInteractive()||s.power.isPowerSaveMode())return false;
         if(!OutdoorNodeProfile.matches(s.kernel.name(),s.kernel.max,65535,RawPanelOutputHooks.supports(s.owner.getClass()),s.outdoor.rangeSupported())||s.outdoor.access==null||s.outdoor.access.max()!=1f)return false;
         OutdoorSdrScope scope=OutdoorSdrScope.resolve(s.owner.getClass());if(scope.privacy!=null&&!scope.allows(s.owner))return false;
         if(!s.outdoor.policy.active||s.outdoor.block()!=null||s.outdoor.lux()<s.outdoor.options.values[1]||s.outdoor.options.values[OutdoorOptions.MAX_NIT]!=0)return false;
@@ -58,10 +59,13 @@ final class OutdoorNodeBridge {
         else release();
     }
     void release(){s.handler.removeCallbacks(check);queued=false;if(requested){requested=false;send(false,0);}}
+    long pauseForTest(){release();return lastActiveUntil;}
     void close(){release();closed=true;}
     synchronized void send(boolean active,int target){
         long physical=OutdoorOutputAccess.physical(s);
-        pending=(physical>0?"v3 ":"v2 ")+android.os.Process.myPid()+" "+(SystemClock.uptimeMillis()+1500)+" "+target+" "+(active?1:0)+(physical>0?" "+physical:"")+"\n";
+        long until=SystemClock.uptimeMillis()+LEASE_MS;
+        if(active)lastActiveUntil=until;
+        pending=(physical>0?"v3 ":"v2 ")+android.os.Process.myPid()+" "+until+" "+target+" "+(active?1:0)+(physical>0?" "+physical:"")+"\n";
         if(writing)return;writing=true;try{executor.execute(this::drain);}catch(RuntimeException rejected){writing=false;}
     }
     void drain(){while(true){String value;synchronized(this){value=pending;pending=null;if(value==null){writing=false;return;}}

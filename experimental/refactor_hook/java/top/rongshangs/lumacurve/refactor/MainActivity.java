@@ -53,6 +53,10 @@ public final class MainActivity extends Activity {
     SceneOptions sceneOptions=new SceneOptions();SceneSettings sceneSettings;
     final Switch[] advancedSwitches=new Switch[AdvancedOptions.GROUPS.length];final SeekBar[] advancedSliders=new SeekBar[AdvancedOptions.KEYS.length];final TextView[] advancedLabels=new TextView[AdvancedOptions.KEYS.length];
     TextView advancedStatus,unsavedHint;final TextView[] settingHints=new TextView[12];Switch logFollow;
+    static final String LOG_ERRORS_ONLY="log_errors_only";
+    Button logLevel;
+    boolean logErrorsOnly;
+    boolean logLevelRead;
     LinearLayout settingsHome,settingsTarget,bottomNav;ScrollView settingsHomeScroll;int settingsHomeY;long settingsScrollRestore;boolean settingsHomeRestoring;final LinearLayout[] settingGroups=new LinearLayout[12];final LinearLayout[] settingScreens=new LinearLayout[12];final Button[] settingApply=new Button[12];int settingsGroup=-1;float curveFloor;
     View displayedPage;long pageTransition;
     BrightnessControlOptions controls=new BrightnessControlOptions();ManualBrightnessPanel manualPanel;boolean openManualPanel;
@@ -119,7 +123,7 @@ public final class MainActivity extends Activity {
     @Override public void onCreate(Bundle saved){
         super.onCreate(saved);updateOffered=Boolean.TRUE.equals(getLastNonConfigurationInstance());settingsHomeY=saved==null?0:saved.getInt("settings_home_y",0);openManualPanel=getIntent().getBooleanExtra("manual_brightness_panel",false);restoredUi=saved;darkTheme=(getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK)==android.content.res.Configuration.UI_MODE_NIGHT_YES;INK=themed(INK);MUTED=themed(MUTED);BLUE=themed(BLUE);BG=themed(BG);
         getWindow().setDecorFitsSystemWindows(false);getWindow().setStatusBarColor(Color.TRANSPARENT);getWindow().setNavigationBarColor(Color.TRANSPARENT);getWindow().setNavigationBarContrastEnforced(false);getWindow().setStatusBarContrastEnforced(false);
-        autoScroll=getPreferences(0).getBoolean("log_auto_scroll",true);refreshSeconds=getPreferences(0).getInt("refresh_seconds",2);english=!getResources().getConfiguration().getLocales().get(0).getLanguage().equals("zh");getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING|WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);
+        autoScroll=getPreferences(0).getBoolean("log_auto_scroll",true);logErrorsOnly=getPreferences(0).getBoolean(LOG_ERRORS_ONLY,false);refreshSeconds=getPreferences(0).getInt("refresh_seconds",2);english=!getResources().getConfiguration().getLocales().get(0).getLanguage().equals("zh");getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING|WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);
         try{factors=CurvePlan.factors(getPreferences(0).getString("draft","1,1,1,1"));}catch(Exception ignored){}
         curveFloor=getPreferences(0).getFloat("draft_floor",0);
         root=column();root.setBackgroundColor(BG);root.setFocusableInTouchMode(true);viewport=new ImmersiveLayout(this);viewport.addView(root,new FrameLayout.LayoutParams(-1,-1));setContentView(viewport);
@@ -436,10 +440,19 @@ public final class MainActivity extends Activity {
         LinearLayout b=card(settingsTarget);b.addView(text("主屏手动亮度",18,INK));manualPanelSwitch=new Switch(this);manualPanelSwitch.setText(tr("允许磁贴手动调节"));manualPanelSwitch.setTextSize(14);manualPanelSwitch.setMinimumHeight(dp(48));b.addView(manualPanelSwitch,new LinearLayout.LayoutParams(-1,-2));manualPanelSwitch.setOnCheckedChangeListener((v,on)->{if(on!=controls.manualPanel){controls.manualPanel=on;dirty=true;drawCurve();}});
         manualPanelLimitSettings=new ManualPanelLimitSettings(this,b);
         b.addView(text("拖动面板滑块即切到手动亮度。锁屏时暂停，解锁后恢复，开启自动亮度后结束。",12,MUTED));
-        button("打开主屏亮度面板",this::showManualPanel,b);button("添加控制中心磁贴",this::addBrightnessTile,b);
+        manualPanelStatus=text("当前主屏不支持节点直写",12,MUTED);manualPanelStatus.setVisibility(View.GONE);b.addView(manualPanelStatus);
+        manualPanelOpenButton=button("打开主屏亮度面板",this::showManualPanel,b);manualPanelTileButton=button("添加控制中心磁贴",this::addBrightnessTile,b);
     }
     ControlCenterSettings controlCenterSettings;ManualPanelLimitSettings manualPanelLimitSettings;View controlCenterChoice;
-    void drawControls(){if(manualPanelLimitSettings!=null)manualPanelLimitSettings.refresh();if(controlCenterSettings!=null)controlCenterSettings.refresh();if(darkLockSwitch==null||manualPanelSwitch==null)return;boolean supported=runtime!=null&&runtime.optBoolean("dark_lock_supported");darkLockSwitch.setChecked(controls.darkLock);darkLockSwitch.setEnabled(supported||controls.darkLock);manualPanelSwitch.setChecked(controls.manualPanel);manualPanelSwitch.setEnabled(runtime!=null&&runtime.optBoolean("manual_panel_supported"));
+    Button manualPanelOpenButton,manualPanelTileButton;TextView manualPanelStatus;
+    void drawControls(){if(manualPanelLimitSettings!=null)manualPanelLimitSettings.refresh();if(controlCenterSettings!=null)controlCenterSettings.refresh();
+        boolean blocked=runtime!=null&&!runtime.optString("manual_panel_direct_block").isEmpty();
+        if(manualPanelOpenButton!=null)manualPanelOpenButton.setEnabled(!blocked);
+        if(manualPanelTileButton!=null)manualPanelTileButton.setEnabled(!blocked);
+        if(manualPanelStatus!=null)manualPanelStatus.setVisibility(blocked?View.VISIBLE:View.GONE);
+        BrightnessTileService.publish(runtime);
+        if(manualPanelSwitch!=null){manualPanelSwitch.setChecked(controls.manualPanel);manualPanelSwitch.setEnabled(runtime!=null&&runtime.optBoolean("manual_panel_supported"));}
+        if(darkLockSwitch==null)return;boolean supported=runtime!=null&&runtime.optBoolean("dark_lock_supported");darkLockSwitch.setChecked(controls.darkLock);darkLockSwitch.setEnabled(supported||controls.darkLock);
         if(darkSunsetSwitch!=null){darkSunsetSwitch.setChecked(controls.sunsetOnly);darkSunsetSwitch.setEnabled(controls.darkLock);}
         if(darkManualExitSwitch!=null){darkManualExitSwitch.setChecked(controls.manualExit);darkManualExitSwitch.setEnabled(supported||controls.manualExit);}
         String[] labels={"进入照度："+format(controls.enterLux)+" lux","等待时间："+controls.minutes+" 分钟","退出照度："+format(controls.exitLux)+" lux","退出确认："+controls.exitSeconds+" 秒"};int[] p={Math.round(controls.enterLux)-1,controls.minutes-1,Math.round((controls.exitLux-5)/5),controls.exitSeconds-1};for(int i=0;i<4;i++){controlSliders[i].setProgress(p[i]);controlLabels[i].setText(labels[i]);enableParameter(controlSliders[i],controlLabels[i],supported&&controls.darkLock);}
@@ -510,13 +523,30 @@ public final class MainActivity extends Activity {
         featureCheckPage=new FeatureCheckPage(this);featureCheckPage.root.setVisibility(View.GONE);content.addView(featureCheckPage.root,new FrameLayout.LayoutParams(-1,-1));
         logCompatibility=new LogCompatibilityPanel(this);LinearLayout.LayoutParams summary=new LinearLayout.LayoutParams(-1,-2);summary.bottomMargin=dp(12);pages[2].addView(logCompatibility.view,summary);
         LinearLayout b=card(pages[2]);LinearLayout.LayoutParams panel=(LinearLayout.LayoutParams)b.getLayoutParams();panel.height=0;panel.weight=1;panel.bottomMargin=0;b.setLayoutParams(panel);b.setPadding(dp(14),dp(12),dp(14),dp(12));
-        LinearLayout r=row(b);LinearLayout logHeading=column();logHeading.addView(text("最近运行记录",15,INK));logHeading.addView(text("当前系统进程 · 最近 160 条",10,MUTED));r.addView(logHeading,new LinearLayout.LayoutParams(0,-2,1));Button refresh=action("刷新",()->run("inspect",null));refresh.setTextSize(12);Switch follow=new Switch(this);logFollow=follow;follow.setText(tr("自动滚动"));follow.setTextSize(11);follow.setShowText(false);follow.setChecked(autoScroll);follow.setPadding(dp(4),0,dp(8),0);r.addView(follow,new LinearLayout.LayoutParams(-2,dp(36)));
-        follow.setOnCheckedChangeListener((v,on)->{autoScroll=on;getPreferences(0).edit().putBoolean("log_auto_scroll",on).apply();if(on)scrollLogs();});r.addView(refresh,new LinearLayout.LayoutParams(dp(56),dp(48)));
-        logText=text("尚无记录",12,INK);logText.setTypeface(Typeface.MONOSPACE);logText.setTextIsSelectable(true);logText.setPadding(dp(10),dp(8),dp(10),dp(8));
+        b.addView(text("最近运行记录",15,INK));
+        LinearLayout toolbar=row(b);
+        toolbar.setPadding(0,dp(4),0,0);
+        LinearLayout actions=row(toolbar);
+        actions.setLayoutParams(new LinearLayout.LayoutParams(0,-2,1));
+        logLevel=action(logLevelLabel(),this::showLogLevel);
+        logLevel.setTextSize(12);
+        actions.addView(logLevel,new LinearLayout.LayoutParams(-2,-2));
+        Button refresh=action("刷新",()->run("inspect",null));
+        refresh.setTextSize(12);
+        LinearLayout.LayoutParams refreshSize=new LinearLayout.LayoutParams(-2,-2);
+        refreshSize.setMarginStart(dp(8));
+        actions.addView(refresh,refreshSize);
+        Switch follow=new Switch(this);
+        logFollow=follow;follow.setText(tr("自动滚动"));follow.setTextSize(11);follow.setShowText(false);
+        follow.setChecked(autoScroll);follow.setMinimumHeight(dp(48));
+        follow.setPadding(dp(8),0,0,0);follow.setSwitchPadding(dp(8));
+        toolbar.addView(follow,new LinearLayout.LayoutParams(-2,-2));
+        follow.setOnCheckedChangeListener((v,on)->{autoScroll=on;getPreferences(0).edit().putBoolean("log_auto_scroll",on).apply();if(on)scrollLogs();});
+        logText=text(logErrorsOnly?"尚无错误记录":"尚无运行记录",12,INK);logText.setTypeface(Typeface.MONOSPACE);logText.setTextIsSelectable(true);logText.setPadding(dp(10),dp(8),dp(10),dp(8));
         logScroller=new ElasticScrollView(this);logScroller.setBackground(background(0xfff2f4f8,12));logScroller.setClipToOutline(true);logScroller.addView(logText);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,0,1);lp.topMargin=dp(8);lp.bottomMargin=dp(8);b.addView(logScroller,lp);
         logText.addOnLayoutChangeListener((v,l,t,right,bottom,ol,ot,or,ob)->{if(autoScroll&&bottom-t!=ob-ot)scrollLogs();});
         logScroller.addOnLayoutChangeListener((v,l,t,right,bottom,ol,ot,or,ob)->{if(autoScroll&&bottom-t!=ob-ot)scrollLogs();});
-        r=row(b);compact("亮度分支",this::branches,r);compact("详细读数",this::details,r);compact("导出分析包",()->run("export",null),r);
+        LinearLayout r=row(b);compact("亮度分支",this::branches,r);compact("详细读数",this::details,r);compact("导出分析包",()->run("export",null),r);
         for(int i=0;i<r.getChildCount();i++){Button tool=(Button)r.getChildAt(i);tool.setTextSize(12);tool.setMaxLines(2);tool.setEllipsize(null);tool.setPadding(dp(6),dp(6),dp(6),dp(6));LinearLayout.LayoutParams size=(LinearLayout.LayoutParams)tool.getLayoutParams();size.height=LinearLayout.LayoutParams.MATCH_PARENT;tool.setLayoutParams(size);}
         note.setMaxLines(2);note.setEllipsize(android.text.TextUtils.TruncateAt.END);b.addView(note);
     }
@@ -530,6 +560,76 @@ public final class MainActivity extends Activity {
     void refreshThanks(){
         if(thanksBusy||SystemClock.elapsedRealtime()-thanksChecked<60000&&thanksChecked!=0)return;thanksBusy=true;thanksChecked=SystemClock.elapsedRealtime();
         network.execute(()->{try{JSONObject data=ThanksFeed.check();ui.post(()->{if(destroyed)return;thanksBusy=false;try{renderThanks(data);getPreferences(0).edit().putString("thanks_cache",data.toString()).apply();thanksStatus.setText("已同步官网感谢名单");}catch(Exception ignored){thanksStatus.setText("名单来自官网，联网时自动更新");}});}catch(Exception failure){ui.post(()->{if(destroyed)return;thanksBusy=false;thanksStatus.setText("暂未连接官网，显示已保存的名单");});}});
+    }
+    String logLevelLabel(){return logErrorsOnly?"日志级别 · 仅错误":"日志级别 · 完整";}
+    void showLogLevel(){
+        if(!logLevel.isEnabled())return;
+        LinearLayout body=column();
+        body.addView(text("为尽量实现零后台、减少性能开销，HyperLux 复用 LSPosed 的日志系统，App 筛选并显示已有记录。「完整」会记录照度跳变、光感参考切换等运行信息，建议排查问题时使用。「仅错误」只写入错误，App 和 LSPosed 同时生效。",14,MUTED));
+        RadioGroup levels=new RadioGroup(this);
+        levels.setOrientation(RadioGroup.VERTICAL);
+        body.addView(levels);
+        AlertDialog dialog=dialog("日志级别",body);
+        for(boolean errorsOnly:new boolean[]{false,true}){
+            RadioButton option=new RadioButton(this);
+            option.setId(View.generateViewId());
+            option.setChecked(errorsOnly==logErrorsOnly);
+            option.setText(tr(errorsOnly?"仅错误":"完整"));
+            option.setTextColor(INK);
+            option.setButtonTintList(new ColorStateList(new int[][]{new int[]{android.R.attr.state_checked},new int[0]},new int[]{BLUE,MUTED}));
+            option.setMinHeight(dp(48));
+            option.setBackground(ripple(0xffeef2fa,12));
+            option.setPadding(dp(12),dp(4),dp(12),dp(4));
+            RadioGroup.LayoutParams lp=new RadioGroup.LayoutParams(-1,-2);lp.topMargin=dp(6);
+            levels.addView(option,lp);
+            option.setOnClickListener(v->{
+                dialog.dismiss();
+                changeLogLevel(errorsOnly?RuntimeLog.ERRORS:RuntimeLog.FULL);
+            });
+        }
+        dialog.show();
+    }
+    String requestLogLevel(String selection)throws Exception{
+        JSONObject result=request("log-level",selection);
+        if(!result.optBoolean("ok"))throw new IOException(result.optString("message","日志级别保存未确认"));
+        String level=result.getString("log_level");
+        if(!RuntimeLog.normalize(level).equals(level))throw new IOException("日志级别未确认");
+        return level;
+    }
+    void setLogLevelLabel(String level){
+        logErrorsOnly=RuntimeLog.ERRORS.equals(level);
+        if(getPreferences(0).getBoolean(LOG_ERRORS_ONLY,false)!=logErrorsOnly)
+            getPreferences(0).edit().putBoolean(LOG_ERRORS_ONLY,logErrorsOnly).apply();
+        logLevel.setText(logLevelLabel());
+        renderLogs();
+    }
+    void changeLogLevel(String selection){
+        logLevel.setEnabled(false);
+        worker.execute(()->{
+            try{
+                String level=requestLogLevel(selection);logLevelRead=true;
+                ui.post(()->{if(!destroyed){setLogLevelLabel(level);logLevel.setEnabled(true);}});
+            }catch(Exception failure){
+                closeBridge();logLevelRead=false;
+                ui.post(()->{if(!destroyed){logLevel.setEnabled(true);operationFailure("log-level",failure);}});
+            }finally{if(!visible)closeBridge();}
+        });
+    }
+    String logLevelOnConnect(JSONObject answer){
+        JSONObject access=answer.optJSONObject("root_access");
+        JSONObject settings=access==null?null:access.optJSONObject("settings");
+        if(logLevelRead||settings==null||!settings.optBoolean("readable"))return null;
+        logLevelRead=true;
+        try{return requestLogLevel(getPreferences(0).getBoolean(LOG_ERRORS_ONLY,false)?"migrate-errors":"read");}
+        catch(Exception unavailable){return null;}
+    }
+    void renderLogs(){
+        String lines=RuntimeLog.visibleLines(runtime==null?null:runtime.optJSONArray("logs"),logErrorsOnly);
+        String next=lines.isEmpty()?(logErrorsOnly?"尚无错误记录":"尚无运行记录"):lines;
+        if(tr(next).contentEquals(logText.getText()))return;
+        int position=logScroller.getScrollY();
+        logText.setText(next);
+        if(autoScroll)scrollLogs();else logScroller.post(()->logScroller.scrollTo(0,position));
     }
     void scrollLogs(){if(logScroller!=null&&autoScroll)logScroller.post(()->{if(autoScroll&&!destroyed)logScroller.scrollTo(0,logText.getHeight());});}
     void copyGroupNumber(){android.content.ClipboardManager cm=(android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE);cm.setPrimaryClip(ClipData.newPlainText(tr("QQ 交流群"),"314981836"));show("已复制群号");}
@@ -774,6 +874,7 @@ if(request!=501||result!=RESULT_OK||data==null||data.getData()==null)return;Uri 
                 catch(Exception rootFailure){if(!command.equals("export"))throw rootFailure;closeBridge();received=AppRootDiagnostics.export(this,lastAnswer,rootFailure);}
                 if(command.equals("export"))DiagnosticSharing.prepare(this,received);
                 final JSONObject result=received;
+                String level=(command.equals("inspect")||command.equals("self-check"))?logLevelOnConnect(result):null;
                 if((command.equals("inspect")||command.equals("self-check"))&&!legacyChecked&&!getPreferences(0).getBoolean("legacy_imported",false)){
                     legacyChecked=true;
                     try{JSONObject old=request("legacy-preferences",null);if(old.optBoolean("ok")){
@@ -787,7 +888,9 @@ if(request!=501||result!=RESULT_OK||data==null||data.getData()==null)return;Uri 
                     if(command.equals("restore-defaults")){
                         try{loadOptions(new JSONObject().put("factors","1,1,1,1"));dirty=false;getPreferences(0).edit().remove("draft").remove("draft_floor").remove("draft_baseline").putBoolean("legacy_imported",true).apply();}catch(Exception failure){show(failure.getMessage());}
                     }
-                    if(state!=null)render(state);else apply.setEnabled(runtime!=null&&factoryLux!=null);drawDraftState();if(mappingEdited&&settingsGroup==ControlCenterSetup.SETTINGS_GROUP&&controls.nodeSliderMode>0&&controlCenterSettings!=null)controlCenterSettings.setup.check(true);offerLegacyModules();offerUpdate();quickSetup.resume();quickSetup.invite();quickSetup.refreshed(command,true);finishFeatureCheckRequest(command,result);if(logCompatibility!=null&&(command.equals("inspect")||command.equals("self-check")))logCompatibility.update(lastAnswer,rootFeatureReport);
+                    if(state!=null)render(state);else apply.setEnabled(runtime!=null&&factoryLux!=null);
+                    if(level!=null)setLogLevelLabel(level);
+                    drawDraftState();if(mappingEdited&&settingsGroup==ControlCenterSetup.SETTINGS_GROUP&&controls.nodeSliderMode>0&&controlCenterSettings!=null)controlCenterSettings.setup.check(true);offerLegacyModules();offerUpdate();quickSetup.resume();quickSetup.invite();quickSetup.refreshed(command,true);finishFeatureCheckRequest(command,result);if(logCompatibility!=null&&(command.equals("inspect")||command.equals("self-check")))logCompatibility.update(lastAnswer,rootFeatureReport);
                     if(featureCheckRefreshPending&&featureChecksVisible){rereadPending=false;ui.post(this::refreshFeatureChecks);}else if(rereadPending){rereadPending=false;ui.post(()->run("inspect",null));}
                     if(!(command.equals("inspect")||command.equals("self-check"))){String message=result.optString("message",result.has("path")?"已导出："+result.optString("path"):"操作完成");show(message);
                         if(result.has("path")){boolean configFile=command.equals("export-config");AlertDialog d=dialog(configFile?"配置已导出":"分析包已导出",text(result.optString("path")+"\n\n"+(configFile?"文件位于设备存储根目录。包含当前设置，可在后续版本导入。":result.optBoolean("partial_root_report")?"权限分析包位于下载目录 HyperLux 文件夹。仅含 APP 侧错误与最近状态，未收集到实时系统日志。":"包含设备与显示信息，请按需分享。"),14,MUTED));d.show();if(configFile)dialogButton(d,"知道了",null,true);else dialogButton(d,"确定并分享",()->DiagnosticSharing.share(this,result),true);}}
@@ -845,8 +948,7 @@ if(request!=501||result!=RESULT_OK||data==null||data.getData()==null)return;Uri 
             thermalState.setText("温控："+thermal+"\n电池 "+(runtime.has("battery_temperature")?format(runtime.optDouble("battery_temperature"))+"℃":"无读数")+"；系统热状态 "+severity(runtime.optInt("thermal_severity",-1)));
             double anchor=runtime.optDouble("user_anchor_lux",-1);userState.setText("手动偏好："+(anchor>=0?"系统锚点位于 "+format(anchor)+" lux":"当前没有手动锚点"));
 
-            JSONArray logs=runtime.optJSONArray("logs");StringBuilder lines=new StringBuilder();if(logs!=null)for(int i=0;i<logs.length();i++)lines.append(logs.getString(i)).append('\n');String next=lines.length()==0?"尚无运行记录":lines.toString();
-            if(!tr(next).contentEquals(logText.getText())){int position=logScroller.getScrollY();logText.setText(next);if(autoScroll)scrollLogs();else logScroller.post(()->logScroller.scrollTo(0,position));}
+            renderLogs();
             // After an OTA, an unsupported option that was enabled must still be switchable off.
             smallBrightenSwitch.setEnabled(runtime.optBoolean("small_response_supported")||smallBrightenOverride);smallBrightenSlider.setEnabled(runtime.optBoolean("small_response_supported"));
             lowLightSwitch.setEnabled(runtime.optBoolean("low_light_supported")||lowLightStability);for(SeekBar slider:new SeekBar[]{lowLimitSlider,lowBrightSlider,lowDarkSlider})slider.setEnabled(runtime.optBoolean("low_light_supported")&&lowLightStability);

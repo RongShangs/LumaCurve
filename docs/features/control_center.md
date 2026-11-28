@@ -9,7 +9,7 @@
 | 项目 | 要求 |
 | --- | --- |
 | 触发 | 保存的映射已启用，真实SystemUI注入、坐标接口与同代配置表已就绪。 SystemUI观察器在后台注册并就绪后才启用映射；启动主线程不等待SettingsProvider或广播注册。 |
-| 需求与行为 | 标准与有效端点标定分别验证，提供同代坐标表；锁屏回原生，缺实际加载回执不假报已生效 |
+| 需求与行为 | 标准与有效端点标定分别验证，提供同代坐标表。读取控制器关联字段的类型，校验策略和滑块回调签名，按控件类型缓存范围访问器。原生逻辑转换方法确实缺失时，用控制器实际采用的逻辑值核验原生回显。实测控件采用固定 V1 逻辑坐标 0–16383 时，一个精确吻合的非端点回显即可确认。其他原生坐标范围或独立标定仍需两个相距足够的样本。框架当前亮度用于实际亮度回显。锁屏回原生，运行回执区分加载和坐标核验进度。 |
 | 退出 / 失败 | 锁屏退回原生坐标，配置或进程换代清旧profile；未知标定不回放旧坐标。 初始化失败清理部分观察器，最多三次异步尝试；未就绪沿用原生亮度及锁屏控制，不绕过锁屏。 |
 | 默认 | `off` · 新配置关闭 |
 | 配置键 | `control_center_node_mode` |
@@ -20,7 +20,7 @@
 | 项目 | 要求 |
 | --- | --- |
 | 触发 | 完整节点模式下，已解锁用户主动拖动，实际物理节点及同代控制权已确认。 SystemUI观察器在后台注册并就绪后才启用映射；启动主线程不等待SettingsProvider或广播注册。 |
-| 需求与行为 | 全条按真实节点比例显示，拖动关闭自动亮度并放开暗光锁定，复用面板保持，不学习；HDR保留系统图像处理；折叠主屏按实时默认物理屏、已验证配对节点和本次同屏标定绑定，不跨屏回放旧目标 |
+| 需求与行为 | 全条按真实节点比例显示，拖动关闭自动亮度并放开暗光锁定，复用面板保持，不学习；HDR保留系统图像处理。背光节点由原子调光接管时暂停完整及分区节点控制，保留设置并沿用系统亮度。折叠主屏按实时默认物理屏、已验证配对节点和本次同屏标定绑定，不跨屏回放旧目标 |
 | 退出 / 失败 | 打开自动亮度结束保持；锁屏回原生亮度条，解锁按当前代次恢复映射。 灭屏时折叠映射监听释放节点权限并等待，禁止新租约或写入；换屏撤回旧控制权，等待新屏绑定及新手势。 初始化失败清理部分观察器，最多三次异步尝试；未就绪沿用原生亮度及锁屏控制，不绕过锁屏。 |
 | 默认 | `off` · 新配置关闭 |
 | 配置键 | `control_center_node_mode`、`control_center_node_maximum`、`control_center_node_path` |
@@ -30,12 +30,23 @@
 
 | 项目 | 要求 |
 | --- | --- |
-| 触发 | 分区模式下，普通与额外节点边界已验证（服务端边界接受 config.* 或 DisplayDeviceConfig 内嵌 HBM 数据身份）；首次触顶后3秒内再次上滑，或按真实自动高亮状态接续控制。系统界面 V1 新 ABI 仍单列待适配。 SystemUI观察器在后台注册并就绪后才启用映射；启动主线程不等待SettingsProvider或广播注册。 |
-| 需求与行为 | 普通75%保留原生学习；首次顶住分界并提示，3秒内再次上滑才进入增强25%；实际节点上限可设；返回普通段可恢复自动或继续手动；折叠内外屏复用保存选择仅限同原生布局、同控制器、相同上限的已验证配对节点，实际目标始终绑定当前物理屏 |
+| 触发 | 分区模式下，普通与额外节点边界及系统界面坐标已验证，服务端边界接受 config.* 或 DisplayDeviceConfig 内嵌 HBM 数据身份。首次触顶后3秒内再次上滑，或按真实自动高亮状态接续控制。SystemUI观察器在后台注册并就绪后才启用映射，启动主线程不等待SettingsProvider或广播注册。 |
+| 需求与行为 | 普通75%保留原生学习；首次顶住分界并提示，3秒内再次上滑才进入增强25%；实际节点上限可设；返回普通段可恢复自动或继续手动。运行节点能力未确认时隐藏分区参数并保留已保存选择。折叠内外屏复用保存选择仅限同原生布局、同控制器、相同上限的已验证配对节点，实际目标始终绑定当前物理屏 |
 | 退出 / 失败 | 回普通段按所选恢复自动或继续手动；锁屏回原生；过期和换代拒绝旧手势。 初始化失败清理部分观察器，最多三次异步尝试；未就绪沿用原生亮度及锁屏控制，不绕过锁屏。 |
 | 默认 | `off` · 新配置关闭 |
 | 配置键 | `control_center_node_mode`、`control_center_partition_maximum`、`control_center_partition_restore_auto` |
 | 依赖能力 | `control_center_slider`、`main_panel_node` |
+
+### SystemUI 亮度条接口 · `control_center_system_ui`
+
+| 项目 | 要求 |
+| --- | --- |
+| 触发 | 在应用启动或手动自检时，核验主用户 SystemUI 的 PID、进程启动标识和构建。 |
+| 需求与行为 | 独立列出 V1 原生换算、V1 原生回显校验、Gamma 换算。识别到路线时显示对应名称，并按回执区分接口可用、等待回显、坐标校验未通过或配置尚未送达。设备标定与实际节点能力各自显示。 |
+| 退出 / 失败 | 进程代次不符、旧构建或回执不可读时显示待确认。页面查看与展开均使用最近自检结果。 |
+| 默认 | `observe` · 在现有功能自检中读取 SystemUI 回执 |
+| 配置键 | 无独立持久化亮度配置键 |
+| 依赖能力 | `root_settings` |
 
 ## 分叉与收束
 
@@ -45,12 +56,12 @@
 - 完整节点mode=3复用已验证坐标回显，并独立核验主屏隔离、物理ID、Root可写节点与监听进程；动态折叠监听未知时不套用。
 - 分区mode=4额外读取设备普通HBM边界并经真实标定换算；没有可靠边界或额外区间则只拒绝分区。
 - 分区普通段占75%、增强段占25%；普通V1使用原生逻辑输入全域，gamma使用物理普通边界；增强段及回显按实际节点标定。用户上界不修改自动HBM范围。
-- 普通V1的延迟回显先将真实物理读数反解为本机逻辑进度，再映射到75%，动画比较使用同一逆变换。作用域、手势和控制权为独立检查。 分区普通边界接受 config.* 与 DisplayDeviceConfig 内嵌两种已验证 HBM 数据身份；系统界面 HyperOSBrightnessPolicyV1 的新 ABI 仍为独立待适配项，不在本次边界修复内。 已验证fold_default_display可与完整/分区节点监听组合，当前物理屏须等于本次TABLES标定；不再将已验证折叠节点一概禁用。 SystemUI观察器通过原有有界IO线程注册；Application.onCreate/addToggleSlider只发布上下文并排队，不同步访问Provider/注册广播。未完成初始化不采用映射。
+- 普通V1的延迟回显先将真实物理读数反解为本机逻辑进度，再映射到75%，动画比较使用同一逆变换。作用域、手势和控制权为独立检查。分区普通边界接受 config.* 与 DisplayDeviceConfig 内嵌两种已验证 HBM 数据身份。SystemUI从控制器关联字段收束真实对象的类型，旧逻辑换算方法优先，缺失时优先核对原生逻辑源和回显进度，无法识别逻辑源时验证独立设备标定。已验证fold_default_display可与完整/分区节点监听组合，当前物理屏须等于本次TABLES标定。SystemUI观察器通过原有有界IO线程注册，Application.onCreate/addToggleSlider只发布上下文并排队。就绪前使用原生亮度条。
 
 | 契约 | 内容 |
 | --- | --- |
 | 组合方式 | `per_feature` |
-| 统一输出 | 标定/分区坐标、同代profile、统一节点保持和作用域结果 |
+| 统一输出 | 标定与分区坐标、同代profile、统一节点保持和作用域。功能自检读取当前构建、主用户及PID/启动标识一致的SystemUI回执，分别呈现接口路线与就绪状态。 |
 | 坐标与身份 | UI进度/framework brightness/物理背光/节点分层；普通段0—.75，经逆变换回显 |
 
 ### 清理及回滚
@@ -72,10 +83,13 @@
 | `partition_node_v4` · 普通亮度与节点分区控制 | 使用本机普通亮度边界划分区间；普通区间保留自动亮度与原学习。到达边界松手后，三秒内再次向上滑动才使用共用节点保持；返回普通区间可恢复自动或保持手动。 |
 | `partition_ddc_hbm` · 原机配置普通上限 | 优先读取原始HBM过渡点，按本机标定换算普通区间；类型或数据错误不降级绕过。 |
 | `partition_hbm_normal` · 控制器普通上限 | 原机配置没有该入口或合法无HBM数据时，读取实际普通亮度上限；不按固定比例猜测。 |
+| `oem_v1` · V1 原生换算接口 | 系统提供原生 V1 亮度到滑块进度的换算方法。 |
+| `oem_v1_native_progress` · V1 原生回显校验 | 系统直接生成 V1 滑块进度，通过原生回显核验坐标。 |
+| `gamma` · Gamma 换算接口 | 系统使用 Gamma 在亮度与滑块进度之间换算。 |
 
-路线内部 ABI：`sensor_identity`、`sensor_freshness`、`control_center_feedback`、`control_center_minimum`、`control_center_conversion`、`slider_calibration_domain`、`partition_manual_ceiling`、`control_center_tracking_lifecycle`、`system_ui_scope_reader`、`system_ui_explicit_restart`、`manual_node_hold_policy`、`mapping_recovery_confirmation`、`control_center_lockscreen`、`control_center_partition_boundary`；完整条件仅维护在 [ABI索引](../architecture/compatibility-index.md#abi-内部变体)。
+路线内部 ABI：`sensor_identity`、`sensor_freshness`、`control_center_feedback`、`control_center_minimum`、`control_center_conversion`、`slider_calibration_domain`、`partition_manual_ceiling`、`control_center_tracking_lifecycle`、`control_center_system_ui_coordinates`、`system_ui_scope_reader`、`system_ui_explicit_restart`、`manual_node_hold_policy`、`mapping_recovery_confirmation`、`control_center_lockscreen`、`control_center_partition_boundary`；完整条件仅维护在 [ABI索引](../architecture/compatibility-index.md#abi-内部变体)。
 
-运行证据：`control_center_slider.kind`、`control_center_slider.error`、`hyperlux_control_center_tables_v2.enabled`、`hyperlux_control_center_tables_v2.revision`、`hyperlux_control_center_tables_v2.user_serial`、`control_center_slider.calibration_profile`、`control_center_slider.compatibility_state`、`control_center_slider.oem_v1_ready`、`control_center_raw_supported`、`control_center_slider.raw_ready`、`control_center_slider.raw_control`、`control_center_node_detail`、`control_center_partition_supported`、`control_center_slider.partition`、`control_center_slider.partition_error`、`hyperlux_control_center_tables_v2.partition_maximum`、`control_center_slider.raw_control.confirmation_trace`、`main-panel.previous.log`、`main-panel.log.NATIVE_EXIT`、`control_center_setup.scope_state`、`control_center_setup.injection_state`、`hyperlux_control_center_ui_v1.pid`、`hyperlux_control_center_ui_v1.process_start`、`main_panel_node.node_physical_display_id`、`mapping_warning`、`main-panel.log.NATIVE_READY`、`control_center_system_ui.observers_ready`、`control_center_system_ui.observer_attempts`。
+运行证据：`control_center_slider.kind`、`control_center_slider.error`、`hyperlux_control_center_tables_v2.enabled`、`hyperlux_control_center_tables_v2.revision`、`hyperlux_control_center_tables_v2.user_serial`、`control_center_slider.calibration_profile`、`control_center_slider.compatibility_state`、`control_center_slider.oem_v1_ready`、`control_center_raw_supported`、`control_center_slider.raw_ready`、`control_center_slider.raw_control`、`control_center_node_detail`、`control_center_partition_supported`、`control_center_slider.partition`、`control_center_slider.partition_error`、`hyperlux_control_center_tables_v2.partition_maximum`、`control_center_slider.raw_control.confirmation_trace`、`main-panel.previous.log`、`main-panel.log.NATIVE_EXIT`、`control_center_setup.scope_state`、`control_center_setup.injection_state`、`hyperlux_control_center_ui_v1.pid`、`hyperlux_control_center_ui_v1.process_start`、`hyperlux_control_center_ui_v1.route`、`hyperlux_control_center_ui_v1.coordinate_abi`、`hyperlux_control_center_ui_v1.coordinate_evidence`、`main_panel_node.node_physical_display_id`、`mapping_warning`、`main-panel.log.NATIVE_READY`、`hyperlux_control_center_ui_v1.observers_ready`、`hyperlux_control_center_ui_v1.observer_attempts`、`root_feature_self_check.features.control_center_system_ui.system_ui_route`。
 
 验证入口：
 
@@ -83,6 +97,7 @@
 - [refactor_control_center_root.py](../../tests/refactor_control_center_root.py)
 - [refactor_brightness_control.py](../../tests/refactor_brightness_control.py)
 - [refactor_feature_self_check.py](../../tests/refactor_feature_self_check.py)
+- [refactor_feature_page.py](../../tests/refactor_feature_page.py)
 - [refactor_control_center_calibration.py](../../tests/refactor_control_center_calibration.py)
 - [refactor_control_center_nodes.py](../../tests/refactor_control_center_nodes.py)
 - [refactor_control_center_partition.py](../../tests/refactor_control_center_partition.py)
@@ -98,21 +113,23 @@
 
 | 文件 | 当前源码 SHA-256 前16位 |
 | --- | --- |
-| [BrightnessControl.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/BrightnessControl.java) | `7f6e8cc411da5e30` |
+| [BrightnessControl.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/BrightnessControl.java) | `e7797c2cfeb536ce` |
 | [BrightnessControlOptions.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/BrightnessControlOptions.java) | `e5078bc085530fa2` |
 | [ControlCenterCalibration.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ControlCenterCalibration.java) | `ad750d057839e101` |
 | [ControlCenterCurve.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ControlCenterCurve.java) | `e0e3f8e8862e574b` |
 | [ControlCenterDemo.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ControlCenterDemo.java) | `f9df10326eab7cd1` |
 | [ControlCenterDemoState.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ControlCenterDemoState.java) | `1464b3f355f43df4` |
 | [ControlCenterEngine.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ControlCenterEngine.java) | `46016e14936d7f35` |
-| [ControlCenterHooks.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ControlCenterHooks.java) | `3dfaef93dbd3e86d` |
+| [ControlCenterHooks.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ControlCenterHooks.java) | `ae40bec3736ba221` |
 | [ControlCenterNodes.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ControlCenterNodes.java) | `863d074a2629b048` |
 | [ControlCenterPartition.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ControlCenterPartition.java) | `0b7dbda96aee0692` |
-| [ControlCenterRoot.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ControlCenterRoot.java) | `49074e9977d153a4` |
+| [ControlCenterRoot.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ControlCenterRoot.java) | `dae3fb7c2fbf775e` |
 | [ControlCenterScreen.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ControlCenterScreen.java) | `38370628b9178c79` |
-| [ControlCenterSettings.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ControlCenterSettings.java) | `47eab653db15059f` |
+| [ControlCenterSettings.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ControlCenterSettings.java) | `d37776f4c5dc0cc2` |
 | [ControlCenterSetup.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ControlCenterSetup.java) | `daa3c13a325dc0c9` |
 | [ControlCenterStatus.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ControlCenterStatus.java) | `4751c6f78fffe8d1` |
-| [ManualPanelLimitSettings.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ManualPanelLimitSettings.java) | `8a289539d35b29b4` |
+| [FeatureCheckPage.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/FeatureCheckPage.java) | `cb44241c6543b5ac` |
+| [ManualPanelLimitSettings.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ManualPanelLimitSettings.java) | `90e808b1c344a891` |
 | [MappingRecoveryState.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/MappingRecoveryState.java) | `846a31654e6cb880` |
-| [SystemUiAccess.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/SystemUiAccess.java) | `9335400ed1723c1b` |
+| [RootFeatureChecks.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/RootFeatureChecks.java) | `e013c0d69fb177d7` |
+| [SystemUiAccess.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/SystemUiAccess.java) | `b215fa16668a67a6` |

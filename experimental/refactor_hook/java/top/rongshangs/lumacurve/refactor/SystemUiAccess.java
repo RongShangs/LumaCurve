@@ -2,6 +2,7 @@ package top.rongshangs.lumacurve.refactor;
 
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
+import android.os.UserHandle;
 import android.system.Os;
 import android.system.OsConstants;
 import java.io.*;
@@ -59,14 +60,63 @@ final class SystemUiAccess {
         String state="unconfirmed";JSONObject status=null;
         if(raw!=null&&raw.length()<=262144)try{
             status=new JSONObject(raw);int pid=status.optInt("pid",-1);Identity live=identity(proc,pid);
-            if(PACKAGE.equals(live.name)&&live.start.equals(status.optString("process_start")))state=AppBuild.BUILD.equals(status.optString("build"))?"current":"old_build";
+            Object build=status.opt("build");
+            if(PACKAGE.equals(live.name)&&live.start.equals(status.optString("process_start"))&&build instanceof String&&!((String)build).isEmpty()){
+                report.put("primary_user",UserHandle.getUserHandleForUid(live.uid).equals(UserHandle.getUserHandleForUid(0)));
+                state=AppBuild.BUILD.equals(build)?"current":"old_build";
+            }
         }catch(Exception ignored){}
-        report.put("injection_state",state);if(state.equals("current"))report.put("coordinate_abi",status.optBoolean("coordinate_abi")).put("profile_ready",status.optBoolean("profile_ready")).put("injection_detail",status.optString("detail"));return report;
+        report.put("injection_state",state);
+        if(state.equals("current"))report.put("coordinate_abi",status.optBoolean("coordinate_abi"))
+            .put("profile_ready",status.optBoolean("profile_ready")).put("injection_detail",status.optString("detail"))
+            .put("route",status.optString("route")).put("observers_ready",status.optBoolean("observers_ready"))
+            .put("coordinate_evidence",status.optString("coordinate_evidence"));
+        return report;
+    }
+    private static JSONObject readInjection(JSONObject report,RootSettings settings)throws JSONException{
+        String raw=null;
+        try{raw=settings.get(ControlCenterEngine.UI);}catch(Exception unavailable){report.put("injection_read_error",unavailable.toString());}
+        return injection(report,raw,new File("/proc"));
     }
     static JSONObject inspect(RootSettings settings)throws JSONException{
-        JSONObject report=scopes(databases(new File("/data/adb")));String raw=null;
-        try{raw=settings.get(ControlCenterEngine.UI);}catch(Exception unavailable){report.put("injection_read_error",unavailable.toString());}
-        return injection(report,raw,new File("/proc")).put("checked_elapsed_ms",android.os.SystemClock.elapsedRealtime());
+        return readInjection(scopes(databases(new File("/data/adb"))),settings)
+            .put("checked_elapsed_ms",android.os.SystemClock.elapsedRealtime());
+    }
+    static JSONObject coordinateCheck(RootSettings settings)throws JSONException{
+        return coordinateCheck(readInjection(new JSONObject(),settings));
+    }
+    static JSONObject coordinateCheck(JSONObject receipt)throws JSONException{
+        JSONObject result=new JSONObject().put("state","pending");
+        String injection=receipt.optString("injection_state");
+        if(receipt.has("injection_read_error"))return result.put("detail","无法读取 SystemUI 回执");
+        if(!receipt.optBoolean("primary_user"))return result.put("detail","尚未取得当前 SystemUI 回执");
+        if(injection.equals("old_build"))return result.put("detail","SystemUI 仍加载旧版模块");
+        if(!injection.equals("current"))return result.put("detail","尚未取得当前 SystemUI 回执");
+
+        String route=receipt.optString("route"),evidence=receipt.optString("coordinate_evidence");
+        boolean observed=route.equals("oem_v1_native_progress");
+        boolean known=observed||route.equals("oem_v1")||route.equals("gamma");
+        if(known)result.put("system_ui_route",route);
+        String lastDetail=receipt.optString("injection_detail");
+        if(!lastDetail.isEmpty()&&!lastDetail.equals("等待核对原生亮度条坐标"))
+            result.put("system_ui_report_detail",lastDetail.substring(0,Math.min(160,lastDetail.length())));
+
+        if(!receipt.optBoolean("observers_ready"))return result.put("detail","等待 SystemUI 观察器就绪");
+        if(!known)return result.put("detail","等待识别亮度条接口");
+        boolean nativeProof=evidence.equals("native_levels/confirmed"),calibrated=evidence.equals("calibration/confirmed");
+        if(!receipt.optBoolean("coordinate_abi")||observed&&!nativeProof&&!calibrated)
+            return result.put("detail",coordinatePending(receipt,evidence));
+        String detail=nativeProof?"原生回显坐标已核验":calibrated?"已按设备标定核验回显坐标":"实际接口检查通过";
+        return result.put("state","available").put("detail",detail);
+    }
+    private static String coordinatePending(JSONObject receipt,String evidence){
+        int separator=evidence.lastIndexOf('/');
+        switch(evidence.substring(separator+1)){
+            case "waiting_second_progress":return "等待第二个原生回显点";
+            case "native_level_mismatch":case "calibration_mismatch":
+            case "outside_widget_range":case "invalid_native_level":return "原生回显与坐标校验不一致";
+            default:return receipt.optBoolean("profile_ready")?"等待原生亮度条回显":"等待映射配置送达 SystemUI";
+        }
     }
     interface Processes {Identity read(int pid)throws Exception;void terminate(int pid)throws Exception;}
     static boolean restartTarget(Processes processes,Identity expected,int packageUid)throws Exception{

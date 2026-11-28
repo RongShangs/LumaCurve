@@ -158,6 +158,11 @@
       "coordinate_v2",
       "coordinate_v2_calibrated"
     ],
+    "control_center_system_ui": [
+      "oem_v1",
+      "oem_v1_native_progress",
+      "gamma"
+    ],
     "apps": [
       "visible_tasks",
       "focus_fallback"

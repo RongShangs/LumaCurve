@@ -39,14 +39,17 @@ final class ControlCenterSettings {
     }
     void refresh(){
         setup.refresh();
-        boolean partition=a.controls.nodeSliderMode==4;partitionBody.setVisibility(partition?View.VISIBLE:View.GONE);returnPolicy.setVisibility(partition?View.VISIBLE:View.GONE);
+        boolean partition=a.controls.nodeSliderMode==4;
+        boolean partitionAvailable=partition&&a.runtime!=null&&a.runtime.optBoolean("control_center_partition_supported");
+        partitionBody.setVisibility(partitionAvailable?View.VISIBLE:View.GONE);
+        returnPolicy.setVisibility(partitionAvailable?View.VISIBLE:View.GONE);
         for(int i=0;i<modes.length;i++){boolean chosen=modes[i]==a.controls.nodeSliderMode;options[i].setSelected(chosen);options[i].setEnabled(!a.busy&&ControlCenterStatus.selectable(a.runtime,modes[i],a.controls.nodeSliderMode));options[i].setAlpha(options[i].isEnabled()?1:.5f);GradientDrawable background=a.background(chosen?0xffe5edff:0xfff2f4f8,16);background.setStroke(a.dp(chosen?2:1),chosen?a.BLUE:((a.MUTED&0xffffff)|0x55000000));options[i].setBackground(background);marks[i].setText(chosen?"●":"○");badges[i].setVisibility(chosen?View.VISIBLE:View.GONE);options[i].setContentDescription(a.tr(ControlCenterStatus.label(modes[i]))+(chosen?" · "+a.tr("已选中"):""));}
-        String[] labels={"恢复自动亮度","继续保持手动"};for(int i=0;i<2;i++){boolean chosen=a.controls.partitionRestoreAuto==(i==0);returns[i].setSelected(chosen);returns[i].setEnabled(!a.busy);returns[i].setText((chosen?"✓ ":"")+a.tr(labels[i]));returns[i].setTextColor(chosen?a.BG:a.INK);returns[i].setBackground(a.ripple(chosen?a.BLUE:0xffeef2fa,12));}
+        String[] labels={"恢复自动亮度","继续保持手动"};for(int i=0;i<2;i++){boolean chosen=a.controls.partitionRestoreAuto==(i==0);returns[i].setSelected(chosen);returns[i].setEnabled(partitionAvailable&&!a.busy);returns[i].setText((chosen?"✓ ":"")+a.tr(labels[i]));returns[i].setTextColor(chosen?a.BG:a.INK);returns[i].setBackground(a.ripple(chosen?a.BLUE:0xffeef2fa,12));}
         maximum=ControlCenterStatus.maximum(a.runtime,a.rootFeatureReport);double fraction=ControlCenterStatus.ordinary(a.runtime);ordinary=maximum>10&&Double.isFinite(fraction)?(int)Math.ceil(fraction*maximum):0;
-        boolean known=maximum>ordinary&&ordinary>=10;int value=a.controls.partitionMaximum==0?maximum:Math.min(a.controls.partitionMaximum,maximum);updating=true;maximumSlider.setMax(known?maximum-ordinary-1:0);maximumSlider.setProgress(known?Math.max(0,value-ordinary-1):0);updating=false;
+        boolean known=partitionAvailable&&maximum>ordinary&&ordinary>=10;int value=a.controls.partitionMaximum==0?maximum:Math.min(a.controls.partitionMaximum,maximum);updating=true;maximumSlider.setMax(known?maximum-ordinary-1:0);maximumSlider.setProgress(known?Math.max(0,value-ordinary-1):0);updating=false;
         maximumSlider.setEnabled(known&&!a.busy);maximumInput.setEnabled(known&&!a.busy);setLimit.setEnabled(known&&!a.busy);deviceLimit.setEnabled(known&&!a.busy);if(!maximumInput.hasFocus())maximumInput.setText(known?String.valueOf(value):"");limitLabel.setText(a.tr("最高节点"));
         demo.data(known?ordinary:0,known?value:0,a.controls.partitionRestoreAuto);
-        String detail="";if(a.controls.nodeSliderMode>=3){String key=a.controls.nodeSliderMode==4?"control_center_partition_supported":"control_center_raw_supported";if(a.runtime==null||!a.runtime.optBoolean(key))detail="本机相关接口暂未就绪，已有选择保留；可查看详细兼容路线。";else detail=a.runtime.optString("control_center_node_detail");if(partition&&known&&value<=ordinary)detail="最高节点必须高于普通区间上限";}
+        String detail="";if(a.controls.nodeSliderMode>=3){String key=a.controls.nodeSliderMode==4?"control_center_partition_supported":"control_center_raw_supported";if(a.runtime!=null)detail=a.runtime.optString("control_center_node_detail");if(detail.isEmpty()&&(a.runtime==null||!a.runtime.optBoolean(key)))detail="本机相关接口暂未就绪，已有选择保留；可查看详细兼容路线。";if(detail.isEmpty()&&partition&&known&&value<=ordinary)detail="最高节点必须高于普通区间上限";}
         availability.setText(a.tr(detail));availability.setVisibility(detail.isEmpty()?View.GONE:View.VISIBLE);
     }
 }

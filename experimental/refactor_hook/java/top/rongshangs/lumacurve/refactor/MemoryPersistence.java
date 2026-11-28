@@ -41,7 +41,7 @@ final class MemoryPersistence {
   if(!next.unlock&&wakeRestore||!next.modeSwitch&&restoreCause.equals("mode_switch")||!next.forever&&restoreCause.equals("system_reset"))cancelRestore();
   options=next;
   if(!old.persist&&next.persist&&pendingWrite==null&&(cachedRecord==null||cachedRecord.isEmpty()))archiveLoaded=false;
-  if(!old.enabled()||!old.persist&&next.persist||!old.forever&&next.forever)try{if(snapshot(true))queueFlush();else if(!old.persist&&next.persist&&cachedRecord!=null&&!cachedRecord.isEmpty()){pendingWrite=cachedRecord;queueFlush();}}catch(Throwable error){status="记忆保存失败";state.log(status+"："+error.getMessage());}
+  if(!old.enabled()||!old.persist&&next.persist||!old.forever&&next.forever)try{if(snapshot(true))queueFlush();else if(!old.persist&&next.persist&&cachedRecord!=null&&!cachedRecord.isEmpty()){pendingWrite=cachedRecord;queueFlush();}}catch(Throwable error){status="记忆保存失败";state.logError(status+"："+error.getMessage());}
   if(next.persist&&(reset||!old.persist))scheduleRestore();
   else if(next.forever&&!pendingRestore)scheduleRestore("system_reset");
  }
@@ -69,7 +69,7 @@ final class MemoryPersistence {
   if(includeModel){JSONObject model=state.memoryLifecycle.modelRecord();if(model!=null)for(int i=0;i<points.length();i++)if(Math.abs(points.getJSONObject(i).getDouble("lux")-model.getDouble("lux"))<.5){record.put("model",model);break;}}
   pendingWrite=record.toString();savedPoints=points.length();status="手动记忆待保存";return true;
  }
- void captureForHandover(){if(state.closed||state.changing||replaying||!state.phase.equals("active")||!state.appliesToUser())return;try{if(snapshot(true))queueFlush();}catch(Throwable error){status="记忆保存失败";state.log(status+"："+error.getMessage());}}
+ void captureForHandover(){if(state.closed||state.changing||replaying||!state.phase.equals("active")||!state.appliesToUser())return;try{if(snapshot(true))queueFlush();}catch(Throwable error){status="记忆保存失败";state.logError(status+"："+error.getMessage());}}
  void afterReset(){
   if(state.closed||state.changing||replaying||!options.enabled()||!state.phase.equals("active")||!state.appliesToUser())return;
   try{if(pendingRestore)return;if(state.power==null||!state.power.isInteractive()){screenOff();return;}
@@ -102,7 +102,7 @@ final class MemoryPersistence {
   cancelRestore(); // A new gesture always wins, even with persistence disabled.
   if(!options.enabled()||state.memoryStrength<=0||!state.kernel.persistentMemorySupported())return;
   try{if(!snapshot(false))return;state.handler.removeCallbacks(writer);state.handler.postDelayed(writer,1500);
-  }catch(Throwable error){status="手动记忆保存失败";state.log(status+"："+error.getMessage());}
+  }catch(Throwable error){status="手动记忆保存失败";state.logError(status+"："+error.getMessage());}
  }
  void flush(){if(pendingWrite==null)return;
   try{JSONObject record=new JSONObject(pendingWrite),model=null;JSONArray p=record.getJSONArray("points");
@@ -114,7 +114,7 @@ final class MemoryPersistence {
    if(model!=null)for(int i=0;i<p.length();i++)if(Math.abs(p.getJSONObject(i).getDouble("lux")-model.getDouble("lux"))<.5){record.put("model",model);break;}
    String raw=record.toString();if(raw.getBytes(java.nio.charset.StandardCharsets.UTF_8).length>PersistentMemory.LIMIT)throw new IllegalStateException("记忆数据过大");
    if(options.persist&&!Settings.Global.putString(state.context.getContentResolver(),archiveKey(),raw))throw new IllegalStateException("记忆写入失败");cachedRecord=raw;archiveLoaded=true;pendingWrite=null;status=options.persist?"手动记忆已保存":"手动记忆已在本次运行中保留";
-  }catch(Throwable error){status="手动记忆保存失败";state.log(status+"："+error.getMessage());}
+  }catch(Throwable error){status="手动记忆保存失败";state.logError(status+"："+error.getMessage());}
  }
  String record(){if(pendingWrite!=null)return pendingWrite;if(!archiveLoaded){cachedRecord=options.persist?Settings.Global.getString(state.context.getContentResolver(),archiveKey()):null;archiveLoaded=true;}return cachedRecord;}
  void maybeRestore(){expireWake();if(!pendingRestore||!options.enabled())return;
@@ -133,7 +133,7 @@ final class MemoryPersistence {
    cancelRestore();if(p.length()==0){status="无匹配且未过期的手动记忆";return;}
    replaying=true;try{if(replace)state.kernel.replaceManualPoints(p);else state.kernel.restoreManualPoints(p);JSONObject model=PersistentMemory.model(raw);boolean belongs=false;if(model!=null)for(int i=0;i<p.length();i++)if(Math.abs(model.getDouble("lux")-p.getJSONObject(i).getDouble("lux"))<.5)belongs=true;modelSynced=state.kernel.memoryRestoreIncludesModel()||belongs&&state.memoryLifecycle.restoreModel(model);}finally{replaying=false;}
    restored++;status="手动记忆已恢复";state.memoryLifecycle.event("archive_restored");state.log(status+"："+p.length()+" 个节点");state.requestRecalculation();state.queuePublish();
-  }catch(Throwable error){cancelRestore();replaying=false;status="手动记忆恢复未完成";state.log(status+"："+error.getMessage());}
+  }catch(Throwable error){cancelRestore();replaying=false;status="手动记忆恢复未完成";state.logError(status+"："+error.getMessage());}
  }
  void clear()throws Exception{try{themes.clear(scope());}catch(Exception noPlan){}themeRestoreUntil=0;state.handler.removeCallbacks(writer);pendingWrite=null;cancelRestore();if(!Settings.Global.putString(state.context.getContentResolver(),archiveKey(),null))throw new IllegalStateException("已保存的手动记忆清除失败");cachedRecord="";archiveLoaded=true;savedPoints=0;modelSynced=false;status="手动记忆已清除";}
  void close(){state.handler.removeCallbacks(writer);flush();cancelRestore();}

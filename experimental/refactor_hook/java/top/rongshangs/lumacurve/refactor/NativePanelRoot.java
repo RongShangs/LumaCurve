@@ -14,8 +14,14 @@ final class NativePanelRoot {
  static File logFile(File dir){return new File(dir,"main-panel.log");}
  static int read(File f)throws Exception{return PanelNodeDiscovery.number(f);}
  static JSONObject status()throws Exception{
-  JSONObject j=ActivePanelNode.discover();
-  if(!j.optBoolean("supported"))return j;
+  JSONObject j=PanelNodeDiscovery.directAccess(ActivePanelNode.discover());
+  return j.optBoolean("supported")?status(j):j;
+ }
+ static JSONObject manualStatus()throws Exception{
+  JSONObject j=status();String block=j.optString("direct_write_block");
+  return block.isEmpty()?j:j.put("supported",false).put("reason",block);
+ }
+ private static JSONObject status(JSONObject j)throws Exception{
   File node=new File(j.getString("path"));
   File driverActual=new File(node.getParentFile(),"actual_brightness");if(driverActual.isFile())try{j.put("driver_actual",read(driverActual));}catch(Exception unavailable){j.put("driver_actual_error",unavailable.toString());}
   boolean guardMatches=false;
@@ -23,6 +29,7 @@ final class NativePanelRoot {
   j.put("node_mode",Integer.toOctalString(Os.lstat(node.toString()).st_mode&0777));
   // Root may open a 0444 attribute. Probe the actual access decision without
   // truncating, writing brightness, changing permissions or starting a guard.
+  if(j.has("direct_write_block"))return j.put("write_probe","mode_blocks_direct_write");
   if(guardMatches)j.put("write_probe","guard_owns_descriptor");
   else try{probe(j);j.put("write_probe","open_ok");}
   catch(Exception denied){j.put("supported",false).put("reason","node_not_writable").put("write_probe","failed").put("write_error",denied.toString());if(denied instanceof ErrnoException)j.put("write_errno",((ErrnoException)denied).errno);}
@@ -66,11 +73,11 @@ final class NativePanelRoot {
  static void start(JSONObject selected)throws Exception{start(selected,false,0);}
  static void start(JSONObject selected,boolean follow,int enginePid)throws Exception{
   if(follow&&enginePid<=1)throw new IOException("系统进程身份无效");
-  JSONObject current=ActivePanelNode.discover();
-  if(!sameSelection(selected,current))throw new IOException("主屏节点已变化，请重新打开面板");
+  JSONObject current=PanelNodeDiscovery.directAccess(ActivePanelNode.discover());
+  if(!sameSelection(selected,current)||current.has("direct_write_block"))throw new IOException("主屏节点或调光模式已变化，请重新打开面板");
   File dir=install();
-  current=ActivePanelNode.discover();
-  if(!sameSelection(selected,current))throw new IOException("主屏节点已变化，请重新打开面板");
+  current=PanelNodeDiscovery.directAccess(ActivePanelNode.discover());
+  if(!sameSelection(selected,current)||current.has("direct_write_block"))throw new IOException("主屏节点或调光模式已变化，请重新打开面板");
   JSONObject existing=null;try{existing=NativePanelClient.call("STATUS");}catch(Exception ignored){}
   if(existing!=null){
    boolean sameNode=matches(current,existing);

@@ -75,7 +75,7 @@
 | [ApplicationCategories.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ApplicationCategories.java) | `ebb67062fcd250e8` |
 | [ApplicationListActivity.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ApplicationListActivity.java) | `d635c67d2d4abfbb` |
 | [ApplicationSelection.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ApplicationSelection.java) | `5000cff5ae47ae03` |
-| [BrightnessControl.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/BrightnessControl.java) | `7f6e8cc411da5e30` |
+| [BrightnessControl.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/BrightnessControl.java) | `e7797c2cfeb536ce` |
 | [BrightnessControlOptions.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/BrightnessControlOptions.java) | `e5078bc085530fa2` |
 | [DeferredStateWriter.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/DeferredStateWriter.java) | `a1e1a507466fbff5` |
 | [ForegroundApps.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ForegroundApps.java) | `e5e9a47fa5c819c8` |

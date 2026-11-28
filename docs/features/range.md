@@ -51,5 +51,5 @@ HBM getter 与峰值基础范围；只有本机实际启用的动态范围对象
 
 | 文件 | 当前源码 SHA-256 前16位 |
 | --- | --- |
-| [OutdoorController.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/OutdoorController.java) | `04002b346d81ba8d` |
+| [OutdoorController.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/OutdoorController.java) | `6cb4592f934055d4` |
 | [OutdoorTuning.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/OutdoorTuning.java) | `84ee79e3de745ecc` |

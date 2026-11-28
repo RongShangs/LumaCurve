@@ -9,8 +9,9 @@ class RootSettings{final Map<String,String> values=new HashMap<>();String get(St
 class BrightnessControlOptions{static boolean mappingRecoveryWanted(JSONObject c){return c!=null&&c.optBoolean("enabled")&&c.optInt("user_serial",-1)==0&&c.optInt("control_center_node_mode",0)>0&&c.optInt("control_center_node_mode",0)<=4;}static String capability(int mode){return mode==4?"control_center_partition_supported":mode==3?"control_center_raw_supported":"control_center_slider_supported";}int nodeSliderMode,partitionMaximum;static BrightnessControlOptions parseStored(JSONObject c){BrightnessControlOptions o=new BrightnessControlOptions();o.nodeSliderMode=c.optInt("control_center_node_mode");return o;}}
 class ControlCenterEngine{static final String TABLES="tables",UI="ui";}
 class SystemUiAccess{static boolean alive=true;static JSONObject injection(JSONObject probe,String raw,java.io.File proc)throws Exception{return probe.put("injection_state",alive?"current":"unconfirmed");}}
-class ActivePanelNode{static final String PROFILE="fold_default_display";'''+predicate+r'''}
-class NativePanelClient{static JSONObject guard=new JSONObject();static JSONObject call(String s){return guard;}}
+class PanelNodeDiscovery{static JSONObject directAccess(JSONObject n){return n;}}
+class ActivePanelNode{static final String PROFILE="fold_default_display";static JSONObject discover(){return NativePanelRoot.node;}'''+predicate+r'''}
+class NativePanelClient{static JSONObject guard=new JSONObject();static JSONObject call(String s){return guard;}static String stopped;static void require(String command){stopped=command;}}
 class NativePanelRoot{static JSONObject node;static int stops;static JSONObject status(){return node;}static int starts;static void start(JSONObject node,boolean follow,int pid){starts++;}static void stop(){stops++;}}
 public class CoordinateRootTest{
  static int cases;static void check(boolean b){if(!b)throw new AssertionError("case "+cases);cases++;}
@@ -48,6 +49,21 @@ public class CoordinateRootTest{
  table.put("physical","panel-a");s.put("tables",table.toString());started=NativePanelRoot.starts;check(ControlCenterRoot.recover(s,runtime,original,400).getString("state").equals("pending"));check(s.get(ControlCenterRoot.PROFILE)==null&&NativePanelRoot.starts==started);
  NativePanelRoot.node.put("supported",false).put("reason","fold_binding_pending");check(ControlCenterRoot.recover(s,runtime,original,401).getString("state").equals("pending"));check(NativePanelRoot.starts==started);
  NativePanelRoot.node.put("reason","fold_layout_invalid");check(ControlCenterRoot.recover(s,runtime,original,402).getString("state").equals("unavailable"));check(NativePanelRoot.starts==started&&config.toString().equals(original));
+ NativePanelRoot.node=new JSONObject().put("supported",true).put("maximum",16383).put("canonical_path","primary").put("direct_write_block","atomic_backlight");
+ table.put("physical","panel-a");s.put("tables",table.toString());
+ NativePanelClient.guard=new JSONObject().put("armed",true).put("session","cc_armed").put("control_center_listener",true).put("control_center_pid",456);
+ for(int mode:new int[]{3,4}){
+   JSONObject choice=new JSONObject(original).put("control_center_node_mode",mode);
+   check(ControlCenterRoot.recover(s,runtime,choice.toString(),403).getString("state").equals("unavailable"));
+   check(s.get(ControlCenterRoot.PROFILE)==null&&NativePanelRoot.starts==started&&"STOP cc_armed".equals(NativePanelClient.stopped));
+ }
+ NativePanelClient.stopped=null;NativePanelClient.guard.put("session","manual_panel");
+ check(ControlCenterRoot.recover(s,runtime,original,404).getString("state").equals("unavailable")&&NativePanelClient.stopped==null);
+ JSONObject capabilities=new JSONObject(runtime.toString());ControlCenterRoot.annotateNodeCapability(capabilities,NativePanelRoot.node);
+ check(!capabilities.optBoolean("control_center_raw_supported")&&!capabilities.optBoolean("control_center_partition_supported"));
+ check(runtime.optBoolean("control_center_raw_supported")&&config.toString().equals(original));
+ ControlCenterRoot.reconcile(s,runtime,new JSONObject(original).put("control_center_node_mode",2).toString());
+ check(new JSONObject(s.get(ControlCenterRoot.PROFILE)).getString("kind").equals("coordinate_v2"));
  System.out.println("Coordinate Root: "+cases+" cases PASS; no native writer start API in service double");
  }
 }''',encoding='utf-8')

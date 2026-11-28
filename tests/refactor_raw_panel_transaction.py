@@ -4,7 +4,7 @@ import subprocess
 R=Path(__file__).resolve().parents[1];S=R/'experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor'
 O=R/'build/raw-panel-transaction-tests';O.mkdir(parents=True,exist_ok=True)
 J=R/'build/refactor-diagnostics/json-20240303.jar'
-text=(S/'RootControl.java').read_text(encoding='utf-8');start=text.index('    JSONObject rawPanel(String payload)');end=text.index('    JSONObject execute(',start);method=text[start:end]
+text=(S/'RootControl.java').read_text(encoding='utf-8');start=text.index('    JSONObject rawPanel(String payload)');end=text.index('    JSONObject logLevel(',start);adapt=text.index("    private static void annotateManualNodeState(");adapt_end=text.index("    boolean waitFor(",adapt);method=text[start:end]+text[adapt:adapt_end]
 files={
 'top/rongshangs/lumacurve/refactor/ActivePanelNode.java':'package top.rongshangs.lumacurve.refactor;class ActivePanelNode{static final String PROFILE="fold_default_display";}',
 'android/app/ActivityManager.java':'package android.app;public class ActivityManager{public static int getCurrentUser(){return 0;}}',
@@ -13,20 +13,24 @@ import org.json.*;import java.util.*;import java.io.*;import java.nio.file.*;imp
 class ControlCenterRoot{static final String PROFILE="profile";static boolean fail;static int retired;static void reconcile(Object settings,JSONObject runtime,String raw)throws Exception{if(fail)throw new IOException("mapping pending");}static void retireIdleWriter(){retired++;}}
 class RootWorkspace{static File directory(){return RootControl.DATA;}}
 class RootControl{static final String CONFIG="config";
-static final File DATA=new File("build/raw-panel-transaction-tests");Settings settings=new Settings();boolean reject,failMode,failHook,loseBeginAck;String session="";int hookCalls,aborts;List<String> calls=new ArrayList<>();
+static final File DATA=new File("build/raw-panel-transaction-tests");Settings settings=new Settings();boolean reject,failMode,failHook,loseBeginAck,failProbe;String session="";int hookCalls,aborts;List<String> calls=new ArrayList<>();
 class Settings{String config;String get(String key){return config;}boolean put(String key,String value){return true;}String mode="1";String getSystem(String key){return mode;}boolean putSystem(String key,String value){if(failMode)return false;mode=value;return true;}}
-JSONObject live()throws Exception{return new JSONObject().put("pid",123).put("phase","active");}
+JSONObject live()throws Exception{JSONObject runtime=new JSONObject().put("pid",123).put("phase","active");return runtime.put("brightness_control",new JSONObject());}
 JSONObject refreshedLive()throws Exception{return live();}
 JSONObject brightness(String encoded)throws Exception{hookCalls++;JSONObject request=new JSONObject(new String(Base64.getDecoder().decode(encoded),StandardCharsets.UTF_8));String action=request.getString("action");calls.add(action);
  if(failHook)throw new IOException("no hook");
+ JSONObject range=new JSONObject().put("physical_display_id",request.optString("panel_display_id"));
+ if(action.equals("panel_probe"))return new JSONObject().put("ok",!failProbe).put("range",range);
  if(action.equals("raw_abort")){aborts++;settings.mode="1";session="";}
  if(reject||action.equals("raw_validate")&&!session.equals(request.getString("session")))return new JSONObject().put("ok",false).put("message","stale gesture");
  if(action.equals("raw_begin")){session=request.getString("session");if(!failMode)settings.mode="0";if(loseBeginAck)throw new IOException("ack lost after mode changed");}
  if(action.equals("raw_restore")){settings.mode="1";session="";}
- return new JSONObject().put("ok",true).put("state",new JSONObject().put("auto",settings.mode.equals("1")).put("owner",session.isEmpty()?"none":"raw_panel").put("session",session));}
+ if(action.equals("begin")){settings.mode="0";session=request.getString("session");}
+ if(action.equals("end"))session="";
+ return new JSONObject().put("ok",true).put("range",range).put("state",new JSONObject().put("auto",settings.mode.equals("1")).put("owner",session.isEmpty()?"none":"raw_panel").put("session",session));}
 '''+method+'}',
 'top/rongshangs/lumacurve/refactor/NativePanelRoot.java':r'''package top.rongshangs.lumacurve.refactor;import org.json.*;import java.io.*;
-class NativePanelRoot{static boolean failStart,failStop;static int starts,stops;static void reset(){failStart=failStop=false;ControlCenterRoot.fail=false;ControlCenterRoot.retired=0;starts=stops=0;NativePanelClient.reset();}static JSONObject status()throws Exception{return new JSONObject().put("supported",true).put("maximum",16383).put("actual",NativePanelClient.actual);}static void start(JSONObject selected)throws Exception{if(selected.getInt("maximum")!=16383)throw new AssertionError("selection lost");starts++;if(failStart)throw new IOException("exit=6 escape_app_freezer");}static void stop()throws Exception{stops++;if(failStop)throw new IOException("permissions not restored");}}
+class NativePanelRoot{static boolean failStart,failStop,blocked;static int starts,stops;static void reset(){failStart=failStop=blocked=false;ControlCenterRoot.fail=false;ControlCenterRoot.retired=0;starts=stops=0;NativePanelClient.reset();}static JSONObject manualStatus()throws Exception{return blocked?new JSONObject().put("supported",false).put("reason","atomic_backlight").put("direct_write_block","atomic_backlight"):status();}static JSONObject status()throws Exception{return new JSONObject().put("supported",true).put("maximum",16383).put("actual",NativePanelClient.actual);}static void start(JSONObject selected)throws Exception{if(selected.getInt("maximum")!=16383)throw new AssertionError("selection lost");starts++;if(failStart)throw new IOException("exit=6 escape_app_freezer");}static void stop()throws Exception{stops++;if(failStop)throw new IOException("permissions not restored");}}
 ''',
 'top/rongshangs/lumacurve/refactor/NativePanelClient.java':r'''package top.rongshangs.lumacurve.refactor;import org.json.*;import java.io.*;import java.util.*;
 class NativePanelClient{static int actual=700;static boolean failArm,failSet;static List<String> calls=new ArrayList<>();static void reset(){actual=700;failArm=failSet=false;calls.clear();}static void require(String request)throws Exception{calls.add(request);if(request.startsWith("ARM")&&failArm)throw new IOException("lease rejected");}static JSONObject call(String request)throws Exception{calls.add(request);if(failSet)return new JSONObject().put("ok",false).put("reason","write_or_readback_failed").put("errno",13);actual=Integer.parseInt(request.split(" ")[2]);return new JSONObject().put("ok",true);}}
@@ -37,8 +41,16 @@ public class RawTransactionTest{
 static int cases;static void check(boolean b){if(!b)throw new AssertionError("case "+cases);cases++;}
 static RootControl ctl(){NativePanelRoot.reset();return new RootControl();}
 static String req(String action,Object value,String token)throws Exception{return Base64.getEncoder().encodeToString(new JSONObject().put("action",action).put("value",value).put("session",token).toString().getBytes(StandardCharsets.UTF_8));}
+static String frameworkReq(String action,int value)throws Exception{return Base64.getEncoder().encodeToString(new JSONObject().put("action",action).put("value",value).put("session","framework").put("panel_route","framework_manual_output").put("panel_display_id","local:1234").toString().getBytes(StandardCharsets.UTF_8));}
 static String failed(RootControl c,String action,Object value,String token)throws Exception{try{c.rawPanel(req(action,value,token));throw new AssertionError("operation passed");}catch(IOException expected){String message=expected.getMessage();check(new String(Files.readAllBytes(new File(RootWorkspace.directory(),"last-panel-error.txt").toPath()),StandardCharsets.UTF_8).contains(message));return message;}}
 public static void main(String[] ignored)throws Exception{
+RootControl f=ctl();NativePanelRoot.blocked=true;
+JSONObject unavailable=f.rawPanel(req("status",0,"ignored"));
+check(!unavailable.getJSONObject("node").getBoolean("supported")&&unavailable.getJSONObject("runtime").getString("manual_panel_direct_block").equals("atomic_backlight"));
+for(String action:new String[]{"begin","set","restore","keep_awake"})check(failed(f,action,500,"blocked").contains("当前主屏不支持节点直写"));
+check(NativePanelRoot.starts==0&&NativePanelRoot.stops==0&&f.hookCalls==0&&f.settings.mode.equals("1"));
+NativePanelRoot.blocked=false;
+try{f.rawPanel(frameworkReq("begin",50));throw new AssertionError("stale route accepted");}catch(IOException expected){check(expected.getMessage().contains("路线已变化")&&NativePanelRoot.starts==0);}
 RootControl c=ctl();check(c.rawPanel(req("begin",12000,"new")).getBoolean("ok"));check(c.settings.mode.equals("0")&&NativePanelClient.actual==12000);check(NativePanelClient.calls.equals(Arrays.asList("ARM new 123","SET new 12000")));check(c.calls.equals(Arrays.asList("raw_begin","raw_ready")));check(NativePanelRoot.starts==1);
 check(c.rawPanel(req("set",16000,"new")).getBoolean("ok"));check(NativePanelClient.actual==16000&&NativePanelRoot.starts==1);check(NativePanelClient.calls.get(2).equals("SET new 16000"));
 check(c.rawPanel(req("set",16383,"new")).getBoolean("ok"));check(NativePanelClient.actual==16383&&NativePanelClient.calls.get(3).equals("SET new 16383"));

@@ -51,7 +51,8 @@ final class FeatureCheckPage {
         View.OnClickListener expand=v->{if(!expanded.add(id))expanded.remove(id);sync.run();};toggle.setOnClickListener(expand);card.setClickable(true);card.setFocusable(true);card.setOnClickListener(expand);
     }
     void routeRows(LinearLayout details,JSONArray routes){for(int i=0;i<routes.length();i++){JSONObject route=routes.optJSONObject(i);if(route==null)continue;LinearLayout option=a.column();option.setPadding(a.dp(12),a.dp(10),a.dp(12),a.dp(10));option.setBackground(a.background(route.optBoolean("selected")?0xffeef3ff:0xfff4f5f7,12));LinearLayout.LayoutParams size=new LinearLayout.LayoutParams(-1,-2);size.bottomMargin=a.dp(8);details.addView(option,size);
-            String label=route.optBoolean("selected")?"已采用":route.optString("status").equals("unconfirmed")?"尚未确认":"未采用";option.addView(a.text(route.optString("name")+" · "+a.tr(label),13,a.INK));option.addView(a.text(route.optString("condition"),12,a.MUTED));option.addView(a.text(route.optString("reason"),12,a.MUTED));}
+            String status=route.optString("status");
+            String label=route.optBoolean("selected")?"已采用":status.equals("recognized")?"已识别":status.equals("unconfirmed")?"尚未确认":"未采用";option.addView(a.text(route.optString("name")+" · "+a.tr(label),13,a.INK));option.addView(a.text(route.optString("condition"),12,a.MUTED));option.addView(a.text(route.optString("reason"),12,a.MUTED));}
     }
 
 }

@@ -42,7 +42,7 @@ final class RuntimeFeatureChecks {
         f.check("memory_timeout","记忆超时","memory_timeout_supported",false,()->s.memoryLifecycle.timeoutSupported);
         f.check("dark_lock","暗光锁定","dark_lock_supported",true,()->s.receiverRegistered&&s.brightnessControl.available()&&darkSensors());
         f.check("dark_lock_schedule","日落后暗光锁定","dark_lock_schedule_supported",true,()->DarkLockSchedule.supported(s.owner.getClass().getClassLoader()));
-        f.check("manual_panel","主屏手动亮度","manual_panel_supported",true,()->s.receiverRegistered&&RawPanelOutputHooks.supports(s.owner.getClass()));
+        f.check("manual_panel","主屏手动亮度","manual_panel_supported",true,()->s.receiverRegistered&&s.brightnessControl.manualPanelSupported());
         f.check("control_center_slider","控制中心节点映射","control_center_slider_supported",s.controlCenter.waiting(),()->s.receiverRegistered&&s.controlCenter.supported());
         f.check("control_center_raw","控制中心完整节点控制","control_center_raw_supported",s.controlCenter.waiting()&&s.controlCenter.nodes.registered,()->s.receiverRegistered&&s.controlCenter.nodes.supported());
         f.check("control_center_partition","控制中心分区节点控制","control_center_partition_supported",s.controlCenter.waiting()&&s.controlCenter.nodes.registered,()->s.receiverRegistered&&s.controlCenter.nodes.supported()&&s.controlCenter.partition!=null);
@@ -79,6 +79,6 @@ final class RuntimeFeatureChecks {
         f.check("outdoor_curve","高亮目标曲线","outdoor_target_curve_supported",true,()->outdoor()&&s.outdoor.targetCurveSupported());
         f.check("outdoor_test","主动强光激发测试","outdoor_test_supported",true,()->s.receiverRegistered&&OutdoorLightTestAccess.checked(s));
         f.check("node_output","节点高亮框架接口","outdoor_node_supported",true,()->OutdoorNodeBridge.interfaces(s,range()));
-        try{caps=f.capabilities();try{caps.put("outdoor_output_profile",OutdoorOutputAccess.profile(s));}catch(Exception unavailable){}report=f.report(SystemClock.elapsedRealtime(),request);runs++;report.put("runs",runs);}catch(JSONException impossible){s.log("功能自检结果生成失败");}
+        try{caps=f.capabilities();try{caps.put("outdoor_output_profile",OutdoorOutputAccess.profile(s));}catch(Exception unavailable){}report=f.report(SystemClock.elapsedRealtime(),request);runs++;report.put("runs",runs);}catch(JSONException impossible){s.logError("功能自检结果生成失败");}
     }
 }

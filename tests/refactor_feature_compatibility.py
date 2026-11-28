@@ -89,6 +89,9 @@ public class FeatureCompatibilityTest{
   JSONObject altRow=FeatureCompatibility.annotate(new JSONObject().put("features",new JSONArray().put(alt)),r,"root").getJSONArray("features").getJSONObject(0);check(altRow.getJSONArray("routes").getJSONObject(0).getString("reason").equals("current storage denied"));
   JSONObject startup=row("mapping_startup","available").put("startup",new JSONObject().put("route","android_boot_job").put("state","not_run").put("maximum_attempts",4));JSONObject startupReport=new JSONObject().put("features",new JSONArray().put(startup));JSONObject startupRow=FeatureCompatibility.annotate(startupReport,r,"app").getJSONArray("features").getJSONObject(0);check(selected(startupRow).contains("android_boot_job"));check(startupRow.getString("evidence").contains("0/4"));startup.getJSONObject("startup").put("state","restored").put("elapsed_ms",100).put("attempt",1);check(FeatureCompatibility.annotate(startupReport,r,"app").getJSONArray("features").getJSONObject(0).getString("evidence").contains("2/4"));startup.put("state","unsupported");check(selected(FeatureCompatibility.annotate(startupReport,r,"app").getJSONArray("features").getJSONObject(0)).isEmpty());
   JSONObject ordinary=new JSONObject().put("outdoor",new JSONObject().put("target_compatibility_profile","override_target").put("range_profile","native_range_only"));picked("outdoor",ordinary,"native_range_only");
+  picked("manual_panel",new JSONObject(),"raw_primary_output");
+  JSONObject nodeBlocked=new JSONObject().put("manual_panel_direct_block","atomic_backlight");
+  check(selected(enrich("manual_panel","unsupported",nodeBlocked)).isEmpty());
   check(selected(enrich("outdoor","pending",ordinary)).isEmpty());ordinary.getJSONObject("outdoor").put("range_profile","configured_hbm");picked("outdoor",ordinary,"override_target");
   System.out.println("Feature compatibility catalogue: "+cases+" cases PASS; actual presentation model, no device or brightness probes");
  }

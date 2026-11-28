@@ -20,7 +20,8 @@ class PanelNodeDiscovery {static int maximum;static boolean available=true;stati
 class RootControl {static File DATA=new File("not-used");}
 class OutdoorNodeRoot {
  static JSONObject discover(){return PanelNodeDiscovery.discover(new java.io.File("/sys"));}static boolean accepts(JSONObject state,JSONObject node){return node.optBoolean("supported");}static String foldIds(JSONObject node){return "";}
- static boolean supported(JSONObject state){return PanelNodeDiscovery.available&&state.optBoolean("outdoor_node_supported");}static JSONObject health(){return new JSONObject();}static int running(){return -1;}static int anyRunning(){return -1;}
+ static boolean supported(JSONObject state,JSONObject node){return node.optBoolean("supported")&&state.optBoolean("outdoor_node_supported");}static JSONObject health(){return new JSONObject();}static int running(){return -1;}static int anyRunning(){return -1;}
+ REQUESTED
  ANNOTATE
 }
 public class NodeSettingsTest {
@@ -44,7 +45,7 @@ public class NodeSettingsTest {
   JSONObject stale=new JSONObject().put("outdoor_node_supported",true).put("outdoor_node_maximum",4095);PanelNodeDiscovery.available=false;OutdoorNodeRoot.annotate(stale);check(!stale.getBoolean("outdoor_node_supported"));check(!stale.has("outdoor_node_maximum"));
   System.out.println("Outdoor node settings: "+cases+" cases PASS; production range/model/UI methods, Android not tested");
  }
-}'''.replace('DRAW',method('MainActivity.java','void drawNodeTarget(')).replace('ANNOTATE',method('OutdoorNodeRoot.java','static void annotate('))
+}'''.replace('DRAW',method('MainActivity.java','void drawNodeTarget(')).replace('ANNOTATE',method('OutdoorNodeRoot.java','static void annotate(')).replace('REQUESTED',method('OutdoorNodeRoot.java','static boolean requested('))
 p=O/'NodeSettingsTest.java';p.write_text(source,encoding='utf-8');C=O/'classes';C.mkdir(exist_ok=True)
 subprocess.run(['javac','--release','8','-encoding','UTF-8','-cp',str(J),'-d',str(C),str(p),*[str(S/(n+'.java')) for n in ['OutdoorNodeTarget','OutdoorTargetCurve','OutdoorOptions','AdvancedPolicy']]],check=True)
 subprocess.run(['java','-cp',str(C)+';'+str(J),'top.rongshangs.lumacurve.refactor.NodeSettingsTest'],check=True)

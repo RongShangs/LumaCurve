@@ -98,6 +98,7 @@ public class OutdoorFoldTest{
   Files.createDirectories(RootControl.DATA.toPath());
   JSONObject config=new JSONObject().put("enabled",true).put("outdoor_node_boost",true).put("revision","new");
   JSONObject state=new JSONObject().put("phase","active").put("revision","new").put("outdoor",new JSONObject().put("options",new JSONObject().put("outdoor_node_boost",true)));
+  ActivePanelNode.selected=new JSONObject().put("supported",false);
   for(String reason:new String[]{"write_failed","node_changed","start_failed"}){
    JSONObject health=new JSONObject().put("reason",reason).put("failure_revision","new");Files.write(OutdoorNodeRoot.healthFile().toPath(),health.toString().getBytes("UTF-8"));
    OutdoorNodeRoot.reconcile(state,config.toString());check(OutdoorNodeRoot.health().getString("reason").equals(reason));
@@ -110,6 +111,9 @@ public class OutdoorFoldTest{
    check(OutdoorNodeRoot.health().getString("reason").equals("start_failed"));check(OutdoorNodeRoot.running()<0);
   }
   JSONObject before=OutdoorNodeRoot.health();state.put("revision","not-confirmed");OutdoorNodeRoot.reconcileAfterApply(state,config.toString());check(OutdoorNodeRoot.health().toString().equals(before.toString()));
+  state.put("revision","new");ActivePanelNode.selected.put("direct_write_block","atomic_backlight");
+  OutdoorNodeRoot.reconcileAfterApply(state,config.toString());check(OutdoorNodeRoot.health().toString().equals(before.toString())&&config.optBoolean("outdoor_node_boost"));
+  ActivePanelNode.selected.remove("direct_write_block");
   Path healthFile=OutdoorNodeRoot.healthFile().toPath();byte[] existing=Files.readAllBytes(healthFile);
   RootWorkspace.denied=true;
   check(OutdoorNodeRoot.health().length()==0&&OutdoorNodeRoot.anyRunning()<0);

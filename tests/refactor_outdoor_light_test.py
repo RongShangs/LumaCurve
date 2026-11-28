@@ -21,10 +21,11 @@ class OutdoorOutputAccess{static long physical(HookRuntime s){return s.physical;
 class OutdoorOptions{boolean nodeBoost;}
 class Outdoor{OutdoorOptions options=new OutdoorOptions();String block;Policy policy=new Policy();String block(){return block;}String testBlock(){return "disabled".equals(block)?null:block;}void tick(){}}
 class Policy{boolean active;long enterAt=-1,exitAt=-1,started=-1,cooldownUntil,manualAt=-1,next=-1;float manualLux=Float.NaN;String reason="disabled";int resets;void reset(){resets++;active=false;}}
-class BrightnessControl{boolean independent,unlocked=true;boolean independentActive(){return independent;}boolean unlocked(){return unlocked;}}
+class BrightnessControl{String owner="none";boolean independent,unlocked=true;boolean independentActive(){return independent;}boolean unlocked(){return unlocked;}}
 class ScreenBrightnessReading{static void capture(Object owner,JSONObject j){HookRuntime.Owner o=(HookRuntime.Owner)owner;j.put("actual_nit",o.actualNit).put("actual_nit_source","device_backlight_mapping");}}
+class NodeWriter{long readyAt;int pauses,releases;long pauseForTest(){pauses++;return readyAt;}void release(){releases++;}void changed(){}}
 class HookRuntime{
- final Handler handler=new Handler();final Owner owner=new Owner();final Outdoor outdoor=new Outdoor();final BrightnessControl brightnessControl=new BrightnessControl();final OutdoorLightTest test=new OutdoorLightTest(this);boolean closed,thread=true,user=true;String phase="active";long physical=1;int recalcs,publishes;
+ final Handler handler=new Handler();final Owner owner=new Owner();final Outdoor outdoor=new Outdoor();final BrightnessControl brightnessControl=new BrightnessControl();final OutdoorLightTest test=new OutdoorLightTest(this);boolean closed,thread=true,user=true;String phase="active",revision="current";long physical=1;int boundUser,recalcs,publishes;final NodeWriter outdoorNode=new NodeWriter();
  boolean onDisplayThread(){return thread;}boolean appliesToUser(){return user;}void requestRecalculation(){recalcs++;}void queuePublish(){publishes++;}
  public static class Range{public float value=123;void onAmbientLuxChange(float v){value=v;}}
  public static class Impl{public Object mAutomaticBrightnessController=new ABC();public float value=123;public void onAmbientLuxChange(float v){value=v;}}
@@ -51,33 +52,56 @@ class Wrong extends ABC{public String mAmbientLux="wrong";}
 public class SessionTest {
  static int cases;static void check(boolean value){if(!value)throw new AssertionError("outdoor test case "+cases);cases++;}
  static HookRuntime host(){XposedBridge.clear();SystemClock.now=0;return new HookRuntime();}static ABC abc(HookRuntime s){return (ABC)s.owner.mAutomaticBrightnessControllerImpl.mAutomaticBrightnessController;}
- static void failStart(HookRuntime s)throws Exception{try{s.test.start("test");throw new AssertionError("unexpected start");}catch(IllegalStateException expected){cases++;}check(!s.test.active&&XposedBridge.count()==0);}
+ static void failStart(HookRuntime s)throws Exception{try{s.test.start("test",false);throw new AssertionError("unexpected start");}catch(IllegalStateException expected){cases++;}check(!s.test.active&&XposedBridge.count()==0);}
+ static JSONObject nodeBinding(HookRuntime s){return new JSONObject().put("revision",s.revision).put("physical",s.physical).put("user_serial",s.boundUser);}
+ static void rejected(Throwing call)throws Exception{try{call.run();throw new AssertionError("unexpected admission");}catch(IllegalArgumentException|IllegalStateException expected){cases++;}}
+ interface Throwing{void run()throws Exception;}
+ static void pausedNodeTest()throws Exception{
+  HookRuntime s=host();s.outdoor.options.nodeBoost=true;s.outdoorNode.readyAt=1500;
+  rejected(()->s.test.start("paused",true));check(s.test.prepare("paused",nodeBinding(s))==1500);
+  check(s.test.blocksNodes()&&s.test.status().getBoolean("preparing")&&!s.test.active&&s.outdoorNode.pauses==1&&XposedBridge.count()==0);
+  rejected(()->s.test.start("paused",true));rejected(()->s.test.start("plain",false));rejected(()->s.test.stopFor("other"));
+  SystemClock.now=1500;rejected(()->s.test.start("other",true));s.test.start("paused",true);
+  check(s.test.active&&s.test.blocksNodes()&&!s.test.preparing()&&s.outdoorNode.releases==1&&abc(s).calculated==100000);
+  s.outdoor.block="temperature";s.test.check();check(!s.test.active&&!s.test.blocksNodes()&&s.test.reason.equals("temperature")&&s.outdoor.options.nodeBoost&&abc(s).mAmbientLux==123);
+  HookRuntime p=host();p.outdoor.options.nodeBoost=true;
+  rejected(()->p.test.prepare("old",nodeBinding(p).put("revision","old")));
+  rejected(()->p.test.prepare("other-user",nodeBinding(p).put("user_serial",2)));
+  rejected(()->p.test.prepare("other-screen",nodeBinding(p).put("physical",2)));
+  p.brightnessControl.owner="raw_panel";rejected(()->p.test.prepare("owned",nodeBinding(p)));p.brightnessControl.owner="none";
+  p.owner.privacy=true;rejected(()->p.test.prepare("protected",nodeBinding(p)));p.owner.privacy=false;
+  p.test.prepare("fold",nodeBinding(p));p.physical=2;rejected(()->p.test.start("fold",true));p.test.stopFor("fold");check(!p.test.blocksNodes());
+  p.test.prepare("config",nodeBinding(p));p.test.stop("configuration_changed");rejected(()->p.test.start("config",true));
+  p.test.prepare("expired",nodeBinding(p));SystemClock.now=6000;check(!p.test.blocksNodes());rejected(()->p.test.start("expired",true));
+  check(!p.test.active&&XposedBridge.count()==0&&abc(p).calculated!=100000);
+ }
  public static void main(String[] args)throws Exception{
-  HookRuntime s=host();check(OutdoorLightTestAccess.supported(s));check(!s.test.active&&XposedBridge.count()==0&&s.handler.jobs.isEmpty());int learned=abc(s).learned;s.test.start("test");check(s.test.active&&abc(s).mAmbientLux==123&&abc(s).rawLux==123&&abc(s).calculated==100000);check(abc(s).learned==learned&&abc(s).resets==0);check(s.test.status().getLong("remaining_ms")==20000);
+  pausedNodeTest();
+  HookRuntime s=host();check(OutdoorLightTestAccess.supported(s));check(!s.test.active&&XposedBridge.count()==0&&s.handler.jobs.isEmpty());int learned=abc(s).learned;s.test.start("test",false);check(s.test.active&&abc(s).mAmbientLux==123&&abc(s).rawLux==123&&abc(s).calculated==100000);check(abc(s).learned==learned&&abc(s).resets==0);check(s.test.status().getLong("remaining_ms")==20000);
   abc(s).real(250);check(abc(s).mAmbientLux==250&&abc(s).rawLux==250&&s.test.realLux==250);check(abc(s).calculated==100000&&abc(s).learned==learned);
   s.test.observe(new JSONObject().put("actual_nit",1800).put("actual_nit_source","device_backlight_mapping"));s.test.observe(new JSONObject().put("actual_nit",9000).put("actual_nit_source","node_readback_device_calibration"));check(s.test.peak==1800);s.owner.actualNit=1900;s.handler.advance(19999);check(s.test.active);s.handler.advance(20000);check(!s.test.active&&s.test.reason.equals("timeout"));check(abc(s).mAmbientLux==250&&abc(s).mBrightnessRangeController.value==250&&abc(s).calculated==250);check(abc(s).learned==learned&&XposedBridge.count()==0&&s.handler.jobs.isEmpty());check(s.test.peak==1900);check(abc(s).mPreThresholdLux!=100000);
-  for(boolean direct:new boolean[]{false,true}){s=host();s.test.start("manual");abc(s).real(400);abc(s).manual(direct);check(!s.test.active&&s.test.reason.equals("manual"));check(abc(s).anchor==400&&abc(s).learned==9&&XposedBridge.count()==0);}
-  for(String reason:new String[]{"temperature","hdr","manual_mode","screen_off","output_override","power_save"}){s=host();s.test.start("guard");s.outdoor.block=reason;s.test.check();check(!s.test.active&&s.test.reason.equals(reason));check(abc(s).mAmbientLux==123&&XposedBridge.count()==0&&abc(s).learned==8);}
+  for(boolean direct:new boolean[]{false,true}){s=host();s.test.start("manual",false);abc(s).real(400);abc(s).manual(direct);check(!s.test.active&&s.test.reason.equals("manual"));check(abc(s).anchor==400&&abc(s).learned==9&&XposedBridge.count()==0);}
+  for(String reason:new String[]{"temperature","hdr","manual_mode","screen_off","output_override","power_save"}){s=host();s.test.start("guard",false);s.outdoor.block=reason;s.test.check();check(!s.test.active&&s.test.reason.equals(reason));check(abc(s).mAmbientLux==123&&XposedBridge.count()==0&&abc(s).learned==8);}
   s=host();s.outdoor.options.nodeBoost=true;failStart(s);s=host();s.brightnessControl.unlocked=false;failStart(s);s=host();s.brightnessControl.independent=true;failStart(s);s=host();s.user=false;failStart(s);s=host();s.thread=false;failStart(s);s=host();abc(s).mAmbientLuxValid=false;failStart(s);s=host();abc(s).mLightSensorEnabled=false;failStart(s);
   s=host();abc(s).mHandler.loop=new Object();check(!OutdoorLightTestAccess.supported(s));s=host();s.physical=0;check(!OutdoorLightTestAccess.supported(s));s=host();s.owner.mAutomaticBrightnessControllerImpl.mAutomaticBrightnessController=new Wrong();check(!OutdoorLightTestAccess.supported(s));
   for(int fail=1;fail<=8;fail++){s=host();XposedBridge.failAt=fail;failStart(s);check(abc(s).mAmbientLux==123&&abc(s).learned==8);check(s.test.status().getString("profile").equals("unconfirmed"));}
   s=host();s.handler.reject=true;failStart(s);check(abc(s).mAmbientLux==123);s=host();abc(s).failUpdate=true;failStart(s);check(abc(s).mAmbientLux==123&&abc(s).learned==8);
-  s=host();s.test.start("damaged");abc(s).failSetter=true;s.test.stop("user_stop");check(!s.test.active&&abc(s).mAmbientLux==123&&s.test.error.isEmpty());check(abc(s).mBrightnessRangeController.value==123&&XposedBridge.count()==0);
-  s=host();s.test.start("remove");XposedBridge.removeFailures=2;s.test.stop("user_stop");check(!s.test.active&&abc(s).mAmbientLux==123&&!s.test.hooks.isEmpty());s.handler.advance(250);check(s.test.hooks.isEmpty()&&XposedBridge.count()==0);
-  s=host();ABC old=abc(s);s.test.start("display");s.physical=2;s.owner.mAutomaticBrightnessControllerImpl.mAutomaticBrightnessController=new ABC();s.test.check();check(!s.test.active&&old.mAmbientLux==123&&abc(s).mAmbientLux==123&&XposedBridge.count()==0);
-  s=host();s.test.start("id");try{s.test.stopFor("old");throw new AssertionError();}catch(IllegalArgumentException expected){cases++;}check(s.test.active);s.test.stopFor("id");check(!s.test.active);long until=s.test.until;s.handler.advance(50000);check(s.test.until==until&&XposedBridge.count()==0);
-  s=host();s.test.start("thread");s.thread=false;s.test.check();check(s.test.active&&s.test.stopQueued);s.thread=true;s.handler.advance(0);check(!s.test.active&&s.test.reason.equals("thread_changed")&&abc(s).mAmbientLux==123);
-  s=host();s.outdoor.policy.active=true;s.outdoor.policy.started=-5000;s.outdoor.policy.cooldownUntil=50000;s.test.start("budget");s.outdoor.policy.started=100;s.outdoor.policy.cooldownUntil=70000;s.test.stop("user_stop");check(s.outdoor.policy.active&&s.outdoor.policy.started==-5000&&s.outdoor.policy.cooldownUntil==50000);
-  for(boolean automatic:new boolean[]{false,true}){s=host();s.test.start("frame");s.owner.privacy=automatic;s.owner.sdr(1,automatic);check(!s.test.active&&s.test.reason.equals("protected_frame")&&abc(s).mAmbientLux==123);}
-  s=host();s.test.start("ownership");abc(s).mAmbientLux=777;abc(s).mPreThresholdLux=700;s.test.stop("user_stop");check(abc(s).mAmbientLux==777&&abc(s).calculated==777&&abc(s).mPreThresholdLux==700);
-  s=host();s.test.start("ratio");s.test.observe(new JSONObject().put("actual_brightness",.8).put("actual_brightness_source","display_power_state"));check(s.test.status().getDouble("recorded_peak_brightness")==.8);s.test.stop("user_stop");
-  s=host();s.test.start("bypass");abc(s).mRawScreenAutoBrightness=.2f;s.owner.sdr(1,true);check(!s.test.active&&s.test.reason.equals("input_route_changed")&&abc(s).mAmbientLux==123);
-  s=host();abc(s).failSetter=true;s.test.start("no_fake_setter");check(s.test.active&&abc(s).mAmbientLux==123&&abc(s).calculated==100000&&abc(s).learned==8);s.test.stop("user_stop");check(abc(s).mAmbientLux==123&&abc(s).calculated==123&&s.test.error.isEmpty());
-  s=host();s.outdoor.block="disabled";s.test.start("native_baseline");check(s.test.active&&abc(s).calculated==100000&&abc(s).mAmbientLux==123);abc(s).anchor=abc(s).mAmbientLux;check(abc(s).anchor==123);s.test.stop("user_stop");
-  s=host();s.test.start("threshold");abc(s).real(300);check(abc(s).mPreThresholdLux==123&&abc(s).mAmbientBrighteningThreshold==150&&abc(s).mAmbientLux==300);abc(s).resetShortTermModel();check(abc(s).learned==0);s.test.stop("user_stop");
+  s=host();s.test.start("damaged",false);abc(s).failSetter=true;s.test.stop("user_stop");check(!s.test.active&&abc(s).mAmbientLux==123&&s.test.error.isEmpty());check(abc(s).mBrightnessRangeController.value==123&&XposedBridge.count()==0);
+  s=host();s.test.start("remove",false);XposedBridge.removeFailures=2;s.test.stop("user_stop");check(!s.test.active&&abc(s).mAmbientLux==123&&!s.test.hooks.isEmpty());s.handler.advance(250);check(s.test.hooks.isEmpty()&&XposedBridge.count()==0);
+  s=host();ABC old=abc(s);s.test.start("display",false);s.physical=2;s.owner.mAutomaticBrightnessControllerImpl.mAutomaticBrightnessController=new ABC();s.test.check();check(!s.test.active&&old.mAmbientLux==123&&abc(s).mAmbientLux==123&&XposedBridge.count()==0);
+  s=host();s.test.start("id",false);try{s.test.stopFor("old");throw new AssertionError();}catch(IllegalArgumentException expected){cases++;}check(s.test.active);s.test.stopFor("id");check(!s.test.active);long until=s.test.until;s.handler.advance(50000);check(s.test.until==until&&XposedBridge.count()==0);
+  s=host();s.test.start("thread",false);s.thread=false;s.test.check();check(s.test.active&&s.test.stopQueued);s.thread=true;s.handler.advance(0);check(!s.test.active&&s.test.reason.equals("thread_changed")&&abc(s).mAmbientLux==123);
+  s=host();s.outdoor.policy.active=true;s.outdoor.policy.started=-5000;s.outdoor.policy.cooldownUntil=50000;s.test.start("budget",false);s.outdoor.policy.started=100;s.outdoor.policy.cooldownUntil=70000;s.test.stop("user_stop");check(s.outdoor.policy.active&&s.outdoor.policy.started==-5000&&s.outdoor.policy.cooldownUntil==50000);
+  for(boolean automatic:new boolean[]{false,true}){s=host();s.test.start("frame",false);s.owner.privacy=automatic;s.owner.sdr(1,automatic);check(!s.test.active&&s.test.reason.equals("protected_frame")&&abc(s).mAmbientLux==123);}
+  s=host();s.test.start("ownership",false);abc(s).mAmbientLux=777;abc(s).mPreThresholdLux=700;s.test.stop("user_stop");check(abc(s).mAmbientLux==777&&abc(s).calculated==777&&abc(s).mPreThresholdLux==700);
+  s=host();s.test.start("ratio",false);s.test.observe(new JSONObject().put("actual_brightness",.8).put("actual_brightness_source","display_power_state"));check(s.test.status().getDouble("recorded_peak_brightness")==.8);s.test.stop("user_stop");
+  s=host();s.test.start("bypass",false);abc(s).mRawScreenAutoBrightness=.2f;s.owner.sdr(1,true);check(!s.test.active&&s.test.reason.equals("input_route_changed")&&abc(s).mAmbientLux==123);
+  s=host();abc(s).failSetter=true;s.test.start("no_fake_setter",false);check(s.test.active&&abc(s).mAmbientLux==123&&abc(s).calculated==100000&&abc(s).learned==8);s.test.stop("user_stop");check(abc(s).mAmbientLux==123&&abc(s).calculated==123&&s.test.error.isEmpty());
+  s=host();s.outdoor.block="disabled";s.test.start("native_baseline",false);check(s.test.active&&abc(s).calculated==100000&&abc(s).mAmbientLux==123);abc(s).anchor=abc(s).mAmbientLux;check(abc(s).anchor==123);s.test.stop("user_stop");
+  s=host();s.test.start("threshold",false);abc(s).real(300);check(abc(s).mPreThresholdLux==123&&abc(s).mAmbientBrighteningThreshold==150&&abc(s).mAmbientLux==300);abc(s).resetShortTermModel();check(abc(s).learned==0);s.test.stop("user_stop");
   check(((Float)OutdoorLightTestAccess.method(InterfaceNotifier.class,"nativeNotice",float.class,float.class).invoke(new InterfaceNotifier(),7f))==7f);
-  s=host();abc(s).mBrightnessRangeController=new PublicRange();check(OutdoorLightTestAccess.checked(s));s.test.start("public-notify");check(s.test.active&&abc(s).mBrightnessRangeController.value==100000);s.test.stop("user_stop");check(abc(s).mBrightnessRangeController.value==123);
-  s=host();abc(s).mBrightnessRangeController=new InheritedRange();check(OutdoorLightTestAccess.checked(s));s.test.start("inherited-notify");check(s.test.active&&abc(s).mBrightnessRangeController.value==100000);s.test.stop("user_stop");check(abc(s).mBrightnessRangeController.value==123);
+  s=host();abc(s).mBrightnessRangeController=new PublicRange();check(OutdoorLightTestAccess.checked(s));s.test.start("public-notify",false);check(s.test.active&&abc(s).mBrightnessRangeController.value==100000);s.test.stop("user_stop");check(abc(s).mBrightnessRangeController.value==123);
+  s=host();abc(s).mBrightnessRangeController=new InheritedRange();check(OutdoorLightTestAccess.checked(s));s.test.start("inherited-notify",false);check(s.test.active&&abc(s).mBrightnessRangeController.value==100000);s.test.stop("user_stop");check(abc(s).mBrightnessRangeController.value==123);
   System.out.println("Outdoor light test: "+cases+" cases PASS; native input lease model, no device execution");
  }
 }'''

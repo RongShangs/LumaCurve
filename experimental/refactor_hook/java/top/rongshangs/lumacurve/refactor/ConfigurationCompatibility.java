@@ -9,7 +9,11 @@ public final class ConfigurationCompatibility {
         if(!canReuse(stored,caps,fingerprint))return checked;
         String sliderCap=BrightnessControlOptions.capability(proposed.optInt("control_center_node_mode"));
         if(caps.has(sliderCap)&&!caps.optBoolean(sliderCap)&&proposed.optInt("control_center_node_mode",0)>0&&proposed.optInt("control_center_node_mode")==stored.optInt("control_center_node_mode"))checked.put("control_center_node_mode",0);
-        if(caps.has("outdoor_node_supported")&&!caps.optBoolean("outdoor_node_supported")&&proposed.optBoolean("outdoor_node_boost")&&stored.optBoolean("outdoor_node_boost")&&OutdoorOptions.parse(proposed).same(OutdoorOptions.parse(stored)))checked.put("outdoor_node_boost",false);
+        // Paused node control has only two saved inputs. Validate the rest of the outdoor settings independently.
+        if(Boolean.FALSE.equals(caps.opt("outdoor_node_supported"))
+                &&Boolean.TRUE.equals(proposed.opt("outdoor_node_boost"))
+                &&Boolean.TRUE.equals(stored.opt("outdoor_node_boost"))
+                &&OutdoorNodeTarget.parse(proposed)==OutdoorNodeTarget.parse(stored))checked.put("outdoor_node_boost",false);
         if(proposed.optBoolean(OutdoorOptions.OPR_CURVE_ENABLED)&&stored.optBoolean(OutdoorOptions.OPR_CURVE_ENABLED)&&!caps.optBoolean("outdoor_opr_curve_supported")&&OutdoorOptions.OprCurve.parse(proposed.opt(OutdoorOptions.OPR_CURVE)).same(OutdoorOptions.OprCurve.parse(stored.opt(OutdoorOptions.OPR_CURVE))))checked.put(OutdoorOptions.OPR_CURVE_ENABLED,false);
         if(proposed.optBoolean(OutdoorTargetCurve.ENABLED)&&stored.optBoolean(OutdoorTargetCurve.ENABLED)&&!caps.optBoolean("outdoor_target_curve_supported")&&OutdoorTargetCurve.parse(proposed).same(OutdoorTargetCurve.parse(stored)))checked.put(OutdoorTargetCurve.ENABLED,false);
         String[][] groups={{"assist_override","assist_override_supported","assist_brighten","assist_darken","assist_small"},

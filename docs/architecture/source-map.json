@@ -190,7 +190,7 @@
     {
       "file": "ControlCenterHooks.java",
       "layer": "adapters",
-      "purpose": "SystemUI原比例映射及独立v3整节点手势入口；真实节点回显、末端目标合并发送和代次隔离；SystemUI观察器后台有界注册和未就绪的原生回退"
+      "purpose": "按控制器关联字段识别SystemUI策略和滑块组，校验逻辑进度及原生回显，适配完整和分区节点手势、代次隔离和后台有界观察器"
     },
     {
       "file": "ControlCenterMapping.java",
@@ -360,7 +360,7 @@
     {
       "file": "FrameworkBrightness.java",
       "layer": "adapters",
-      "purpose": "设备接口与所有权"
+      "purpose": "应用亮度和暗光锁定等系统亮度接口读写，使用框架亮度坐标"
     },
     {
       "file": "HbmAccess.java",
@@ -778,6 +778,11 @@
       "purpose": "只读证据与诊断；户外/HBM 探测失败时按能力降级，不中断独立节点检查"
     },
     {
+      "file": "RuntimeLog.java",
+      "layer": "diagnostics",
+      "purpose": "共享日志级别控制 LSPosed 写入及近期运行日志快照，提供应用端显示筛选"
+    },
+    {
       "file": "SavedCurve.java",
       "layer": "configuration",
       "purpose": "设备绑定基础曲线转存、校验与保持；新鲜物理采样仅归一4个float ULP内舍入误差，持久化输入严格校验"
@@ -880,7 +885,7 @@
     {
       "file": "SystemUiAccess.java",
       "layer": "adapters",
-      "purpose": "只读查询本模块实际LSPosed作用域；独立核验系统界面包UID/PID/启动标识后执行用户明确请求的单进程重启"
+      "purpose": "读取本模块的LSPosed作用域和经过进程身份核验的SystemUI坐标回执。执行单进程重启前核验包UID、PID及启动标识。"
     },
     {
       "file": "SystemVersion.java",

@@ -87,6 +87,7 @@ public final class RootControl implements AutoCloseable {
             try{OutdoorNodeRoot.reconcile(state,raw);}catch(Exception nodeFailure){if(state!=null)state.put("outdoor_node_detail",nodeFailure.toString());}
             try{ControlCenterRoot.reconcile(settings,state,raw);}catch(Exception nodeFailure){try{settings.put(ControlCenterRoot.PROFILE,null);}catch(Exception ignored){}if(state!=null)state.put("control_center_node_detail",nodeFailure.toString());}
         }
+        try{annotateDirectNodeState(state);}catch(Exception unavailable){if(state!=null)state.put("control_center_node_detail",unavailable.toString());}
         OutdoorNodeRoot.annotate(state);ScreenBrightnessReading.annotate(state);
         if(state==null&&!processAccessError.isEmpty())out.put("hook_issue","root_process_visibility").put("hook_message","Root 无法核验系统进程身份；保留已有系统配置，暂停本次修改。 "+processAccessError);
         out.put("root_access",RootAccess.report(settings).put("process_validation_error",processAccessError));
@@ -94,6 +95,21 @@ public final class RootControl implements AutoCloseable {
         if(state!=null)out.put("runtime",state).put("state_age_ms",Math.max(0,android.os.SystemClock.elapsedRealtime()-state.optLong("elapsed_ms")));
         if(raw!=null)try{out.put("config",new JSONObject(raw));}catch(JSONException ignored){}
         return out;
+    }
+    private static void annotateDirectNodeState(JSONObject runtime)throws Exception{
+        if(runtime==null)return;
+        JSONObject node=PanelNodeDiscovery.directAccess(ActivePanelNode.discover());
+        ControlCenterRoot.annotateNodeCapability(runtime,node);
+        annotateManualNodeState(runtime,node);
+    }
+    private static void annotateManualNodeState(JSONObject runtime,JSONObject node)throws JSONException{
+        if(runtime==null)return;
+        String reason=node.optString("direct_write_block");
+        if(reason.isEmpty())return;
+        runtime.put("manual_panel_direct_block",reason).put("manual_panel_supported",false)
+            .put("manual_panel_supported_state","mtk_led_mode_pending".equals(reason)?"pending":"unsupported");
+        JSONObject control=runtime.optJSONObject("brightness_control");
+        if(control!=null)control.put("manual_panel_supported",false);
     }
     boolean waitFor(String revision,boolean active)throws Exception {
         for(int attempt=0;attempt<60;attempt++) {
@@ -155,13 +171,15 @@ public final class RootControl implements AutoCloseable {
         JSONObject options=decoded.startsWith("{")?new JSONObject(decoded):new JSONObject().put("factors",decoded);
         String previous=settings.get(CONFIG);JSONObject stored=null;
         if(previous!=null&&!previous.equals("null"))try{stored=new JSONObject(previous);}catch(JSONException invalid){/* Invalid storage cannot authorize a dormant preference. */}
+        annotateDirectNodeState(state);
+        OutdoorNodeRoot.annotate(state);
         JSONObject validation=ConfigurationCompatibility.submissionValidation(options,state,stored,Build.FINGERPRINT);
         if(options.has("captured_theme_dark")&&options.getBoolean("captured_theme_dark")!=state.optBoolean("theme_curve_dark"))throw new IOException("深浅色模式已变化，请重新保存当前曲线");
         String factors=options.getString("factors");
-        OutdoorNodeRoot.annotate(state);BrightnessControlOptions controls=BrightnessControlOptions.parseStored(options);BrightnessControlOptions.parseStored(validation).verify(state);
+        BrightnessControlOptions controls=BrightnessControlOptions.parseStored(options);BrightnessControlOptions.parseStored(validation).verify(state);
         SceneOptions sceneOptions=SceneOptions.parse(options);sceneOptions.verify(state);
         AdvancedOptions advanced=AdvancedOptions.parse(options);AdvancedOptions.parse(validation).verify(state);
-        OutdoorOptions outdoor=OutdoorOptions.parse(options);if(outdoor.nodeBoost&&state.optBoolean("outdoor_node_supported"))outdoor.nodeTarget=OutdoorNodeTarget.stored(outdoor.nodeTarget,state.optInt("outdoor_node_maximum"));OutdoorOptions.parse(ConfigurationCompatibility.submissionValidation(options,state,stored,Build.FINGERPRINT)).verify(state);
+        OutdoorOptions outdoor=OutdoorOptions.parse(options);if(outdoor.nodeBoost&&state.optBoolean("outdoor_node_supported"))outdoor.nodeTarget=OutdoorNodeTarget.stored(outdoor.nodeTarget,state.optInt("outdoor_node_maximum"));OutdoorOptions.parse(validation).verify(state);
         boolean thermal=options.optBoolean("thermal_relax",false);float ceiling=(float)options.optDouble("thermal_ceiling",43);ThermalPolicy.validate(ceiling);
         float memory=(float)options.optDouble("memory_strength",1);MemoryPolicy.validate(memory);
         long memoryMs=options.optLong("memory_window",1500);float memoryRange=(float)options.optDouble("memory_lux_range",.3);MemoryPolicy.validateGrouping(memoryMs,memoryRange);
@@ -270,6 +288,8 @@ public final class RootControl implements AutoCloseable {
                     JSONArray pipeline=runtime.optJSONArray("pipeline_trace"),output=runtime.optJSONArray("output_trace");
                     JSONObject outdoorState=runtime.optJSONObject("outdoor");write(zip,"outdoor-state.json",outdoorState==null?"{}":outdoorState.toString(2));write(zip,"outdoor-limit-trace.json",outdoorState==null?"[]":outdoorState.optJSONArray("limit_trace")==null?"[]":outdoorState.getJSONArray("limit_trace").toString(2));
                     try{write(zip,"main-panel-node.json",NativePanelRoot.status().toString(2));}catch(Exception unavailable){write(zip,"main-panel-node.json",new JSONObject().put("error",unavailable.toString()).toString());}write(zip,"brightness-control-state.json",runtime.optJSONObject("brightness_control")==null?"{}":runtime.getJSONObject("brightness_control").toString(2));write(zip,"brightness-control-owner.json",String.valueOf(settings.get("hyperlux_brightness_owner_v1")));write(zip,"brightness-control-ack.json",String.valueOf(settings.get("hyperlux_brightness_ack_v1")));
+                    try{write(zip,"main-panel-route.json",NativePanelRoot.manualStatus().toString(2));}
+                    catch(Exception unavailable){write(zip,"main-panel-route.json",new JSONObject().put("error",unavailable.toString()).toString());}
                     write(zip,"pipeline-trace.json",pipeline==null?"[]":pipeline.toString(2));write(zip,"output-trace.json",output==null?"[]":output.toString(2));
                     write(zip,"trace-readme.txt","Pipeline records group stages from ONE updateAutoBrightness call. Values are framework brightness coordinates (0..1), not nit or percent. Missing fields mean unobserved, not disabled.\nOutput records are separate later calls, not automatically attributed to a calculation. Use uptime_ms within this boot, or unix_ms for wall time. Sensor readings are OEM filtered readings, not raw samples.\nBounded history: latest 24 calculations and 16 output calls.\n");
                 }
@@ -321,8 +341,12 @@ public final class RootControl implements AutoCloseable {
         return result;
     }
     JSONObject brightness(String payload)throws Exception {
-        JSONObject state=live();if(state==null)throw new IOException("尚未连接系统亮度接口，请检查 LSPosed 并重启");
         if(payload.length()>2048)throw new IOException("亮度请求过长");JSONObject request=new JSONObject(new String(Base64.getDecoder().decode(payload),StandardCharsets.UTF_8));
+        if("outdoor_test_prepare".equals(request.optString("action")))throw new IOException("强光测试操作无效");
+        return requestBrightness(request,live());
+    }
+    private JSONObject requestBrightness(JSONObject request,JSONObject state)throws Exception{
+        if(state==null)throw new IOException("尚未连接系统亮度接口，请检查 LSPosed 并重启");
         String id=UUID.randomUUID().toString();request.put("id",id).put("build",BUILD).put("process_start",state.getString("process_start")).put("elapsed",android.os.SystemClock.elapsedRealtime());
         if(!settings.put("hyperlux_brightness_request_v1",request.toString()))throw new IOException("亮度请求提交失败");
         for(int i=0;i<120;i++){String raw=settings.get("hyperlux_brightness_ack_v1");if(raw!=null){JSONObject ack=new JSONObject(raw);if(id.equals(ack.optString("id")))return ack;}Thread.sleep(25);}
@@ -332,20 +356,51 @@ public final class RootControl implements AutoCloseable {
         if(payload==null||payload.length()>512)throw new IOException("强光测试请求无效");
         JSONObject request=new JSONObject(new String(Base64.getDecoder().decode(payload),StandardCharsets.UTF_8));String action=request.getString("action");
         if(!action.equals("start")&&!action.equals("stop"))throw new IOException("强光测试操作无效");
-        request.put("action","outdoor_test_"+action);JSONObject ack=brightness(Base64.getEncoder().encodeToString(request.toString().getBytes(StandardCharsets.UTF_8)));
+        String session=request.getString("session");
+        if(!session.matches("[A-Za-z0-9_-]{1,80}"))throw new IOException("测试会话无效");
+        JSONObject state=live();
+        JSONObject ack=action.equals("start")?startOutdoorTest(session,state):requestBrightness(new JSONObject().put("action","outdoor_test_stop").put("session",session),state);
         if(!ack.optBoolean("ok"))throw new IOException(ack.optString("message","强光测试未确认"));return inspect().put("outdoor_test_result",ack);
+    }
+    private JSONObject startOutdoorTest(String session,JSONObject state)throws Exception{
+        JSONObject start=new JSONObject().put("action","outdoor_test_start").put("session",session);
+        if(!OutdoorNodeRoot.requested(state))return requestBrightness(start,state);
+        JSONObject current=refreshedLive(true);
+        if(current==null)throw new IOException("强光测试状态已失效，请刷新后重试");
+        JSONObject binding=OutdoorNodeRoot.testPauseBinding(current);
+        if(binding==null)return requestBrightness(start,current);
+        start.put("requires_node_pause",true);
+        JSONObject prepare=new JSONObject().put("action","outdoor_test_prepare").put("session",session).put("node_binding",binding);
+        boolean cancel=true;
+        try{
+            JSONObject ready=requestBrightness(prepare,current);
+            if(!ready.optBoolean("ok")){cancel=false;return ready;}
+            OutdoorNodeRoot.stop();
+            long wait=ready.getLong("node_ready_uptime_ms")-android.os.SystemClock.uptimeMillis();
+            if(wait>OutdoorNodeBridge.LEASE_MS)throw new IOException("节点高亮释放时间无效");
+            if(wait>0)Thread.sleep(wait);
+            JSONObject ack=requestBrightness(start,current);
+            cancel=!ack.optBoolean("ok");
+            return ack;
+        }finally{
+            if(cancel)try{requestBrightness(new JSONObject().put("action","outdoor_test_stop").put("session",session),current);}catch(Exception unavailable){/* The preparation expires on the display thread. */}
+        }
     }
     JSONObject rawPanel(String payload)throws Exception{
         String step="读取主屏状态";
         try{
         JSONObject request=new JSONObject(new String(Base64.getDecoder().decode(payload),StandardCharsets.UTF_8));
         String action=request.getString("action");
-        if(action.equals("status"))return new JSONObject().put("ok",true).put("node",NativePanelRoot.status()).put("runtime",refreshedLive());
+        JSONObject runtime=action.equals("status")?refreshedLive():live();
+        if(action.equals("status"))return manualPanelStatus(runtime,NativePanelRoot.manualStatus());
+        if(request.has("panel_route"))throw new IOException("主屏亮度路线已变化，请重新打开面板");
+        JSONObject node=NativePanelRoot.manualStatus();
+        if(node.has("direct_write_block"))throw new IOException("当前主屏不支持节点直写");
         String token=request.getString("session");if(!token.matches("[A-Za-z0-9_-]{1,80}"))throw new IOException("面板会话无效");
         if(action.equals("keep_awake")){
             JSONObject ack=brightness(Base64.getEncoder().encodeToString(request.toString().getBytes(StandardCharsets.UTF_8)));
             if(!ack.optBoolean("ok"))throw new IOException(ack.optString("message","临时常亮未确认"));
-            return new JSONObject().put("ok",true).put("node",NativePanelRoot.status()).put("runtime",refreshedLive());
+            return manualPanelStatus(refreshedLive(),NativePanelRoot.manualStatus());
         }
         if(action.equals("restore")){
             step="停止守护并释放节点";NativePanelRoot.stop();
@@ -360,10 +415,12 @@ public final class RootControl implements AutoCloseable {
                 try{settings.put(ControlCenterRoot.PROFILE,null);}catch(Exception ignored){}
                 ControlCenterRoot.retireIdleWriter();result.put("mapping_warning",mappingFailure.toString());
             }
-            return result.put("node",NativePanelRoot.status()).put("runtime",refreshedLive());
+            JSONObject restored=manualPanelStatus(refreshedLive(),NativePanelRoot.manualStatus());
+            if(result.has("mapping_warning"))restored.put("mapping_warning",result.getString("mapping_warning"));
+            return restored;
         }
         int value=request.getInt("value");if(request.getDouble("value")!=value)throw new IOException("请输入整数节点值");
-        JSONObject node=NativePanelRoot.status();if(!node.optBoolean("supported"))throw new IOException("主屏节点尚不可用："+node.optString("reason","unknown"));int ceiling=BrightnessControlOptions.manualCeiling(BrightnessControlOptions.parseStored(new JSONObject(java.util.Objects.toString(settings.get(CONFIG),"{}"))).manualMaximum,node.getInt("maximum"));if(value<10||value>ceiling)throw new IOException("主屏节点值超出磁贴设置范围");
+        if(!node.optBoolean("supported"))throw new IOException("主屏节点尚不可用："+node.optString("reason","unknown"));int ceiling=BrightnessControlOptions.manualCeiling(BrightnessControlOptions.parseStored(new JSONObject(java.util.Objects.toString(settings.get(CONFIG),"{}"))).manualMaximum,node.getInt("maximum"));if(value<10||value>ceiling)throw new IOException("主屏节点值超出磁贴设置范围");
         if(ActivePanelNode.PROFILE.equals(node.optString("discovery"))&&!node.optString("physical_display_id").equals(request.optString("panel_display_id")))throw new IOException("当前屏幕已切换，请重新打开面板后调节");
         if(action.equals("begin")){step="启动主屏原生守护";NativePanelRoot.start(node);}else if(!action.equals("set"))throw new IOException("未知节点操作");
         request.put("action",action.equals("begin")?"raw_begin":"raw_validate");
@@ -400,6 +457,22 @@ public final class RootControl implements AutoCloseable {
             throw new IOException(detail,failure);
         }
     }
+    private static JSONObject manualPanelStatus(JSONObject runtime,JSONObject node)throws JSONException{
+        annotateManualNodeState(runtime,node);
+        return new JSONObject().put("ok",true).put("runtime",runtime).put("node",node);
+    }
+    JSONObject logLevel(String selection)throws Exception{
+        String saved=settings.get(RuntimeLog.KEY);
+        String selected;
+        if("read".equals(selection)||"migrate-errors".equals(selection)&&saved!=null){
+            selected=RuntimeLog.normalize(saved);
+        }else{
+            selected="migrate-errors".equals(selection)?RuntimeLog.ERRORS:selection;
+            if(!RuntimeLog.FULL.equals(selected)&&!RuntimeLog.ERRORS.equals(selected))throw new IOException("日志级别无效");
+            if(!selected.equals(saved)&&!settings.put(RuntimeLog.KEY,selected))throw new IOException("日志级别保存未确认");
+        }
+        return new JSONObject().put("ok",true).put("log_level",selected);
+    }
     JSONObject execute(String command,String payload)throws Exception{
         if(command.equals("resume-mapping")){RootMappingBoot.configure(settings,settings.get(CONFIG));return ControlCenterRoot.recover(settings,refreshedLive(),settings.get(CONFIG),android.os.SystemClock.elapsedRealtime());}
         if(command.equals("boot-resume-mapping"))return ControlCenterRoot.recover(settings,refreshedLive(),settings.get(CONFIG),android.os.SystemClock.elapsedRealtime(),"root_service_directory");
@@ -407,6 +480,7 @@ public final class RootControl implements AutoCloseable {
         if(command.equals("restart-system-ui"))return SystemUiAccess.restart(settings);
         if(command.equals("inspect"))return inspect();
         if(command.equals("self-check")){selfCheckNext=true;selfCheckReason="app-start".equals(payload)?"app-start":"manual";try{return inspect();}finally{selfCheckNext=false;selfCheckReason="manual";}}
+        if(command.equals("log-level"))return logLevel(payload);
         if(command.equals("outdoor-test"))return outdoorTest(payload);
         if(command.equals("raw-panel")&&payload!=null)return rawPanel(payload);
         if(command.equals("brightness")&&payload!=null)return brightness(payload);

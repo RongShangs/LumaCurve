@@ -46,7 +46,7 @@
 | 契约 | 内容 |
 | --- | --- |
 | 组合方式 | `per_feature` |
-| 统一输出 | 界面偏好、窗口可用尺寸和分析包分享URI |
+| 统一输出 | 界面偏好、窗口可用尺寸和分析包分享URI；日志录制级别由独立设置通道确认，LSPosed 输出和运行快照共用写入判断 |
 | 坐标与身份 | 像素/Insets只在布局边界；不触碰引擎设置 |
 
 ### 清理及回滚
@@ -63,7 +63,7 @@
 
 路线内部 ABI：`ui_preferences_migration`；完整条件仅维护在 [ABI索引](../architecture/compatibility-index.md#abi-内部变体)。
 
-运行证据：`APP.appFeatureReport`、`APP.settings_search_query`、`APP.independent_log_connection_stages`。
+运行证据：`APP.appFeatureReport`、`APP.settings_search_query`、`APP.independent_log_connection_stages`、`APP.log_errors_only`、`runtime.log_level`。
 
 验证入口：
 
@@ -72,6 +72,7 @@
 - [refactor_welcome.py](../../tests/refactor_welcome.py)
 - [refactor_floating_search.py](../../tests/refactor_floating_search.py)
 - [refactor_log_summary.py](../../tests/refactor_log_summary.py)
+- [refactor_root_access.py](../../tests/refactor_root_access.py)
 - [refactor_scroll_elasticity.py](../../tests/refactor_scroll_elasticity.py)
 - [refactor_diagnostic_sharing.py](../../tests/refactor_diagnostic_sharing.py)
 - [refactor_about_page.py](../../tests/refactor_about_page.py)
@@ -81,7 +82,7 @@
 | 文件 | 当前源码 SHA-256 前16位 |
 | --- | --- |
 | [AboutHeroView.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/AboutHeroView.java) | `dd2a925b8c7b0f2d` |
-| [AboutMarquee.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/AboutMarquee.java) | `cb63881e3ce87f14` |
+| [AboutMarquee.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/AboutMarquee.java) | `5484f0b901c50b53` |
 | [AboutPage.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/AboutPage.java) | `20455e7425490514` |
 | [DiagnosticShareFiles.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/DiagnosticShareFiles.java) | `7bb6de497bb904bf` |
 | [DiagnosticShareProvider.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/DiagnosticShareProvider.java) | `94a085e0b46f3046` |
@@ -92,8 +93,9 @@
 | [LauncherVisibility.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/LauncherVisibility.java) | `781a468b055306f9` |
 | [LogCompatibilityPanel.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/LogCompatibilityPanel.java) | `4e3038b061e5be0e` |
 | [LogCompatibilityState.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/LogCompatibilityState.java) | `b6a8a3a8f4d955f1` |
-| [MainActivity.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/MainActivity.java) | `080961a9b06d3e9c` |
+| [MainActivity.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/MainActivity.java) | `20e4170a35bf7399` |
 | [NavigationPolicy.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/NavigationPolicy.java) | `0c2ee299f2b23e4e` |
+| [RuntimeLog.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/RuntimeLog.java) | `40091b4ec2d46f1b` |
 | [ScrollElasticity.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/ScrollElasticity.java) | `8beee69c1016aebb` |
 | [SettingsSearch.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/SettingsSearch.java) | `e6d35527a7fccfc5` |
 | [SettingsSearchIndex.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/SettingsSearchIndex.java) | `b4ca9db9f79554bf` |

@@ -19,6 +19,7 @@ public final class FeatureCompatibility {
         case "root_storage":choice=entry.has("workspace_route")?text(entry,"workspace_route"):"root_private_storage";break;
         case "root_settings":choice=text(entry,"settings_route");break;
         case "dim_aod":choice=text(object(runtime,"dim_aod_compatibility"),"profile");break;
+        case "manual_panel":choice="raw_primary_output";break;
         case "main_sensor":choice=text(object(runtime,"main_input_compatibility"),"profile");break;
         case "dark_lock_schedule":choice=text(object(object(runtime,"brightness_control"),"dark_lock_schedule"),"profile");break;
         case "animation_override":choice=text(runtime,"animation_compatibility_profile");break;
@@ -41,6 +42,7 @@ public final class FeatureCompatibility {
         case "main_panel_node":if(text(entry,"node_discovery").equals("fold_default_display")){choice="fold_default_display";break;}choice=text(entry,"node_class").equals("backlight")?"backlight_node":text(entry,"node_class").equals("leds")?"display_led_node":"";break;
         case "control_center_partition":result.add("partition_node_v4");String boundary=text(object(object(runtime,"control_center_slider"),"partition"),"profile");choice=boundary.equals("ddc_hbm_transition")?"partition_ddc_hbm":boundary.equals("hbm_normal_ceiling")?"partition_hbm_normal":"";break;
         case "control_center_slider":JSONObject slider=object(runtime,"control_center_slider");if(text(slider,"kind").equals("coordinate_v2")){String selected=text(slider,"calibration_profile");choice=selected.isEmpty()?"coordinate_v2":selected;}break;
+        case "control_center_system_ui":choice=text(entry,"system_ui_route");break;
         default:if(routes.length==1&&!routes[0].id.equals("unreported"))choice=routes[0].id;
         }
         for(Route route:routes)if(route.id.equals(choice))result.add(choice);return result;
@@ -71,6 +73,7 @@ public final class FeatureCompatibility {
         case "control_center_partition":JSONObject split=object(object(runtime,"control_center_slider"),"partition");return "普通区间边界："+text(split,"profile")+"\n"+text(object(runtime,"control_center_slider"),"partition_error");
         case "control_center_raw":return "完整节点控制（独立启用）：运行接口就绪不等于 Root 写入成功。\n"+text(object(object(runtime,"control_center_slider"),"raw_control"),"error")+"\n"+text(runtime,"control_center_node_detail");
         case "control_center_slider":JSONObject coordinates=object(runtime,"control_center_slider");return "设备坐标映射；不直接写节点，不改变自动亮度或暗光锁定的控制权。\n"+text(coordinates,"calibration_profile")+"\n"+text(coordinates,"error")+"\n"+text(coordinates,"oem_v1_detail");
+        case "control_center_system_ui":return entry.optString("system_ui_report_detail",text(entry,"detail"));
         default:return text(entry,"detail");
         }
     }
@@ -99,9 +102,29 @@ public final class FeatureCompatibility {
     }
     public static JSONObject annotate(JSONObject report,JSONObject runtime,String source)throws JSONException{
         JSONObject result=report==null?new JSONObject():new JSONObject(report.toString());JSONArray entries=result.optJSONArray("features");if(entries==null)entries=new JSONArray();result.put("features",entries);
-        for(int i=0;i<entries.length();i++){JSONObject entry=entries.optJSONObject(i);if(entry==null)continue;String id=entry.optString("id");Set<String> chosen=selected(id,runtime,entry);JSONArray routes=new JSONArray();List<String> names=new ArrayList<>();
-            for(Route route:catalogue(id)){boolean used=chosen.contains(route.id),unknown=!used&&unconfirmed(id,route,runtime,entry,chosen);if(used)names.add(route.name);routes.put(new JSONObject().put("id",route.id).put("name",route.name).put("condition",route.condition).put("selected",used).put("status",used?"selected":unknown?"unconfirmed":"not_selected").put("reason",used?"本机本次检查所采用的路线；接口可用不等于功能已开启。":unknown?"本次报告未提供完整的路线依据，尚未确认。":unused(route,chosen,id,runtime,entry)));}
-            entry.put("group",group(id)).put("source",source).put("routes",routes).put("route_name",names.isEmpty()?"inactive".equals(entry.optString("state"))?"系统未启用此路径":"available".equals(entry.optString("state"))?"具体路线尚未确认":"尚无可执行路线":String.join(" ＋ ",names)).put("evidence",evidence(id,runtime,entry));
+        String directBlock=text(runtime,"manual_panel_direct_block");
+        for(int i=0;i<entries.length();i++){JSONObject entry=entries.optJSONObject(i);if(entry==null)continue;String id=entry.optString("id");
+            if(!directBlock.isEmpty()&&(id.equals("manual_panel")||id.equals("main_panel_node")||id.equals("control_center_raw")||id.equals("control_center_partition")||id.equals("node_output")||id.equals("outdoor_node_device"))){
+                entry.put("state","mtk_led_mode_pending".equals(directBlock)?"pending":"unsupported").put("detail","当前主屏不支持节点直写");
+            }
+            Set<String> chosen=selected(id,runtime,entry);JSONArray routes=new JSONArray();List<String> names=new ArrayList<>();
+            boolean systemUi=id.equals("control_center_system_ui");
+            String identifiedRoute=systemUi?text(entry,"system_ui_route"):"";
+            for(Route route:catalogue(id)){
+                boolean used=chosen.contains(route.id);
+                boolean recognized=!used&&route.id.equals(identifiedRoute);
+                boolean unknown=!used&&!recognized&&(systemUi&&identifiedRoute.isEmpty()||unconfirmed(id,route,runtime,entry,chosen));
+                if(used||recognized)names.add(route.name);
+                String status=used?"selected":recognized?"recognized":unknown?"unconfirmed":"not_selected";
+                String reason=used?"本机本次检查所采用的路线；接口可用不等于功能已开启。":recognized?text(entry,"detail"):
+                    unknown?"本次报告未提供完整的路线依据，尚未确认。":unused(route,chosen,id,runtime,entry);
+                routes.put(new JSONObject().put("id",route.id).put("name",route.name).put("condition",route.condition)
+                    .put("selected",used).put("status",status).put("reason",reason));
+            }
+            String state=entry.optString("state");
+            String name=names.isEmpty()?state.equals("inactive")?"系统未启用此路径":
+                systemUi||state.equals("available")?"具体路线尚未确认":"尚无可执行路线":String.join(" ＋ ",names);
+            entry.put("group",group(id)).put("source",source).put("routes",routes).put("route_name",name).put("evidence",evidence(id,runtime,entry));
         }return result;
     }
     public static JSONArray combine(JSONObject runtime,JSONObject root,JSONObject app)throws JSONException{JSONArray all=new JSONArray();for(JSONObject report:new JSONObject[]{annotate(object(runtime,"feature_self_check"),runtime,"engine"),annotate(root,runtime,"root"),annotate(app,runtime,"app")}){JSONArray rows=report.getJSONArray("features");for(int i=0;i<rows.length();i++){JSONObject row=rows.optJSONObject(i);if(row!=null){row.put("checked_elapsed_ms",report.optLong("checked_elapsed_ms",-1)).put("checked_unix_ms",report.optLong("checked_unix_ms",-1)).put("check_request",report.optString("request"));all.put(row);}}}return all;}

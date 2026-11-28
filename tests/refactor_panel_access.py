@@ -15,7 +15,7 @@ J = R / 'build/refactor-diagnostics/json-20240303.jar'
 files = {
  'top/rongshangs/lumacurve/refactor/RootWorkspace.java':'package top.rongshangs.lumacurve.refactor;final class RootWorkspace{static java.io.File requireNative(){return new java.io.File("build/panel-access-tests");}static void secure(java.io.File f,boolean create){}static java.io.File directory(){return new java.io.File("build/panel-access-tests");}static java.io.File[] candidates(){return new java.io.File[]{directory()};}}',
 
-    'top/rongshangs/lumacurve/refactor/ActivePanelNode.java': 'package top.rongshangs.lumacurve.refactor;class ActivePanelNode{static final String PROFILE="fold_default_display";static org.json.JSONObject discover()throws Exception{return PanelNodeDiscovery.discover(new java.io.File("/sys"));}}',
+    'top/rongshangs/lumacurve/refactor/ActivePanelNode.java': 'package top.rongshangs.lumacurve.refactor;import org.json.*;class ActivePanelNode{static final String PROFILE="fold_default_display";static JSONObject discover()throws Exception{return PanelNodeDiscovery.discover(new java.io.File("/sys"));}static JSONObject display()throws Exception{return new JSONObject().put("display_state",2).put("unique_id","local:4321");}}',
     'android/system/ErrnoException.java': '''package android.system;public class ErrnoException extends Exception{public final int errno;public ErrnoException(String op,int e){super(op+" errno="+e);errno=e;}}''',
     'android/system/StructStat.java': '''package android.system;public class StructStat{public int st_mode;public long st_dev=1,st_ino=2;}''',
     'android/system/OsConstants.java': '''package android.system;public class OsConstants{public static final int O_WRONLY=1,O_CLOEXEC=02000000,O_NOFOLLOW=0400000;public static boolean S_ISREG(int mode){return (mode&0170000)==0100000;}}''',
@@ -29,7 +29,7 @@ public class Os{
  public static void close(FileDescriptor f){closes++;}public static void chmod(String p,int m){chmods++;}
 }''',
     'top/rongshangs/lumacurve/refactor/RootControl.java': '''package top.rongshangs.lumacurve.refactor;import java.io.*;class RootControl{static final File DATA=new File("build/panel-access-tests");static String process(String... p){return "";}}''',
-    'top/rongshangs/lumacurve/refactor/PanelNodeDiscovery.java': '''package top.rongshangs.lumacurve.refactor;import java.io.*;import org.json.*;class PanelNodeDiscovery{static JSONObject selected;static int number(File f){return 951;}static JSONObject discover(File f)throws Exception{return new JSONObject(selected.toString());}}''',
+    'top/rongshangs/lumacurve/refactor/PanelNodeDiscovery.java': '''package top.rongshangs.lumacurve.refactor;import java.io.*;import org.json.*;class PanelNodeDiscovery{static JSONObject selected;static int ledType=-1;static int number(File f){return 951;}static JSONObject discover(File f)throws Exception{return new JSONObject(selected.toString());}static JSONObject directAccess(JSONObject n){if(ledType>=0)n.put("mtk_led_type",ledType);if(ledType==1)n.put("direct_write_block","atomic_backlight");if(ledType==2)n.put("direct_write_block","factory_backlight");return n;}static int activeMtkConnector(File drm,JSONObject n){return 51;}}''',
     'top/rongshangs/lumacurve/refactor/NativePanelClient.java': '''package top.rongshangs.lumacurve.refactor;import java.io.*;import org.json.*;class NativePanelClient{static JSONObject guard;static JSONObject call(String s)throws Exception{if(guard==null)throw new IOException("Connection refused");return guard;}static void require(String s){}}''',
     'top/rongshangs/lumacurve/refactor/PanelAccessTest.java': r'''package top.rongshangs.lumacurve.refactor;
 import android.system.*;import java.io.*;import java.nio.file.*;import org.json.*;
@@ -51,6 +51,9 @@ public class PanelAccessTest{
   reset();NativePanelClient.guard=new JSONObject(PanelNodeDiscovery.selected.toString()).put("ok",true).put("native_build","raw11-slider");check(NativePanelRoot.status().getBoolean("guard_running"));unchanged();
   for(String wrong:new String[]{"raw06-health","different-node","raw10-unknown"}){reset();NativePanelClient.guard=new JSONObject(PanelNodeDiscovery.selected.toString()).put("ok",true).put("native_build",wrong);out=NativePanelRoot.status();check(!out.getBoolean("supported"));check(out.getString("reason").equals("guard_node_mismatch"));check(Os.opens==0);unchanged();}
   reset();PanelNodeDiscovery.selected=new JSONObject().put("supported",false).put("reason","ambiguous_primary_nodes");check(!NativePanelRoot.status().getBoolean("supported"));check(Os.opens==0);unchanged();
+  reset();PanelNodeDiscovery.ledType=1;out=NativePanelRoot.manualStatus();check(!out.getBoolean("supported")&&out.getInt("mtk_led_type")==1&&out.getString("reason").equals("atomic_backlight")&&Os.opens==0);unchanged();
+  reset();PanelNodeDiscovery.ledType=2;out=NativePanelRoot.manualStatus();check(!out.getBoolean("supported")&&out.getString("reason").equals("factory_backlight")&&Os.opens==0);unchanged();
+  reset();PanelNodeDiscovery.ledType=0;out=NativePanelRoot.manualStatus();check(out.getBoolean("supported")&&out.getInt("mtk_led_type")==0&&Os.opens==1);unchanged();
   System.out.println("Panel access Java: "+cases+" cases PASS; production status, syscall model only");
  }
 }''',

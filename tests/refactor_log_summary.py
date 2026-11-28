@@ -24,11 +24,37 @@ public class LogSummaryTest{
   JSONObject missing=active();missing.getJSONObject("runtime").remove("factory_lux");state=LogCompatibilityState.read(missing,null,null,false);check(state.items[2].status.equals("接口待适配"));check(state.title.contains("曲线尚未就绪"));
   JSONObject current=active().put("root_feature_self_check",report("pending","pending"));state=LogCompatibilityState.read(current,report("unsupported"),null,false);check(state.unsupported==0&&state.pending==3);
   for(JSONObject s:new JSONObject[]{null,active(),new JSONObject().put("hook_issue","root_settings_unavailable"),new JSONObject().put("hook_issue","restart_required"),new JSONObject().put("lsp_loaded",true)}){state=LogCompatibilityState.read(s,root,app,true);for(String text:new String[]{state.title,state.detail,state.items[0].name,state.items[0].status,state.items[1].name,state.items[1].status,state.items[2].name,state.items[2].status})check(text.codePoints().noneMatch(n->n>=0x4e00&&n<=0x9fff));}
+  String info=RuntimeLog.line("输出路径切换：A → B",false);
+  String error=RuntimeLog.line("主屏节点守护续约失败，已退让",true);
+  String ordinary=RuntimeLog.line("状态描述中包含 [ERROR] 字样",false);
+  JSONArray logs=new JSONArray().put(info).put(error).put(ordinary);
+  check(RuntimeLog.visibleLines(logs,false).equals(info+"\n"+error+"\n"+ordinary+"\n"));
+  check(RuntimeLog.visibleLines(logs,true).equals(error+"\n"));
+  check(RuntimeLog.visibleLines(new JSONArray().put(info),true).isEmpty());
+  check(RuntimeLog.visibleLines(null,false).isEmpty());
+  check(logs.length()==3&&logs.getString(0).equals(info)&&logs.getString(1).equals(error));
+  java.util.List<String> lsp=new java.util.ArrayList<>();
+  RuntimeLog recorder=new RuntimeLog(lsp::add);
+  check(recorder.full()&&!recorder.select(null));
+  recorder.record("亮度跳变",false);
+  check(recorder.snapshot().length()==1&&lsp.size()==1);
+  check(recorder.select(RuntimeLog.ERRORS)&&!recorder.full());
+  recorder.record("光感参考切换",false);
+  recorder.record("输出路径切换",false);
+  check(recorder.snapshot().length()==1&&lsp.size()==1);
+  recorder.record("接口错误",true);
+  check(recorder.snapshot().length()==2&&lsp.size()==2&&lsp.get(1).equals("LumaCurve 接口错误"));
+  check(RuntimeLog.visibleLines(recorder.snapshot(),true).contains("接口错误"));
+  check(recorder.select(RuntimeLog.FULL));
+  recorder.record("光感参考恢复",false);
+  check(recorder.snapshot().length()==3&&lsp.size()==3&&recorder.snapshot().getString(0).contains("亮度跳变"));
+  for(int i=0;i<RuntimeLog.LIMIT;i++)recorder.record("运行信息 "+i,false);
+  check(recorder.snapshot().length()==RuntimeLog.LIMIT&&!recorder.snapshot().getString(0).contains("亮度跳变"));
   System.out.println("Log compatibility summary: "+cases+" cases PASS; actual evidence model, no interface probes or Android rendering");
  }
 }''','utf-8')
 C=O/'classes';C.mkdir(exist_ok=True)
-subprocess.run(['javac','--release','8','-encoding','UTF-8','-cp',str(J),'-d',str(C),str(S/'LogCompatibilityState.java'),str(p)],check=True)
+subprocess.run(['javac','--release','8','-encoding','UTF-8','-cp',str(J),'-d',str(C),str(S/'LogCompatibilityState.java'),str(S/'RuntimeLog.java'),str(p)],check=True)
 subprocess.run(['java','-Dfile.encoding=UTF-8','-cp',str(C)+os.pathsep+str(J),'top.rongshangs.lumacurve.refactor.LogSummaryTest'],check=True)
 panel=(S/'LogCompatibilityPanel.java').read_text('utf-8');main=(S/'MainActivity.java').read_text('utf-8')
 assert 'detail.setMaxLines' not in panel and 'detail.setEllipsize' not in panel
@@ -49,3 +75,15 @@ assert 'routeEntry.setText' not in panel.replace('routeEntry.setTextSize','')
 assert '最近自检' not in panel and 'Last checks' not in panel
 assert 'counts.setText' not in panel and 'int total=' not in panel
 print('Compatibility routes entry has one stable label, centered and without numeric summaries: PASS')
+
+logs=main[main.index('    void makeLogs(){'):main.index('    void makeAbout(){')]
+assert '当前系统进程 · 最近 160 条' not in logs
+assert logs.index('b.addView(text("最近运行记录"') < logs.index('LinearLayout toolbar=row(b)')
+assert logs.index('LinearLayout actions=row(toolbar)') < logs.index('actions.addView(logLevel,') < logs.index('actions.addView(refresh,') < logs.index('toolbar.addView(follow,')
+assert 'actions.setLayoutParams(new LinearLayout.LayoutParams(0,-2,1))' in logs
+assert 'refreshSize.setMarginStart(dp(8))' in logs
+print('Log toolbar starts with Log level and Refresh, with Auto-scroll at the end: PASS')
+assert 'changeLogLevel(errorsOnly?RuntimeLog.ERRORS:RuntimeLog.FULL)' in main
+assert '只写入错误，App 和 LSPosed 同时生效' in main
+assert 'RuntimeLog logs=new RuntimeLog(XposedBridge::log)' in (S/'HookRuntime.java').read_text('utf-8')
+print('Recording level is shared by the recent snapshot and LSPosed output: PASS')

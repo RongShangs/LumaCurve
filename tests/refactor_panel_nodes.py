@@ -63,8 +63,24 @@ public class PanelNodeTest{
    else check(!out.has("path"));
   }
   check(!PanelNodeDiscovery.excluded("lcd-backlight"));check(PanelNodeDiscovery.excluded("Panel2-backlight"));check(!PanelNodeDiscovery.primary("torch"));
+  Path platform=Files.createTempDirectory(new File(fixtures.getJSONObject(0).getString("root")).toPath(),"mtk-platform");
+  Path led=Files.createDirectories(platform.resolve("leds/lcd-backlight"));
+  Path ofNode=Files.createDirectories(platform.resolve("of_node"));
+  JSONObject mtk=new JSONObject().put("supported",true).put("class","leds").put("reason","identified_primary").put("canonical_path",led.resolve("brightness").toString());
+  check(PanelNodeDiscovery.mtkDisplayLedType(mtk)==-1);
+  put(led.resolve("led_mode"),"4");put(led.resolve("led_type"),"1");
+  check(PanelNodeDiscovery.mtkDisplayLedType(mtk)==-1);
+  Files.createDirectory(ofNode.resolve("compatible"));
+  check(PanelNodeDiscovery.directAccess(new JSONObject(mtk.toString())).optString("direct_write_block").equals("mtk_led_mode_pending"));
+  Files.delete(ofNode.resolve("compatible"));
+  put(ofNode.resolve("compatible"),"mediatek,mtk-leds\u0000");check(PanelNodeDiscovery.mtkDisplayLedType(mtk)==-1);
+  put(ofNode.resolve("compatible"),"mediatek,disp-leds\u0000other,compat\u0000");check(PanelNodeDiscovery.mtkDisplayLedType(mtk)==1);
+  put(led.resolve("led_type"),"0");check(PanelNodeDiscovery.mtkDisplayLedType(mtk)==0);
+  put(led.resolve("led_type"),"2");check(PanelNodeDiscovery.mtkDisplayLedType(mtk)==2);
+  put(led.resolve("led_type"),"3");try{PanelNodeDiscovery.mtkDisplayLedType(mtk);throw new AssertionError("invalid LED type");}catch(IOException expected){check(expected.getMessage().equals("mtk_led_type_unknown"));}
   System.out.println("Panel node discovery: "+cases+" cases PASS; host filesystem fixtures, Android not tested");
  }
+ static void put(Path path,String value)throws Exception{Files.write(path,value.getBytes(StandardCharsets.US_ASCII));}
 }''',encoding='utf-8')
 classes=O/'classes';classes.mkdir(exist_ok=True)
 subprocess.run(['javac','-encoding','UTF-8','--release','8','-cp',str(J),'-d',str(classes),str(S/'PanelNodeDiscovery.java'),str(test)],check=True)

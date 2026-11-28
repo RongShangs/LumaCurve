@@ -53,9 +53,9 @@
 | 文件 | 当前源码 SHA-256 前16位 |
 | --- | --- |
 | [NitBrightnessLimit.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/NitBrightnessLimit.java) | `891702d7d41da6d6` |
-| [OutdoorController.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/OutdoorController.java) | `04002b346d81ba8d` |
+| [OutdoorController.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/OutdoorController.java) | `6cb4592f934055d4` |
 | [OutdoorCurvePreview.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/OutdoorCurvePreview.java) | `c764bc12c6488d8f` |
 | [OutdoorDetailsPage.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/OutdoorDetailsPage.java) | `3e4ce57a4d14ca47` |
 | [OutdoorOprCurveSettings.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/OutdoorOprCurveSettings.java) | `695a9d340e0bac0b` |
-| [OutdoorSettings.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/OutdoorSettings.java) | `8d26ce76f27d7383` |
+| [OutdoorSettings.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/OutdoorSettings.java) | `163c89304aaed519` |
 | [OutdoorTargetCurve.java](../../experimental/refactor_hook/java/top/rongshangs/lumacurve/refactor/OutdoorTargetCurve.java) | `25d282852b9e4e40` |

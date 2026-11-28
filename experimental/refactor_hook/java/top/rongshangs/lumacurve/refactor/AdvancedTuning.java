@@ -50,7 +50,7 @@ final class AdvancedTuning {
                             s.thresholdSkipReason="";s.thresholdError="";
                             if(guard){s.lastLowThresholdLux=lux;if(small)s.lastLowSmallThreshold=next;else if(bright)s.lastLowBrightThreshold=next;else s.lastLowDarkThreshold=next;}
                             if(Float.compare(next,original)!=0){p.setResult(next);s.thresholdAdjustments++;if(guard)s.lowLightThresholdAdjustments++;}return;
-                        }catch(Throwable unavailable){s.thresholdSkipReason="interface_error";String error=unavailable.toString();if(!error.equals(s.thresholdError)){s.thresholdError=error;s.log("暗光阈值未应用："+error);}return;}
+                        }catch(Throwable unavailable){s.thresholdSkipReason="interface_error";String error=unavailable.toString();if(!error.equals(s.thresholdError)){s.thresholdError=error;s.logError("暗光阈值未应用："+error);}return;}
                     }}
                 }}));
             }thresholds.add(cls);
